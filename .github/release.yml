@@ -1,0 +1,33 @@
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+    authors:
+      - bot
+      - github-actions
+  categories:
+    - title: "🚀 Features"
+      labels:
+        - "feat"
+        - "feature"
+        - "enhancement"
+    - title: "🐛 Bug Fixes"
+      labels:
+        - "fix"
+        - "bug"
+    - title: "🔧 Maintenance"
+      labels:
+        - "chore"
+        - "refactor"
+        - "ci"
+        - "build"
+    - title: "📝 Documentation"
+      labels:
+        - "docs"
+        - "documentation"
+    - title: "📦 Dependency Updates"
+      labels:
+        - "dependencies"
+    - title: "🧪 Testing"
+      labels:
+        - "test"
