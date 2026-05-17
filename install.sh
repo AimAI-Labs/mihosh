@@ -52,7 +52,7 @@ echo_info "Detected System: $OS_TYPE $ARCH_TYPE"
 
 # 2. Get Latest Version
 echo_info "Checking latest version..."
-LATEST_RELEASE_URL="https://api.github.com/repos/aimony/mihosh/releases/latest"
+LATEST_RELEASE_URL="https://api.github.com/repos/AimAI-Labs/mihosh/releases/latest"
 VERSION=$(curl -s $LATEST_RELEASE_URL | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -z "$VERSION" ]; then
@@ -63,7 +63,7 @@ fi
 echo_info "Latest version: $VERSION"
 
 # 3. Construct Download URL
-DOWNLOAD_URL="https://github.com/aimony/mihosh/releases/download/${VERSION}/${BINARY_NAME}.tar.gz"
+DOWNLOAD_URL="https://github.com/AimAI-Labs/mihosh/releases/download/${VERSION}/${BINARY_NAME}.tar.gz"
 
 # 4. Download and Install
 # 4. Download and Install

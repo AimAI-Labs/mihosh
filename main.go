@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/aimony/mihosh/internal/cli"
+	"github.com/AimAI-Labs/mihosh/internal/cli"
 )
 
 func main() {

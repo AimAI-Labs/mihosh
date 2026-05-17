@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aimony/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 )
 
 // Client mihomo API 客户端

@@ -3,7 +3,7 @@ package logs
 import (
 	"testing"
 
-	"github.com/aimony/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

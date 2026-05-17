@@ -3,7 +3,7 @@ package nodes
 import (
 	"testing"
 
-	"github.com/aimony/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 )
 
 func TestHandleMouseLeft_GroupSelectionKeepsLinkage(t *testing.T) {

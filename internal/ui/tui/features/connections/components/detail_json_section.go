@@ -3,7 +3,7 @@ package components
 import (
 	"encoding/json"
 
-	"github.com/aimony/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 )
 
 func renderJSONDetailSection(conn *model.Connection, s detailStyles) ([]string, error) {

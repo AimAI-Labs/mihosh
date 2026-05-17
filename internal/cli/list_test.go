@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/aimony/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 )
 
 func TestRenderGroupList(t *testing.T) {

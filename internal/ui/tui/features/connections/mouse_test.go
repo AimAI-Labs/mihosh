@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aimony/mihosh/internal/domain/model"
-	"github.com/aimony/mihosh/internal/ui/tui/features/connections/components"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
 )
 
 func TestConnsHandleMouseLeft_DoubleClickConnectionEntersDetail(t *testing.T) {

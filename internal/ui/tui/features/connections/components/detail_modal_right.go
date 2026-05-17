@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aimony/mihosh/internal/domain/model"
-	"github.com/aimony/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/charmbracelet/lipgloss"
 )
 

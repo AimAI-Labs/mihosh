@@ -1,6 +1,6 @@
 package common
 
-import "github.com/aimony/mihosh/internal/domain/model"
+import "github.com/AimAI-Labs/mihosh/internal/domain/model"
 
 const (
 	// 布局相关

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	configpkg "github.com/aimony/mihosh/internal/infrastructure/config"
+	configpkg "github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

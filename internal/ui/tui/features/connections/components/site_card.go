@@ -3,8 +3,8 @@ package components
 import (
 	"fmt"
 
-	"github.com/aimony/mihosh/internal/domain/model"
-	"github.com/aimony/mihosh/internal/ui/styles"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/styles"
 	"github.com/charmbracelet/lipgloss"
 )
 

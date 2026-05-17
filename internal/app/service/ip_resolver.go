@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aimony/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 )
 
 // IPResolver 内网IP解析器（带缓存）

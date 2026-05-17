@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aimony/mihosh/internal/domain/model"
-	"github.com/aimony/mihosh/internal/ui/tui/features/connections/components"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
 )
 
 func TestResolveConnectionsMouseHit_FindsSiteAndConnectionTargets(t *testing.T) {

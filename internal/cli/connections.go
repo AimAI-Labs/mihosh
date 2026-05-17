@@ -5,11 +5,11 @@ import (
 	"io"
 	"os"
 
-	"github.com/aimony/mihosh/internal/app/service"
-	"github.com/aimony/mihosh/internal/domain/model"
-	"github.com/aimony/mihosh/internal/infrastructure/api"
-	"github.com/aimony/mihosh/internal/infrastructure/config"
-	"github.com/aimony/mihosh/pkg/utils"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/spf13/cobra"
 )
 

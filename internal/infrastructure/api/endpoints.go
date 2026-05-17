@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/aimony/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 )
 
 // GetProxies 获取所有代理信息

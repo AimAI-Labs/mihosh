@@ -1,8 +1,8 @@
 package logs
 
 import (
-	"github.com/aimony/mihosh/internal/app/service"
-	"github.com/aimony/mihosh/internal/ui/tui/messages"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

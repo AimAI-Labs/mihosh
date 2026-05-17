@@ -1,8 +1,8 @@
 package service
 
 import (
-	"github.com/aimony/mihosh/internal/domain/model"
-	"github.com/aimony/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 )
 
 // ConnectionService 连接监控服务

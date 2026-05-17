@@ -1,20 +1,20 @@
 package tui
 
 import (
-	"github.com/aimony/mihosh/internal/ui/tui/features/connections"
-	"github.com/aimony/mihosh/internal/ui/tui/features/nodes"
-	"github.com/aimony/mihosh/internal/ui/tui/features/logs"
-	"github.com/aimony/mihosh/internal/ui/tui/features/rules"
-	"github.com/aimony/mihosh/internal/ui/tui/features/settings"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/logs"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
 	"context"
 
-	"github.com/aimony/mihosh/internal/ui/tui/components/layout"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 
-	"github.com/aimony/mihosh/internal/app/service"
-	"github.com/aimony/mihosh/internal/domain/model"
-	"github.com/aimony/mihosh/internal/infrastructure/api"
-	"github.com/aimony/mihosh/internal/infrastructure/config"
-	"github.com/aimony/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 )
 
 // Model TUI 主模型（仅保留全局共享状态）

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aimony/mihosh/internal/domain/model"
-	"github.com/aimony/mihosh/pkg/utils"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/pkg/utils"
 )
 
 func renderConnectionInfoSection(conn *model.Connection, s detailStyles) []string {

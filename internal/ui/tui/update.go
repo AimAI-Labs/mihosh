@@ -1,16 +1,16 @@
 package tui
 
 import (
-	"github.com/aimony/mihosh/internal/ui/tui/features/connections"
-	"github.com/aimony/mihosh/internal/ui/tui/features/nodes"
-	"github.com/aimony/mihosh/internal/ui/tui/features/rules"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
 	"time"
 
-	"github.com/aimony/mihosh/internal/ui/tui/components/layout"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 
-	"github.com/aimony/mihosh/internal/ui/tui/messages"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 
-	"github.com/aimony/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )

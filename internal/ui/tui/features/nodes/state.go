@@ -1,15 +1,15 @@
 package nodes
 
 import (
-	"github.com/aimony/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/aimony/mihosh/internal/app/service"
-	"github.com/aimony/mihosh/internal/domain/model"
-	"github.com/aimony/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )

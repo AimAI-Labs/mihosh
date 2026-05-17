@@ -3,9 +3,9 @@ package cli
 import (
 	"fmt"
 
-	"github.com/aimony/mihosh/internal/app/service"
-	"github.com/aimony/mihosh/internal/infrastructure/api"
-	"github.com/aimony/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/spf13/cobra"
 )
 

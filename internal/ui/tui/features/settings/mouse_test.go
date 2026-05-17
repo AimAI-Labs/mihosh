@@ -3,7 +3,7 @@ package settings
 import (
 	"testing"
 
-	"github.com/aimony/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 )
 
 func TestHandleMouseLeft_SingleClickSelectsSetting(t *testing.T) {

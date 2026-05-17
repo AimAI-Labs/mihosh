@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aimony/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 )
 
 func TestRenderLogEntry_HOffsetZero(t *testing.T) {

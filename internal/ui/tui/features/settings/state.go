@@ -1,9 +1,9 @@
 package settings
 
 import (
-	"github.com/aimony/mihosh/internal/app/service"
-	"github.com/aimony/mihosh/internal/infrastructure/config"
-	"github.com/aimony/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"time"

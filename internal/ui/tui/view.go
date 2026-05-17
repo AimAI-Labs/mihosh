@@ -1,9 +1,9 @@
 package tui
 
 import (
-	"github.com/aimony/mihosh/internal/ui/styles"
-	"github.com/aimony/mihosh/internal/ui/tui/components/common"
-	"github.com/aimony/mihosh/internal/ui/tui/components/layout"
+	"github.com/AimAI-Labs/mihosh/internal/ui/styles"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/charmbracelet/lipgloss"
 )
 

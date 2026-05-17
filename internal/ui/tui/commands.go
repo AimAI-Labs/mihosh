@@ -1,12 +1,12 @@
 package tui
 
 import (
-	"github.com/aimony/mihosh/internal/ui/tui/features/connections"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
 	"context"
 
-	"github.com/aimony/mihosh/internal/ui/tui/messages"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 
-	"github.com/aimony/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

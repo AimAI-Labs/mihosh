@@ -1,14 +1,14 @@
 package tui
 
 import (
-	"github.com/aimony/mihosh/internal/ui/tui/features/connections"
-	"github.com/aimony/mihosh/internal/ui/tui/features/nodes"
-	"github.com/aimony/mihosh/internal/ui/tui/features/logs"
-	"github.com/aimony/mihosh/internal/ui/tui/features/rules"
-	"github.com/aimony/mihosh/internal/ui/tui/features/settings"
-	"github.com/aimony/mihosh/internal/ui/tui/features/help"
-	"github.com/aimony/mihosh/internal/ui/tui/components/common"
-	"github.com/aimony/mihosh/internal/ui/tui/components/layout"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/logs"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/help"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 )
 
 // getPageSize 计算页面内容的可用宽度和高度

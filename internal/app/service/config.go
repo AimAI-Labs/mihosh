@@ -3,7 +3,7 @@ package service
 import (
 	"fmt"
 
-	"github.com/aimony/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 )
 
 // ConfigService 配置管理服务

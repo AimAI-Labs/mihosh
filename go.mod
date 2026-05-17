@@ -1,4 +1,4 @@
-module github.com/aimony/mihosh
+module github.com/AimAI-Labs/mihosh
 
 go 1.24.0
 

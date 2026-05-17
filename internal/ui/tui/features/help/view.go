@@ -3,7 +3,7 @@ package help
 import (
 	"strings"
 
-	"github.com/aimony/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/charmbracelet/lipgloss"
 )
 
