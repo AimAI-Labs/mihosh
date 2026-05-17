@@ -28,7 +28,7 @@ A full-featured terminal UI (TUI) management tool for mihomo, allowing you to el
 
 ```bash
 # Install (Linux/macOS)
-curl -fsSL https://raw.githubusercontent.com/AimAI-Labs/mihosh/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/AimAI-Labs/mihosh/refs/heads/main/install.sh | bash
 ```
 
 
