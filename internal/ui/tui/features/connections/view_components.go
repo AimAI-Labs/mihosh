@@ -3,6 +3,7 @@ package connections
 import (
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -171,8 +172,8 @@ func resolveViewModeHit(state PageState, pageX, pageY int) (MouseHit, bool) {
 }
 
 func connectionTabLabels(viewMode int) (activeLabel, historyLabel string) {
-	activeLabel = "活跃连接"
-	historyLabel = "历史连接"
+	activeLabel = i18n.T("conns.tab_active")
+	historyLabel = i18n.T("conns.tab_history")
 	if viewMode == ConnViewActive {
 		activeLabel = "● " + activeLabel
 	} else {

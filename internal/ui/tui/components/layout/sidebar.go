@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/styles"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -19,15 +20,15 @@ const (
 	PageCount // 页面总数，必须放在最后
 )
 
-// 侧边栏项目
-var sidebarItems = []struct {
-	Label string
-}{
-	{"节点"},
-	{"连接"},
-	{"日志"},
-	{"规则"},
-	{"设置"},
+// getSidebarItems 获取侧边栏项目
+func getSidebarItems() []struct{ Label string } {
+	return []struct{ Label string }{
+		{i18n.T("menu.nodes")},
+		{i18n.T("menu.connections")},
+		{i18n.T("menu.logs")},
+		{i18n.T("menu.rules")},
+		{i18n.T("menu.settings")},
+	}
 }
 
 // SidebarWidth 侧边栏渲染宽度（含右边框）
@@ -47,6 +48,7 @@ func RenderSidebar(currentPage PageType, height int) string {
 		Align(lipgloss.Center)
 
 	var items []string
+	sidebarItems := getSidebarItems()
 
 	for i, item := range sidebarItems {
 		var label string
@@ -84,7 +86,13 @@ func RenderSidebar(currentPage PageType, height int) string {
 
 // GetPageTitle 获取页面标题
 func GetPageTitle(page PageType) string {
-	titles := []string{"节点管理", "连接监控", "系统日志", "规则列表", "设置"}
+	titles := []string{
+		i18n.T("title.nodes"),
+		i18n.T("title.connections"),
+		i18n.T("title.logs"),
+		i18n.T("title.rules"),
+		i18n.T("title.settings"),
+	}
 	if int(page) < len(titles) {
 		return titles[page]
 	}

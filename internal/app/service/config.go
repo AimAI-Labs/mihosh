@@ -82,8 +82,13 @@ func (s *ConfigService) SetConfigValue(key, value string) error {
 		cfg.Timeout = timeout
 	case "proxy_address", "proxy-address":
 		cfg.ProxyAddress = value
+	case "language":
+		if value != "auto" && value != "zh-CN" && value != "en-US" {
+			return fmt.Errorf("language 必须是 auto, zh-CN 或 en-US")
+		}
+		cfg.Language = value
 	default:
-		return fmt.Errorf("未知的配置项: %s (可用: api_address, secret, test_url, timeout, proxy_address)", key)
+		return fmt.Errorf("未知的配置项: %s (可用: api_address, secret, test_url, timeout, proxy_address, language)", key)
 	}
 
 	return config.Save(cfg)

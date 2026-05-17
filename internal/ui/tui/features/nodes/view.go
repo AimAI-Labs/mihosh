@@ -6,6 +6,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-runewidth"
 )
@@ -69,26 +70,26 @@ func RenderNodesPage(state PageState) string {
 	// 搜索状态提示行
 	var searchLine string
 	if state.FilterMode {
-		searchLine = common.TableHeaderStyle.Render(fmt.Sprintf("搜索: %s▌", state.FilterText))
+		searchLine = common.TableHeaderStyle.Render(i18n.Tf("nodes.search_active", state.FilterText))
 	} else if state.FilterText != "" {
-		searchLine = common.MutedStyle.Render(fmt.Sprintf("搜索: %s  [Esc]清除", state.FilterText))
+		searchLine = common.MutedStyle.Render(i18n.Tf("nodes.search_inactive", state.FilterText))
 	}
 
-	helpText := common.MutedStyle.Render(fmt.Sprintf("[↑/↓]选择 [←/→]切组 [Enter]切换 [t]测速 [m]模式 [s]排序:%s [/]搜索 [r]刷新", sortLabel))
+	helpText := common.MutedStyle.Render(i18n.Tf("nodes.help", sortLabel))
 
 	var failureBadge string
 	if len(state.TestFailures) > 0 {
-		failureBadge = common.ErrorStyle.Render(fmt.Sprintf("⚠ %d 个节点测速失败", len(state.TestFailures))) +
-			" " + common.MutedStyle.Render("[f]查看详情")
+		failureBadge = common.ErrorStyle.Render(i18n.Tf("nodes.failure_badge", len(state.TestFailures))) +
+			" " + common.MutedStyle.Render(i18n.T("nodes.view_failure"))
 	}
 
 	mainContent := lipgloss.JoinVertical(
 		lipgloss.Left,
 		modeSwitch,
-		common.PageHeaderStyle.Width(state.Width-4).Render(fmt.Sprintf("策略组 [%d/%d]", state.SelectedGroup+1, len(state.GroupNames))),
+		common.PageHeaderStyle.Width(state.Width-4).Render(i18n.Tf("nodes.group_header", state.SelectedGroup+1, len(state.GroupNames))),
 		groupList,
 		"",
-		common.PageHeaderStyle.Width(state.Width-4).Render(fmt.Sprintf("节点列表 [%d/%d]", state.SelectedProxy+1, len(state.CurrentProxies))),
+		common.PageHeaderStyle.Width(state.Width-4).Render(i18n.Tf("nodes.list_header", state.SelectedProxy+1, len(state.CurrentProxies))),
 		proxyList,
 		searchLine,
 		failureBadge,
@@ -131,7 +132,7 @@ func buildFailureModal(state PageState) string {
 
 	allLines := buildFailureDetailLines(failures, innerWidth)
 	if len(allLines) == 0 {
-		allLines = []string{"暂无测速失败记录"}
+		allLines = []string{i18n.T("nodes.empty_failure")}
 	}
 	totalLines := len(allLines)
 
@@ -151,21 +152,21 @@ func buildFailureModal(state PageState) string {
 	// 构建内容行
 	var bodyLines []string
 	if scrollTop > 0 {
-		bodyLines = append(bodyLines, common.DimStyle.Render(fmt.Sprintf("↑ 还有 %d 行", scrollTop)))
+		bodyLines = append(bodyLines, common.DimStyle.Render(i18n.Tf("nodes.failure_scroll_up", scrollTop)))
 	}
 	for _, line := range allLines[scrollTop:endIdx] {
 		bodyLines = append(bodyLines, line)
 	}
 	if endIdx < totalLines {
-		bodyLines = append(bodyLines, common.DimStyle.Render(fmt.Sprintf("↓ 还有 %d 行", totalLines-endIdx)))
+		bodyLines = append(bodyLines, common.DimStyle.Render(i18n.Tf("nodes.failure_scroll_down", totalLines-endIdx)))
 	}
 	bodyLines = append(bodyLines, "")
-	bodyLines = append(bodyLines, common.MutedStyle.Render("[↑/↓] 滚动  [Home/End] 跳转  [f/Esc] 关闭"))
+	bodyLines = append(bodyLines, common.MutedStyle.Render(i18n.T("nodes.failure_modal_help")))
 
 	body := strings.Join(bodyLines, "\n")
 
-	title := common.ErrorStyle.Render(fmt.Sprintf("⚠ 测速失败节点列表  共 %d 条", len(failures)))
-	subtitle := common.DimStyle.Render("格式: 节点 / 原因 / 源信息（完整保留）")
+	title := common.ErrorStyle.Render(i18n.Tf("nodes.failure_modal_title", len(failures)))
+	subtitle := common.DimStyle.Render(i18n.T("nodes.failure_modal_subtitle"))
 	separator := common.DimStyle.Render(strings.Repeat("─", innerWidth))
 	content := lipgloss.JoinVertical(lipgloss.Left, title, subtitle, separator, body)
 
@@ -188,8 +189,8 @@ func buildFailureDetailLines(failures []string, width int) []string {
 		summary := summarizeFailure(raw)
 
 		lines = append(lines, fmt.Sprintf("[%02d] %s", i+1, node))
-		lines = append(lines, wrapWithPrefix("  原因: ", summary, width)...)
-		lines = append(lines, wrapWithPrefix("  源信息: ", raw, width)...)
+		lines = append(lines, wrapWithPrefix(i18n.T("nodes.reason_prefix"), summary, width)...)
+		lines = append(lines, wrapWithPrefix(i18n.T("nodes.raw_prefix"), raw, width)...)
 		if i < len(failures)-1 {
 			lines = append(lines, "")
 		}
@@ -204,13 +205,13 @@ func splitFailureEntry(entry string) (node string, raw string) {
 		raw = strings.TrimSpace(parts[1])
 	}
 	if node == "" {
-		node = "未知节点"
+		node = i18n.T("nodes.unknown_node")
 	}
 	if raw == "" {
 		raw = strings.TrimSpace(entry)
 	}
 	if raw == "" {
-		raw = "未知错误"
+		raw = i18n.T("nodes.unknown_error")
 	}
 	return node, raw
 }
@@ -218,7 +219,7 @@ func splitFailureEntry(entry string) (node string, raw string) {
 func summarizeFailure(raw string) string {
 	msg := strings.TrimSpace(raw)
 	if msg == "" {
-		return "未知错误"
+		return i18n.T("nodes.unknown_error")
 	}
 
 	if detail := extractRequestFailureDetail(msg); detail != "" {
@@ -226,10 +227,10 @@ func summarizeFailure(raw string) string {
 	}
 
 	if strings.Contains(msg, "context deadline exceeded") {
-		return "请求超时（context deadline exceeded）"
+		return i18n.T("nodes.timeout_context")
 	}
 	if strings.Contains(strings.ToLower(msg), "timeout") {
-		return "请求超时（timeout）"
+		return i18n.T("nodes.timeout")
 	}
 
 	return msg

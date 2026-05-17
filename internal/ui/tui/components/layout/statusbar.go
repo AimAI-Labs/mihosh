@@ -6,6 +6,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/styles"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -27,16 +28,16 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, c
 
 		friendlyErr := errText
 		if strings.Contains(errText, "context dead") {
-			friendlyErr = "测速超时，节点可能不可用"
+			friendlyErr = i18n.T("status.err.timeout_node")
 		} else if strings.Contains(errText, "connection refused") {
-			friendlyErr = "无法连接mihomo API，请检查mihomo是否运行"
+			friendlyErr = i18n.T("status.err.refused")
 		} else if strings.Contains(errText, "timeout") {
-			friendlyErr = "请求超时，请检查网络或增加超时时间"
+			friendlyErr = i18n.T("status.err.timeout")
 		}
 
 		status = styles.ErrorStyle.Render(fmt.Sprintf("✗ %s", friendlyErr))
 	} else if testing {
-		statusText := "⏳ 正在测速..."
+		statusText := i18n.T("status.testing")
 		if target := strings.TrimSpace(testingTarget); target != "" {
 			// 避免节点名过长挤压状态栏布局
 			maxTargetLen := width / 3
@@ -44,17 +45,17 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, c
 				maxTargetLen = 8
 			}
 			target = truncateRunes(target, maxTargetLen)
-			statusText = fmt.Sprintf("⏳ 正在测速: %s", target)
+			statusText = fmt.Sprintf("%s: %s", i18n.T("status.testing"), target)
 		}
 		status = styles.TestingStyle.Render(statusText)
 	} else {
-		status = styles.StatusStyle.Render("● 正常")
+		status = styles.StatusStyle.Render("● " + i18n.T("status.normal"))
 	}
 
 	// ── 中部：快捷键提示 ──
 	helpHint := lipgloss.NewStyle().
 		Foreground(styles.ColorDim).
-		Render("1-5 切页 │ / 搜索 │ ? 帮助 │ q 退出")
+		Render(i18n.T("status.help_hint"))
 
 	// ── 右侧：实时指标 ──
 	var metricsStr string
@@ -75,7 +76,7 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, c
 	// ── 总流量 ──
 	if uploadTotal > 0 || downloadTotal > 0 {
 		sep := dimStyle.Render("  │  ")
-		totalStr := dimStyle.Render("总流量:") +
+		totalStr := dimStyle.Render(i18n.T("status.total")+":") +
 			"  " + upStyle.Render(fmt.Sprintf("↑%s", utils.FormatBytes(uploadTotal))) +
 			"  " + downStyle.Render(fmt.Sprintf("↓%s", utils.FormatBytes(downloadTotal)))
 		if metricsStr != "" {

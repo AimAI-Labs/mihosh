@@ -11,12 +11,12 @@ import (
 )
 
 const (
-	settingsLabelWidth  = 12
+	settingsLabelWidth  = 24
 	settingsMinRowWidth = 40
 )
 
-var SettingKeys = []string{"api-address", "secret", "test-url", "timeout", "proxy-address"}
-var SettingLabels = []string{"API 地址", "密钥", "测速URL", "超时(ms)", "代理地址"}
+var SettingKeys = []string{"api-address", "secret", "test-url", "timeout", "proxy-address", "language"}
+var SettingLabels = []string{"API 地址", "密钥", "测速URL", "超时(ms)", "代理地址", "语言"}
 
 // PageState 设置页面状态
 type PageState struct {
@@ -44,6 +44,11 @@ func GetSettingValue(cfg *config.Config, index int) string {
 		return fmt.Sprintf("%d", cfg.Timeout)
 	case 4:
 		return cfg.ProxyAddress
+	case 5:
+		if cfg.Language == "" {
+			return "auto"
+		}
+		return cfg.Language
 	}
 	return ""
 }
@@ -108,7 +113,14 @@ func RenderSettingsPage(state PageState, width, height int) string {
 		}
 
 		var renderedValue string
-		if state.EditMode && i == state.SelectedSetting {
+		if i == 5 {
+			// 语言选项使用 Tab 组件渲染
+			valToRender := value
+			if state.EditMode && i == state.SelectedSetting {
+				valToRender = state.EditValue
+			}
+			renderedValue = renderLanguageTabs(valToRender, state.EditMode && i == state.SelectedSetting)
+		} else if state.EditMode && i == state.SelectedSetting {
 			// 在光标位置渲染真实光标指示符
 			cursorPos := state.EditCursor
 			if cursorPos < 0 {
@@ -156,7 +168,11 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	// 操作提示
 	var helpText string
 	if state.EditMode {
-		helpText = common.MutedStyle.Render("[Enter]保存 [Esc]取消")
+		if state.SelectedSetting == 5 {
+			helpText = common.MutedStyle.Render("[←/→/Tab]切换 [Enter]保存 [Esc]取消")
+		} else {
+			helpText = common.MutedStyle.Render("[Enter]保存 [Esc]取消")
+		}
 	} else {
 		helpText = common.MutedStyle.Render("[↑/↓]选择 [Enter/双击]编辑")
 	}
@@ -173,4 +189,36 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	contentLines := strings.Count(mainContent, "\n") + 1
 	footer := common.RenderFooter(width, height, contentLines, helpText)
 	return mainContent + footer
+}
+
+func renderLanguageTabs(currentLang string, editMode bool) string {
+	modes := []string{"auto", "zh-CN", "en-US"}
+	var parts []string
+
+	activeStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("#555555")).
+		Foreground(common.CWhite).
+		Padding(0, 1)
+
+	if editMode {
+		activeStyle = activeStyle.Background(lipgloss.Color("#007BFF")).Bold(true)
+	}
+
+	inactiveStyle := lipgloss.NewStyle().
+		Foreground(common.CMuted).
+		Padding(0, 1)
+
+	borderStyle := lipgloss.NewStyle().Foreground(common.CMuted)
+
+	for i, m := range modes {
+		if currentLang == m {
+			parts = append(parts, activeStyle.Render(" "+m+" "))
+		} else {
+			parts = append(parts, inactiveStyle.Render(" "+m+" "))
+		}
+		if i < len(modes)-1 {
+			parts = append(parts, borderStyle.Render("│"))
+		}
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Left, parts...)
 }

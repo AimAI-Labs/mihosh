@@ -3,6 +3,8 @@ package nodes
 import (
 	"strings"
 	"testing"
+
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
 
 func TestSplitFailureEntry(t *testing.T) {
@@ -24,6 +26,9 @@ func TestSummarizeFailure_ExtractsRequestDetail(t *testing.T) {
 }
 
 func TestBuildFailureModal_PreservesSourceInfo(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("zh-CN")
+
 	source := `Get "http://127.0.0.1:9097/Proxies/hy2%E5%8F%B0%E6%B9%BE05/delay?url=http%3A%2F%2Fwww.gstatic.com%2Fgenerate_204&timeout=5000": dial tcp 127.0.0.1:9097: connectex: No connection could be made`
 	state := PageState{
 		Width:        86,

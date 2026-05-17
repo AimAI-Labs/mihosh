@@ -36,10 +36,46 @@ func TestSavePersistsProxyAddress(t *testing.T) {
 	reader := viper.New()
 	reader.SetConfigFile(configFile)
 	reader.SetConfigType("yaml")
-	
+
 	err = reader.ReadInConfig()
 	require.NoError(t, err, "ReadInConfig() returned error")
 
 	got := reader.GetString("proxy_address")
 	assert.Equal(t, cfg.ProxyAddress, got, "proxy_address not persisted")
+}
+
+func TestSavePersistsLanguage(t *testing.T) {
+	t.Cleanup(func() {
+		viper.Reset()
+	})
+	viper.Reset()
+
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("USERPROFILE", tempHome)
+	t.Setenv("HOMEDRIVE", "")
+	t.Setenv("HOMEPATH", "")
+
+	cfg := &Config{
+		APIAddress:   "http://127.0.0.1:9090",
+		Secret:       "test-secret",
+		TestURL:      "http://www.gstatic.com/generate_204",
+		Timeout:      5000,
+		ProxyAddress: "http://127.0.0.1:7890",
+		Language:     "en-US",
+	}
+
+	err := Save(cfg)
+	require.NoError(t, err, "Save() returned error")
+
+	configFile := filepath.Join(tempHome, ".mihosh", "config.yaml")
+	reader := viper.New()
+	reader.SetConfigFile(configFile)
+	reader.SetConfigType("yaml")
+
+	err = reader.ReadInConfig()
+	require.NoError(t, err, "ReadInConfig() returned error")
+
+	got := reader.GetString("language")
+	assert.Equal(t, cfg.Language, got, "language not persisted")
 }

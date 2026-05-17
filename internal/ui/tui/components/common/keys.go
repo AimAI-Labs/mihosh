@@ -1,6 +1,9 @@
 package common
 
-import "github.com/charmbracelet/bubbles/key"
+import (
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
+	"github.com/charmbracelet/bubbles/key"
+)
 
 // KeyMap 快捷键定义
 type KeyMap struct {
@@ -132,4 +135,34 @@ var Keys = KeyMap{
 		key.WithKeys("]"),
 		key.WithHelp("]", "级别+"),
 	),
+}
+
+// InitKeyBindings initializes the help descriptions for key bindings using i18n.
+// This must be called after i18n.Init().
+func InitKeyBindings() {
+	Keys.Up.SetHelp("↑/k", i18n.T("key.up"))
+	Keys.Down.SetHelp("↓/j", i18n.T("key.down"))
+	Keys.Left.SetHelp("←/h", i18n.T("key.left"))
+	Keys.Right.SetHelp("→/l", i18n.T("key.right"))
+	Keys.Enter.SetHelp("enter", i18n.T("key.enter"))
+	Keys.Test.SetHelp("t", i18n.T("key.test"))
+	Keys.TestAll.SetHelp("a", i18n.T("key.testall"))
+	Keys.Refresh.SetHelp("r", i18n.T("key.refresh"))
+	Keys.Quit.SetHelp("q", i18n.T("key.quit"))
+	Keys.NextPage.SetHelp("tab", i18n.T("key.nextpage"))
+	Keys.PrevPage.SetHelp("shift+tab", i18n.T("key.prevpage"))
+	Keys.Page1.SetHelp("1", i18n.T("key.nodes"))
+	Keys.Page2.SetHelp("2", i18n.T("key.connections"))
+	Keys.Page3.SetHelp("3", i18n.T("key.logs"))
+	Keys.Page4.SetHelp("4", i18n.T("key.rules"))
+	Keys.Page5.SetHelp("5", i18n.T("key.settings"))
+	Keys.Escape.SetHelp("esc", i18n.T("key.escape"))
+	Keys.Save.SetHelp("s", i18n.T("key.save"))
+	Keys.Backspace.SetHelp("backspace", i18n.T("key.backspace"))
+	Keys.Delete.SetHelp("delete", i18n.T("key.delete"))
+	Keys.Home.SetHelp("home", i18n.T("key.home"))
+	Keys.End.SetHelp("end", i18n.T("key.end"))
+	Keys.Clear.SetHelp("c", i18n.T("key.clear"))
+	Keys.LogLevelDown.SetHelp("[", i18n.T("key.logleveldown"))
+	Keys.LogLevelUp.SetHelp("]", i18n.T("key.loglevelup"))
 }

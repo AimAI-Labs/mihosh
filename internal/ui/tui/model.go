@@ -63,6 +63,7 @@ type Model struct {
 
 // NewModel 创建新的 TUI 模型
 func NewModel(client *api.Client, testURL string, timeout int) Model {
+	common.InitKeyBindings()
 	cfg, err := config.Load()
 	if err != nil || cfg == nil {
 		cfg = &config.DefaultConfig

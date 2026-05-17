@@ -7,6 +7,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -71,14 +72,14 @@ func RenderConnectionsPage(state PageState) string {
 	if state.ViewMode == 0 {
 		// 活跃连接
 		if state.Connections == nil {
-			return "正在加载连接信息..."
+			return i18n.T("conns.loading")
 		}
 		connList = state.Connections.Connections
-		viewModeLabel = headerStyle.Render("● 活跃连接") + dimStyle.Render("  历史连接")
+		viewModeLabel = headerStyle.Render(i18n.T("conns.active_active")) + dimStyle.Render(i18n.T("conns.history_inactive"))
 	} else {
 		// 历史连接
 		connList = state.ClosedConnections
-		viewModeLabel = dimStyle.Render("活跃连接  ") + headerStyle.Render("● 历史连接")
+		viewModeLabel = dimStyle.Render(i18n.T("conns.active_inactive")) + headerStyle.Render(i18n.T("conns.history_active"))
 	}
 
 	// 过滤连接
@@ -87,15 +88,13 @@ func RenderConnectionsPage(state PageState) string {
 	// 统计信息
 	var stats string
 	if state.ViewMode == 0 && state.Connections != nil {
-		stats = fmt.Sprintf(
-			"活跃: %s | 上传: %s | 下载: %s",
+		stats = i18n.Tf("conns.stats_active",
 			headerStyle.Render(fmt.Sprintf("%d", len(filteredConns))),
 			headerStyle.Render(utils.FormatBytes(state.Connections.UploadTotal)),
 			headerStyle.Render(utils.FormatBytes(state.Connections.DownloadTotal)),
 		)
 	} else {
-		stats = fmt.Sprintf(
-			"历史: %s 条记录",
+		stats = i18n.Tf("conns.stats_history",
 			headerStyle.Render(fmt.Sprintf("%d", len(filteredConns))),
 		)
 	}
@@ -103,9 +102,9 @@ func RenderConnectionsPage(state PageState) string {
 	// 过滤输入框
 	filterLine := ""
 	if state.FilterMode {
-		filterLine = fmt.Sprintf("过滤: %s█", state.FilterText)
+		filterLine = i18n.Tf("conns.filter_active", state.FilterText)
 	} else if state.FilterText != "" {
-		filterLine = dimStyle.Render(fmt.Sprintf("过滤: %s (按/编辑, Esc清除)", state.FilterText))
+		filterLine = dimStyle.Render(i18n.Tf("conns.filter_inactive", state.FilterText))
 	}
 
 	// 表头
@@ -160,7 +159,7 @@ func RenderConnectionsPage(state PageState) string {
 	// 连接列表
 	var rows []string
 	if len(filteredConns) == 0 {
-		rows = append(rows, dimStyle.Render("  无活跃连接"))
+		rows = append(rows, dimStyle.Render(i18n.T("conns.empty_active")))
 	} else {
 		// 确保选中索引在有效范围内
 		selectedIdx := state.SelectedIndex
@@ -202,24 +201,24 @@ func RenderConnectionsPage(state PageState) string {
 
 		// 显示滚动提示
 		if scrollTop > 0 {
-			rows = append([]string{dimStyle.Render(fmt.Sprintf("  ↑ 还有 %d 条", scrollTop))}, rows...)
+			rows = append([]string{dimStyle.Render(i18n.Tf("conns.scroll_up", scrollTop))}, rows...)
 		}
 		if endIdx < len(filteredConns) {
-			rows = append(rows, dimStyle.Render(fmt.Sprintf("  ↓ 还有 %d 条", len(filteredConns)-endIdx)))
+			rows = append(rows, dimStyle.Render(i18n.Tf("conns.scroll_down", len(filteredConns)-endIdx)))
 		}
 	}
 
 	// 帮助提示
 	var helpText string
 	if state.ViewMode == 0 {
-		helpText = dimStyle.Render("[↑↓]选择 [x]关闭 [X]全部关闭 [/]搜索 [h]历史 [s]测速 [S]全测 [双击图表]排行 [r]刷新")
+		helpText = dimStyle.Render(i18n.T("conns.help_active"))
 	} else {
-		helpText = dimStyle.Render("[↑↓]选择 [Enter]详情 [/]搜索 [h]活跃")
+		helpText = dimStyle.Render(i18n.T("conns.help_history"))
 	}
 
 	// 组装页面
 	var content []string
-	content = append(content, headerStyle.Render("连接监控")+"  "+viewModeLabel)
+	content = append(content, headerStyle.Render(i18n.T("title.connections"))+"  "+viewModeLabel)
 	content = append(content, "")
 
 	// 渲染监控图表区域（仅在活跃连接视图显示）

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -177,7 +178,7 @@ func renderScrollbar(height, total, scrollTop, currentIdx int) string {
 
 func RenderGroupListComponent(state PageState, groupMaxLines int) string {
 	if len(state.GroupNames) == 0 {
-		return "  正在加载..."
+		return i18n.T("nodes.loading")
 	}
 
 	maxNameLen := nodesDefaultNameLen
@@ -198,9 +199,9 @@ func RenderGroupListComponent(state PageState, groupMaxLines int) string {
 
 	window := resolveListWindow(state.SelectedGroup, state.GroupScrollTop, groupMaxLines, len(state.GroupNames))
 	header := fmt.Sprintf("  %s │ %s │ %s",
-		padString("名称", maxNameLen),
-		padString("类型", maxTypeLen),
-		padString("当前节点", maxNowLen),
+		padString(i18n.T("nodes.col_name"), maxNameLen),
+		padString(i18n.T("nodes.col_type"), maxTypeLen),
+		padString(i18n.T("nodes.col_now"), maxNowLen),
 	)
 
 	lines := make([]string, 0, window.End-window.ScrollTop)
@@ -236,9 +237,9 @@ func RenderGroupListComponent(state PageState, groupMaxLines int) string {
 func RenderProxyListComponent(state PageState, proxyMaxLines int) string {
 	if len(state.CurrentProxies) == 0 {
 		if state.FilterText != "" {
-			return "  无搜索结果"
+			return i18n.T("nodes.empty_search")
 		}
-		return "  无可用节点"
+		return i18n.T("nodes.empty_proxies")
 	}
 
 	var currentNode string
@@ -261,9 +262,9 @@ func RenderProxyListComponent(state PageState, proxyMaxLines int) string {
 	window := resolveListWindow(state.SelectedProxy, state.ProxyScrollTop, proxyMaxLines, len(state.CurrentProxies))
 
 	header := fmt.Sprintf("  %s │ %s │ %s",
-		padString("名称", maxNameLen),
-		padString("延迟", delayColWidth),
-		padString("状态", statusColWidth),
+		padString(i18n.T("nodes.col_name"), maxNameLen),
+		padString(i18n.T("nodes.col_delay"), delayColWidth),
+		padString(i18n.T("nodes.col_status"), statusColWidth),
 	)
 
 	lines := make([]string, 0, window.End-window.ScrollTop)
@@ -333,9 +334,9 @@ func RenderModeSwitchComponent(currentMode string) string {
 		Label string
 		Value string
 	}{
-		{"规则", "rule"},
-		{"全局", "global"},
-		{"直连", "direct"},
+		{i18n.T("nodes.mode_rule"), "rule"},
+		{i18n.T("nodes.mode_global"), "global"},
+		{i18n.T("nodes.mode_direct"), "direct"},
 	}
 
 	activeStyle := lipgloss.NewStyle().

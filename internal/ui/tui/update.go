@@ -11,6 +11,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -276,8 +277,17 @@ func (m Model) dispatchKeyToPage(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case layout.PageSettings:
 		var newCfg, proxyAddr = m.config, ""
+		oldLanguage := ""
+		if m.config != nil {
+			oldLanguage = m.config.Language
+		}
 		m.settingsState, newCfg, proxyAddr, cmd = m.settingsState.Update(msg, m.config, m.configSvc)
 		m.config = newCfg
+		if newCfg != nil && newCfg.Language != oldLanguage {
+			i18n.SetLanguageOverride(newCfg.Language)
+			common.InitKeyBindings()
+			cmd = tea.Batch(cmd, tea.ClearScreen)
+		}
 		if proxyAddr != "" {
 			m.connsState = m.connsState.UpdateProxyAddr(proxyAddr)
 		}

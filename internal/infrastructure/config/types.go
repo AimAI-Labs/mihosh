@@ -7,6 +7,7 @@ type Config struct {
 	TestURL      string `mapstructure:"test_url"`
 	Timeout      int    `mapstructure:"timeout"`
 	ProxyAddress string `mapstructure:"proxy_address"`
+	Language     string `mapstructure:"language"`
 }
 
 // DefaultConfig 默认配置
@@ -16,4 +17,5 @@ var DefaultConfig = Config{
 	TestURL:      "http://www.gstatic.com/generate_204",
 	Timeout:      5000,
 	ProxyAddress: "http://127.0.0.1:7890",
+	Language:     "auto",
 }

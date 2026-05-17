@@ -109,6 +109,27 @@ func (s State) HandleMouseLeft(pageY int, cfg *config.Config) State {
 
 // handleEditMode 处理编辑模式按键，返回更新后的 cfg 和 proxyAddr（空表示无变化）
 func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService) (State, *config.Config, string, tea.Cmd) {
+	if s.selectedSetting == 5 { // 语言设置采用 tab 切换
+		switch {
+		case key.Matches(msg, common.Keys.Escape):
+			s.editMode = false
+			s.editValue = ""
+		case key.Matches(msg, common.Keys.Enter):
+			settingKey := SettingKeys[s.selectedSetting]
+			if err := configSvc.SetConfigValue(settingKey, s.editValue); err == nil {
+				newCfg, _ := configSvc.LoadConfig()
+				s.editMode = false
+				s.editValue = ""
+				return s, newCfg, newCfg.ProxyAddress, nil
+			}
+		case msg.String() == "left":
+			s.editValue = prevLanguage(s.editValue)
+		case msg.String() == "right", msg.String() == "tab":
+			s.editValue = nextLanguage(s.editValue)
+		}
+		return s, cfg, "", nil
+	}
+
 	switch {
 	case key.Matches(msg, common.Keys.Escape):
 		s.editMode = false
@@ -182,4 +203,24 @@ func (s *State) isMouseDoubleClick(settingIdx int, now time.Time) bool {
 	s.lastMouseAt = now
 
 	return isDoubleClick
+}
+
+func nextLanguage(lang string) string {
+	langs := []string{"auto", "zh-CN", "en-US"}
+	for i, l := range langs {
+		if l == lang {
+			return langs[(i+1)%len(langs)]
+		}
+	}
+	return "auto"
+}
+
+func prevLanguage(lang string) string {
+	langs := []string{"auto", "zh-CN", "en-US"}
+	for i, l := range langs {
+		if l == lang {
+			return langs[(i+len(langs)-1)%len(langs)]
+		}
+	}
+	return "auto"
 }
