@@ -62,21 +62,37 @@ fi
 
 echo_info "Latest version: $VERSION"
 
+# Check if already installed and up-to-date
+if command -v "$TARGET_NAME" >/dev/null 2>&1; then
+    CURRENT_VERSION=$("$TARGET_NAME" version 2>/dev/null | awk '{print $2}')
+    if [ "${CURRENT_VERSION#v}" = "${VERSION#v}" ]; then
+        echo_info "$TARGET_NAME is already up to date (version $VERSION). Skip installation."
+        exit 0
+    else
+        echo_info "Found existing version: ${CURRENT_VERSION:-unknown}. Upgrading to $VERSION..."
+    fi
+fi
+
 # 3. Construct Download URL
 DOWNLOAD_URL="https://github.com/AimAI-Labs/mihosh/releases/download/${VERSION}/${BINARY_NAME}.tar.gz"
 
 # 4. Download and Install
-# 4. Download and Install
 TMP_DIR=$(mktemp -d)
 ARCHIVE_FILE="${TMP_DIR}/${BINARY_NAME}.tar.gz"
+LOCAL_ARCHIVE="${BINARY_NAME}.tar.gz"
 
-echo_info "Downloading ${BINARY_NAME} from ${DOWNLOAD_URL}..."
-if curl -L -o "$ARCHIVE_FILE" --fail "$DOWNLOAD_URL"; then
-    echo_info "Download successful."
+if [ -f "$LOCAL_ARCHIVE" ]; then
+    echo_info "Found local archive $LOCAL_ARCHIVE. Skipping download."
+    cp "$LOCAL_ARCHIVE" "$ARCHIVE_FILE"
 else
-    echo_error "Download failed. Please check your internet connection or if the asset exists for your architecture."
-    rm -rf "$TMP_DIR"
-    exit 1
+    echo_info "Downloading ${BINARY_NAME} from ${DOWNLOAD_URL}..."
+    if curl -L -o "$ARCHIVE_FILE" --fail "$DOWNLOAD_URL"; then
+        echo_info "Download successful."
+    else
+        echo_error "Download failed. Please check your internet connection or if the asset exists for your architecture."
+        rm -rf "$TMP_DIR"
+        exit 1
+    fi
 fi
 
 echo_info "Extracting archive..."
@@ -100,10 +116,10 @@ chmod +x "$EXTRACTED_BINARY"
 
 echo_info "Installing to ${INSTALL_DIR}/${TARGET_NAME}..."
 if [ -w "$INSTALL_DIR" ]; then
-    mv "$EXTRACTED_BINARY" "${INSTALL_DIR}/${TARGET_NAME}"
+    mv -f "$EXTRACTED_BINARY" "${INSTALL_DIR}/${TARGET_NAME}"
 else
     echo_info "Sudo permission required to install to ${INSTALL_DIR}"
-    sudo mv "$EXTRACTED_BINARY" "${INSTALL_DIR}/${TARGET_NAME}"
+    sudo mv -f "$EXTRACTED_BINARY" "${INSTALL_DIR}/${TARGET_NAME}"
 fi
 
 rm -rf "$TMP_DIR"
