@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Questions / Discussions
+    url: https://github.com/AimAI-Labs/mihosh/discussions
+    about: Have a question? Please start a discussion instead of opening an issue.
+  - name: 📖 Documentation
+    url: https://github.com/AimAI-Labs/mihosh#readme
+    about: Check the README for installation and usage guides.

@@ -1,0 +1,147 @@
+name: "🐛 Bug Report"
+description: "Report a Mihosh bug"
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Pre-submission Checklist
+      description: Please confirm the following before submitting. Issues without required checks will be closed.
+      options:
+        - label: I have searched the [Issue Tracker](https://github.com/AimAI-Labs/mihosh/issues) and confirmed this issue has not been reported
+          required: true
+        - label: I am using the latest version of Mihosh
+          required: true
+        - label: I have confirmed that the Mihomo core service is running properly
+          required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: What operating system are you using?
+      multiple: false
+      options:
+        - Windows
+        - Linux
+        - macOS
+    validations:
+      required: true
+
+  - type: input
+    id: os_version
+    attributes:
+      label: OS Version
+      description: "e.g., Windows 11 23H2, Ubuntu 24.04, macOS 15.1"
+      placeholder: "Windows 11 23H2"
+    validations:
+      required: true
+
+  - type: input
+    id: mihosh_version
+    attributes:
+      label: Mihosh Version
+      description: "Run `mihosh --version` to get the version number"
+      placeholder: "v0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal Emulator
+      description: "e.g., Windows Terminal, iTerm2, Alacritty, Kitty, etc."
+      placeholder: "Windows Terminal 1.21"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: affected_area
+    attributes:
+      label: Affected Area(s)
+      description: Select the affected page or feature (multiple selections allowed)
+      multiple: true
+      options:
+        - Nodes
+        - Connections
+        - Logs
+        - Rules
+        - Settings
+        - CLI Mode
+        - WebSocket
+        - Configuration Loading
+        - UI Rendering / Layout
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Please clearly describe the issue you encountered.
+      placeholder: "A brief description of the bug"
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: "Describe the correct behavior you expected"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Please provide the minimal steps to reliably reproduce the issue.
+      placeholder: |
+        1. Start Mihosh (`mihosh`)
+        2. Switch to the Connections page
+        3. Perform a specific action
+        4. Observe the unexpected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration File
+      description: "Please provide your `~/.mihosh/config.yaml` content (redact sensitive info like `secret`)"
+      render: yaml
+      placeholder: |
+        api_address: http://127.0.0.1:9090
+        secret: ***
+        test_url: http://www.gstatic.com/generate_204
+        timeout: 5000
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: "If applicable, paste any error logs or terminal output here."
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots / Recordings
+      description: "For UI issues, please provide screenshots or terminal recordings (e.g., [asciinema](https://asciinema.org/))."
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: "Any other information that may help diagnose the issue."
+    validations:
+      required: false

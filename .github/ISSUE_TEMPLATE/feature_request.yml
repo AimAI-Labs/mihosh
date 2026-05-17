@@ -1,0 +1,97 @@
+name: "✨ Feature Request"
+description: "Suggest a new feature or improvement"
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Pre-submission Checklist
+      description: Please confirm the following before submitting.
+      options:
+        - label: I have searched the [Issue Tracker](https://github.com/AimAI-Labs/mihosh/issues) and confirmed this feature has not been requested
+          required: true
+        - label: I have confirmed this feature is not on the [README](https://github.com/AimAI-Labs/mihosh#readme) roadmap
+          required: false
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: What category does this feature fall under?
+      multiple: false
+      options:
+        - New Page / View
+        - Existing Page Enhancement
+        - CLI Command Extension
+        - Performance Optimization
+        - UI / UX Improvement
+        - Keyboard Shortcuts
+        - Configuration Options
+        - Internationalization (i18n)
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: affected_page
+    attributes:
+      label: Related Page(s)
+      description: Which page does this feature relate to? (multiple selections allowed, select "N/A" if not applicable)
+      multiple: true
+      options:
+        - Nodes
+        - Connections
+        - Logs
+        - Rules
+        - Settings
+        - CLI Mode
+        - Global / Cross-page
+        - N/A
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Motivation
+      description: |
+        Describe the context of your request. What problem are you facing, or what experience would you like to improve?
+        e.g., "When the number of nodes exceeds 50, it's hard to quickly find the one I want..."
+      placeholder: "I often encounter the following when using Mihosh..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Clearly describe the feature or improvement you'd like.
+      placeholder: "I would like to be able to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative approaches?
+      placeholder: "I also considered..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References / Inspiration
+      description: "Are there other tools or projects that implement a similar feature? Please provide links or screenshots."
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: "Any other context, screenshots, or mockups."
+    validations:
+      required: false
