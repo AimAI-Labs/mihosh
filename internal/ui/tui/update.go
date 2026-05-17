@@ -64,7 +64,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if contentHeight < common.MinContentHeight {
 				contentHeight = common.MinContentHeight
 			}
-			if msg.X >= 0 && msg.X < layout.SidebarWidth && msg.Y >= 0 && msg.Y < contentHeight {
+			sidebarWidth := layout.SidebarWidth()
+			if msg.X >= 0 && msg.X < sidebarWidth && msg.Y >= 0 && msg.Y < contentHeight {
 				clickedPage := layout.GetClickedPage(msg.X, msg.Y, contentHeight)
 				if clickedPage >= 0 && clickedPage < layout.PageCount {
 					m.currentPage = clickedPage
@@ -326,7 +327,8 @@ func (m *Model) refreshCurrentPage() tea.Cmd {
 
 // handleMouseScroll 处理鼠标滚轮滚动
 func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
-	if x >= 0 && x < layout.SidebarWidth {
+	sidebarWidth := layout.SidebarWidth()
+	if x >= 0 && x < sidebarWidth {
 		if up {
 			m.currentPage = (m.currentPage + layout.PageCount - 1) % layout.PageCount
 		} else {
@@ -335,7 +337,7 @@ func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
 		return m, m.onPageChange()
 	}
 
-	sidebarRenderedWidth := layout.SidebarWidth + 1
+	sidebarRenderedWidth := layout.SidebarWidth() + 1
 	mainWidth := m.width - sidebarRenderedWidth
 	if mainWidth < common.MinMainWidth {
 		mainWidth = common.MinMainWidth
@@ -389,12 +391,26 @@ func (m Model) handleConnectionsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleSettingsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
-	_, pageY, _, _, ok := m.resolveMainPageMouseHit(x, y)
+	pageX, pageY, _, _, ok := m.resolveMainPageMouseHit(x, y)
 	if !ok {
 		return m, nil
 	}
 
-	m.settingsState = m.settingsState.HandleMouseLeft(pageY, m.config)
+	oldLanguage := ""
+	if m.config != nil {
+		oldLanguage = m.config.Language
+	}
+
+	var proxyAddr string
+	m.settingsState, m.config, proxyAddr = m.settingsState.HandleMouseLeft(pageX, pageY, m.config, m.configSvc)
+	if m.config != nil && m.config.Language != oldLanguage {
+		i18n.SetLanguageOverride(m.config.Language)
+		common.InitKeyBindings()
+		return m, tea.ClearScreen
+	}
+	if proxyAddr != "" {
+		m.connsState = m.connsState.UpdateProxyAddr(proxyAddr)
+	}
 	return m, nil
 }
 
@@ -419,7 +435,7 @@ func (m Model) resolveMainPageMouseHit(x, y int) (pageX, pageY, pageWidth, pageH
 		return 0, 0, 0, 0, false
 	}
 
-	sidebarRenderedWidth := layout.SidebarWidth + 1
+	sidebarRenderedWidth := layout.SidebarWidth() + 1
 	mainWidth := m.width - sidebarRenderedWidth
 	if mainWidth < common.MinMainWidth {
 		mainWidth = common.MinMainWidth

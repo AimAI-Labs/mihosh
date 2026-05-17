@@ -57,6 +57,52 @@ func TestSettingsLanguageSaveAppliesI18nImmediately(t *testing.T) {
 	}
 }
 
+func TestSettingsLanguageMouseClickAppliesI18nImmediately(t *testing.T) {
+	t.Cleanup(func() {
+		viper.Reset()
+	})
+	viper.Reset()
+
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("USERPROFILE", tempHome)
+	t.Setenv("HOMEDRIVE", "")
+	t.Setenv("HOMEPATH", "")
+
+	cfg := config.DefaultConfig
+	cfg.Language = "zh-CN"
+	if err := config.Save(&cfg); err != nil {
+		t.Fatalf("Save() returned error: %v", err)
+	}
+
+	i18n.Init()
+	i18n.SetLanguageOverride("zh-CN")
+
+	model := Model{
+		currentPage: layout.PageSettings,
+		config:      &cfg,
+		configSvc:   service.NewConfigService(),
+		width:       120,
+		height:      30,
+	}
+
+	const rawX = 51
+	const rawY = 12
+
+	next, cmd := model.handleSettingsMouseLeft(rawX, rawY)
+	if cmd == nil {
+		t.Fatalf("expected clear screen cmd after language mouse change")
+	}
+	model = next.(Model)
+
+	if model.config.Language != "en-US" {
+		t.Fatalf("expected model language en-US, got %q", model.config.Language)
+	}
+	if got := i18n.T("menu.nodes"); got != "Nodes" {
+		t.Fatalf("expected i18n to switch immediately, got %q", got)
+	}
+}
+
 func keyMsg(s string) tea.KeyMsg {
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
 }

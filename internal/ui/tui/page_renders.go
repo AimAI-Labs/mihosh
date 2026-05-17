@@ -13,7 +13,7 @@ import (
 
 // getPageSize 计算页面内容的可用宽度和高度
 func (m Model) getPageSize() (pageWidth, pageHeight int) {
-	sidebarRenderedWidth := layout.SidebarWidth + 1
+	sidebarRenderedWidth := layout.SidebarWidth() + 1
 	mainWidth := m.width - sidebarRenderedWidth
 	if mainWidth < common.MinMainWidth {
 		mainWidth = common.MinMainWidth

@@ -5,7 +5,6 @@ import "github.com/AimAI-Labs/mihosh/internal/domain/model"
 const (
 	// 布局相关
 	StatusBarHeight  = 2 // 分隔线 + 信息行
-	SidebarWidth     = 6 // 侧边栏宽度 (与 sidebar.go 同步)
 	MinContentHeight = 5
 	MinMainWidth     = 20
 

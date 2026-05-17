@@ -20,7 +20,7 @@ func (m Model) View() string {
 	}
 
 	// ── 布局参数 ──
-	sidebarRenderedWidth := layout.SidebarWidth + 1 // 含右边框 │
+	sidebarRenderedWidth := layout.SidebarWidth() + 1 // 含右边框 │
 	statusBarHeight := common.StatusBarHeight       // 分隔线 + 信息行
 	contentHeight := m.height - statusBarHeight
 	if contentHeight < common.MinContentHeight {

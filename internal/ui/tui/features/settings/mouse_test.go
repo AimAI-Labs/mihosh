@@ -3,7 +3,9 @@ package settings
 import (
 	"testing"
 
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/spf13/viper"
 )
 
 func TestHandleMouseLeft_SingleClickSelectsSetting(t *testing.T) {
@@ -15,8 +17,9 @@ func TestHandleMouseLeft_SingleClickSelectsSetting(t *testing.T) {
 		Timeout:      5000,
 		ProxyAddress: "http://127.0.0.1:7890",
 	}
+	configSvc := service.NewConfigService()
 
-	next := state.HandleMouseLeft(5, cfg)
+	next, _, _ := state.HandleMouseLeft(0, 5, cfg, configSvc)
 	if next.selectedSetting != 1 {
 		t.Fatalf("expected selectedSetting=1, got %d", next.selectedSetting)
 	}
@@ -30,14 +33,15 @@ func TestHandleMouseLeft_DoubleClickEntersEditMode(t *testing.T) {
 	cfg := &config.Config{
 		Timeout: 7000,
 	}
+	configSvc := service.NewConfigService()
 
 	const timeoutRowY = 7 // timeout index=3, offset=4
-	next := state.HandleMouseLeft(timeoutRowY, cfg)
+	next, _, _ := state.HandleMouseLeft(0, timeoutRowY, cfg, configSvc)
 	if next.editMode {
 		t.Fatalf("expected editMode=false on first click")
 	}
 
-	next = next.HandleMouseLeft(timeoutRowY, cfg)
+	next, _, _ = next.HandleMouseLeft(0, timeoutRowY, cfg, configSvc)
 	if !next.editMode {
 		t.Fatalf("expected editMode=true after double click")
 	}
@@ -46,5 +50,44 @@ func TestHandleMouseLeft_DoubleClickEntersEditMode(t *testing.T) {
 	}
 	if next.editCursor != 4 {
 		t.Fatalf("expected editCursor=4, got %d", next.editCursor)
+	}
+}
+
+func TestHandleMouseLeft_ClickLanguageTabSavesImmediately(t *testing.T) {
+	t.Cleanup(func() {
+		viper.Reset()
+	})
+	viper.Reset()
+
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("USERPROFILE", tempHome)
+	t.Setenv("HOMEDRIVE", "")
+	t.Setenv("HOMEPATH", "")
+
+	cfg := config.DefaultConfig
+	cfg.Language = "auto"
+	if err := config.Save(&cfg); err != nil {
+		t.Fatalf("Save() returned error: %v", err)
+	}
+
+	configSvc := service.NewConfigService()
+	state := State{}
+
+	const languageRowY = 9
+	const zhCNTabX = settingsContainerLeft + settingsRowPaddingLeft + settingsLabelWidth + len("auto") + 2 + 1
+	next, newCfg, _ := state.HandleMouseLeft(zhCNTabX, languageRowY, &cfg, configSvc)
+
+	if next.selectedSetting != 5 {
+		t.Fatalf("expected language row selected, got %d", next.selectedSetting)
+	}
+	if newCfg == nil {
+		t.Fatalf("expected config reload after language click")
+	}
+	if newCfg.Language != "zh-CN" {
+		t.Fatalf("expected language zh-CN, got %q", newCfg.Language)
+	}
+	if next.editMode {
+		t.Fatalf("expected language click to save directly without entering edit mode")
 	}
 }

@@ -2,6 +2,7 @@ package layout
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/styles"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -31,20 +32,33 @@ func getSidebarItems() []struct{ Label string } {
 	}
 }
 
-// SidebarWidth 侧边栏渲染宽度（含右边框）
-const SidebarWidth = 6
+const minSidebarWidth = 6
+
+// SidebarWidth 返回当前语言下侧边栏内容宽度（不含右边框）
+func SidebarWidth() int {
+	maxWidth := minSidebarWidth
+	for _, item := range getSidebarItems() {
+		labelWidth := utf8.RuneCountInString(item.Label)
+		if labelWidth > maxWidth {
+			maxWidth = labelWidth
+		}
+	}
+	return maxWidth
+}
 
 // RenderSidebar 渲染侧边栏
 func RenderSidebar(currentPage PageType, height int) string {
+	sidebarWidth := SidebarWidth()
+
 	activeStyle := lipgloss.NewStyle().
 		Foreground(styles.ColorPrimary).
 		Bold(true).
-		Width(SidebarWidth).
+		Width(sidebarWidth).
 		Align(lipgloss.Center)
 
 	inactiveStyle := lipgloss.NewStyle().
 		Foreground(styles.ColorGray).
-		Width(SidebarWidth).
+		Width(sidebarWidth).
 		Align(lipgloss.Center)
 
 	var items []string
@@ -74,7 +88,7 @@ func RenderSidebar(currentPage PageType, height int) string {
 
 	// 用右侧边框分隔，内容垂直居中
 	barStyle := lipgloss.NewStyle().
-		Width(SidebarWidth).
+		Width(sidebarWidth).
 		Height(height).
 		AlignVertical(lipgloss.Center).
 		BorderStyle(lipgloss.Border{Right: "│"}).
@@ -112,7 +126,7 @@ func SidebarMenuHeight(height int) int {
 // 返回对应的页面类型，如果点击不在菜单区域返回 -1
 func GetClickedPage(x, y, height int) PageType {
 	// 侧边栏宽度为6（不含右边框），点击的X坐标应该 < 6
-	if x < 0 || x >= SidebarWidth {
+	if x < 0 || x >= SidebarWidth() {
 		return -1
 	}
 

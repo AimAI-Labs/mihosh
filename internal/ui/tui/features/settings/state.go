@@ -15,6 +15,8 @@ const (
 
 	settingsMouseRowsOffset      = 4
 	settingsDoubleClickThreshold = 350 * time.Millisecond
+	settingsContainerLeft        = 2
+	settingsRowPaddingLeft       = 1
 )
 
 // State 设置页面完整状态
@@ -79,24 +81,46 @@ func (s State) HandleMouseScroll(up bool) State {
 }
 
 // HandleMouseLeft 处理 settings 页面左键单击/双击
-func (s State) HandleMouseLeft(pageY int, cfg *config.Config) State {
+func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *service.ConfigService) (State, *config.Config, string) {
 	settingIdx := resolveMouseSettingIndex(pageY)
 
-	// 编辑模式下点击空白处退出编辑
 	if s.editMode {
+		if s.selectedSetting == 5 {
+			if lang, ok := resolveLanguageMouseTarget(pageX); ok {
+				if err := configSvc.SetConfigValue(SettingKeys[s.selectedSetting], lang); err == nil {
+					newCfg, _ := configSvc.LoadConfig()
+					s.editMode = false
+					s.editValue = ""
+					s.editCursor = 0
+					return s, newCfg, newCfg.ProxyAddress
+				}
+				return s, cfg, ""
+			}
+		}
+
+		// 编辑模式下点击空白处退出编辑
 		if settingIdx < 0 || settingIdx >= len(SettingKeys) {
 			s.editMode = false
 			s.editValue = ""
 			s.editCursor = 0
 		}
-		return s
+		return s, cfg, ""
 	}
 
 	if settingIdx < 0 || settingIdx >= len(SettingKeys) {
-		return s
+		return s, cfg, ""
 	}
 
 	s.selectedSetting = settingIdx
+	if settingIdx == 5 {
+		if lang, ok := resolveLanguageMouseTarget(pageX); ok {
+			if err := configSvc.SetConfigValue(SettingKeys[settingIdx], lang); err == nil {
+				newCfg, _ := configSvc.LoadConfig()
+				return s, newCfg, newCfg.ProxyAddress
+			}
+		}
+	}
+
 	now := time.Now()
 	if s.isMouseDoubleClick(settingIdx, now) {
 		s.editMode = true
@@ -104,7 +128,7 @@ func (s State) HandleMouseLeft(pageY int, cfg *config.Config) State {
 		s.editCursor = len(s.editValue)
 	}
 
-	return s
+	return s, cfg, ""
 }
 
 // handleEditMode 处理编辑模式按键，返回更新后的 cfg 和 proxyAddr（空表示无变化）
@@ -223,4 +247,27 @@ func prevLanguage(lang string) string {
 		}
 	}
 	return "auto"
+}
+
+func resolveLanguageMouseTarget(pageX int) (string, bool) {
+	if pageX < 0 {
+		return "", false
+	}
+
+	valueStartX := settingsContainerLeft + settingsRowPaddingLeft + settingsLabelWidth
+	modes := []string{"auto", "zh-CN", "en-US"}
+	cursor := valueStartX
+
+	for i, mode := range modes {
+		tabWidth := len(mode) + 2
+		if pageX >= cursor && pageX < cursor+tabWidth {
+			return mode, true
+		}
+		cursor += tabWidth
+		if i < len(modes)-1 {
+			cursor++
+		}
+	}
+
+	return "", false
 }
