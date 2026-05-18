@@ -46,3 +46,4 @@ mihosh.exe
 mihosh-*
 tmp.exe
 main.exe
+.gomodcache/*

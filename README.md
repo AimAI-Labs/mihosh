@@ -34,7 +34,14 @@ A full-featured terminal UI (TUI) management tool for mihomo, allowing you to el
 
 ## Installation
 
+### Homebrew
 
+```bash
+brew tap AimAI-Labs/mihosh https://github.com/AimAI-Labs/mihosh
+brew install mihosh
+```
+
+### Install Script
 
 ```bash
 # Install (Linux/macOS)

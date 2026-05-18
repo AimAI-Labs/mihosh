@@ -45,11 +45,15 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
         run: |
+          DATE="$(date -u +%Y-%m-%d)"
+          LDFLAGS="-s -w -X github.com/AimAI-Labs/mihosh/internal/cli.Version=${VERSION} -X github.com/AimAI-Labs/mihosh/internal/cli.Commit=${COMMIT} -X github.com/AimAI-Labs/mihosh/internal/cli.Date=${DATE}"
           if [ "$GOOS" = "windows" ]; then
-            go build -ldflags="-s -w" -o mihosh.exe .
+            go build -ldflags="${LDFLAGS}" -o mihosh.exe .
           else
-            go build -ldflags="-s -w" -o mihosh .
+            go build -ldflags="${LDFLAGS}" -o mihosh .
           fi
 
       - name: Package
@@ -73,6 +77,10 @@ jobs:
       contents: write
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
@@ -85,3 +93,72 @@ jobs:
             mihosh-*.tar.gz
             mihosh-*.zip
           generate_release_notes: true
+
+      - name: Update Homebrew formula
+        env:
+          VERSION: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p Formula
+
+          darwin_amd64_sha="$(sha256sum mihosh-darwin-amd64.tar.gz | awk '{print $1}')"
+          darwin_arm64_sha="$(sha256sum mihosh-darwin-arm64.tar.gz | awk '{print $1}')"
+          linux_amd64_sha="$(sha256sum mihosh-linux-amd64.tar.gz | awk '{print $1}')"
+          linux_arm64_sha="$(sha256sum mihosh-linux-arm64.tar.gz | awk '{print $1}')"
+
+          cat > Formula/mihosh.rb <<EOF
+          class Mihosh < Formula
+            desc "Terminal UI management tool for mihomo"
+            homepage "https://github.com/${REPOSITORY}"
+            version "${VERSION#v}"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "https://github.com/${REPOSITORY}/releases/download/${VERSION}/mihosh-darwin-arm64.tar.gz"
+                sha256 "${darwin_arm64_sha}"
+              else
+                url "https://github.com/${REPOSITORY}/releases/download/${VERSION}/mihosh-darwin-amd64.tar.gz"
+                sha256 "${darwin_amd64_sha}"
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.arm?
+                url "https://github.com/${REPOSITORY}/releases/download/${VERSION}/mihosh-linux-arm64.tar.gz"
+                sha256 "${linux_arm64_sha}"
+              else
+                url "https://github.com/${REPOSITORY}/releases/download/${VERSION}/mihosh-linux-amd64.tar.gz"
+                sha256 "${linux_amd64_sha}"
+              end
+            end
+
+            def install
+              bin.install "mihosh"
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/mihosh version")
+            end
+          end
+          EOF
+
+      - name: Push Homebrew formula
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- Formula/mihosh.rb; then
+            echo "Homebrew formula is already up to date."
+            exit 0
+          fi
+
+          git add Formula/mihosh.rb
+          git commit -m "Update mihosh to ${GITHUB_REF_NAME}"
+          git push origin HEAD:${DEFAULT_BRANCH}
