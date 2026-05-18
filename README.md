@@ -100,10 +100,21 @@ mihosh config show --output table    # Show config in table format
 ## Development
 
 ```bash
-go mod tidy      # Install dependencies
-go test ./...    # Run tests
-go build .       # Build
+go mod download  # Install dependencies
+make check       # Format, vet, test, and build
 ```
+
+If `make` is not available on your system, run the equivalent commands manually:
+
+```bash
+go fmt ./...
+go vet ./...
+go test ./...
+go build .
+```
+
+Pull requests are validated by GitHub Actions for formatting, module verification,
+vet, tests, build, lint, and CodeQL analysis.
 
 ## License
 

@@ -16,9 +16,12 @@ cd mihosh
 # Install dependencies
 go mod download
 
-# Build and run
-go build -o mihosh.exe .
-./mihosh.exe
+# Run local checks
+make check
+
+# Build and run manually if make is unavailable
+go build .
+./mihosh
 ```
 
 ## Code Standards
@@ -26,7 +29,19 @@ go build -o mihosh.exe .
 - Run `go fmt ./...` to format code
 - Run `go vet ./...` to check for potential issues
 - Run `go test ./...` to ensure tests pass
+- Run `go build .` to verify the binary builds
+- Prefer `make check` when `make` is available; it runs the standard local gate
 - Follow the architecture and coding conventions in [AGENTS.md](../AGENTS.md)
+
+## Automation
+
+Pull requests run these checks in GitHub Actions:
+
+- CI: gofmt check, module verification, `go vet ./...`, `go test ./...`, and `go build .`
+- Lint: golangci-lint with a conservative correctness-focused configuration
+- CodeQL: Go security analysis
+
+Dependabot opens weekly pull requests for Go module and GitHub Actions updates.
 
 ## Core Principles
 
@@ -73,9 +88,10 @@ docs: update installation guide for macOS
 
 1. **Fork** this repository and create your branch (`git checkout -b feat/amazing-feature`)
 2. Make your changes and ensure tests pass
-3. Commit following the convention above
-4. Push to your fork (`git push origin feat/amazing-feature`)
-5. Open a Pull Request and fill in the PR template
+3. Run `make check` or the equivalent Go commands
+4. Commit following the convention above
+5. Push to your fork (`git push origin feat/amazing-feature`)
+6. Open a Pull Request and fill in the PR template
 
 ## Reporting Bugs
 
