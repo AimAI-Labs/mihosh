@@ -1,5 +1,0 @@
-api_address: http://127.0.0.1:9090
-secret: your-secret-here
-test_url: http://www.gstatic.com/generate_204
-timeout: 5000
-proxy_address: http://127.0.0.1:7890

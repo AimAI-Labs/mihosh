@@ -69,7 +69,11 @@ This opens the interactive TUI. Press `5` or `Tab` to switch to the Help page fo
 
 ## Configuration
 
-Config file located at `~/.mihosh/config.yaml`:
+### File Location
+
+- Linux / macOS: `~/.mihosh/config.yaml`
+
+### Available Options
 
 ```yaml
 api_address: http://127.0.0.1:9090
@@ -77,6 +81,17 @@ secret: your-secret-here
 test_url: http://www.gstatic.com/generate_204
 timeout: 5000
 proxy_address: http://127.0.0.1:7890
+```
+
+### CLI Configuration Commands
+
+```bash
+mihosh config set api-address http://127.0.0.1:9090
+mihosh config set secret your-secret-here
+mihosh config set test-url http://www.gstatic.com/generate_204
+mihosh config set timeout 5000
+mihosh config set proxy-address http://127.0.0.1:7890
+mihosh config show --output table
 ```
 
 ## CLI Mode (Optional)
