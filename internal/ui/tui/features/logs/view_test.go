@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 )
 
 func TestRenderLogEntry_HOffsetZero(t *testing.T) {
@@ -128,5 +129,40 @@ func TestRenderLogEntry_URLEncoded(t *testing.T) {
 	result := renderLogEntry(log, false, 80, 0)
 	if !strings.Contains(result, "url=encoded") {
 		t.Fatalf("expected URL-decoded content, got %q", result)
+	}
+}
+
+func TestResolveLogLevelTabStyle_ActiveKeepsContinuousBackgroundAroundIndicator(t *testing.T) {
+	style := resolveLogLevelTabStyle("info", true)
+	if style.Background != common.CSecondary {
+		t.Fatalf("expected active background %q, got %q", common.CSecondary, style.Background)
+	}
+	if style.Foreground != common.CWhite {
+		t.Fatalf("expected active foreground %q, got %q", common.CWhite, style.Foreground)
+	}
+	if style.Indicator == style.Background {
+		t.Fatalf("expected active indicator color to differ from background, got %q", style.Indicator)
+	}
+	if style.Indicator != common.CWhite {
+		t.Fatalf("expected active info indicator fallback %q, got %q", common.CWhite, style.Indicator)
+	}
+	if !style.Bold {
+		t.Fatal("expected active tab to be bold")
+	}
+}
+
+func TestResolveLogLevelTabStyle_InactiveUsesCommonInactiveColors(t *testing.T) {
+	style := resolveLogLevelTabStyle("debug", false)
+	if style.Background != common.CHighlight {
+		t.Fatalf("expected inactive background %q, got %q", common.CHighlight, style.Background)
+	}
+	if style.Foreground != common.CMuted {
+		t.Fatalf("expected inactive foreground %q, got %q", common.CMuted, style.Foreground)
+	}
+	if style.Indicator != logLevelColors["debug"] {
+		t.Fatalf("expected indicator foreground %q, got %q", logLevelColors["debug"], style.Indicator)
+	}
+	if style.Bold {
+		t.Fatal("expected inactive tab not to be bold")
 	}
 }

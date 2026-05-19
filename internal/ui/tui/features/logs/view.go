@@ -29,6 +29,13 @@ var logLevelColors = map[string]lipgloss.Color{
 	"silent":  common.CPurple,
 }
 
+type logLevelTabStyle struct {
+	Background lipgloss.Color
+	Foreground lipgloss.Color
+	Indicator  lipgloss.Color
+	Bold       bool
+}
+
 // PageState 日志页面状态
 type PageState struct {
 	Logs               []model.LogEntry // 日志列表
@@ -114,28 +121,37 @@ func RenderLogsPage(state PageState) string {
 func renderLevelBar(selectedLevel int) string {
 	var tabs []string
 
-	activeStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(common.CWhite).
-		Background(common.CHighlight).
-		Padding(0, 1)
-
-	inactiveStyle := lipgloss.NewStyle().
-		Foreground(common.CMuted).
-		Padding(0, 1)
-
 	for i, level := range logLevels {
-		color := logLevelColors[level]
-		indicator := lipgloss.NewStyle().Foreground(color).Render("●")
-
-		if i == selectedLevel {
-			tabs = append(tabs, activeStyle.Render(indicator+" "+level))
-		} else {
-			tabs = append(tabs, inactiveStyle.Render(indicator+" "+level))
-		}
+		tabs = append(tabs, renderLogLevelTab(level, i == selectedLevel))
 	}
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
+}
+
+func renderLogLevelTab(level string, active bool) string {
+	style := resolveLogLevelTabStyle(level, active)
+
+	baseStyle := lipgloss.NewStyle().Background(style.Background)
+	indicator := baseStyle.Foreground(style.Indicator).Render("●")
+	text := baseStyle.Foreground(style.Foreground).Bold(style.Bold).Render(" " + level + " ")
+	return baseStyle.Render(" ") + indicator + text
+}
+
+func resolveLogLevelTabStyle(level string, active bool) logLevelTabStyle {
+	style := logLevelTabStyle{
+		Background: common.CHighlight,
+		Foreground: common.CMuted,
+		Indicator:  logLevelColors[level],
+	}
+	if active {
+		style.Background = common.CSecondary
+		style.Foreground = common.CWhite
+		style.Bold = true
+		if style.Indicator == style.Background {
+			style.Indicator = common.CWhite
+		}
+	}
+	return style
 }
 
 // LevelBarPositions 返回每个级别标签的起始位置（用于鼠标点击检测）
@@ -147,7 +163,7 @@ func LevelBarPositions(pageWidth int) []int {
 	activeStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(common.CWhite).
-		Background(common.CHighlight).
+		Background(common.CSecondary).
 		Padding(0, 1)
 
 	for i, level := range logLevels {
