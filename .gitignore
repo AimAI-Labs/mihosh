@@ -1,49 +1,37 @@
-# 编译输出
+# Compiled object files / Build artifacts
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+mihosh*
+deploy.*
 
-# 测试文件
+
+# Test output
 *.test
-coverage.out
-coverage.html
 
-# Go 工作区文件
+# Go workspace
 go.work
 go.work.sum
 
-# 依赖缓存
+# Dependencies
 vendor/
 
-# 操作系统文件
+# OS specific files
 .DS_Store
 Thumbs.db
 
-# IDE 配置
+# IDEs and editors
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# 配置文件（不提交用户配置）
-config.yaml
+# Configuration and local files
 *.prof
-.gocache/*
-deploy.sh
-deploy.ps1
+.gocache/
+.gomodcache/
 docs/*
-.gocache/*
-AGENTS_MD_RESEARCH_SUMMARY.md
-*.patch
 .spec-workflow/
-
-# 构建产物
-mihosh
-mihosh.exe
-mihosh-*
-tmp.exe
-main.exe
-.gomodcache/*

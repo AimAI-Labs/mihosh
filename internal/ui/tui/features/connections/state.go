@@ -1,6 +1,7 @@
 package connections
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -39,8 +40,9 @@ type State struct {
 	connDetailSnapshot    *model.Connection
 	connIPInfo            *model.IPInfo
 	connDetailLeftScroll  int
-	connDetailRightScroll int
-	connDetailFocusPanel  int // 0=左侧(基础+地理), 1=右侧(JSON)
+	connDetailRightScroll    int
+	connDetailFocusPanel     int // 0=左侧(基础+地理), 1=右侧(JSON)
+	connDetailJSONLineCount  int // JSON行数缓存，用于滚动上限约束
 	connViewMode          int // 0=活跃, 1=历史
 
 	siteTests        []model.SiteTest
@@ -220,8 +222,10 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client, timeout int) (State, t
 		case key.Matches(msg, common.Keys.Down), msg.String() == "j":
 			if s.connDetailFocusPanel == 0 {
 				s.connDetailLeftScroll++
+				s.clampLeftScroll()
 			} else {
 				s.connDetailRightScroll++
+				s.clampRightScroll()
 			}
 		}
 		return s, nil
@@ -353,6 +357,7 @@ func (s State) HandleMouseLeft(
 						s.connDetailRightScroll = 0
 						s.connDetailFocusPanel = 0
 						s.connIPInfo = nil
+						s.connDetailJSONLineCount = countConnJSONLines(conn)
 						return s, FetchIPInfo(conn.Metadata.DestinationIP)
 					}
 				}
@@ -457,8 +462,10 @@ func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight in
 		} else {
 			if isRightSide {
 				s.connDetailRightScroll++
+				s.clampRightScroll()
 			} else {
 				s.connDetailLeftScroll++
+				s.clampLeftScroll()
 			}
 		}
 
@@ -612,6 +619,7 @@ func (s State) openSelectedConnectionDetail() (State, tea.Cmd) {
 	s.connDetailSnapshot = &snapshot
 	s.connDetailMode = true
 	s.connIPInfo = nil
+	s.connDetailJSONLineCount = countConnJSONLines(&snapshot)
 	return s, FetchIPInfo(conn.Metadata.DestinationIP)
 }
 
@@ -631,6 +639,40 @@ func (s *State) closeConnectionDetail() {
 	s.connDetailLeftScroll = 0
 	s.connDetailRightScroll = 0
 	s.connDetailFocusPanel = 0
+	s.connDetailJSONLineCount = 0
+}
+
+// clampRightScroll 约束右侧(JSON)滚动偏移上限
+func (s *State) clampRightScroll() {
+	if s.connDetailJSONLineCount > 0 {
+		maxScroll := s.connDetailJSONLineCount - 5 // 5 = 最小可视行数
+		if maxScroll < 0 {
+			maxScroll = 0
+		}
+		if s.connDetailRightScroll > maxScroll {
+			s.connDetailRightScroll = maxScroll
+		}
+	}
+}
+
+// clampLeftScroll 约束左侧滚动偏移上限（左侧内容行数有限，使用静态上限）
+func (s *State) clampLeftScroll() {
+	const maxLeftScroll = 50
+	if s.connDetailLeftScroll > maxLeftScroll {
+		s.connDetailLeftScroll = maxLeftScroll
+	}
+}
+
+// countConnJSONLines 计算连接JSON的行数
+func countConnJSONLines(conn *model.Connection) int {
+	if conn == nil {
+		return 0
+	}
+	data, err := json.MarshalIndent(conn, "", "  ")
+	if err != nil {
+		return 0
+	}
+	return len(strings.Split(string(data), "\n"))
 }
 
 func (s *State) closeTopNModal() {
