@@ -19,6 +19,11 @@ import (
 // connRefreshInterval 连接刷新间隔
 const connRefreshInterval = 1 * time.Second
 
+const (
+	autoRefreshNoticeTicks = 3
+	autoRefreshSyncedTicks = 1
+)
+
 // connTick 创建连接页面定时器
 func connTick() tea.Cmd {
 	return tea.Tick(connRefreshInterval, func(t time.Time) tea.Msg {
@@ -33,12 +38,19 @@ func logsTick() tea.Cmd {
 	})
 }
 
+func autoRefreshTick() tea.Cmd {
+	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
+		return messages.AutoRefreshTickMsg(t)
+	})
+}
+
 // Init 初始化
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		nodes.FetchGroups(m.client),
 		nodes.FetchProxies(m.client),
 		nodes.FetchConfigMode(m.client),
+		autoRefreshTick(),
 		startWSStreams(m.wsClient, m.wsMsgChan),
 		listenWSMessages(m.wsCtx, m.wsMsgChan),
 	)
@@ -156,12 +168,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// ── 数据消息：分发到子状态 ──
 
 	case messages.GroupsMsg:
+		m.notice = ""
 		m.nodesState = m.nodesState.ApplyGroups(msg.Groups, msg.OrderedNames)
 
 	case messages.ProxiesMsg:
+		m.notice = ""
 		m.nodesState = m.nodesState.ApplyProxies(msg)
 
 	case messages.ConfigModeMsg:
+		m.notice = ""
 		m.nodesState = m.nodesState.ApplyConfigMode(msg.Mode)
 
 	case messages.ConnectionsMsg:
@@ -245,8 +260,42 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, logsTick()
 		}
 
+	case messages.AutoRefreshTickMsg:
+		interval := m.autoRefreshInterval()
+		if interval <= 0 {
+			m.autoRefreshRemaining = 0
+			m.autoRefreshSynced = false
+			m.autoRefreshSyncedTTL = 0
+			m.notice = ""
+			m.noticeTicks = 0
+			return m, autoRefreshTick()
+		}
+		m.advanceAutoRefreshTransientState()
+		if m.autoRefreshRemaining <= 0 || m.autoRefreshRemaining > interval {
+			m.autoRefreshRemaining = interval
+		}
+		m.autoRefreshRemaining--
+		if m.autoRefreshRemaining <= 0 {
+			m.autoRefreshRemaining = interval
+			return m, tea.Batch(autoRefreshTick(), fetchAutoRefresh(m.client, m.nodesState))
+		}
+		return m, autoRefreshTick()
+
+	case autoRefreshMsg:
+		m.nodesState = m.nodesState.ApplyGroups(msg.Result.Groups, msg.Result.OrderedNames)
+		m.nodesState = m.nodesState.ApplyProxies(msg.Result.Proxies)
+		m.nodesState = m.nodesState.ApplyConfigMode(msg.Result.Mode)
+		m.autoRefreshSynced = true
+		m.autoRefreshSyncedTTL = autoRefreshSyncedTicks
+		if msg.Changed {
+			m.notice = i18n.T("status.auto_refreshed")
+			m.noticeTicks = autoRefreshNoticeTicks
+		}
+
 	case messages.ErrMsg:
 		m.err = msg
+		m.notice = ""
+		m.noticeTicks = 0
 		m.nodesState.Testing = false
 		m.nodesState.TestingTarget = ""
 		m.nodesState.TestAllActive = false
@@ -291,6 +340,13 @@ func (m Model) dispatchKeyToPage(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if proxyAddr != "" {
 			m.connsState = m.connsState.UpdateProxyAddr(proxyAddr)
+		}
+		if newCfg != nil {
+			m.autoRefreshRemaining = newCfg.AutoRefreshInterval
+			m.autoRefreshSynced = false
+			m.autoRefreshSyncedTTL = 0
+			m.notice = ""
+			m.noticeTicks = 0
 		}
 	}
 	return m, cmd
@@ -411,7 +467,36 @@ func (m Model) handleSettingsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 	if proxyAddr != "" {
 		m.connsState = m.connsState.UpdateProxyAddr(proxyAddr)
 	}
+	if m.config != nil {
+		m.autoRefreshRemaining = m.config.AutoRefreshInterval
+		m.autoRefreshSynced = false
+		m.autoRefreshSyncedTTL = 0
+		m.notice = ""
+		m.noticeTicks = 0
+	}
 	return m, nil
+}
+
+func (m *Model) advanceAutoRefreshTransientState() {
+	if m.autoRefreshSyncedTTL > 0 {
+		m.autoRefreshSyncedTTL--
+		if m.autoRefreshSyncedTTL == 0 {
+			m.autoRefreshSynced = false
+		}
+	}
+	if m.noticeTicks > 0 {
+		m.noticeTicks--
+		if m.noticeTicks == 0 {
+			m.notice = ""
+		}
+	}
+}
+
+func (m Model) autoRefreshInterval() int {
+	if m.config == nil {
+		return 0
+	}
+	return m.config.AutoRefreshInterval
 }
 
 func (m Model) handleLogsMouseLeft(x, y int) (tea.Model, tea.Cmd) {

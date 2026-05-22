@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"fmt"
 	"strings"
 	"unicode/utf8"
 
@@ -46,8 +47,14 @@ func SidebarWidth() int {
 	return maxWidth
 }
 
+type SidebarRefreshStatus struct {
+	Enabled          bool
+	SecondsRemaining int
+	Synced           bool
+}
+
 // RenderSidebar 渲染侧边栏
-func RenderSidebar(currentPage PageType, height int) string {
+func RenderSidebar(currentPage PageType, height int, refreshStatus ...SidebarRefreshStatus) string {
 	sidebarWidth := SidebarWidth()
 
 	activeStyle := lipgloss.NewStyle().
@@ -86,16 +93,41 @@ func RenderSidebar(currentPage PageType, height int) string {
 	}
 	content = strings.Join(lines, "\n")
 
-	// 用右侧边框分隔，内容垂直居中
+	placedContent := lipgloss.Place(sidebarWidth, height, lipgloss.Center, lipgloss.Center, content)
+	if len(refreshStatus) > 0 {
+		if status := renderSidebarRefreshStatus(sidebarWidth, refreshStatus[0]); status != "" {
+			contentLines := strings.Split(placedContent, "\n")
+			if len(contentLines) > 0 {
+				contentLines[len(contentLines)-1] = status
+				placedContent = strings.Join(contentLines, "\n")
+			}
+		}
+	}
+
+	// 用右侧边框分隔
 	barStyle := lipgloss.NewStyle().
 		Width(sidebarWidth).
 		Height(height).
-		AlignVertical(lipgloss.Center).
 		BorderStyle(lipgloss.Border{Right: "│"}).
 		BorderRight(true).
 		BorderForeground(styles.ColorBorder)
 
-	return barStyle.Render(content)
+	return barStyle.Render(placedContent)
+}
+
+func renderSidebarRefreshStatus(width int, status SidebarRefreshStatus) string {
+	if !status.Enabled {
+		return ""
+	}
+	text := fmt.Sprintf("%ds", status.SecondsRemaining)
+	if status.Synced {
+		text = "✔"
+	}
+	return lipgloss.NewStyle().
+		Width(width).
+		Align(lipgloss.Center).
+		Foreground(styles.ColorSuccess).
+		Render(text)
 }
 
 // GetPageTitle 获取页面标题

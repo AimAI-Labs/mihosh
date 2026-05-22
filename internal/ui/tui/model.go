@@ -1,12 +1,12 @@
 package tui
 
 import (
+	"context"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/logs"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
-	"context"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 
@@ -27,10 +27,13 @@ type Model struct {
 	connSvc   *service.ConnectionService
 
 	// 路由与布局
-	currentPage layout.PageType
-	width       int
-	height      int
-	showHelp    bool
+	currentPage          layout.PageType
+	width                int
+	height               int
+	showHelp             bool
+	autoRefreshRemaining int
+	autoRefreshSynced    bool
+	autoRefreshSyncedTTL int
 
 	// 测速参数（供 NodesState 使用）
 	testURL string
@@ -40,7 +43,9 @@ type Model struct {
 	chartData *model.ChartData
 
 	// 全局错误（状态栏显示）
-	err error
+	err         error
+	notice      string
+	noticeTicks int
 
 	// WebSocket
 	wsClient  *api.WSClient
@@ -59,8 +64,6 @@ type Model struct {
 	settingsState settings.State
 }
 
-
-
 // NewModel 创建新的 TUI 模型
 func NewModel(client *api.Client, testURL string, timeout int) Model {
 	common.InitKeyBindings()
@@ -78,24 +81,25 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 	ipResolver := service.NewIPResolver()
 
 	return Model{
-		client:        client,
-		config:        cfg,
-		proxySvc:      proxySvc,
-		configSvc:     configSvc,
-		connSvc:       connSvc,
-		testURL:       testURL,
-		timeout:       timeout,
-		currentPage:   layout.PageNodes,
-		chartData:     model.NewChartData(common.ChartPoints),
-		wsClient:      wsClient,
-		wsMsgChan:     make(chan interface{}, common.WSMsgChanCap),
-		wsCtx:         wsCtx,
-		wsCancel:      wsCancel,
-		ipResolver:    ipResolver,
-		nodesState:    nodes.State{},
-		connsState:    connections.NewState(cfg.ProxyAddress, model.DefaultSiteTests()),
-		logsState:     logs.NewState(),
-		rulesState:    rules.State{},
-		settingsState: settings.State{},
+		client:               client,
+		config:               cfg,
+		proxySvc:             proxySvc,
+		configSvc:            configSvc,
+		connSvc:              connSvc,
+		testURL:              testURL,
+		timeout:              timeout,
+		currentPage:          layout.PageNodes,
+		chartData:            model.NewChartData(common.ChartPoints),
+		wsClient:             wsClient,
+		wsMsgChan:            make(chan interface{}, common.WSMsgChanCap),
+		wsCtx:                wsCtx,
+		wsCancel:             wsCancel,
+		ipResolver:           ipResolver,
+		nodesState:           nodes.State{},
+		connsState:           connections.NewState(cfg.ProxyAddress, model.DefaultSiteTests()),
+		logsState:            logs.NewState(),
+		rulesState:           rules.State{},
+		settingsState:        settings.State{},
+		autoRefreshRemaining: cfg.AutoRefreshInterval,
 	}
 }

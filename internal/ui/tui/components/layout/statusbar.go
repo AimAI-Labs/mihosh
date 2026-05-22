@@ -12,7 +12,7 @@ import (
 )
 
 // RenderStatusBar 渲染底部状态栏（含实时指标和累计流量）
-func RenderStatusBar(width int, err error, testing bool, testingTarget string, chartData *model.ChartData, uploadTotal int64, downloadTotal int64) string {
+func RenderStatusBar(width int, err error, testing bool, testingTarget string, notice string, chartData *model.ChartData, uploadTotal int64, downloadTotal int64) string {
 	// ── 左侧：运行状态 / 错误 ──
 	var status string
 	if err != nil {
@@ -36,6 +36,8 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, c
 		}
 
 		status = styles.ErrorStyle.Render(fmt.Sprintf("✗ %s", friendlyErr))
+	} else if strings.TrimSpace(notice) != "" {
+		status = styles.StatusStyle.Render("✔ " + truncateRunes(notice, width/2))
 	} else if testing {
 		statusText := i18n.T("status.testing")
 		if target := strings.TrimSpace(testingTarget); target != "" {

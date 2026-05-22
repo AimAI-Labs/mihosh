@@ -15,8 +15,8 @@ const (
 	settingsMinRowWidth = 40
 )
 
-var SettingKeys = []string{"api-address", "secret", "test-url", "timeout", "proxy-address", "language"}
-var SettingLabels = []string{"API 地址", "密钥", "测速URL", "超时(ms)", "代理地址", "语言"}
+var SettingKeys = []string{"api-address", "secret", "test-url", "timeout", "proxy-address", "language", "auto-refresh-interval"}
+var SettingLabels = []string{"API 地址", "密钥", "测速URL", "超时(ms)", "代理地址", "语言", "自动刷新(秒)"}
 
 // PageState 设置页面状态
 type PageState struct {
@@ -49,6 +49,8 @@ func GetSettingValue(cfg *config.Config, index int) string {
 			return "auto"
 		}
 		return cfg.Language
+	case 6:
+		return fmt.Sprintf("%d", cfg.AutoRefreshInterval)
 	}
 	return ""
 }
@@ -113,7 +115,7 @@ func RenderSettingsPage(state PageState, width, height int) string {
 		}
 
 		var renderedValue string
-		if i == 5 {
+		if i == LanguageSettingIndex() {
 			// 语言选项使用 Tab 组件渲染
 			valToRender := value
 			if state.EditMode && i == state.SelectedSetting {
@@ -168,7 +170,7 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	// 操作提示
 	var helpText string
 	if state.EditMode {
-		if state.SelectedSetting == 5 {
+		if state.SelectedSetting == LanguageSettingIndex() {
 			helpText = common.MutedStyle.Render("[←/→/Tab]切换 [Enter]保存 [Esc]取消")
 		} else {
 			helpText = common.MutedStyle.Render("[Enter]保存 [Esc]取消")

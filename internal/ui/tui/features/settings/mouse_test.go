@@ -91,3 +91,19 @@ func TestHandleMouseLeft_ClickLanguageTabSavesImmediately(t *testing.T) {
 		t.Fatalf("expected language click to save directly without entering edit mode")
 	}
 }
+
+func TestSettingsIncludesAutoRefreshInterval(t *testing.T) {
+	cfg := &config.Config{
+		AutoRefreshInterval: 7,
+	}
+
+	if len(SettingKeys) != 7 {
+		t.Fatalf("expected 7 setting keys, got %d", len(SettingKeys))
+	}
+	if SettingKeys[6] != "auto-refresh-interval" {
+		t.Fatalf("expected auto-refresh-interval setting key, got %q", SettingKeys[6])
+	}
+	if got := GetSettingValue(cfg, 6); got != "7" {
+		t.Fatalf("expected auto refresh interval value 7, got %q", got)
+	}
+}

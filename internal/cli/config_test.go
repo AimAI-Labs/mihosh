@@ -13,11 +13,12 @@ import (
 
 func TestRenderConfigShow(t *testing.T) {
 	cfg := &configpkg.Config{
-		APIAddress:   "http://127.0.0.1:9090",
-		Secret:       "secret-token",
-		TestURL:      "http://www.gstatic.com/generate_204",
-		Timeout:      5000,
-		ProxyAddress: "http://127.0.0.1:7890",
+		APIAddress:          "http://127.0.0.1:9090",
+		Secret:              "secret-token",
+		TestURL:             "http://www.gstatic.com/generate_204",
+		Timeout:             5000,
+		ProxyAddress:        "http://127.0.0.1:7890",
+		AutoRefreshInterval: 5,
 	}
 
 	tests := []struct {
@@ -31,6 +32,7 @@ func TestRenderConfigShow(t *testing.T) {
 			contains: []string{
 				`"api_address": "http://127.0.0.1:9090"`,
 				`"secret": "sec****ken"`,
+				`"auto_refresh_interval": 5`,
 				`"config_file":`,
 				`config.yaml`,
 			},
@@ -43,6 +45,7 @@ func TestRenderConfigShow(t *testing.T) {
 				"VALUE",
 				"API_ADDRESS",
 				"http://127.0.0.1:9090",
+				"AUTO_REFRESH_INTERVAL",
 			},
 		},
 	}

@@ -27,6 +27,7 @@ func Save(cfg *Config) error {
 	viper.Set("timeout", cfg.Timeout)
 	viper.Set("proxy_address", cfg.ProxyAddress)
 	viper.Set("language", cfg.Language)
+	viper.Set("auto_refresh_interval", cfg.AutoRefreshInterval)
 
 	return viper.WriteConfigAs(configFile)
 }

@@ -82,13 +82,15 @@ var configSetCmd = &cobra.Command{
   test-url     - 测速 URL (例如: http://www.gstatic.com/generate_204)
   timeout      - 超时时间，单位毫秒 (例如: 5000)
   proxy-address - HTTP 代理地址 (例如: http://127.0.0.1:7890)
+  auto-refresh-interval - TUI 自动刷新间隔，单位秒，0 表示关闭
 
 示例:
   mihosh config set api-address http://127.0.0.1:9090
   mihosh config set secret your-secret-here
   mihosh config set test-url http://www.google.com/generate_204
   mihosh config set timeout 3000
-  mihosh config set proxy-address http://127.0.0.1:7890`,
+  mihosh config set proxy-address http://127.0.0.1:7890
+  mihosh config set auto-refresh-interval 5`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		key := args[0]
@@ -219,7 +221,6 @@ func reloadMihomoCore(configPath string) error {
 	fmt.Println(reloadStyle.Render("✓ 已自动重载 mihomo 核心，新配置已生效。"))
 	return nil
 }
-
 
 func init() {
 	configShowCmd.Flags().StringVar(&configShowOutput, "output", string(outputFormatPlain), "输出格式: json|table|plain")
@@ -380,26 +381,31 @@ func wrapGeneralError(err error) error {
 
 func isConfigSetValidationError(err error) bool {
 	msg := strings.TrimSpace(err.Error())
-	return strings.Contains(msg, "未知的配置项:") || strings.Contains(msg, "timeout 必须是数字:")
+	return strings.Contains(msg, "未知的配置项:") ||
+		strings.Contains(msg, "timeout 必须是数字:") ||
+		strings.Contains(msg, "auto_refresh_interval 必须是数字:") ||
+		strings.Contains(msg, "auto_refresh_interval 不能小于 0")
 }
 
 func renderConfigShow(w io.Writer, cfg *config.Config, configPath string, format outputFormat) error {
 	switch format {
 	case outputFormatJSON:
 		payload := struct {
-			APIAddress   string `json:"api_address"`
-			Secret       string `json:"secret"`
-			TestURL      string `json:"test_url"`
-			TimeoutMS    int    `json:"timeout_ms"`
-			ProxyAddress string `json:"proxy_address"`
-			ConfigFile   string `json:"config_file"`
+			APIAddress          string `json:"api_address"`
+			Secret              string `json:"secret"`
+			TestURL             string `json:"test_url"`
+			TimeoutMS           int    `json:"timeout_ms"`
+			ProxyAddress        string `json:"proxy_address"`
+			AutoRefreshInterval int    `json:"auto_refresh_interval"`
+			ConfigFile          string `json:"config_file"`
 		}{
-			APIAddress:   cfg.APIAddress,
-			Secret:       utils.MaskSecret(cfg.Secret),
-			TestURL:      cfg.TestURL,
-			TimeoutMS:    cfg.Timeout,
-			ProxyAddress: cfg.ProxyAddress,
-			ConfigFile:   configPath,
+			APIAddress:          cfg.APIAddress,
+			Secret:              utils.MaskSecret(cfg.Secret),
+			TestURL:             cfg.TestURL,
+			TimeoutMS:           cfg.Timeout,
+			ProxyAddress:        cfg.ProxyAddress,
+			AutoRefreshInterval: cfg.AutoRefreshInterval,
+			ConfigFile:          configPath,
 		}
 		return writeJSON(w, payload)
 	case outputFormatTable:
@@ -410,6 +416,7 @@ func renderConfigShow(w io.Writer, cfg *config.Config, configPath string, format
 		fmt.Fprintf(tw, "TEST_URL\t%s\n", cfg.TestURL)
 		fmt.Fprintf(tw, "TIMEOUT_MS\t%d\n", cfg.Timeout)
 		fmt.Fprintf(tw, "PROXY_ADDRESS\t%s\n", cfg.ProxyAddress)
+		fmt.Fprintf(tw, "AUTO_REFRESH_INTERVAL\t%d\n", cfg.AutoRefreshInterval)
 		fmt.Fprintf(tw, "CONFIG_FILE\t%s\n", configPath)
 		return tw.Flush()
 	case outputFormatPlain:
@@ -419,6 +426,7 @@ func renderConfigShow(w io.Writer, cfg *config.Config, configPath string, format
 		fmt.Fprintf(w, "  测速 URL: %s\n", cfg.TestURL)
 		fmt.Fprintf(w, "  超时:     %dms\n", cfg.Timeout)
 		fmt.Fprintf(w, "  代理地址: %s\n", cfg.ProxyAddress)
+		fmt.Fprintf(w, "  自动刷新: %ds\n", cfg.AutoRefreshInterval)
 		fmt.Fprintf(w, "\n配置文件位置: %s\n", configPath)
 		return nil
 	default:

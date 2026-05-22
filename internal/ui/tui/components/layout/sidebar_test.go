@@ -37,3 +37,25 @@ func TestRenderSidebar_DoesNotWrapEnglishSettingsLabel(t *testing.T) {
 		t.Fatalf("expected Settings label in sidebar, got %q", sidebar)
 	}
 }
+
+func TestRenderSidebarShowsRefreshCountdownSeconds(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("en-US")
+
+	sidebar := RenderSidebar(PageNodes, 20, SidebarRefreshStatus{Enabled: true, SecondsRemaining: 4})
+
+	if !strings.Contains(sidebar, "4s") {
+		t.Fatalf("expected sidebar to show countdown seconds, got %q", sidebar)
+	}
+}
+
+func TestRenderSidebarShowsSyncedCheckmark(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("en-US")
+
+	sidebar := RenderSidebar(PageNodes, 20, SidebarRefreshStatus{Enabled: true, Synced: true})
+
+	if !strings.Contains(sidebar, "✔") {
+		t.Fatalf("expected sidebar to show synced checkmark, got %q", sidebar)
+	}
+}

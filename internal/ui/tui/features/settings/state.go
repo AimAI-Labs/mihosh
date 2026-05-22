@@ -85,7 +85,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 	settingIdx := resolveMouseSettingIndex(pageY)
 
 	if s.editMode {
-		if s.selectedSetting == 5 {
+		if s.selectedSetting == LanguageSettingIndex() {
 			if lang, ok := resolveLanguageMouseTarget(pageX); ok {
 				if err := configSvc.SetConfigValue(SettingKeys[s.selectedSetting], lang); err == nil {
 					newCfg, _ := configSvc.LoadConfig()
@@ -112,7 +112,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 	}
 
 	s.selectedSetting = settingIdx
-	if settingIdx == 5 {
+	if settingIdx == LanguageSettingIndex() {
 		if lang, ok := resolveLanguageMouseTarget(pageX); ok {
 			if err := configSvc.SetConfigValue(SettingKeys[settingIdx], lang); err == nil {
 				newCfg, _ := configSvc.LoadConfig()
@@ -133,7 +133,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 
 // handleEditMode 处理编辑模式按键，返回更新后的 cfg 和 proxyAddr（空表示无变化）
 func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService) (State, *config.Config, string, tea.Cmd) {
-	if s.selectedSetting == 5 { // 语言设置采用 tab 切换
+	if s.selectedSetting == LanguageSettingIndex() { // 语言设置采用 tab 切换
 		switch {
 		case key.Matches(msg, common.Keys.Escape):
 			s.editMode = false
@@ -247,6 +247,15 @@ func prevLanguage(lang string) string {
 		}
 	}
 	return "auto"
+}
+
+func LanguageSettingIndex() int {
+	for i, key := range SettingKeys {
+		if key == "language" {
+			return i
+		}
+	}
+	return -1
 }
 
 func resolveLanguageMouseTarget(pageX int) (string, bool) {

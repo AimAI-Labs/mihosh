@@ -21,7 +21,7 @@ func (m Model) View() string {
 
 	// ── 布局参数 ──
 	sidebarRenderedWidth := layout.SidebarWidth() + 1 // 含右边框 │
-	statusBarHeight := common.StatusBarHeight       // 分隔线 + 信息行
+	statusBarHeight := common.StatusBarHeight         // 分隔线 + 信息行
 	contentHeight := m.height - statusBarHeight
 	if contentHeight < common.MinContentHeight {
 		contentHeight = common.MinContentHeight
@@ -32,7 +32,11 @@ func (m Model) View() string {
 	}
 
 	// ── 侧边栏 ──
-	sidebar := layout.RenderSidebar(m.currentPage, contentHeight)
+	sidebar := layout.RenderSidebar(m.currentPage, contentHeight, layout.SidebarRefreshStatus{
+		Enabled:          m.autoRefreshInterval() > 0,
+		SecondsRemaining: m.autoRefreshRemaining,
+		Synced:           m.autoRefreshSynced,
+	})
 
 	// ── 渲染当前页面内容 ──
 	var pageContent string
@@ -85,6 +89,7 @@ func (m Model) View() string {
 		m.err,
 		m.nodesState.Testing,
 		m.nodesState.TestingTarget,
+		m.notice,
 		m.chartData,
 		uploadTotal,
 		downloadTotal,

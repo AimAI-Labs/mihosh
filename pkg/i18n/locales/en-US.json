@@ -18,6 +18,7 @@
   "status.normal": "Normal",
   "status.help_hint": "1-5 Switch │ / Search │ ? Help │ q Quit",
   "status.total": "Total",
+  "status.auto_refreshed": "Config synced: external node/mode change detected",
 
   "key.up": "Up",
   "key.down": "Down",

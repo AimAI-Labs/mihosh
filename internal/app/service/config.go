@@ -87,8 +87,17 @@ func (s *ConfigService) SetConfigValue(key, value string) error {
 			return fmt.Errorf("language 必须是 auto, zh-CN 或 en-US")
 		}
 		cfg.Language = value
+	case "auto_refresh_interval", "auto-refresh-interval":
+		var interval int
+		if _, err := fmt.Sscanf(value, "%d", &interval); err != nil {
+			return fmt.Errorf("auto_refresh_interval 必须是数字: %v", err)
+		}
+		if interval < 0 {
+			return fmt.Errorf("auto_refresh_interval 不能小于 0")
+		}
+		cfg.AutoRefreshInterval = interval
 	default:
-		return fmt.Errorf("未知的配置项: %s (可用: api_address, secret, test_url, timeout, proxy_address, language)", key)
+		return fmt.Errorf("未知的配置项: %s (可用: api_address, secret, test_url, timeout, proxy_address, language, auto_refresh_interval)", key)
 	}
 
 	return config.Save(cfg)
