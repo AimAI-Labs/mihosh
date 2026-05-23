@@ -146,17 +146,18 @@ func (c *Client) CloseAllConnections() error {
 
 // GetMemory 获取内存使用信息
 func (c *Client) GetMemory() (*model.MemoryResponse, error) {
-	data, err := c.DoRequest("GET", "/memory", nil)
+	httpResp, err := c.doRawRequest("GET", "/memory", nil)
 	if err != nil {
 		return nil, err
 	}
+	defer httpResp.Body.Close()
 
-	var resp model.MemoryResponse
-	if err := json.Unmarshal(data, &resp); err != nil {
+	var mem model.MemoryResponse
+	if err := json.NewDecoder(httpResp.Body).Decode(&mem); err != nil {
 		return nil, err
 	}
 
-	return &resp, nil
+	return &mem, nil
 }
 
 // GetRules 获取规则列表

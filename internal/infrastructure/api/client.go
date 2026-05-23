@@ -33,6 +33,16 @@ func NewClient(cfg *config.Config) *Client {
 
 // DoRequest 执行 HTTP 请求（导出供 endpoints 使用）
 func (c *Client) DoRequest(method, path string, body interface{}) ([]byte, error) {
+	resp, err := c.doRawRequest(method, path, body)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	return io.ReadAll(resp.Body)
+}
+
+func (c *Client) doRawRequest(method, path string, body interface{}) (*http.Response, error) {
 	url := c.baseURL + path
 
 	var reqBody io.Reader
@@ -58,13 +68,13 @@ func (c *Client) DoRequest(method, path string, body interface{}) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		resp.Body.Close()
 		return nil, fmt.Errorf("API 请求失败: %s", resp.Status)
 	}
 
-	return io.ReadAll(resp.Body)
+	return resp, nil
 }
 
 // NewHTTPClientWithProxy 创建一个带代理的 HTTP 客户端
