@@ -66,6 +66,9 @@ func init() {
 	rootCmd.AddCommand(connectionsCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(modeCmd)
+	rootCmd.AddCommand(statusCmd)
+	rootCmd.AddCommand(serviceCmd)
+	rootCmd.AddCommand(doctorCmd)
 }
 
 // Execute 执行命令
