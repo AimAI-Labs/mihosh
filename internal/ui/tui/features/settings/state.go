@@ -30,6 +30,11 @@ type State struct {
 	lastMouseAt      time.Time
 }
 
+// IsEditing 返回是否处于编辑模式
+func (s State) IsEditing() bool {
+	return s.editMode
+}
+
 // ToPageState 转换为渲染层所需的 PageState
 func (s State) ToPageState(cfg *config.Config) PageState {
 	return PageState{

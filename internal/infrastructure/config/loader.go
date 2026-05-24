@@ -217,11 +217,20 @@ func Load() (*Config, error) {
 	viper.SetConfigFile(configFile)
 	viper.SetConfigType("yaml")
 
+	// 预注册默认值，防止 Unmarshal 将 YAML 缺失字段重置为零值
+	viper.SetDefault("api_address", DefaultConfig.APIAddress)
+	viper.SetDefault("secret", DefaultConfig.Secret)
+	viper.SetDefault("test_url", DefaultConfig.TestURL)
+	viper.SetDefault("timeout", DefaultConfig.Timeout)
+	viper.SetDefault("proxy_address", DefaultConfig.ProxyAddress)
+	viper.SetDefault("language", DefaultConfig.Language)
+	viper.SetDefault("auto_refresh_interval", DefaultConfig.AutoRefreshInterval)
+
 	if err := viper.ReadInConfig(); err != nil {
 		return nil, err
 	}
 
-	cfg := DefaultConfig
+	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, err
 	}

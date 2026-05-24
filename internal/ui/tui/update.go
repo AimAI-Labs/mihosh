@@ -119,6 +119,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// 设置页面编辑模式：优先分发到页面，避免全局快捷键拦截数字输入
+		if m.currentPage == layout.PageSettings && m.settingsState.IsEditing() {
+			return m.dispatchKeyToPage(msg)
+		}
+
 		// 全局快捷键
 		switch {
 		case key.Matches(msg, common.Keys.Quit):
