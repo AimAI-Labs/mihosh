@@ -57,9 +57,7 @@ func padString(s string, targetWidth int) string {
 
 // RenderNodesPage 渲染节点管理页面
 func RenderNodesPage(state PageState) string {
-	groupMaxLines, proxyMaxLines := CalcNodesListMaxLines(state.Height)
-	groupList := RenderGroupListComponent(state, groupMaxLines)
-	proxyList := RenderProxyListComponent(state, proxyMaxLines)
+	metrics := calcNodesLayoutMetrics(state.Width, state.Height)
 	modeSwitch := RenderModeSwitchComponent(state.Mode)
 
 	sortLabel := ""
@@ -83,17 +81,47 @@ func RenderNodesPage(state PageState) string {
 			" " + common.MutedStyle.Render(i18n.T("nodes.view_failure"))
 	}
 
-	mainContent := lipgloss.JoinVertical(
-		lipgloss.Left,
-		modeSwitch,
-		common.PageHeaderStyle.Width(state.Width-4).Render(i18n.Tf("nodes.group_header", state.SelectedGroup+1, len(state.GroupNames))),
-		groupList,
-		"",
-		common.PageHeaderStyle.Width(state.Width-4).Render(i18n.Tf("nodes.list_header", state.SelectedProxy+1, len(state.CurrentProxies))),
-		proxyList,
-		searchLine,
-		failureBadge,
-	)
+	var mainContent string
+	if metrics.Wide {
+		groupPanel := renderTokyoPanel(
+			i18n.Tf("nodes.group_header", state.SelectedGroup+1, len(state.GroupNames)),
+			RenderGroupListComponentWidth(state, metrics.GroupMaxLines, metrics.GroupPanelWidth-4),
+			metrics.GroupPanelWidth,
+		)
+		proxyPanel := renderTokyoPanel(
+			i18n.Tf("nodes.list_header", state.SelectedProxy+1, len(state.CurrentProxies)),
+			RenderProxyListComponentWidth(state, metrics.ProxyMaxLines, metrics.ProxyPanelWidth-4),
+			metrics.ProxyPanelWidth,
+		)
+		panels := lipgloss.JoinHorizontal(lipgloss.Top, groupPanel, strings.Repeat(" ", nodesPanelGap), proxyPanel)
+		mainContent = lipgloss.JoinVertical(
+			lipgloss.Left,
+			modeSwitch,
+			panels,
+			searchLine,
+			failureBadge,
+		)
+	} else {
+		groupList := RenderGroupListComponentWidth(state, metrics.GroupMaxLines, state.Width-6)
+		proxyList := RenderProxyListComponentWidth(state, metrics.ProxyMaxLines, state.Width-6)
+		mainContent = lipgloss.JoinVertical(
+			lipgloss.Left,
+			modeSwitch,
+			renderTokyoPanel(
+				i18n.Tf("nodes.group_header", state.SelectedGroup+1, len(state.GroupNames)),
+				groupList,
+				state.Width-2,
+			),
+			"",
+			renderTokyoPanel(
+				i18n.Tf("nodes.list_header", state.SelectedProxy+1, len(state.CurrentProxies)),
+				proxyList,
+				state.Width-2,
+			),
+			searchLine,
+			failureBadge,
+		)
+	}
 
 	contentLines := strings.Count(mainContent, "\n") + 1
 	footer := common.RenderFooter(state.Width, state.Height, contentLines, helpText)
@@ -105,6 +133,8 @@ func RenderNodesPage(state PageState) string {
 	}
 	return fullPage
 }
+
+
 
 // buildFailureModal 构建测速失败详情弹窗字符串
 func buildFailureModal(state PageState) string {

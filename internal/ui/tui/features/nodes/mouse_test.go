@@ -17,8 +17,8 @@ func TestHandleMouseLeft_GroupSelectionKeepsLinkage(t *testing.T) {
 	}
 	state.updateCurrentProxies()
 
-	// Y=5 是第一条策略组数据（g1），Y=6 是第二条（g2）
-	next, cmd := state.HandleMouseLeft(4, 6, 120, 24, nil)
+	// Y=4 是第一条策略组数据（g1），Y=5 是第二条（g2）
+	next, cmd := state.HandleMouseLeft(4, 5, 120, 24, nil)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd for single group click")
 	}
@@ -46,12 +46,12 @@ func TestHandleMouseLeft_ProxyDoubleClickExecutesSwitch(t *testing.T) {
 	// proxyHeaderStart = 4 + 2 + 1 = 7
 	// proxyListStart = 7 + 2 = 9
 	// proxyDataStart = 9 + 1 = 10
-	next, cmd := state.HandleMouseLeft(8, 10, 120, 24, nil)
+	next, cmd := state.HandleMouseLeft(8, 10, 78, 24, nil)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd for first click")
 	}
 
-	next, cmd = next.HandleMouseLeft(8, 10, 120, 24, nil)
+	next, cmd = next.HandleMouseLeft(8, 10, 78, 24, nil)
 	if cmd == nil {
 		t.Fatalf("expected non-nil cmd for proxy double click")
 	}
