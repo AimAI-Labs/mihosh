@@ -20,19 +20,18 @@ func (m Model) View() string {
 	}
 
 	// ── 布局参数 ──
-	sidebarRenderedWidth := layout.SidebarWidth() + 1 // 含右边框 │
-	statusBarHeight := common.StatusBarHeight         // 分隔线 + 信息行
-	contentHeight := m.height - statusBarHeight
+	statusBarHeight := common.StatusBarHeight // 分隔线 + 信息行
+	contentHeight := m.height - statusBarHeight - layout.TopNavHeight
 	if contentHeight < common.MinContentHeight {
 		contentHeight = common.MinContentHeight
 	}
-	mainWidth := m.width - sidebarRenderedWidth
+	mainWidth := m.width
 	if mainWidth < common.MinMainWidth {
 		mainWidth = common.MinMainWidth
 	}
 
-	// ── 侧边栏 ──
-	sidebar := layout.RenderSidebar(m.currentPage, contentHeight, layout.SidebarRefreshStatus{
+	// ── 顶部导航 ──
+	topNav := layout.RenderTopNav(m.currentPage, m.width, layout.SidebarRefreshStatus{
 		Enabled:          m.autoRefreshInterval() > 0,
 		SecondsRemaining: m.autoRefreshRemaining,
 		Synced:           m.autoRefreshSynced,
@@ -75,9 +74,6 @@ func (m Model) View() string {
 
 	mainPane := mainPaneStyle.Render(mainContent)
 
-	// ── 横向拼接：侧边栏 | 主面板 ──
-	upper := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, mainPane)
-
 	// ── 底部状态栏 ──
 	var uploadTotal, downloadTotal int64
 	if m.connsState.Connections != nil {
@@ -95,5 +91,5 @@ func (m Model) View() string {
 		downloadTotal,
 	)
 
-	return lipgloss.JoinVertical(lipgloss.Left, upper, statusBar)
+	return lipgloss.JoinVertical(lipgloss.Left, topNav, mainPane, statusBar)
 }

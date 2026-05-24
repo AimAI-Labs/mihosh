@@ -71,14 +71,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMsg:
 		switch {
 		case isMouseLeftPress(msg):
-			statusBarHeight := common.StatusBarHeight
-			contentHeight := m.height - statusBarHeight
-			if contentHeight < common.MinContentHeight {
-				contentHeight = common.MinContentHeight
-			}
-			sidebarWidth := layout.SidebarWidth()
-			if msg.X >= 0 && msg.X < sidebarWidth && msg.Y >= 0 && msg.Y < contentHeight {
-				clickedPage := layout.GetClickedPage(msg.X, msg.Y, contentHeight)
+			if msg.Y >= 0 && msg.Y < layout.TopNavHeight {
+				clickedPage := layout.GetClickedTopNavPage(msg.X, msg.Y, m.width)
 				if clickedPage >= 0 && clickedPage < layout.PageCount {
 					m.currentPage = clickedPage
 					return m, m.onPageChange()
@@ -383,8 +377,7 @@ func (m *Model) refreshCurrentPage() tea.Cmd {
 
 // handleMouseScroll 处理鼠标滚轮滚动
 func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
-	sidebarWidth := layout.SidebarWidth()
-	if x >= 0 && x < sidebarWidth {
+	if y >= 0 && y < layout.TopNavHeight {
 		if up {
 			m.currentPage = (m.currentPage + layout.PageCount - 1) % layout.PageCount
 		} else {
@@ -393,14 +386,13 @@ func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
 		return m, m.onPageChange()
 	}
 
-	sidebarRenderedWidth := layout.SidebarWidth() + 1
-	mainWidth := m.width - sidebarRenderedWidth
+	mainWidth := m.width
 	if mainWidth < common.MinMainWidth {
 		mainWidth = common.MinMainWidth
 	}
-	mainX := x - sidebarRenderedWidth
-	mainY := y
-	mainHeight := m.height
+	mainX := x
+	mainY := y - layout.TopNavHeight
+	mainHeight := m.height - layout.TopNavHeight
 
 	switch m.currentPage {
 	case layout.PageNodes:
@@ -512,36 +504,39 @@ func (m Model) handleLogsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 
 func (m Model) resolveMainPageMouseHit(x, y int) (pageX, pageY, pageWidth, pageHeight int, ok bool) {
 	statusBarHeight := common.StatusBarHeight
-	contentHeight := m.height - statusBarHeight
+	contentHeight := m.height - statusBarHeight - layout.TopNavHeight
 	if contentHeight < common.MinContentHeight {
 		contentHeight = common.MinContentHeight
 	}
-	if y < 0 || y >= contentHeight {
+	contentYAbs := y - layout.TopNavHeight
+	if contentYAbs < 0 || contentYAbs >= contentHeight {
 		return 0, 0, 0, 0, false
 	}
 
-	sidebarRenderedWidth := layout.SidebarWidth() + 1
-	mainWidth := m.width - sidebarRenderedWidth
+	mainWidth := m.width
 	if mainWidth < common.MinMainWidth {
 		mainWidth = common.MinMainWidth
 	}
 
-	mainX := x - sidebarRenderedWidth
+	mainX := x
 	if mainX <= 0 || mainX >= mainWidth-1 {
 		return 0, 0, 0, 0, false
 	}
-	if y <= 0 || y >= contentHeight-1 {
+	if contentYAbs <= 0 || contentYAbs >= contentHeight-1 {
 		return 0, 0, 0, 0, false
 	}
 
-	contentY := y - 1
+	contentY := contentYAbs - 1
 	const pageContentOffsetY = 2 // 标题 + 空行
 	if contentY < pageContentOffsetY {
 		return 0, 0, 0, 0, false
 	}
 
 	pageY = contentY - pageContentOffsetY
-	pageHeight = m.height - 8
+	pageHeight = m.height - layout.TopNavHeight - 8
+	if pageHeight < common.MinContentHeight {
+		pageHeight = common.MinContentHeight
+	}
 	pageWidth = mainWidth - 2
 	if pageWidth < common.MinMainWidth {
 		pageWidth = common.MinMainWidth

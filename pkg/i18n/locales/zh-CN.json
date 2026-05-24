@@ -18,6 +18,7 @@
   "status.normal": "正常",
   "status.help_hint": "1-5 切页 │ / 搜索 │ ? 帮助 │ q 退出",
   "status.total": "总流量",
+  "status.auto_refresh": "自动刷新",
   "status.auto_refreshed": "配置已同步：检测到外部节点/模式变化",
 
   "key.up": "上",

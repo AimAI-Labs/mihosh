@@ -86,8 +86,10 @@ func TestSettingsLanguageMouseClickAppliesI18nImmediately(t *testing.T) {
 		height:      30,
 	}
 
-	const rawX = 51
-	const rawY = 12
+	const pageX = 42
+	const pageY = 9
+	const rawX = pageX + 1
+	const rawY = pageY + layout.TopNavHeight + 3
 
 	next, cmd := model.handleSettingsMouseLeft(rawX, rawY)
 	if cmd == nil {

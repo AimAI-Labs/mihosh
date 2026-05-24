@@ -3,7 +3,6 @@ package layout
 import (
 	"fmt"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/styles"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -33,19 +32,7 @@ func getSidebarItems() []struct{ Label string } {
 	}
 }
 
-const minSidebarWidth = 6
-
-// SidebarWidth 返回当前语言下侧边栏内容宽度（不含右边框）
-func SidebarWidth() int {
-	maxWidth := minSidebarWidth
-	for _, item := range getSidebarItems() {
-		labelWidth := utf8.RuneCountInString(item.Label)
-		if labelWidth > maxWidth {
-			maxWidth = labelWidth
-		}
-	}
-	return maxWidth
-}
+const TopNavHeight = 3
 
 type SidebarRefreshStatus struct {
 	Enabled          bool
@@ -53,69 +40,158 @@ type SidebarRefreshStatus struct {
 	Synced           bool
 }
 
-// RenderSidebar 渲染侧边栏
-func RenderSidebar(currentPage PageType, height int, refreshStatus ...SidebarRefreshStatus) string {
-	sidebarWidth := SidebarWidth()
-
-	activeStyle := lipgloss.NewStyle().
-		Foreground(styles.ColorPrimary).
-		Bold(true).
-		Width(sidebarWidth).
-		Align(lipgloss.Center)
-
-	inactiveStyle := lipgloss.NewStyle().
-		Foreground(styles.ColorGray).
-		Width(sidebarWidth).
-		Align(lipgloss.Center)
-
-	var items []string
-	sidebarItems := getSidebarItems()
-
-	for i, item := range sidebarItems {
-		var label string
-		if PageType(i) == currentPage {
-			label = activeStyle.Render(item.Label)
-		} else {
-			label = inactiveStyle.Render(item.Label)
-		}
-		items = append(items, label)
-		if i < len(sidebarItems)-1 {
-			items = append(items, "")
-		}
-	}
-
-	content := strings.Join(items, "\n")
-
-	// 截断超出的内容，防止侧边栏溢出
-	lines := strings.Split(content, "\n")
-	if len(lines) > height {
-		lines = lines[:height]
-	}
-	content = strings.Join(lines, "\n")
-
-	placedContent := lipgloss.Place(sidebarWidth, height, lipgloss.Center, lipgloss.Center, content)
-	if len(refreshStatus) > 0 {
-		if status := renderSidebarRefreshStatus(sidebarWidth, refreshStatus[0]); status != "" {
-			contentLines := strings.Split(placedContent, "\n")
-			if len(contentLines) > 0 {
-				contentLines[len(contentLines)-1] = status
-				placedContent = strings.Join(contentLines, "\n")
-			}
-		}
-	}
-
-	// 用右侧边框分隔
-	barStyle := lipgloss.NewStyle().
-		Width(sidebarWidth).
-		Height(height).
-		BorderStyle(lipgloss.Border{Right: "│"}).
-		BorderRight(true).
-		BorderForeground(styles.ColorBorder)
-
-	return barStyle.Render(placedContent)
+type topNavItemBounds struct {
+	Page   PageType
+	StartX int
+	EndX   int
 }
 
-func renderSidebarRefreshStatus(width int, status SidebarRefreshStatus) string {
+// RenderTopNav 渲染顶部横向导航栏。导航栏无标题，使用与节点管理面板一致的方框语言。
+func RenderTopNav(currentPage PageType, width int, refreshStatus ...SidebarRefreshStatus) string {
+	if width < commonMinTopNavWidth() {
+		width = commonMinTopNavWidth()
+	}
+	innerWidth := width - 2
+	if innerWidth < 1 {
+		innerWidth = 1
+	}
+
+	content := renderTopNavContent(currentPage, innerWidth, refreshStatus...)
+	topLine := lipgloss.NewStyle().Foreground(styles.ColorPrimary).Render("╭" + strings.Repeat("─", innerWidth) + "╮")
+	middleLine := lipgloss.NewStyle().Foreground(styles.ColorPrimary).Render("│") +
+		content +
+		lipgloss.NewStyle().Foreground(styles.ColorPrimary).Render("│")
+	bottomLine := lipgloss.NewStyle().Foreground(styles.ColorPrimary).Render("╰" + strings.Repeat("─", innerWidth) + "╯")
+	return topLine + "\n" + middleLine + "\n" + bottomLine
+}
+
+func commonMinTopNavWidth() int {
+	return 24
+}
+
+func renderTopNavContent(currentPage PageType, width int, refreshStatus ...SidebarRefreshStatus) string {
+	items := getSidebarItems()
+	activeStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("#292E42")).
+		Foreground(styles.ColorPrimary).
+		Bold(true)
+	inactiveStyle := lipgloss.NewStyle().Foreground(styles.ColorGray)
+	separatorStyle := lipgloss.NewStyle().Foreground(styles.ColorGray)
+
+	parts := make([]string, 0, len(items)*2)
+	for i, item := range items {
+		label := " " + item.Label + " "
+		if PageType(i) == currentPage {
+			parts = append(parts, activeStyle.Render(label))
+		} else {
+			parts = append(parts, inactiveStyle.Render(label))
+		}
+		if i < len(items)-1 {
+			parts = append(parts, separatorStyle.Render("│"))
+		}
+	}
+
+	left := lipgloss.JoinHorizontal(lipgloss.Left, parts...)
+	right := ""
+	if len(refreshStatus) > 0 {
+		right = renderSidebarRefreshStatus(refreshStatus[0], true)
+		if right != "" && lipgloss.Width(left)+lipgloss.Width(right)+1 > width {
+			right = renderSidebarRefreshStatus(refreshStatus[0], false)
+		}
+	}
+	if right == "" {
+		return fitTopNavLine(left, width)
+	}
+
+	gap := width - lipgloss.Width(left) - lipgloss.Width(right)
+	if gap < 1 {
+		leftWidth := width - lipgloss.Width(right) - 1
+		if leftWidth <= 0 {
+			return fitTopNavLine(right, width)
+		}
+		return truncateTopNavLine(left, leftWidth) + " " + right
+	}
+	return fitTopNavLine(left+strings.Repeat(" ", gap)+right, width)
+}
+
+func fitTopNavLine(line string, width int) string {
+	lineWidth := lipgloss.Width(line)
+	if lineWidth > width {
+		return truncateTopNavLine(line, width)
+	}
+	return line + strings.Repeat(" ", width-lineWidth)
+}
+
+func truncateTopNavLine(line string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	if lipgloss.Width(line) <= width {
+		return line
+	}
+	var b strings.Builder
+	current := 0
+	inEscape := false
+	for _, r := range line {
+		if inEscape {
+			b.WriteRune(r)
+			if r == 'm' {
+				inEscape = false
+			}
+			continue
+		}
+		if r == '\x1b' {
+			inEscape = true
+			b.WriteRune(r)
+			continue
+		}
+		rw := lipgloss.Width(string(r))
+		if current+rw > width {
+			break
+		}
+		b.WriteRune(r)
+		current += rw
+	}
+	if current < width {
+		b.WriteString(strings.Repeat(" ", width-current))
+	}
+	return b.String()
+}
+
+// GetClickedTopNavPage 获取点击位置对应的顶部导航页面。
+func GetClickedTopNavPage(x, y, width int) PageType {
+	if y != 1 || x <= 0 || x >= width-1 {
+		return -1
+	}
+	contentX := x - 1
+	for _, bounds := range calcTopNavItemBounds() {
+		if contentX >= bounds.StartX && contentX < bounds.EndX {
+			return bounds.Page
+		}
+	}
+	return -1
+}
+
+func calcTopNavItemBounds() []topNavItemBounds {
+	items := getSidebarItems()
+	bounds := make([]topNavItemBounds, 0, len(items))
+	x := 0
+	for i, item := range items {
+		itemWidth := lipgloss.Width(" " + item.Label + " ")
+		bounds = append(bounds, topNavItemBounds{
+			Page:   PageType(i),
+			StartX: x,
+			EndX:   x + itemWidth,
+		})
+		x += itemWidth
+		if i < len(items)-1 {
+			x++
+		}
+	}
+	return bounds
+}
+
+func renderSidebarRefreshStatus(status SidebarRefreshStatus, includeLabel bool) string {
 	if !status.Enabled {
 		return ""
 	}
@@ -123,8 +199,10 @@ func renderSidebarRefreshStatus(width int, status SidebarRefreshStatus) string {
 	if status.Synced {
 		text = "✔"
 	}
+	if includeLabel {
+		text = i18n.T("status.auto_refresh") + " " + text
+	}
 	return lipgloss.NewStyle().
-		Width(width).
 		Align(lipgloss.Center).
 		Foreground(styles.ColorSuccess).
 		Render(text)
@@ -143,53 +221,4 @@ func GetPageTitle(page PageType) string {
 		return titles[page]
 	}
 	return ""
-}
-
-// SidebarMenuHeight 获取侧边栏菜单区域的高度（不含边框）
-func SidebarMenuHeight(height int) int {
-	// 侧边栏有5个菜单项，每个菜单项占1行，项之间有4个空行
-	// 菜单项: 节点(0), 连接(1), 日志(2), 规则(3), 设置(4)
-	// 总共占据: 5 + 4 = 9 行
-	return 9
-}
-
-// GetClickedPage 获取点击位置对应的页面类型
-// x, y 是点击的绝对坐标，height 是侧边栏的实际可用高度（contentHeight）
-// 返回对应的页面类型，如果点击不在菜单区域返回 -1
-func GetClickedPage(x, y, height int) PageType {
-	// 侧边栏宽度为6（不含右边框），点击的X坐标应该 < 6
-	if x < 0 || x >= SidebarWidth() {
-		return -1
-	}
-
-	// 菜单内容共 9 行（5项 + 4空行），lipgloss AlignVertical(Center)
-	// 会在顶部插入 (height - 9) / 2 行空白，需要减去该偏移
-	const menuContentHeight = 9
-	topPadding := (height - menuContentHeight) / 2
-	if topPadding < 0 {
-		topPadding = 0
-	}
-
-	// 将绝对 y 转换为菜单内的相对 y
-	menuY := y - topPadding
-	if menuY < 0 || menuY >= menuContentHeight {
-		return -1
-	}
-
-	// 计算点击的是哪个菜单项
-	// 节点: 0, 连接: 1, 日志: 2, 规则: 3, 设置: 4
-	// 空行位置: 1, 3, 5, 7
-	clickedPage := menuY / 2
-
-	// 如果点击的是空行位置，则无效
-	if menuY%2 == 1 {
-		return -1
-	}
-
-	// 确保不超过页面数量
-	if clickedPage >= int(PageCount) {
-		return -1
-	}
-
-	return PageType(clickedPage)
 }

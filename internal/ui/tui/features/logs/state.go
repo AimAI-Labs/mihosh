@@ -95,16 +95,16 @@ func (s State) ClearLogs() State {
 // ToPageState 转换为渲染层所需的 PageState
 func (s State) ToPageState(width, height int) PageState {
 	return PageState{
-		Logs:               s.logs(),
-		FilteredLogIndices: s.filteredLogIndices,
-		LogLevel:           s.logLevel,
-		FilterText:         s.logFilter,
-		FilterMode:         s.logFilterMode,
-		SelectedLog:        s.selectedLog,
-		ScrollTop:          s.logScrollTop,
-		HScrollOffset:      s.logHScrollOffset,
-		Width:              width,
-		Height:             height,
+		Logs:                s.logs(),
+		FilteredLogIndices:  s.filteredLogIndices,
+		LogLevel:            s.logLevel,
+		FilterText:          s.logFilter,
+		FilterMode:          s.logFilterMode,
+		SelectedLog:         s.selectedLog,
+		ScrollTop:           s.logScrollTop,
+		HScrollOffset:       s.logHScrollOffset,
+		Width:               width,
+		Height:              height,
 		DetailMode:          s.detailMode,
 		DetailLog:           s.detailLog,
 		DetailParsed:        s.detailParsed,
@@ -310,7 +310,6 @@ func (s State) HandleMouseLeft(pageY int, pageX int, pageWidth int, resolver *se
 	return s, nil
 }
 
-
 // HandleMouseScroll 鼠标滚轮处理
 func (s State) HandleMouseScroll(up bool) State {
 	count := len(s.filteredLogIndices)
@@ -331,8 +330,7 @@ func (s State) HandleMouseScroll(up bool) State {
 
 // UpdateMaxHScrollOffset 根据页面尺寸更新最大水平滚动偏移
 func (s State) UpdateMaxHScrollOffset(width, height int) State {
-	sidebarRenderedWidth := 19
-	pageWidth := width - sidebarRenderedWidth - 2
+	pageWidth := width - 2
 	if pageWidth < 1 {
 		pageWidth = 1
 	}

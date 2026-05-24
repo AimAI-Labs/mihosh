@@ -1,20 +1,19 @@
 package tui
 
 import (
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/logs"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/help"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/help"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/logs"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
 )
 
 // getPageSize 计算页面内容的可用宽度和高度
 func (m Model) getPageSize() (pageWidth, pageHeight int) {
-	sidebarRenderedWidth := layout.SidebarWidth() + 1
-	mainWidth := m.width - sidebarRenderedWidth
+	mainWidth := m.width
 	if mainWidth < common.MinMainWidth {
 		mainWidth = common.MinMainWidth
 	}
@@ -22,7 +21,10 @@ func (m Model) getPageSize() (pageWidth, pageHeight int) {
 	if pageWidth < common.MinMainWidth {
 		pageWidth = common.MinMainWidth
 	}
-	pageHeight = m.height - 8
+	pageHeight = m.height - layout.TopNavHeight - 8
+	if pageHeight < common.MinContentHeight {
+		pageHeight = common.MinContentHeight
+	}
 	return pageWidth, pageHeight
 }
 
