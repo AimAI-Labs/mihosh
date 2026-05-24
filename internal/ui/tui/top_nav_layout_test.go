@@ -21,7 +21,7 @@ func TestResolveMainPageMouseHitUsesTopNavOffset(t *testing.T) {
 		t.Fatal("expected point inside main page content to resolve")
 	}
 	if pageX != 1 {
-		t.Fatalf("expected pageX 1 without left sidebar offset, got %d", pageX)
+		t.Fatalf("expected pageX 1 without horizontal nav offset, got %d", pageX)
 	}
 	if pageY != 0 {
 		t.Fatalf("expected pageY 0 after top nav and title offsets, got %d", pageY)
@@ -76,6 +76,92 @@ func TestMouseClickTopNavChangesPage(t *testing.T) {
 	got := next.(Model).currentPage
 	if got != layout.PageLogs {
 		t.Fatalf("expected click on top nav logs item to switch to PageLogs, got %v", got)
+	}
+}
+
+func TestMouseClickTopNavDoesNotActivateTopNavBorder(t *testing.T) {
+	m := Model{
+		currentPage: layout.PageNodes,
+		width:       100,
+		height:      30,
+	}
+
+	next, _ := m.Update(tea.MouseMsg{
+		X:      2,
+		Y:      1,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+
+	if next.(Model).topNavActive() {
+		t.Fatal("expected top nav mouse click not to activate top nav border")
+	}
+}
+
+func TestMouseClickOutsideTopNavDoesNotActivateTopNavBorder(t *testing.T) {
+	m := Model{
+		currentPage: layout.PageNodes,
+		width:       100,
+		height:      30,
+	}
+
+	next, _ := m.Update(tea.MouseMsg{
+		X:      50,
+		Y:      10,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+
+	if next.(Model).topNavActive() {
+		t.Fatal("expected non-top-nav mouse click not to activate top nav border")
+	}
+}
+
+func TestMouseWheelOnTopNavDoesNotActivateTopNavBorder(t *testing.T) {
+	m := Model{
+		currentPage: layout.PageNodes,
+		width:       100,
+		height:      30,
+	}
+
+	next, _ := m.Update(tea.MouseMsg{
+		X:      50,
+		Y:      1,
+		Button: tea.MouseButtonWheelDown,
+		Action: tea.MouseActionPress,
+	})
+
+	if next.(Model).topNavActive() {
+		t.Fatal("expected top nav mouse wheel scroll not to activate top nav border")
+	}
+}
+
+func TestMouseWheelOutsideTopNavDoesNotActivateTopNavBorder(t *testing.T) {
+	m := Model{
+		currentPage: layout.PageNodes,
+		width:       100,
+		height:      30,
+	}
+
+	next, _ := m.Update(tea.MouseMsg{
+		X:      50,
+		Y:      10,
+		Button: tea.MouseButtonWheelDown,
+		Action: tea.MouseActionPress,
+	})
+
+	if next.(Model).topNavActive() {
+		t.Fatal("expected non-top-nav mouse wheel scroll not to activate top nav border")
+	}
+}
+
+func TestAutoRefreshSyncDoesNotActivateTopNavBorder(t *testing.T) {
+	model := Model{
+		autoRefreshSynced: true,
+	}
+
+	if model.topNavActive() {
+		t.Fatal("expected auto refresh sync not to activate top nav border")
 	}
 }
 

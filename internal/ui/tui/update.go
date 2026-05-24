@@ -261,6 +261,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case messages.AutoRefreshTickMsg:
 		interval := m.autoRefreshInterval()
+		m.advanceAutoRefreshTransientState()
 		if interval <= 0 {
 			m.autoRefreshRemaining = 0
 			m.autoRefreshSynced = false
@@ -269,7 +270,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.noticeTicks = 0
 			return m, autoRefreshTick()
 		}
-		m.advanceAutoRefreshTransientState()
 		if m.autoRefreshRemaining <= 0 || m.autoRefreshRemaining > interval {
 			m.autoRefreshRemaining = interval
 		}
@@ -487,6 +487,10 @@ func (m *Model) advanceAutoRefreshTransientState() {
 			m.notice = ""
 		}
 	}
+}
+
+func (m Model) topNavActive() bool {
+	return false
 }
 
 func (m Model) autoRefreshInterval() int {

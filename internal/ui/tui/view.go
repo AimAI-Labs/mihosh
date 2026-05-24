@@ -31,7 +31,7 @@ func (m Model) View() string {
 	}
 
 	// ── 顶部导航 ──
-	topNav := layout.RenderTopNav(m.currentPage, m.width, layout.SidebarRefreshStatus{
+	topNav := layout.RenderTopNav(m.currentPage, m.width, layout.TopNavRefreshStatus{
 		Enabled:          m.autoRefreshInterval() > 0,
 		SecondsRemaining: m.autoRefreshRemaining,
 		Synced:           m.autoRefreshSynced,

@@ -21,8 +21,8 @@ const (
 	PageCount // 页面总数，必须放在最后
 )
 
-// getSidebarItems 获取侧边栏项目
-func getSidebarItems() []struct{ Label string } {
+// getTopNavItems 获取顶部导航项目
+func getTopNavItems() []struct{ Label string } {
 	return []struct{ Label string }{
 		{i18n.T("menu.nodes")},
 		{i18n.T("menu.connections")},
@@ -34,7 +34,7 @@ func getSidebarItems() []struct{ Label string } {
 
 const TopNavHeight = 3
 
-type SidebarRefreshStatus struct {
+type TopNavRefreshStatus struct {
 	Enabled          bool
 	SecondsRemaining int
 	Synced           bool
@@ -47,7 +47,7 @@ type topNavItemBounds struct {
 }
 
 // RenderTopNav 渲染顶部横向导航栏。导航栏无标题，使用与节点管理面板一致的方框语言。
-func RenderTopNav(currentPage PageType, width int, refreshStatus ...SidebarRefreshStatus) string {
+func RenderTopNav(currentPage PageType, width int, refreshStatus ...TopNavRefreshStatus) string {
 	if width < commonMinTopNavWidth() {
 		width = commonMinTopNavWidth()
 	}
@@ -57,11 +57,12 @@ func RenderTopNav(currentPage PageType, width int, refreshStatus ...SidebarRefre
 	}
 
 	content := renderTopNavContent(currentPage, innerWidth, refreshStatus...)
-	topLine := lipgloss.NewStyle().Foreground(styles.ColorPrimary).Render("╭" + strings.Repeat("─", innerWidth) + "╮")
-	middleLine := lipgloss.NewStyle().Foreground(styles.ColorPrimary).Render("│") +
+	borderStyle := topNavBorderStyle()
+	topLine := borderStyle.Render("╭" + strings.Repeat("─", innerWidth) + "╮")
+	middleLine := borderStyle.Render("│") +
 		content +
-		lipgloss.NewStyle().Foreground(styles.ColorPrimary).Render("│")
-	bottomLine := lipgloss.NewStyle().Foreground(styles.ColorPrimary).Render("╰" + strings.Repeat("─", innerWidth) + "╯")
+		borderStyle.Render("│")
+	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
 	return topLine + "\n" + middleLine + "\n" + bottomLine
 }
 
@@ -69,8 +70,12 @@ func commonMinTopNavWidth() int {
 	return 24
 }
 
-func renderTopNavContent(currentPage PageType, width int, refreshStatus ...SidebarRefreshStatus) string {
-	items := getSidebarItems()
+func topNavBorderStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(styles.ColorBorder)
+}
+
+func renderTopNavContent(currentPage PageType, width int, refreshStatus ...TopNavRefreshStatus) string {
+	items := getTopNavItems()
 	activeStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color("#292E42")).
 		Foreground(styles.ColorPrimary).
@@ -94,9 +99,9 @@ func renderTopNavContent(currentPage PageType, width int, refreshStatus ...Sideb
 	left := lipgloss.JoinHorizontal(lipgloss.Left, parts...)
 	right := ""
 	if len(refreshStatus) > 0 {
-		right = renderSidebarRefreshStatus(refreshStatus[0], true)
+		right = renderTopNavRefreshStatus(refreshStatus[0], true)
 		if right != "" && lipgloss.Width(left)+lipgloss.Width(right)+1 > width {
-			right = renderSidebarRefreshStatus(refreshStatus[0], false)
+			right = renderTopNavRefreshStatus(refreshStatus[0], false)
 		}
 	}
 	if right == "" {
@@ -173,7 +178,7 @@ func GetClickedTopNavPage(x, y, width int) PageType {
 }
 
 func calcTopNavItemBounds() []topNavItemBounds {
-	items := getSidebarItems()
+	items := getTopNavItems()
 	bounds := make([]topNavItemBounds, 0, len(items))
 	x := 0
 	for i, item := range items {
@@ -191,7 +196,7 @@ func calcTopNavItemBounds() []topNavItemBounds {
 	return bounds
 }
 
-func renderSidebarRefreshStatus(status SidebarRefreshStatus, includeLabel bool) string {
+func renderTopNavRefreshStatus(status TopNavRefreshStatus, includeLabel bool) string {
 	if !status.Enabled {
 		return ""
 	}

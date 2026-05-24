@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/AimAI-Labs/mihosh/internal/ui/styles"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -50,11 +51,33 @@ func TestRenderTopNavIsTitlelessBox(t *testing.T) {
 	}
 }
 
+func TestRenderTopNavUsesNeutralBorderWhenIdle(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("en-US")
+
+	style := topNavBorderStyle()
+
+	if got := style.GetForeground(); got != styles.ColorBorder {
+		t.Fatalf("expected idle top nav border to use neutral border color, got %q", got)
+	}
+}
+
+func TestRenderTopNavKeepsNeutralBorderWhenActiveStatusIsProvided(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("en-US")
+
+	style := topNavBorderStyle()
+
+	if got := style.GetForeground(); got != styles.ColorBorder {
+		t.Fatalf("expected active top nav border to remain neutral, got %q", got)
+	}
+}
+
 func TestRenderTopNavShowsRefreshCountdownSeconds(t *testing.T) {
 	i18n.Init()
 	i18n.SetLanguageOverride("en-US")
 
-	nav := RenderTopNav(PageNodes, 72, SidebarRefreshStatus{Enabled: true, SecondsRemaining: 4})
+	nav := RenderTopNav(PageNodes, 72, TopNavRefreshStatus{Enabled: true, SecondsRemaining: 4})
 
 	if !strings.Contains(nav, "4s") {
 		t.Fatalf("expected top nav to show countdown seconds, got %q", nav)
@@ -65,7 +88,7 @@ func TestRenderTopNavKeepsRefreshCountdownWhenWidthIsTight(t *testing.T) {
 	i18n.Init()
 	i18n.SetLanguageOverride("en-US")
 
-	nav := RenderTopNav(PageNodes, 34, SidebarRefreshStatus{Enabled: true, SecondsRemaining: 120})
+	nav := RenderTopNav(PageNodes, 34, TopNavRefreshStatus{Enabled: true, SecondsRemaining: 120})
 
 	if !strings.Contains(nav, "120s") {
 		t.Fatalf("expected top nav to keep countdown when width is tight, got %q", nav)
@@ -77,7 +100,7 @@ func TestRenderTopNavKeepsRefreshCountdownWithinNarrowWidth(t *testing.T) {
 	i18n.SetLanguageOverride("zh-CN")
 
 	width := 24
-	nav := RenderTopNav(PageNodes, width, SidebarRefreshStatus{Enabled: true, SecondsRemaining: 123456789012345678})
+	nav := RenderTopNav(PageNodes, width, TopNavRefreshStatus{Enabled: true, SecondsRemaining: 123456789012345678})
 
 	if !strings.Contains(nav, "123456789012345678s") {
 		t.Fatalf("expected top nav to keep countdown seconds, got %q", nav)
@@ -93,7 +116,7 @@ func TestRenderTopNavShowsSyncedCheckmark(t *testing.T) {
 	i18n.Init()
 	i18n.SetLanguageOverride("en-US")
 
-	nav := RenderTopNav(PageNodes, 72, SidebarRefreshStatus{Enabled: true, Synced: true})
+	nav := RenderTopNav(PageNodes, 72, TopNavRefreshStatus{Enabled: true, Synced: true})
 
 	if !strings.Contains(nav, "✔") {
 		t.Fatalf("expected top nav to show synced checkmark, got %q", nav)
