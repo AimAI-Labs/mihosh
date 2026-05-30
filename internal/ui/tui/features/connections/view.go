@@ -110,18 +110,16 @@ func RenderConnectionsPage(state PageState) string {
 	// 表头
 	tableHeader := components.RenderTableHeader(headerStyle, state.Width)
 
+	// 计算图表可用高度（响应式：根据终端高度动态调整图表大小）
+	maxChartHeight := calcMaxChartHeight(state)
+
 	// 计算使用的行数 (Header + Stats + Spacers + TableHeader + Divider + Footer)
 	usedLines := connectionsBaseUsedLines
 
 	// 加上图表和测试区域的行数
 	if state.ViewMode == 0 {
-		if state.ChartData != nil {
-			if state.Width < 90 {
-				usedLines += 14 // 窄屏堆叠：3个图表×(3行+1间距)+2间距 ≈ 14
-			} else {
-				usedLines += 8 // 宽屏并排：7行+1间距
-			}
-		}
+		chartHeight := components.ComputeChartSectionHeight(maxChartHeight)
+		usedLines += chartHeight
 		if len(state.SiteTests) > 0 {
 			layoutCols := 4
 			if state.Width < 60 {
@@ -223,7 +221,7 @@ func RenderConnectionsPage(state PageState) string {
 
 	// 渲染监控图表区域（仅在活跃连接视图显示）
 	if state.ViewMode == 0 {
-		chartsSection := components.RenderChartsSection(state.ChartData, state.Width)
+		chartsSection := components.RenderChartsSection(state.ChartData, state.Width, maxChartHeight)
 		if chartsSection != "" {
 			content = append(content, chartsSection)
 			content = append(content, "")
@@ -290,11 +288,4 @@ func containsAnyLower(slice []string, sub string) bool {
 		}
 	}
 	return false
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

@@ -91,7 +91,7 @@ func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 
 	if state.ViewMode == 0 {
 		if state.ChartData != nil {
-			chartsSection := components.RenderChartsSection(state.ChartData, state.Width)
+			chartsSection := components.RenderChartsSection(state.ChartData, state.Width, calcMaxChartHeight(state))
 			if chartsSection != "" {
 				h := lipgloss.Height(chartsSection)
 				if pageY >= line && pageY < line+h {
@@ -257,16 +257,37 @@ func resolveConnectionsListWindow(state PageState, total int) connectionsListWin
 	}
 }
 
+// calcMaxChartHeight 计算图表区域可用的最大高度。
+// 扣除基础布局、TopN、网站测速、过滤器和连接列表最小行数后，剩余空间给图表。
+func calcMaxChartHeight(state PageState) int {
+	if state.ViewMode != 0 || state.ChartData == nil {
+		return 0
+	}
+	otherUsed := connectionsBaseUsedLines
+	if len(state.SiteTests) > 0 {
+		layoutCols := 4
+		if state.Width < 60 {
+			layoutCols = 2
+		} else if state.Width < 90 {
+			layoutCols = 3
+		}
+		cardRows := (len(state.SiteTests) + layoutCols - 1) / layoutCols
+		otherUsed += 2 + cardRows*5 + 1
+	}
+	if len(state.TopNItems) > 0 {
+		otherUsed += len(state.TopNItems) + 2
+	}
+	if state.FilterMode || state.FilterText != "" {
+		otherUsed++
+	}
+	return state.Height - otherUsed - connectionsMinDisplayRows
+}
+
 func calcConnectionsMaxDisplay(state PageState) int {
 	usedLines := connectionsBaseUsedLines
 	if state.ViewMode == 0 {
-		if state.ChartData != nil {
-			if state.Width < 90 {
-				usedLines += 14 // 窄屏堆叠布局
-			} else {
-				usedLines += 8 // 宽屏并排布局
-			}
-		}
+		chartHeight := components.ComputeChartSectionHeight(calcMaxChartHeight(state))
+		usedLines += chartHeight
 		if len(state.TopNItems) > 0 {
 			usedLines += len(state.TopNItems) + 2
 		}

@@ -51,9 +51,9 @@ func FetchIPInfo(ip string) tea.Cmd {
 		}
 
 		client := &http.Client{Timeout: 5 * time.Second}
-		url := fmt.Sprintf("https://api.ip.sb/geoip/%s", ip)
+		apiURL := fmt.Sprintf("https://api.ip.sb/geoip/%s", ip)
 
-		req, err := http.NewRequest("GET", url, nil)
+		req, err := http.NewRequest("GET", apiURL, nil)
 		if err != nil {
 			return messages.IPInfoMsg{Info: nil, Err: err}
 		}
@@ -122,7 +122,9 @@ func ParseProxyURL(addr string) (*url.URL, error) {
 
 // hasScheme 检查地址是否有协议前缀
 func hasScheme(addr string) bool {
-	return len(addr) > 7 && (addr[:7] == "http://" || addr[:8] == "https://" || addr[:9] == "socks5://")
+	return (len(addr) >= 7 && addr[:7] == "http://") ||
+		(len(addr) >= 8 && addr[:8] == "https://") ||
+		(len(addr) >= 9 && addr[:9] == "socks5://")
 }
 
 // ConvertToConnectionsResponse 将 api.ConnectionsData 转换为 model.ConnectionsResponse

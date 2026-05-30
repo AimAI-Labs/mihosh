@@ -2,155 +2,84 @@ package components
 
 import (
 	"fmt"
+	"math"
+	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/charmbracelet/lipgloss"
 )
 
-// RenderChartsSection 渲染监控图表区域
-func RenderChartsSection(chartData *model.ChartData, width int) string {
+const (
+	chartPanelMinW   = 28 // 面板最小宽度
+	chartPanelChrome = 4  // 面板边框+内边距占用宽度
+)
+
+const (
+	maxSymmetricHalfHeight = 4 // 上半或下半最大行数
+	minSymmetricHalfHeight = 2 // 上半或下半最小行数（低于此值不渲染图表）
+)
+
+// chartSectionChrome 图表面板边框占用行数（上下边框）
+const chartSectionChrome = 3 // 上边框(1) + 中轴(1) + 下边框(1)
+
+// ComputeChartSectionHeight 根据可用高度计算图表区域实际占用行数。
+// maxHeight <= 0 或空间不足时返回 0。
+func ComputeChartSectionHeight(maxHeight int) int {
+	// 面板总行数 = 2*halfH + chartSectionChrome
+	// 最少需要 halfH=2: 2*2+3 = 7
+	if maxHeight < 2*minSymmetricHalfHeight+chartSectionChrome {
+		return 0
+	}
+	halfH := (maxHeight - chartSectionChrome) / 2
+	if halfH > maxSymmetricHalfHeight {
+		halfH = maxSymmetricHalfHeight
+	}
+	if halfH < minSymmetricHalfHeight {
+		return 0
+	}
+	return 2*halfH + chartSectionChrome
+}
+
+// RenderChartsSection 渲染监控图表区域（对称柱状图）
+// maxHeight 控制图表最大行数，实现高度响应式；<= 0 时使用默认最大高度。
+func RenderChartsSection(chartData *model.ChartData, width int, maxHeight int) string {
 	if chartData == nil {
 		return ""
 	}
 
-	// 窄屏阈值：小于此宽度时切换为竖向堆叠布局
-	const narrowThreshold = 90
-
-	if width < narrowThreshold {
-		return renderChartsNarrow(chartData, width)
+	// 动态计算 halfHeight
+	halfH := maxSymmetricHalfHeight
+	if maxHeight > 0 {
+		computed := (maxHeight - chartSectionChrome) / 2
+		if computed < halfH {
+			halfH = computed
+		}
 	}
-	return renderChartsWide(chartData, width)
-}
-
-// renderChartsWide 宽屏：三图表并排
-func renderChartsWide(chartData *model.ChartData, width int) string {
-	chartWidth := (width - 8) / 3
-	if chartWidth < 20 {
-		chartWidth = 20
-	}
-	if chartWidth > 45 {
-		chartWidth = 45
+	if halfH < minSymmetricHalfHeight {
+		return ""
 	}
 
-	// 速度图表配置
-	speedConfig := common.SparklineConfig{
-		Title:      "上传/下载速度",
-		Width:      chartWidth,
-		Height:     4,
-		Color1:     lipgloss.Color("#00BFFF"), // 蓝色 - 上传
-		Color2:     lipgloss.Color("#9370DB"), // 紫色 - 下载
-		Label1:     "上传速度",
-		Label2:     "下载速度",
-		MinValue:   0, // Y轴完全自适应
-		ShowXAxis:  true,
-		MaxSeconds: 60,
-		FormatFunc: func(v int64) string {
-			return FormatSpeed(v)
-		},
+	panelWidth := width - 4 // 页面左右边距
+	if panelWidth < chartPanelMinW {
+		panelWidth = chartPanelMinW
 	}
 
-	// 内存图表配置
-	memoryConfig := common.SparklineConfig{
-		Title:      "内存使用",
-		Width:      chartWidth,
-		Height:     4,
-		Color1:     lipgloss.Color("#00FF7F"), // 绿色
-		Label1:     "内存使用",
-		MinValue:   0, // Y轴完全自适应
-		ShowXAxis:  true,
-		MaxSeconds: 60,
-		FormatFunc: func(v int64) string {
-			return FormatMemory(v)
-		},
+	chartWidth := panelWidth - chartPanelChrome
+	if chartWidth < 16 {
+		chartWidth = 16
 	}
 
-	// 连接数图表配置
-	connConfig := common.SparklineConfig{
-		Title:      "连接",
-		Width:      chartWidth,
-		Height:     4,
-		Color1:     lipgloss.Color("#FFD700"), // 金色
-		Label1:     "连接",
-		MinValue:   0, // 连接数Y轴自适应
-		ShowXAxis:  true,
-		MaxSeconds: 60,
-		FormatFunc: func(v int64) string {
-			return fmt.Sprintf("%d", v)
-		},
-	}
-
-	// 渲染三个图表
-	speedChart := common.RenderDualSparkline(
+	body := RenderSymmetricBarChart(
 		chartData.SpeedUpHistory,
 		chartData.SpeedDownHistory,
-		speedConfig,
+		FormatSpeed,
+		chartWidth,
+		halfH,
 	)
-	memoryChart := common.RenderSparkline(chartData.MemoryHistory, memoryConfig)
-	connChart := common.RenderIntSparkline(chartData.ConnCountHistory, connConfig)
-
-	// 横向拼接三个图表
-	return lipgloss.JoinHorizontal(lipgloss.Top, speedChart, "  ", memoryChart, "  ", connChart)
+	return common.RenderTokyoPanel("上传/下载速度", body, panelWidth)
 }
 
-// renderChartsNarrow 窄屏：图表竖向堆叠，每行一个图表
-func renderChartsNarrow(chartData *model.ChartData, width int) string {
-	chartWidth := width - 4
-	if chartWidth < 20 {
-		chartWidth = 20
-	}
-	if chartWidth > 45 {
-		chartWidth = 45
-	}
-
-	speedConfig := common.SparklineConfig{
-		Title:      "上传/下载速度",
-		Width:      chartWidth,
-		Height:     3,
-		Color1:     lipgloss.Color("#00BFFF"),
-		Color2:     lipgloss.Color("#9370DB"),
-		Label1:     "上传速度",
-		Label2:     "下载速度",
-		MinValue:   0,
-		ShowXAxis:  false,
-		MaxSeconds: 60,
-		FormatFunc: func(v int64) string { return FormatSpeed(v) },
-	}
-
-	memoryConfig := common.SparklineConfig{
-		Title:      "内存使用",
-		Width:      chartWidth,
-		Height:     3,
-		Color1:     lipgloss.Color("#00FF7F"),
-		Label1:     "内存使用",
-		MinValue:   0,
-		ShowXAxis:  false,
-		MaxSeconds: 60,
-		FormatFunc: func(v int64) string { return FormatMemory(v) },
-	}
-
-	connConfig := common.SparklineConfig{
-		Title:      "连接",
-		Width:      chartWidth,
-		Height:     3,
-		Color1:     lipgloss.Color("#FFD700"),
-		Label1:     "连接",
-		MinValue:   0,
-		ShowXAxis:  false,
-		MaxSeconds: 60,
-		FormatFunc: func(v int64) string { return fmt.Sprintf("%d", v) },
-	}
-
-	speedChart := common.RenderDualSparkline(
-		chartData.SpeedUpHistory,
-		chartData.SpeedDownHistory,
-		speedConfig,
-	)
-	memoryChart := common.RenderSparkline(chartData.MemoryHistory, memoryConfig)
-	connChart := common.RenderIntSparkline(chartData.ConnCountHistory, connConfig)
-
-	return lipgloss.JoinVertical(lipgloss.Left, speedChart, "", memoryChart, "", connChart)
-}
 
 // FormatSpeed 格式化速度
 func FormatSpeed(bytesPerSec int64) string {
@@ -174,4 +103,124 @@ func FormatMemory(bytes int64) string {
 	} else {
 		return fmt.Sprintf("%.1f GB", float64(bytes)/(1024*1024*1024))
 	}
+}
+
+// RenderSymmetricBarChart 渲染对称柱状图（下载在上，上传在下）
+// halfH 控制上半或下半的高度（行数），实现高度响应式。
+func RenderSymmetricBarChart(uploadData, downloadData []int64, formatFunc func(int64) string, width int, halfH int) string {
+	if width < 16 {
+		width = 16
+	}
+
+	// 计算 Y 轴标签宽度
+	maxVal := common.FindMax(uploadData)
+	downloadMax := common.FindMax(downloadData)
+	if downloadMax > maxVal {
+		maxVal = downloadMax
+	}
+	if maxVal < 1 {
+		maxVal = 1
+	}
+
+	labelMax := formatFunc(maxVal)
+	labelHalf := formatFunc(maxVal / 2)
+	labelWidth := len(labelMax)
+	if w := len(labelHalf); w > labelWidth {
+		labelWidth = w
+	}
+	if labelWidth < 8 {
+		labelWidth = 8
+	}
+
+	// 图表内容宽度 = 总宽度 - 标签宽度 - 分隔符(2)
+	chartWidth := width - labelWidth - 2
+	if chartWidth < 8 {
+		chartWidth = 8
+	}
+
+	// 采样数据
+	sampledUp := common.SampleData(uploadData, chartWidth)
+	sampledDown := common.SampleData(downloadData, chartWidth)
+
+	// 颜色样式
+	purpleStyle := lipgloss.NewStyle().Foreground(common.TokyoPurple)
+	blueStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue)
+	labelStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted)
+	axisStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted)
+
+	halfHF := float64(halfH)
+
+	var lines []string
+
+	// === 上半部分（下载柱，从中轴往上生长） ===
+	for row := 0; row < halfH; row++ {
+		// Y 轴标签
+		var label string
+		if row == 0 {
+			label = labelStyle.Render(fmt.Sprintf("%*s", labelWidth, labelMax))
+		} else if row == halfH/2 {
+			label = labelStyle.Render(fmt.Sprintf("%*s", labelWidth, labelHalf))
+		} else {
+			label = strings.Repeat(" ", labelWidth)
+		}
+
+		// 渲染柱子（从中轴往上生长：row(halfH-1) = 靠近中轴，row 0 = 顶部）
+		var bars strings.Builder
+		for i := 0; i < chartWidth; i++ {
+			barH := math.Round(float64(sampledDown[i]) / float64(maxVal) * halfHF)
+			// 从中轴往上填充：barH=1 填 row(halfH-1)，barH=halfH 填 row0-row(halfH-1)
+			if row >= halfH-int(barH) {
+				bars.WriteString(purpleStyle.Render("█"))
+			} else {
+				bars.WriteRune(' ')
+			}
+		}
+
+		separator := axisStyle.Render(" ┤")
+		lines = append(lines, label+separator+bars.String())
+	}
+
+	// === 中轴行 ===
+	var centerLabel strings.Builder
+	centerLabel.WriteString(strings.Repeat(" ", labelWidth))
+	centerLabel.WriteString(axisStyle.Render(" ┼"))
+
+	for i := 0; i < chartWidth; i++ {
+		if sampledDown[i] > 0 {
+			centerLabel.WriteString(purpleStyle.Render("█"))
+		} else {
+			centerLabel.WriteString(axisStyle.Render("─"))
+		}
+	}
+	lines = append(lines, centerLabel.String())
+
+	// === 下半部分（上传柱，从中心轴向下生长） ===
+	for row := 0; row < halfH; row++ {
+		// Y 轴标签（靠近中轴时显示半值，最底部显示最大值）
+		var label string
+		if row == halfH-1 {
+			label = labelStyle.Render(fmt.Sprintf("%*s", labelWidth, labelMax))
+		} else if row == halfH/2 {
+			label = labelStyle.Render(fmt.Sprintf("%*s", labelWidth, labelHalf))
+		} else {
+			label = strings.Repeat(" ", labelWidth)
+		}
+
+		// 渲染柱子
+		var bars strings.Builder
+		for i := 0; i < chartWidth; i++ {
+			barH := math.Round(float64(sampledUp[i]) / float64(maxVal) * halfHF)
+			// row 0 是最靠近中轴的行，需要 barH > row
+			if barH > float64(row) {
+				bars.WriteString(blueStyle.Render("█"))
+			} else {
+				bars.WriteRune(' ')
+			}
+		}
+
+		separator := axisStyle.Render(" ┤")
+		lines = append(lines, label+separator+bars.String())
+	}
+
+	return strings.Join(lines, "\n")
 }

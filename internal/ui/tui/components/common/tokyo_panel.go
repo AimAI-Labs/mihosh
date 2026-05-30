@@ -119,12 +119,13 @@ func RenderTokyoPanel(title, body string, width int) string {
 		titleLen = DisplayWidth(title)
 	}
 
-	topPrefix := "╭─ " + title + " "
-	remaining := innerWidth - titleLen - 3
-	if remaining < 0 {
-		remaining = 0
+	// 逐字符填充顶部边框，确保总宽度精确等于 innerWidth+2（含 ╭ 和 ╮）
+	topBorder := "╭─ " + title + " "
+	for lipgloss.Width(topBorder) < innerWidth+1 {
+		topBorder += "─"
 	}
-	topLine := TokyoBlueStyle().Render(topPrefix + strings.Repeat("─", remaining) + "╮")
+	topBorder += "╮"
+	topLine := TokyoBlueStyle().Render(topBorder)
 	bottomLine := TokyoBlueStyle().Render("╰" + strings.Repeat("─", innerWidth) + "╯")
 
 	bodyLines := strings.Split(body, "\n")

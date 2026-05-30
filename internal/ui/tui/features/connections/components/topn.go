@@ -1,7 +1,6 @@
 package components
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
@@ -20,10 +19,10 @@ func RenderTopNSection(items []TopNItem, width int) string {
 		return ""
 	}
 
-	titleStyle := lipgloss.NewStyle().Foreground(common.CPrimary).Bold(true)
-	nameStyle := lipgloss.NewStyle().Foreground(common.CWhite)
-	bytesStyle := lipgloss.NewStyle().Foreground(common.CSecondary)
-	barColor := lipgloss.Color("#9370DB") // 紫色进度条
+	titleStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue).Bold(true)
+	nameStyle := lipgloss.NewStyle().Foreground(common.TokyoForeground)
+	bytesStyle := lipgloss.NewStyle().Foreground(common.TokyoCyan)
+	barColor := common.TokyoPurple // 紫色进度条
 
 	var lines []string
 	title := titleStyle.Render("Top 5 吞吐量排行 (过去5分钟)")
@@ -81,9 +80,10 @@ func RenderTopNSection(items []TopNItem, width int) string {
 		}
 
 		bar := lipgloss.NewStyle().Foreground(barColor).Render(strings.Repeat("█", barLen))
-		emptyBar := lipgloss.NewStyle().Foreground(common.CMuted).Render(strings.Repeat("░", barsWidth-barLen))
+		emptyBar := lipgloss.NewStyle().Foreground(common.TokyoMuted).Render(strings.Repeat("░", barsWidth-barLen))
 
-		line := fmt.Sprintf("%s │ %s%s %s", nameStr, bar, emptyBar, bytesStrRendered)
+		sep := common.TokyoMutedStyle().Render(" │ ")
+		line := nameStr + sep + bar + emptyBar + " " + bytesStrRendered
 		lines = append(lines, line)
 	}
 

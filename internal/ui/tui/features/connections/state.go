@@ -581,6 +581,14 @@ func (s State) ApplyConnectionClosed() State {
 	if s.selectedConn > 0 {
 		s.selectedConn--
 	}
+	// 确保选中索引不超过连接数量上限
+	connCount := s.filteredConnCount()
+	if connCount > 0 && s.selectedConn >= connCount {
+		s.selectedConn = connCount - 1
+	}
+	if s.selectedConn < 0 {
+		s.selectedConn = 0
+	}
 	return s
 }
 
@@ -700,11 +708,13 @@ func (s State) handleConnFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		s.connScrollTop = 0
 	case key.Matches(msg, common.Keys.Backspace):
 		if len(s.connFilter) > 0 {
-			s.connFilter = s.connFilter[:len(s.connFilter)-1]
+			runes := []rune(s.connFilter)
+			s.connFilter = string(runes[:len(runes)-1])
 		}
 	default:
 		input := msg.String()
-		if len(input) == 1 && input[0] >= 32 && input[0] < 127 {
+		runes := []rune(input)
+		if len(runes) == 1 && runes[0] >= 32 {
 			s.connFilter += input
 		}
 	}
