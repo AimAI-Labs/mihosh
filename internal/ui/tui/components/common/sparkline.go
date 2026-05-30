@@ -58,9 +58,9 @@ func RenderDualSparkline(data1, data2 []int64, config SparklineConfig) string {
 	}
 
 	// 找出最大值用于缩放
-	maxVal := findMax(data1)
+	maxVal := FindMax(data1)
 	if data2 != nil {
-		maxVal2 := findMax(data2)
+		maxVal2 := FindMax(data2)
 		if maxVal2 > maxVal {
 			maxVal = maxVal2
 		}
@@ -88,10 +88,10 @@ func RenderDualSparkline(data1, data2 []int64, config SparklineConfig) string {
 	}
 
 	// 采样数据以适应宽度
-	sampled1 := sampleData(data1, chartWidth)
+	sampled1 := SampleData(data1, chartWidth)
 	var sampled2 []int64
 	if data2 != nil {
-		sampled2 = sampleData(data2, chartWidth)
+		sampled2 = SampleData(data2, chartWidth)
 	}
 
 	// 样式
@@ -231,8 +231,8 @@ func RenderIntSparkline(data []int, config SparklineConfig) string {
 	return RenderSparkline(data64, config)
 }
 
-// findMax 找出切片中的最大值
-func findMax(data []int64) int64 {
+// FindMax 找出切片中的最大值
+func FindMax(data []int64) int64 {
 	if len(data) == 0 {
 		return 0
 	}
@@ -268,8 +268,8 @@ func maxLabelWidth(labels []string) int {
 	return max
 }
 
-// sampleData 采样数据以适应宽度
-func sampleData(data []int64, width int) []int64 {
+// SampleData 采样数据以适应宽度
+func SampleData(data []int64, width int) []int64 {
 	if len(data) == 0 {
 		return make([]int64, width)
 	}

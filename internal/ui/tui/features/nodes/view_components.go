@@ -33,15 +33,16 @@ const (
 	nodesPanelChromeWidth   = nodesPanelFrameWidth + nodesPanelPadding*2
 )
 
+// Tokyo 颜色引用共享常量
 var (
-	tokyoForeground = lipgloss.Color("#C0CAF5")
-	tokyoMuted      = lipgloss.Color("#565F89")
-	tokyoBlue       = lipgloss.Color("#7AA2F7")
-	tokyoCyan       = lipgloss.Color("#7DCFFF")
-	tokyoGreen      = lipgloss.Color("#9ECE6A")
-	tokyoRed        = lipgloss.Color("#F7768E")
-	tokyoPanel      = lipgloss.Color("#1A1B26")
-	tokyoSelected   = lipgloss.Color("#292E42")
+	tokyoForeground = common.TokyoForeground
+	tokyoMuted      = common.TokyoMuted
+	tokyoBlue       = common.TokyoBlue
+	tokyoCyan       = common.TokyoCyan
+	tokyoGreen      = common.TokyoGreen
+	tokyoRed        = common.TokyoRed
+	tokyoPanel      = common.TokyoPanel
+	tokyoSelected   = common.TokyoSelected
 )
 
 // MouseTarget 表示 nodes 页面鼠标命中的列表组件
@@ -645,55 +646,23 @@ func fitLine(s string, width int) string {
 }
 
 func truncateDisplay(s string, width int) string {
-	if width <= 0 || displayWidth(s) <= width {
-		return s
-	}
-	if width == 1 {
-		return "~"
-	}
-
-	var b strings.Builder
-	current := 0
-	for _, r := range s {
-		rw := displayWidth(string(r))
-		if current+rw > width-1 {
-			break
-		}
-		b.WriteRune(r)
-		current += rw
-	}
-	b.WriteRune('~')
-	return b.String()
+	return common.TruncateDisplay(s, width)
 }
 
-func tokyoTextStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(tokyoForeground)
-}
+// Tokyo 样式函数委托给 common 包
 
-func tokyoHeaderStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(tokyoMuted).Bold(true)
-}
-
-func tokyoMutedStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(tokyoMuted)
-}
-
-func tokyoCyanStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(tokyoCyan).Bold(true)
-}
-
-func tokyoGreenStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(tokyoGreen).Bold(true)
-}
-
-func tokyoRedStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(tokyoRed)
-}
+func tokyoTextStyle() lipgloss.Style   { return common.TokyoTextStyle() }
+func tokyoHeaderStyle() lipgloss.Style { return common.TokyoHeaderStyle() }
+func tokyoMutedStyle() lipgloss.Style  { return common.TokyoMutedStyle() }
+func tokyoCyanStyle() lipgloss.Style   { return common.TokyoCyanStyle() }
+func tokyoGreenStyle() lipgloss.Style  { return common.TokyoGreenStyle() }
+func tokyoRedStyle() lipgloss.Style    { return common.TokyoRedStyle() }
+func tokyoBlueStyle() lipgloss.Style   { return common.TokyoBlueStyle() }
 
 func tokyoSelectedStyle(width int) lipgloss.Style {
 	style := lipgloss.NewStyle().
-		Background(tokyoSelected).
-		Foreground(tokyoCyan).
+		Background(common.TokyoSelected).
+		Foreground(common.TokyoCyan).
 		Bold(true)
 	if width > 0 {
 		style = style.Width(width)
@@ -701,49 +670,6 @@ func tokyoSelectedStyle(width int) lipgloss.Style {
 	return style
 }
 
-func tokyoBlueStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(tokyoBlue)
-}
-
 func renderTokyoPanel(title, body string, width int) string {
-	if width < 24 {
-		width = 24
-	}
-	innerWidth := width - 2
-
-	// 安全截断过长标题，防止折行
-	titleLen := displayWidth(title)
-	maxTitleLen := innerWidth - 6
-	if maxTitleLen > 0 && titleLen > maxTitleLen {
-		title = truncateDisplay(title, maxTitleLen)
-		titleLen = displayWidth(title)
-	}
-
-	topPrefix := "╭─ " + title + " "
-	remaining := innerWidth - titleLen - 3
-	if remaining < 0 {
-		remaining = 0
-	}
-	topLine := tokyoBlueStyle().Render(topPrefix + strings.Repeat("─", remaining) + "╮")
-	bottomLine := tokyoBlueStyle().Render("╰" + strings.Repeat("─", innerWidth) + "╯")
-
-	bodyLines := strings.Split(body, "\n")
-	var middleLines []string
-	contentWidth := innerWidth - 2 // 左右 padding 各 1
-
-	for _, line := range bodyLines {
-		lineLen := lipgloss.Width(line)
-		pad := contentWidth - lineLen
-		if pad < 0 {
-			pad = 0
-			line = truncateDisplay(line, contentWidth)
-		}
-		middleLine := tokyoBlueStyle().Render("│ ") +
-			line +
-			strings.Repeat(" ", pad) +
-			tokyoBlueStyle().Render(" │")
-		middleLines = append(middleLines, middleLine)
-	}
-
-	return topLine + "\n" + strings.Join(middleLines, "\n") + "\n" + bottomLine
+	return common.RenderTokyoPanel(title, body, width)
 }

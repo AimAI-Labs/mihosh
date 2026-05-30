@@ -41,18 +41,14 @@ type PageState struct {
 	FilterMode        bool   // 是否处于搜索输入模式
 }
 
-// displayWidth 计算字符串的显示宽度（使用 runewidth 库精确计算）
+// displayWidth 委托给 common.DisplayWidth
 func displayWidth(s string) int {
-	return runewidth.StringWidth(s)
+	return common.DisplayWidth(s)
 }
 
-// padString 将字符串填充到指定显示宽度
+// padString 委托给 common.PadString
 func padString(s string, targetWidth int) string {
-	currentWidth := displayWidth(s)
-	if currentWidth >= targetWidth {
-		return s
-	}
-	return s + strings.Repeat(" ", targetWidth-currentWidth)
+	return common.PadString(s, targetWidth)
 }
 
 // RenderNodesPage 渲染节点管理页面

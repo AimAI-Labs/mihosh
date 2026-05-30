@@ -116,6 +116,7 @@ func (s State) sortedTestFailures() []string {
 			return nodeName(result[i]) < nodeName(result[j])
 		})
 	case SortOrderDelayAsc, SortOrderAvailable:
+		// 测速失败记录没有延迟数据，保持按名称排序以便查找
 		sort.Slice(result, func(i, j int) bool {
 			return nodeName(result[i]) < nodeName(result[j])
 		})
