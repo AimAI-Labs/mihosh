@@ -527,30 +527,17 @@ func (m Model) resolveMainPageMouseHit(x, y int) (pageX, pageY, pageWidth, pageH
 		mainWidth = common.MinMainWidth
 	}
 
-	mainX := x
-	if mainX <= 0 || mainX >= mainWidth-1 {
-		return 0, 0, 0, 0, false
-	}
-	if contentYAbs <= 0 || contentYAbs >= contentHeight-1 {
-		return 0, 0, 0, 0, false
-	}
-
-	contentY := contentYAbs - 1
-	const pageContentOffsetY = 0
-	if contentY < pageContentOffsetY {
-		return 0, 0, 0, 0, false
-	}
-
-	pageY = contentY - pageContentOffsetY
-	pageHeight = m.height - layout.TopNavHeight - 8
+	// 移除外边框检查，内容直接从顶部开始
+	pageY = contentYAbs
+	pageHeight = m.height - layout.TopNavHeight - common.StatusBarHeight
 	if pageHeight < common.MinContentHeight {
 		pageHeight = common.MinContentHeight
 	}
-	pageWidth = mainWidth - 2
+	pageWidth = mainWidth
 	if pageWidth < common.MinMainWidth {
 		pageWidth = common.MinMainWidth
 	}
-	pageX = mainX - 1
+	pageX = x
 	if pageX < 0 || pageX >= pageWidth {
 		return 0, 0, 0, 0, false
 	}

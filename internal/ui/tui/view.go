@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"github.com/AimAI-Labs/mihosh/internal/ui/styles"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/charmbracelet/lipgloss"
@@ -52,19 +51,6 @@ func (m Model) View() string {
 		pageContent = m.renderRulesPage()
 	}
 
-	// ── 主面板 ──
-	mainPaneStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(styles.ColorBorder).
-		Width(mainWidth - 2).
-		Height(contentHeight - 2)
-
-	mainContent := lipgloss.JoinVertical(lipgloss.Left,
-		pageContent,
-	)
-
-	mainPane := mainPaneStyle.Render(mainContent)
-
 	// ── 底部状态栏 ──
 	var uploadTotal, downloadTotal int64
 	if m.connsState.Connections != nil {
@@ -82,5 +68,5 @@ func (m Model) View() string {
 		downloadTotal,
 	)
 
-	return lipgloss.JoinVertical(lipgloss.Left, topNav, mainPane, statusBar)
+	return lipgloss.JoinVertical(lipgloss.Left, topNav, pageContent, statusBar)
 }

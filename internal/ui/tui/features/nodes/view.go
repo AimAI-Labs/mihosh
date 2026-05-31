@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	nodesFixedLines     = 12
+	nodesFixedLines     = 11 // 模式切换(1) + 面板标题(2*2) + 搜索行(1) + 失败行(1) + 间距(4)
 	nodesMinHeight      = 10
 	nodesDefaultNameLen = 8
 )
@@ -54,7 +54,7 @@ func padString(s string, targetWidth int) string {
 // RenderNodesPage 渲染节点管理页面
 func RenderNodesPage(state PageState) string {
 	metrics := calcNodesLayoutMetrics(state.Width, state.Height)
-	modeSwitch := RenderModeSwitchComponent(state.Mode)
+	modeSwitch := RenderModeSwitchComponent(state.Mode, state.Width)
 
 	sortLabel := ""
 	if len(state.SortOrderLabels) > 0 && state.CurrentSortOrder < len(state.SortOrderLabels) {
@@ -93,6 +93,7 @@ func RenderNodesPage(state PageState) string {
 		mainContent = lipgloss.JoinVertical(
 			lipgloss.Left,
 			modeSwitch,
+			"",
 			panels,
 			searchLine,
 			failureBadge,
@@ -103,6 +104,7 @@ func RenderNodesPage(state PageState) string {
 		mainContent = lipgloss.JoinVertical(
 			lipgloss.Left,
 			modeSwitch,
+			"",
 			renderTokyoPanel(
 				i18n.Tf("nodes.group_header", state.SelectedGroup+1, len(state.GroupNames)),
 				groupList,

@@ -37,22 +37,25 @@ func TestResolveMouseHit_GroupAndProxy(t *testing.T) {
 		Height:         24,
 	}
 
-	groupHit := ResolveMouseHit(state, 10, 5)
+	// 模式切换占 3 行 (Y=0-2)，ListStartY=4，nodesSectionHeaderLines=2
+	// groupListStart = 4 + 2 = 6
+	// groupDataStart = 6 + 1 = 7 (跳过表头)
+	groupHit := ResolveMouseHit(state, 10, 7)
 	if groupHit.Target != MouseTargetGroup || groupHit.Index != 0 {
 		t.Fatalf("expected group index 0, got target=%v index=%d", groupHit.Target, groupHit.Index)
 	}
 
-	// proxyListStart 依赖 groupMaxLines. height=24 -> groupMaxLines=4.
-	// groupListLines = 1 + 3 = 4.
-	// proxyHeaderStart = 4 + 4 + 1 = 9
-	// proxyListStart = 9 + 2 = 11
-	// proxyDataStart = 11 + 1 = 12
-	proxyHit := ResolveMouseHit(state, 10, 12)
+	// height=24, availableHeight=11, groupMaxLines=3, proxyMaxLines=8
+	// groupListLines = 1 + 3 = 4 (header + 3 visible rows)
+	// proxyHeaderStart = 6 + 4 + 1 = 11
+	// proxyListStart = 11 + 2 = 13
+	// proxyDataStart = 13 + 1 = 14
+	proxyHit := ResolveMouseHit(state, 10, 14)
 	if proxyHit.Target != MouseTargetProxy || proxyHit.Index != 0 {
 		t.Fatalf("expected proxy index 0, got target=%v index=%d", proxyHit.Target, proxyHit.Index)
 	}
 
-	headerHit := ResolveMouseHit(state, 10, 4)
+	headerHit := ResolveMouseHit(state, 10, 6)
 	if headerHit.Target != MouseTargetNone {
 		t.Fatalf("expected no hit on header row, got target=%v index=%d", headerHit.Target, headerHit.Index)
 	}
@@ -69,15 +72,19 @@ func TestResolveMouseHit_WithScrollWindow(t *testing.T) {
 		Height:         24,
 	}
 
-	// groupMaxLines=4 时，selected=7 会将可见窗口顶到 4，首行数据应命中 g4
-	groupHit := ResolveMouseHit(state, 10, 5)
-	if groupHit.Target != MouseTargetGroup || groupHit.Index != 4 {
-		t.Fatalf("expected group index 4, got target=%v index=%d", groupHit.Target, groupHit.Index)
+	// height=24, availableHeight=11, groupMaxLines=3, selected=7 -> scrollTop = 7-3+1 = 5, 窗口显示 g5,g6,g7
+	// groupListStart = 4 + 2 = 6, groupDataStart = 6 + 1 = 7
+	groupHit := ResolveMouseHit(state, 10, 7)
+	if groupHit.Target != MouseTargetGroup || groupHit.Index != 5 {
+		t.Fatalf("expected group index 5, got target=%v index=%d", groupHit.Target, groupHit.Index)
 	}
 
-	// proxyMaxLines=11 时 (24-12-4=8), selected=11 会将可见窗口顶到 4，首行数据应命中 p4
-	// 让 ResolveMouseHit 自动计算
-	proxyHit := ResolveMouseHit(state, 10, 15)
+	// proxyMaxLines=8, selected=11 -> scrollTop = 11-8+1 = 4, 窗口显示 p4-p11
+	// groupListLines = 1 + 3 = 4 (header + 3 visible rows)
+	// proxyHeaderStart = 6 + 4 + 1 = 11
+	// proxyListStart = 11 + 2 = 13
+	// proxyDataStart = 13 + 1 = 14
+	proxyHit := ResolveMouseHit(state, 10, 14)
 	if proxyHit.Target != MouseTargetProxy || proxyHit.Index < 0 {
 		t.Fatalf("expected proxy hit, got target=%v index=%d", proxyHit.Target, proxyHit.Index)
 	}
@@ -142,7 +149,8 @@ func TestResolveMouseHit_WideLayoutProxyPanel(t *testing.T) {
 		Height:         30,
 	}
 
-	hit := ResolveMouseHit(state, 58, 4)
+	// DataStartY = 6 (模式切换 3 行 + 间距 1 行 + 面板标题 2 行)
+	hit := ResolveMouseHit(state, 58, 6)
 	if hit.Target != MouseTargetProxy || hit.Index != 0 {
 		t.Fatalf("expected first proxy row in right panel, got target=%v index=%d", hit.Target, hit.Index)
 	}

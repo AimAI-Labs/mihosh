@@ -17,11 +17,11 @@ func (m Model) getPageSize() (pageWidth, pageHeight int) {
 	if mainWidth < common.MinMainWidth {
 		mainWidth = common.MinMainWidth
 	}
-	pageWidth = mainWidth - 2
+	pageWidth = mainWidth
 	if pageWidth < common.MinMainWidth {
 		pageWidth = common.MinMainWidth
 	}
-	pageHeight = m.height - layout.TopNavHeight - 8
+	pageHeight = m.height - layout.TopNavHeight - common.StatusBarHeight
 	if pageHeight < common.MinContentHeight {
 		pageHeight = common.MinContentHeight
 	}

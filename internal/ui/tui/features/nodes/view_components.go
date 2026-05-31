@@ -31,6 +31,7 @@ const (
 	nodesPanelPadding       = 1
 	nodesPanelFrameWidth    = 2
 	nodesPanelChromeWidth   = nodesPanelFrameWidth + nodesPanelPadding*2
+	nodesModeSwitchHeight   = 3 // 模式切换栏边框高度
 )
 
 // Tokyo 颜色引用共享常量
@@ -81,26 +82,36 @@ type nodesLayoutMetrics struct {
 func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 	metrics := calcNodesLayoutMetrics(state.Width, state.Height)
 
-	// 模式切换菜单位于最顶部，占据 [0, 1] 行。
-	// 格式： 规则 │ 全局 │ 直连
-	//       ──────────────────────
-	if pageY >= 0 && pageY <= 1 {
-		// 样式中有 Padding(0, 0, 0, 1)，所以从 X=1 开始
-		// 每个选项: 1(padding) + 1(space) + 4(label) + 1(space) + 1(padding) = 8
-		// 选项之间有 1 个分隔符 │
-		// 所以 index 0: X[1-8], index 1: X[10-17], index 2: X[19-26]
-		if pageX >= 1 && pageX < 28 {
-			index := (pageX - 1) / 9
-			// 简单校验是否点在分隔符上
-			if (pageX-1)%9 < 8 {
-				if index >= 0 && index < 3 {
-					return MouseHit{
-						Target: MouseTargetMode,
-						Index:  index,
-					}
+	// 模式切换菜单位于最顶部，占据第 0-2 行（带边框）。
+	// 格式：╭─────────────────╮
+	//       │ 规则 │ 全局 │ 直连 │
+	//       ╰─────────────────╯
+	if pageY >= 0 && pageY < nodesModeSwitchHeight && pageX >= 0 {
+		// 只检测中间行（Y=1）的按钮点击
+		if pageY == 1 {
+			// 按钮从第 1 个字符开始（跳过左边框 │）
+			buttonWidth := 6 // 1 + 4 + 1
+			separatorWidth := 1
+			step := buttonWidth + separatorWidth
+
+			index := -1
+			for i := 0; i < 3; i++ {
+				start := 1 + i*step // 跳过左边框
+				end := start + buttonWidth
+				if pageX >= start && pageX < end {
+					index = i
+					break
+				}
+			}
+
+			if index >= 0 && index < 3 {
+				return MouseHit{
+					Target: MouseTargetMode,
+					Index:  index,
 				}
 			}
 		}
+		return MouseHit{Target: MouseTargetNone, Index: -1}
 	}
 
 	if metrics.Wide {
@@ -169,7 +180,7 @@ func resolvePanelMouseHit(target MouseTarget, selected, scrollTop, maxLines, tot
 }
 
 func CalcNodesListMaxLines(height int) (int, int) {
-	availableHeight := height - nodesFixedLines
+	availableHeight := height - nodesFixedLines - nodesModeSwitchHeight + 1 // 模式切换从1行增加到3行
 	if availableHeight < nodesMinHeight {
 		availableHeight = nodesMinHeight
 	}
@@ -198,8 +209,8 @@ func calcNodesLayoutMetrics(width, height int) nodesLayoutMetrics {
 		Wide:          wide,
 		GroupMaxLines: groupMaxLines,
 		ProxyMaxLines: proxyMaxLines,
-		ListStartY:    2,
-		DataStartY:    4,
+		ListStartY:    nodesModeSwitchHeight + 1, // 模式切换(3) + 间距(1)
+		DataStartY:    nodesModeSwitchHeight + 3, // 模式切换(3) + 间距(1) + 面板标题(2)
 	}
 	if !wide {
 		return metrics
@@ -222,7 +233,7 @@ func calcNodesLayoutMetrics(width, height int) nodesLayoutMetrics {
 		}
 	}
 
-	panelRows := height - 11
+	panelRows := height - 12 // 模式切换(3) + 间距(1) + 面板标题(2*2) + 间距(4)
 	if panelRows < nodesProxyMinLines {
 		panelRows = nodesProxyMinLines
 	}
@@ -519,8 +530,8 @@ func RenderProxyListComponentWidth(state PageState, proxyMaxLines, width int) st
 	return tokyoHeaderStyle().Render(header) + "\n" + strings.Join(lines, "\n")
 }
 
-// RenderModeSwitchComponent 渲染模式切换按钮
-func RenderModeSwitchComponent(currentMode string) string {
+// RenderModeSwitchComponent 渲染模式切换按钮（带边框，与导航栏风格一致）
+func RenderModeSwitchComponent(currentMode string, width int) string {
 	modes := []struct {
 		Label string
 		Value string
@@ -533,33 +544,45 @@ func RenderModeSwitchComponent(currentMode string) string {
 	activeStyle := lipgloss.NewStyle().
 		Background(tokyoSelected).
 		Foreground(tokyoCyan).
-		Bold(true).
-		Padding(0, 1)
+		Bold(true)
 	inactiveStyle := lipgloss.NewStyle().
-		Foreground(tokyoBlue).
-		Padding(0, 1)
-	borderStyle := lipgloss.NewStyle().Foreground(tokyoMuted)
+		Foreground(tokyoBlue)
+	separatorStyle := lipgloss.NewStyle().Foreground(tokyoMuted)
 
 	var parts []string
 	for i, m := range modes {
-		text := m.Label
+		label := " " + m.Label + " "
 		if strings.ToLower(currentMode) == m.Value {
-			parts = append(parts, activeStyle.Render(" "+text+" "))
+			parts = append(parts, activeStyle.Render(label))
 		} else {
-			parts = append(parts, inactiveStyle.Render(" "+text+" "))
+			parts = append(parts, inactiveStyle.Render(label))
 		}
 		if i < len(modes)-1 {
-			parts = append(parts, borderStyle.Render("│"))
+			parts = append(parts, separatorStyle.Render("│"))
 		}
 	}
 
 	content := lipgloss.JoinHorizontal(lipgloss.Left, parts...)
 
-	return lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), false, false, true, false). // Only bottom border
-		BorderForeground(tokyoBlue).
-		Padding(0, 0, 0, 1).
-		Render(content)
+	// 计算内边框宽度
+	innerWidth := width - 2
+	if innerWidth < 1 {
+		innerWidth = 1
+	}
+
+	// 填充内容到指定宽度
+	contentWidth := lipgloss.Width(content)
+	if contentWidth < innerWidth {
+		content += strings.Repeat(" ", innerWidth-contentWidth)
+	}
+
+	// 渲染带边框的模式切换栏
+	borderStyle := lipgloss.NewStyle().Foreground(tokyoBlue)
+	topLine := borderStyle.Render("╭" + strings.Repeat("─", innerWidth) + "╮")
+	middleLine := borderStyle.Render("│") + content + borderStyle.Render("│")
+	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
+
+	return topLine + "\n" + middleLine + "\n" + bottomLine
 }
 
 func calcGroupColumnWidths(state PageState, width int) (int, int, int) {

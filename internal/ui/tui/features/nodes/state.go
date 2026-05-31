@@ -473,8 +473,8 @@ func (s State) HandleMouseScroll(up bool, pageX, pageY, pageWidth, pageHeight in
 	hit := ResolveMouseHit(s.ToPageState(pageWidth, pageHeight), pageX, pageY)
 	groupMaxLines, proxyMaxLines := CalcNodesListMaxLines(pageHeight)
 
-	// 如果鼠标在策略组区域，或鼠标不在任何有效区域但当前焦点是策略组
-	if hit.Target == MouseTargetGroup || (hit.Target == MouseTargetNone && s.MouseFocus == nodesMouseFocusGroup) {
+	// 如果鼠标在策略组区域，或鼠标在非列表区域（模式切换/无目标）但当前焦点是策略组
+	if hit.Target == MouseTargetGroup || (hit.Target != MouseTargetProxy && s.MouseFocus == nodesMouseFocusGroup) {
 		if up {
 			if s.SelectedGroup > 0 {
 				s.SelectedGroup--

@@ -16,18 +16,19 @@ func TestResolveMainPageMouseHitUsesTopNavOffset(t *testing.T) {
 		height: 30,
 	}
 
-	pageX, pageY, pageWidth, _, ok := m.resolveMainPageMouseHit(2, layout.TopNavHeight+3)
+	// 移除外边框后，内容直接从顶部导航下方开始
+	pageX, pageY, pageWidth, _, ok := m.resolveMainPageMouseHit(2, layout.TopNavHeight)
 	if !ok {
 		t.Fatal("expected point inside main page content to resolve")
 	}
-	if pageX != 1 {
-		t.Fatalf("expected pageX 1 without horizontal nav offset, got %d", pageX)
+	if pageX != 2 {
+		t.Fatalf("expected pageX 2, got %d", pageX)
 	}
 	if pageY != 0 {
-		t.Fatalf("expected pageY 0 after top nav and title offsets, got %d", pageY)
+		t.Fatalf("expected pageY 0 after top nav offset, got %d", pageY)
 	}
-	if pageWidth != 98 {
-		t.Fatalf("expected page width 98, got %d", pageWidth)
+	if pageWidth != 100 {
+		t.Fatalf("expected page width 100, got %d", pageWidth)
 	}
 }
 
