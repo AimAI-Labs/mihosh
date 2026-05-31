@@ -68,18 +68,15 @@ func RenderConnectionsPage(state PageState) string {
 
 	// 根据视图模式选择数据源
 	var connList []model.Connection
-	var viewModeLabel string
 	if state.ViewMode == 0 {
 		// 活跃连接
 		if state.Connections == nil {
 			return i18n.T("conns.loading")
 		}
 		connList = state.Connections.Connections
-		viewModeLabel = headerStyle.Render(i18n.T("conns.active_active")) + dimStyle.Render(i18n.T("conns.history_inactive"))
 	} else {
 		// 历史连接
 		connList = state.ClosedConnections
-		viewModeLabel = dimStyle.Render(i18n.T("conns.active_inactive")) + headerStyle.Render(i18n.T("conns.history_active"))
 	}
 
 	// 过滤连接
@@ -214,9 +211,12 @@ func RenderConnectionsPage(state PageState) string {
 		helpText = dimStyle.Render(i18n.T("conns.help_history"))
 	}
 
+	// 渲染模式切换组件（带边框）
+	modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width)
+
 	// 组装页面
 	var content []string
-	content = append(content, headerStyle.Render(i18n.T("title.connections"))+"  "+viewModeLabel)
+	content = append(content, modeSwitch)
 	content = append(content, "")
 
 	// 渲染监控图表区域（仅在活跃连接视图显示）

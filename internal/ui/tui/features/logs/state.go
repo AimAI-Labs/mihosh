@@ -273,19 +273,22 @@ func (s State) HandleMouseLeft(pageY int, pageX int, pageWidth int, resolver *se
 		return s, nil
 	}
 
-	// 点击级别栏（pageY == 0）切换日志级别
-	if pageY == 0 {
-		clickedLevel := ClickedLevel(pageX, pageWidth, s.logLevel)
-		if clickedLevel >= 0 && clickedLevel != s.logLevel {
-			s.logLevel = clickedLevel
-			s.updateFilteredLogs()
-			s.selectedLog = 0
-			s.logScrollTop = 0
+	// 点击级别栏（带边框，占据 Y=0 到 Y=2）切换日志级别
+	if pageY >= 0 && pageY < logsModeSwitchHeight {
+		// 只检测中间行（Y=1）的按钮点击
+		if pageY == 1 {
+			clickedLevel := ClickedLevel(pageX, pageWidth, s.logLevel)
+			if clickedLevel >= 0 && clickedLevel != s.logLevel {
+				s.logLevel = clickedLevel
+				s.updateFilteredLogs()
+				s.selectedLog = 0
+				s.logScrollTop = 0
+			}
 		}
 		return s, nil
 	}
 
-	const headerLines = 6 // levelBar + space + search + space + stats + space
+	const headerLines = 8 // levelBar(3) + space(1) + search(1) + space(1) + stats(1) + space(1)
 	clickedIndex := (pageY - headerLines) + s.logScrollTop
 	if clickedIndex < 0 || clickedIndex >= len(s.filteredLogIndices) {
 		return s, nil

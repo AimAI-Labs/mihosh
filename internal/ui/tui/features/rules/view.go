@@ -11,10 +11,11 @@ import (
 )
 
 const (
-	rulesFixedLines    = 6
+	rulesFixedLines    = 6 // 头部组件(4) + 间距(1) + 底部(1)
 	rulesMinHeight     = 5
 	rulesScrollWidth   = 2
 	colorAnimationMs   = 250
+	rulesHeaderHeight  = 4 // 头部组件边框高度（标题行 + 搜索行 + 上下边框）
 )
 
 var (
@@ -78,11 +79,6 @@ type PageState struct {
 func RenderRulesPage(state PageState) string {
 	var sections []string
 
-	// 渲染搜索框
-	searchBox := renderRuleSearchBox(state.FilterText, state.FilterMode, state.SelectedTypes)
-	sections = append(sections, searchBox)
-	sections = append(sections, "")
-
 	// 过滤规则 (使用缓存的索引)
 	var filteredRules []filteredRule
 	for _, idx := range state.FilteredRuleIndices {
@@ -96,10 +92,14 @@ func RenderRulesPage(state PageState) string {
 	if state.FilterText != "" || len(state.SelectedTypes) > 0 {
 		stats += fmt.Sprintf(" (过滤自 %d 条)", len(state.Rules))
 	}
-	sections = append(sections, common.MutedStyle.Render(stats))
+
+	// 渲染带边框的头部组件（包含标题、统计和搜索框）
+	searchBox := renderRuleSearchBox(state.FilterText, state.FilterMode, state.SelectedTypes)
+	header := RenderRulesHeaderComponent(stats, searchBox, state.Width)
+	sections = append(sections, header)
 	sections = append(sections, "")
 
-	// 计算可显示的规则行数 (搜索框 + 统计 + 间隔)
+	// 计算可显示的规则行数
 	availableHeight := state.Height - rulesFixedLines
 	if availableHeight < rulesMinHeight {
 		availableHeight = rulesMinHeight
@@ -125,6 +125,41 @@ func RenderRulesPage(state PageState) string {
 	return result
 }
 
+// RenderRulesHeaderComponent 渲染规则页面头部组件（带边框，包含统计和搜索框）
+func RenderRulesHeaderComponent(stats string, searchBox string, width int) string {
+	statsStyle := lipgloss.NewStyle().
+		Foreground(common.TokyoBlue)
+
+	statsText := statsStyle.Render(stats)
+
+	// 计算内边框宽度
+	innerWidth := width - 2
+	if innerWidth < 1 {
+		innerWidth = 1
+	}
+
+	// 填充统计行到指定宽度
+	statsWidth := lipgloss.Width(statsText)
+	if statsWidth < innerWidth {
+		statsText += strings.Repeat(" ", innerWidth-statsWidth)
+	}
+
+	// 填充搜索行到指定宽度
+	searchWidth := lipgloss.Width(searchBox)
+	if searchWidth < innerWidth {
+		searchBox += strings.Repeat(" ", innerWidth-searchWidth)
+	}
+
+	// 渲染带边框的头部栏
+	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue)
+	topLine := borderStyle.Render("╭" + strings.Repeat("─", innerWidth) + "╮")
+	statsRow := borderStyle.Render("│") + statsText + borderStyle.Render("│")
+	searchRow := borderStyle.Render("│") + searchBox + borderStyle.Render("│")
+	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
+
+	return topLine + "\n" + statsRow + "\n" + searchRow + "\n" + bottomLine
+}
+
 // renderRuleSearchBox 渲染搜索框
 func renderRuleSearchBox(filterText string, filterMode bool, selectedTypes []string) string {
 	inputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF"))
@@ -140,7 +175,7 @@ func renderRuleSearchBox(filterText string, filterMode bool, selectedTypes []str
 		input += inputStyle.Render("█")
 	}
 
-	hint := common.MutedStyle.Render(" (多个关键词用空格分隔)")
+	hint := common.MutedStyle.Render(" 空格分隔多词")
 	if len(selectedTypes) > 0 {
 		typeNames := strings.Join(selectedTypes, ", ")
 		typeIndicator := lipgloss.NewStyle().

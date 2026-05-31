@@ -1,19 +1,20 @@
 package settings
 
 import (
+	"time"
+
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
-	"time"
 )
 
 const (
 	asciiMinPrintable = 32
 	asciiMaxPrintable = 127
 
-	settingsMouseRowsOffset      = 4
+	settingsMouseRowsOffset      = 2
 	settingsDoubleClickThreshold = 350 * time.Millisecond
 	settingsContainerLeft        = 2
 	settingsRowPaddingLeft       = 1
@@ -28,6 +29,9 @@ type State struct {
 
 	lastMouseSetting int
 	lastMouseAt      time.Time
+
+	// Toast 管理器
+	toastManager *common.ToastManager
 }
 
 // IsEditing 返回是否处于编辑模式
@@ -37,12 +41,16 @@ func (s State) IsEditing() bool {
 
 // ToPageState 转换为渲染层所需的 PageState
 func (s State) ToPageState(cfg *config.Config) PageState {
+	if s.toastManager == nil {
+		s.toastManager = common.NewToastManager()
+	}
 	return PageState{
 		Config:          cfg,
 		SelectedSetting: s.selectedSetting,
 		EditMode:        s.editMode,
 		EditValue:       s.editValue,
 		EditCursor:      s.editCursor,
+		Toast:           s.toastManager,
 	}
 }
 
@@ -97,8 +105,10 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 					s.editMode = false
 					s.editValue = ""
 					s.editCursor = 0
+					s.showToast("语言设置已保存", common.ToastSuccess)
 					return s, newCfg, newCfg.ProxyAddress
 				}
+				s.showToast("保存失败", common.ToastError)
 				return s, cfg, ""
 			}
 		}
@@ -121,8 +131,10 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 		if lang, ok := resolveLanguageMouseTarget(pageX); ok {
 			if err := configSvc.SetConfigValue(SettingKeys[settingIdx], lang); err == nil {
 				newCfg, _ := configSvc.LoadConfig()
+				s.showToast("语言设置已保存", common.ToastSuccess)
 				return s, newCfg, newCfg.ProxyAddress
 			}
+			s.showToast("保存失败", common.ToastError)
 		}
 	}
 
@@ -149,8 +161,10 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 				newCfg, _ := configSvc.LoadConfig()
 				s.editMode = false
 				s.editValue = ""
+				s.showToast("语言设置已保存", common.ToastSuccess)
 				return s, newCfg, newCfg.ProxyAddress, nil
 			}
+			s.showToast("保存失败", common.ToastError)
 		case msg.String() == "left":
 			s.editValue = prevLanguage(s.editValue)
 		case msg.String() == "right", msg.String() == "tab":
@@ -168,13 +182,15 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 	case key.Matches(msg, common.Keys.Enter):
 		settingKey := SettingKeys[s.selectedSetting]
 		if err := configSvc.SetConfigValue(settingKey, s.editValue); err != nil {
-			// 保存失败：保持编辑模式，但不更新 cfg
+			// 保存失败：保持编辑模式，显示错误提示
+			s.showToast("保存失败: "+err.Error(), common.ToastError)
 			return s, cfg, "", nil
 		}
 		newCfg, _ := configSvc.LoadConfig()
 		s.editMode = false
 		s.editValue = ""
 		s.editCursor = 0
+		s.showToast("设置已保存", common.ToastSuccess)
 		return s, newCfg, newCfg.ProxyAddress, nil
 
 	case msg.String() == "left":
@@ -213,6 +229,14 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 	}
 
 	return s, cfg, "", nil
+}
+
+// showToast 显示 Toast 提示
+func (s *State) showToast(msg string, toastType common.ToastType) {
+	if s.toastManager == nil {
+		s.toastManager = common.NewToastManager()
+	}
+	s.toastManager.Add(msg, toastType, 2*time.Second)
 }
 
 func resolveMouseSettingIndex(pageY int) int {

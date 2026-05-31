@@ -1,23 +1,24 @@
 package connections
 
 import (
+	"strings"
+
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
 
 const (
-	connectionsBaseUsedLines    = 8
+	connectionsBaseUsedLines    = 10 // 模式切换(3) + 间距(1) + 统计(1) + 表头(1) + 分隔线(1) + 底部(3)
 	connectionsMinDisplayRows   = 5
 	connectionsSiteCardsTopLine = 2
 	connectionsSiteCardHeight   = 5
 	connectionsSiteCardMinWidth = 12
 	connectionsSiteCardMaxWidth = 20
 	connectionsSiteCardOuterPad = 3
-	connectionsHeaderTitle      = "连接监控"
-	connectionsHeaderGapWidth   = 2
-	connectionsTabsGapWidth     = 2
+	connectionsModeSwitchHeight = 3 // 模式切换栏边框高度
 )
 
 // MouseTarget 表示 connections 页面鼠标命中的组件
@@ -87,7 +88,7 @@ func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 		return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}
 	}
 
-	line := 2 // 页面标题 + 空行
+	line := connectionsModeSwitchHeight + 1 // 模式切换(3) + 空行(1)
 
 	if state.ViewMode == 0 {
 		if state.ChartData != nil {
@@ -151,21 +152,35 @@ func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 }
 
 func resolveViewModeHit(state PageState, pageX, pageY int) (MouseHit, bool) {
-	if pageY != 0 {
-		return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}, false
-	}
+	// 模式切换菜单位于最顶部，占据第 0-2 行（带边框）。
+	// 格式：╭─────────────────╮
+	//       │ 活跃连接 │ 历史连接 │
+	//       ╰─────────────────╯
+	if pageY >= 0 && pageY < connectionsModeSwitchHeight && pageX >= 0 {
+		// 只检测中间行（Y=1）的按钮点击
+		if pageY == 1 {
+			// 按钮从第 1 个字符开始（跳过左边框 │）
+			buttonWidths := []int{
+				lipgloss.Width(" " + i18n.T("conns.tab_active") + " "),
+				lipgloss.Width(" " + i18n.T("conns.tab_history") + " "),
+			}
+			separatorWidth := 1
 
-	activeLabel, historyLabel := connectionTabLabels(state.ViewMode)
-	activeStart := lipgloss.Width(connectionsHeaderTitle) + connectionsHeaderGapWidth
-	activeEnd := activeStart + lipgloss.Width(activeLabel)
-	historyStart := activeEnd + connectionsTabsGapWidth
-	historyEnd := historyStart + lipgloss.Width(historyLabel)
-
-	if pageX >= activeStart && pageX < activeEnd {
-		return MouseHit{Target: MouseTargetViewActive, Index: -1}, true
-	}
-	if pageX >= historyStart && pageX < historyEnd {
-		return MouseHit{Target: MouseTargetViewHistory, Index: -1}, true
+			x := 1 // 跳过左边框
+			for i, bw := range buttonWidths {
+				if pageX >= x && pageX < x+bw {
+					if i == 0 {
+						return MouseHit{Target: MouseTargetViewActive, Index: -1}, true
+					}
+					return MouseHit{Target: MouseTargetViewHistory, Index: -1}, true
+				}
+				x += bw
+				if i < len(buttonWidths)-1 {
+					x += separatorWidth
+				}
+			}
+		}
+		return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}, true
 	}
 
 	return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}, false
@@ -180,6 +195,60 @@ func connectionTabLabels(viewMode int) (activeLabel, historyLabel string) {
 		historyLabel = "● " + historyLabel
 	}
 	return activeLabel, historyLabel
+}
+
+// RenderConnModeSwitchComponent 渲染连接页面模式切换按钮（带边框，与节点模式切换风格一致）
+func RenderConnModeSwitchComponent(viewMode int, width int) string {
+	modes := []struct {
+		Label string
+		Value int
+	}{
+		{i18n.T("conns.tab_active"), ConnViewActive},
+		{i18n.T("conns.tab_history"), ConnViewHistory},
+	}
+
+	activeStyle := lipgloss.NewStyle().
+		Background(common.TokyoSelected).
+		Foreground(common.TokyoCyan).
+		Bold(true)
+	inactiveStyle := lipgloss.NewStyle().
+		Foreground(common.TokyoBlue)
+	separatorStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted)
+
+	var parts []string
+	for i, m := range modes {
+		label := " " + m.Label + " "
+		if viewMode == m.Value {
+			parts = append(parts, activeStyle.Render(label))
+		} else {
+			parts = append(parts, inactiveStyle.Render(label))
+		}
+		if i < len(modes)-1 {
+			parts = append(parts, separatorStyle.Render("│"))
+		}
+	}
+
+	content := lipgloss.JoinHorizontal(lipgloss.Left, parts...)
+
+	// 计算内边框宽度
+	innerWidth := width - 2
+	if innerWidth < 1 {
+		innerWidth = 1
+	}
+
+	// 填充内容到指定宽度
+	contentWidth := lipgloss.Width(content)
+	if contentWidth < innerWidth {
+		content += strings.Repeat(" ", innerWidth-contentWidth)
+	}
+
+	// 渲染带边框的模式切换栏
+	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue)
+	topLine := borderStyle.Render("╭" + strings.Repeat("─", innerWidth) + "╮")
+	middleLine := borderStyle.Render("│") + content + borderStyle.Render("│")
+	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
+
+	return topLine + "\n" + middleLine + "\n" + bottomLine
 }
 
 func resolveSiteTestMouseHit(state PageState, pageX int, siteSectionY int) int {

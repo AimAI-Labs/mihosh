@@ -11,10 +11,11 @@ import (
 )
 
 const (
-	logsFixedLines     = 8
+	logsFixedLines     = 10 // 级别栏(3) + 间距(1) + 搜索框(1) + 间距(1) + 统计(1) + 间隔(1) + 底部(2)
 	logsMinHeight      = 5
 	logsDefaultPadding = 20
 	logsLevelWidth     = 8
+	logsModeSwitchHeight = 3 // 级别栏边框高度
 )
 
 // 日志级别列表
@@ -76,7 +77,7 @@ func RenderLogsPage(state PageState) string {
 	var sections []string
 
 	// 渲染日志级别标签栏
-	levelBar := renderLevelBar(state.LogLevel)
+	levelBar := renderLevelBar(state.LogLevel, state.Width)
 	sections = append(sections, levelBar)
 	sections = append(sections, "")
 
@@ -117,38 +118,70 @@ func RenderLogsPage(state PageState) string {
 	return mainContent + footer
 }
 
-// renderLevelBar 渲染日志级别标签栏
-func renderLevelBar(selectedLevel int) string {
+// renderLevelBar 渲染日志级别标签栏（带边框）
+func renderLevelBar(selectedLevel int, width int) string {
+	// 渲染原始的级别标签
 	var tabs []string
-
 	for i, level := range logLevels {
 		tabs = append(tabs, renderLogLevelTab(level, i == selectedLevel))
 	}
+	content := lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
+	// 计算内边框宽度
+	innerWidth := width - 2
+	if innerWidth < 1 {
+		innerWidth = 1
+	}
+
+	// 填充内容到指定宽度
+	contentWidth := lipgloss.Width(content)
+	if contentWidth < innerWidth {
+		content += strings.Repeat(" ", innerWidth-contentWidth)
+	}
+
+	// 渲染带边框的级别栏
+	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue)
+	topLine := borderStyle.Render("╭" + strings.Repeat("─", innerWidth) + "╮")
+	middleLine := borderStyle.Render("│") + content + borderStyle.Render("│")
+	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
+
+	return topLine + "\n" + middleLine + "\n" + bottomLine
 }
 
 func renderLogLevelTab(level string, active bool) string {
 	style := resolveLogLevelTabStyle(level, active)
 
-	baseStyle := lipgloss.NewStyle().Background(style.Background)
-	indicator := baseStyle.Foreground(style.Indicator).Render("●")
-	text := baseStyle.Foreground(style.Foreground).Bold(style.Bold).Render(" " + level + " ")
-	return baseStyle.Render(" ") + indicator + text
+	if active {
+		// 激活状态：只有文字部分有背景
+		indicator := lipgloss.NewStyle().Foreground(style.Indicator).Render("●")
+		text := lipgloss.NewStyle().
+			Background(style.Background).
+			Foreground(style.Foreground).
+			Bold(style.Bold).
+			Render(" " + level + " ")
+		return indicator + text
+	}
+
+	// 非激活状态：无背景
+	indicator := lipgloss.NewStyle().Foreground(style.Indicator).Render("●")
+	text := lipgloss.NewStyle().
+		Foreground(style.Foreground).
+		Render(" " + level + " ")
+	return indicator + text
 }
 
 func resolveLogLevelTabStyle(level string, active bool) logLevelTabStyle {
 	style := logLevelTabStyle{
-		Background: common.CHighlight,
-		Foreground: common.CMuted,
+		Background: common.TokyoSelected,
+		Foreground: common.TokyoMuted,
 		Indicator:  logLevelColors[level],
 	}
 	if active {
-		style.Background = common.CSecondary
-		style.Foreground = common.CWhite
+		style.Background = common.TokyoSelected
+		style.Foreground = common.TokyoCyan
 		style.Bold = true
 		if style.Indicator == style.Background {
-			style.Indicator = common.CWhite
+			style.Indicator = common.TokyoCyan
 		}
 	}
 	return style
@@ -162,18 +195,14 @@ func LevelBarPositions(pageWidth int) []int {
 	// 使用实际渲染宽度计算（考虑 lipgloss 样式）
 	activeStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(common.CWhite).
-		Background(common.CSecondary).
-		Padding(0, 1)
+		Foreground(lipgloss.Color("#FFFFFF")).
+		Background(common.TokyoBlue)
 
 	for i, level := range logLevels {
 		positions[i] = currentPos
-		tag := activeStyle.Render("● " + level)
+		tag := activeStyle.Render(" ● " + level + " ")
 		currentPos += lipgloss.Width(tag)
-		// 级别之间有 1 个空格分隔
-		if i < len(logLevels)-1 {
-			currentPos++
-		}
+		// 级别之间没有空格分隔（因为 tab 自身有背景）
 	}
 
 	return positions
