@@ -53,13 +53,6 @@ func (m Model) View() string {
 	}
 
 	// ── 主面板 ──
-	pageTitle := layout.GetPageTitle(m.currentPage)
-
-	titleStyle := lipgloss.NewStyle().
-		Foreground(styles.ColorPrimary).
-		Bold(true).
-		Padding(0, 1)
-
 	mainPaneStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(styles.ColorBorder).
@@ -67,8 +60,6 @@ func (m Model) View() string {
 		Height(contentHeight - 2)
 
 	mainContent := lipgloss.JoinVertical(lipgloss.Left,
-		titleStyle.Render(pageTitle),
-		"",
 		pageContent,
 	)
 

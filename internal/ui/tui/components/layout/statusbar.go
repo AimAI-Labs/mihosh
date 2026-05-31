@@ -51,35 +51,28 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, n
 		}
 		status = styles.TestingStyle.Render(statusText)
 	} else {
-		status = styles.StatusStyle.Render("● " + i18n.T("status.normal"))
+		status = ""
 	}
-
-	// ── 中部：快捷键提示 ──
-	helpHint := lipgloss.NewStyle().
-		Foreground(styles.ColorDim).
-		Render(i18n.T("status.help_hint"))
 
 	// ── 右侧：实时指标 ──
 	var metricsStr string
 	dimStyle := lipgloss.NewStyle().Foreground(styles.ColorGray)
 	upStyle := lipgloss.NewStyle().Foreground(styles.ColorSuccess)
 	downStyle := lipgloss.NewStyle().Foreground(styles.ColorPrimary)
+	sep := dimStyle.Render(" │ ")
 
+	// 当前实时流量
 	if chartData != nil {
-		mem := lastValue(chartData.MemoryHistory)
 		upSpeed := lastValue(chartData.SpeedUpHistory)
 		downSpeed := lastValue(chartData.SpeedDownHistory)
 
-		metricsStr = dimStyle.Render(fmt.Sprintf("MEM %s", utils.FormatBytes(mem))) +
-			"  " + upStyle.Render(fmt.Sprintf("↑%s/s", utils.FormatBytes(upSpeed))) +
+		metricsStr = upStyle.Render(fmt.Sprintf("↑%s/s", utils.FormatBytes(upSpeed))) +
 			"  " + downStyle.Render(fmt.Sprintf("↓%s/s", utils.FormatBytes(downSpeed)))
 	}
 
-	// ── 总流量 ──
+	// 总流量
 	if uploadTotal > 0 || downloadTotal > 0 {
-		sep := dimStyle.Render("  │  ")
-		totalStr := dimStyle.Render(i18n.T("status.total")+":") +
-			"  " + upStyle.Render(fmt.Sprintf("↑%s", utils.FormatBytes(uploadTotal))) +
+		totalStr := upStyle.Render(fmt.Sprintf("↑%s", utils.FormatBytes(uploadTotal))) +
 			"  " + downStyle.Render(fmt.Sprintf("↓%s", utils.FormatBytes(downloadTotal)))
 		if metricsStr != "" {
 			metricsStr = metricsStr + sep + totalStr
@@ -88,12 +81,23 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, n
 		}
 	}
 
+	// MEM 放在最右边
+	if chartData != nil {
+		mem := lastValue(chartData.MemoryHistory)
+		memStr := dimStyle.Render(fmt.Sprintf("MEM %s", utils.FormatBytes(mem)))
+		if metricsStr != "" {
+			metricsStr = metricsStr + sep + memStr
+		} else {
+			metricsStr = memStr
+		}
+	}
+
 	// ── 分隔线 ──
 	divider := styles.DividerStyle.
 		Render(strings.Repeat("─", width))
 
 	// ── 组装状态行 ──
-	leftPart := status + "  " + helpHint
+	leftPart := status
 	// 计算右侧空间并右对齐
 	gap := width - lipgloss.Width(leftPart) - lipgloss.Width(metricsStr) - 2
 	if gap < 0 {
