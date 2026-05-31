@@ -536,7 +536,7 @@ func (m Model) resolveMainPageMouseHit(x, y int) (pageX, pageY, pageWidth, pageH
 	}
 
 	contentY := contentYAbs - 1
-	const pageContentOffsetY = 2 // 标题 + 空行
+	const pageContentOffsetY = 0
 	if contentY < pageContentOffsetY {
 		return 0, 0, 0, 0, false
 	}
