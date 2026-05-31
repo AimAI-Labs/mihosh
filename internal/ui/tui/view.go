@@ -57,6 +57,27 @@ func (m Model) View() string {
 		uploadTotal = m.connsState.Connections.UploadTotal
 		downloadTotal = m.connsState.Connections.DownloadTotal
 	}
+
+	// 提取当前活动节点信息（优先 GLOBAL 组，即实际代理出口）
+	var groupName, nodeName string
+	var delay int
+	// 优先查找 GLOBAL 组
+	if group, ok := m.nodesState.Groups["GLOBAL"]; ok {
+		groupName = "GLOBAL"
+		nodeName = group.Now
+	} else if len(m.nodesState.GroupNames) > 0 {
+		// 回退到第一个策略组
+		groupName = m.nodesState.GroupNames[0]
+		if group, ok := m.nodesState.Groups[groupName]; ok {
+			nodeName = group.Now
+		}
+	}
+	if nodeName != "" {
+		if proxy, ok := m.nodesState.Proxies[nodeName]; ok && len(proxy.History) > 0 {
+			delay = proxy.History[len(proxy.History)-1].Delay
+		}
+	}
+
 	statusBar := layout.RenderStatusBar(
 		m.width,
 		m.err,
@@ -66,6 +87,10 @@ func (m Model) View() string {
 		m.chartData,
 		uploadTotal,
 		downloadTotal,
+		m.nodesState.Mode,
+		groupName,
+		nodeName,
+		delay,
 	)
 
 	return lipgloss.JoinVertical(lipgloss.Left, topNav, pageContent, statusBar)
