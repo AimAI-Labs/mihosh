@@ -4,7 +4,6 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/help"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/logs"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
@@ -46,11 +45,6 @@ func (m Model) renderSettingsPage() string {
 	pageWidth, pageHeight := m.getPageSize()
 	state := m.settingsState.ToPageState(m.config)
 	return settings.RenderSettingsPage(state, pageWidth, pageHeight)
-}
-
-// renderHelpPage 渲染帮助页面弹窗
-func (m Model) renderHelpPage() string {
-	return help.RenderHelpPage(m.width, m.height)
 }
 
 // renderLogsPage 渲染日志页面

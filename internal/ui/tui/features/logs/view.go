@@ -109,13 +109,7 @@ func RenderLogsPage(state PageState) string {
 	logList := renderLogList(filteredLogs, state.SelectedLog, state.ScrollTop, availableHeight, state.Width, state.HScrollOffset)
 	sections = append(sections, logList)
 
-	// 统一底部的提示信息
-	helpText := "[↑/↓]选择 [Enter]详情 [{/}]级别 [/]搜索 [c]清空 [Esc]清除搜索 [r]刷新"
-	mainContent := strings.Join(sections, "\n")
-	contentLines := strings.Count(mainContent, "\n") + 1
-
-	footer := common.RenderFooter(state.Width, state.Height, contentLines, helpText)
-	return mainContent + footer
+	return strings.Join(sections, "\n")
 }
 
 // renderLevelBar 渲染日志级别标签栏（带边框）

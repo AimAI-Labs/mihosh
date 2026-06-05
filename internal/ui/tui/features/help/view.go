@@ -3,143 +3,304 @@ package help
 import (
 	"strings"
 
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/charmbracelet/lipgloss"
 )
 
-// RenderHelpPage 渲染帮助页面（支持宽度自适应）
-func RenderHelpPage(width, height int) string {
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#FFD700"))
+// keybinding 单条快捷键条目
+type keybinding struct {
+	key  string
+	desc string
+}
 
-	sectionStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#00BFFF")).
-		MarginBottom(1)
+// section 快捷键分组
+type section struct {
+	title    string
+	bindings []keybinding
+}
 
-	keyStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#00FF00")).
-		Width(12)
+// helpSections 所有快捷键分组定义
+var helpSections = []section{
+	{
+		title: "全局",
+		bindings: []keybinding{
+			{"?", "显示/关闭帮助"},
+			{"Tab / Shift+Tab", "切换页面"},
+			{"1-5", "直接跳转页面"},
+			{"r", "刷新当前页面"},
+			{"q / Ctrl+C", "退出程序"},
+		},
+	},
+	{
+		title: "节点管理 [1]",
+		bindings: []keybinding{
+			{"↑/↓  k/j", "选择节点"},
+			{"←/→  h/l", "切换策略组"},
+			{"Enter", "切换到选中节点"},
+			{"t", "测速当前节点"},
+			{"a", "测速当前组所有节点"},
+			{"m", "切换代理模式"},
+			{"s", "切换排序方式"},
+			{"/", "搜索节点"},
+			{"f", "查看测速失败详情"},
+		},
+	},
+	{
+		title: "连接监控 [2]",
+		bindings: []keybinding{
+			{"↑/↓  k/j", "选择连接"},
+			{"Enter", "查看连接详情"},
+			{"x", "关闭选中连接"},
+			{"X", "关闭所有连接"},
+			{"/", "搜索过滤"},
+			{"h", "切换活跃/历史视图"},
+			{"s / S", "测速选中/全部站点"},
+			{"Esc", "清除过滤 / 返回"},
+		},
+	},
+	{
+		title: "日志 [3]",
+		bindings: []keybinding{
+			{"↑/↓  k/j", "选择日志"},
+			{"Enter", "查看日志详情"},
+			{"[ / ]", "降低/提升日志级别"},
+			{"/", "搜索过滤"},
+			{"c", "清空日志"},
+			{"Esc", "清除搜索"},
+		},
+	},
+	{
+		title: "规则 [4]",
+		bindings: []keybinding{
+			{"↑/↓  k/j", "选择规则"},
+			{"/", "搜索过滤"},
+			{"t", "类型筛选"},
+			{"Esc", "清除搜索 / 关闭筛选"},
+		},
+	},
+	{
+		title: "设置 [5]",
+		bindings: []keybinding{
+			{"↑/↓", "选择配置项"},
+			{"Enter / 双击", "编辑配置项"},
+			{"←/→ / Tab", "切换选项（语言）"},
+			{"s / Enter", "保存修改"},
+			{"Esc", "取消编辑"},
+		},
+	},
+	{
+		title: "延迟颜色",
+		bindings: []keybinding{
+			{"绿色 ●", "< 100ms"},
+			{"黄色 ●", "100 – 300ms"},
+			{"红色 ●", "> 300ms"},
+		},
+	},
+}
 
-	descStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#CCCCCC"))
+// 颜色常量 — Tokyo Night
+var (
+	colorBorder  = lipgloss.Color("#7aa2f7") // blue
+	colorTitle   = lipgloss.Color("#c0caf5") // foreground
+	colorSection = lipgloss.Color("#7dcfff") // cyan
+	colorKey     = lipgloss.Color("#e0af68") // yellow
+	colorDesc    = lipgloss.Color("#a9b1d6") // comment
+	colorDim     = lipgloss.Color("#565f89") // dark5
+	colorGreen   = lipgloss.Color("#9ece6a")
+	colorYellow  = lipgloss.Color("#e0af68")
+	colorRed     = lipgloss.Color("#f7768e")
+)
 
-	// 帮助卡片样式
-	cardStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#444444")).
-		Padding(1, 2).
-		MarginRight(2)
-
-	// 渲染键值对
-	renderKey := func(key, desc string) string {
-		return keyStyle.Render(key) + descStyle.Render(desc)
+// OverlayHelpPopup 将帮助弹窗居中叠加在 base 页面之上。
+//
+// 步骤：
+//  1. 对 base 每行整体套 Faint，让背景内容降亮但不消失
+//  2. 用 lipgloss.Place 把弹窗居中放到与终端等大的画布上
+//  3. 画布中有可见内容的行（弹窗区域）整行替换对应的暗化行
+//
+// 整行替换避免了对含 ANSI 序列的字符串做字节级切割。
+func OverlayHelpPopup(base string, width, height int) string {
+	// ── 1. 暗化底层 ──
+	baseLines := strings.Split(base, "\n")
+	for len(baseLines) < height {
+		baseLines = append(baseLines, "")
+	}
+	if len(baseLines) > height {
+		baseLines = baseLines[:height]
 	}
 
-	// 全局快捷键卡片
-	globalKeys := lipgloss.JoinVertical(lipgloss.Left,
-		sectionStyle.Render("🌐 全局快捷键"),
-		renderKey("?", "显示/隐藏帮助"),
-		renderKey("Tab", "下一页"),
-		renderKey("Shift+Tab", "上一页"),
-		renderKey("r", "刷新当前页面"),
-		renderKey("q", "退出程序"),
-	)
+	faint := lipgloss.NewStyle().Faint(true)
+	dimmed := make([]string, height)
+	for i, l := range baseLines {
+		dimmed[i] = faint.Render(l)
+	}
 
-	// 节点管理卡片
-	nodesKeys := lipgloss.JoinVertical(lipgloss.Left,
-		sectionStyle.Render("📡 节点管理 [1]"),
-		renderKey("↑/↓ k/j", "选择节点"),
-		renderKey("←/→ h/l", "切换策略组"),
-		renderKey("Enter", "切换到选中节点"),
-		renderKey("t", "测速当前节点"),
-		renderKey("a", "测速当前组所有节点"),
-	)
+	// ── 2. 弹窗居中放入画布 ──
+	popup := renderPopup(width, height)
+	canvas := lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, popup)
+	canvasLines := strings.Split(canvas, "\n")
+	for len(canvasLines) < height {
+		canvasLines = append(canvasLines, "")
+	}
 
-	// 连接监控卡片
-	connKeys := lipgloss.JoinVertical(lipgloss.Left,
-		sectionStyle.Render("🔗 连接监控 [2]"),
-		renderKey("↑/↓ k/j", "选择连接"),
-		renderKey("Enter", "查看连接详情"),
-		renderKey("x", "关闭选中连接"),
-		renderKey("X", "关闭所有连接"),
-		renderKey("/", "搜索过滤"),
-		renderKey("Esc", "清除过滤/返回"),
-		renderKey("Tab", "切换活跃/历史"),
-	)
+	// ── 3. 弹窗行整行替换暗化行 ──
+	result := make([]string, height)
+	copy(result, dimmed)
+	for i, cl := range canvasLines {
+		if i >= height {
+			break
+		}
+		if lipgloss.Width(strings.TrimSpace(cl)) > 0 {
+			result[i] = cl
+		}
+	}
 
-	// 日志页面卡片
-	logsKeys := lipgloss.JoinVertical(lipgloss.Left,
-		sectionStyle.Render("📜 日志 [3]"),
-		renderKey("↑/↓ k/j", "选择日志"),
-		renderKey("[/]", "切换日志级别"),
-		renderKey("/", "搜索过滤"),
-		renderKey("c", "清空日志"),
-		renderKey("Esc", "清除搜索"),
-	)
+	return strings.Join(result, "\n")
+}
 
-	// 规则页面卡片
-	rulesKeys := lipgloss.JoinVertical(lipgloss.Left,
-		sectionStyle.Render("📋 规则 [4]"),
-		renderKey("↑/↓ k/j", "选择规则"),
-		renderKey("/", "搜索过滤"),
-		renderKey("Esc", "清除搜索"),
-	)
+// renderPopup 渲染帮助弹窗（无背景色，使用终端默认背景）
+func renderPopup(termWidth, termHeight int) string {
+	// ── 弹窗尺寸 ──
+	popupWidth := termWidth * 88 / 100
+	if popupWidth > 112 {
+		popupWidth = 112
+	}
+	if popupWidth < 60 {
+		popupWidth = 60
+	}
 
-	// 设置页面卡片
-	settingsKeys := lipgloss.JoinVertical(lipgloss.Left,
-		sectionStyle.Render("⚙️  设置 [5]"),
-		renderKey("↑/↓", "选择配置项"),
-		renderKey("Enter", "编辑配置项"),
-		renderKey("Esc", "取消编辑"),
-	)
+	popupHeight := termHeight * 85 / 100
+	if popupHeight > 42 {
+		popupHeight = 42
+	}
+	if popupHeight < 20 {
+		popupHeight = 20
+	}
 
-	// 延迟颜色说明卡片
-	latencyInfo := lipgloss.JoinVertical(lipgloss.Left,
-		sectionStyle.Render("🎨 延迟颜色说明"),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Render("●")+" "+descStyle.Render("绿色 - 小于200ms"),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00")).Render("●")+" "+descStyle.Render("黄色 - 200-500ms"),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Render("●")+" "+descStyle.Render("红色 - 大于500ms"),
-	)
+	// 内容区宽度 = 弹窗宽度 - 边框(2) - 内边距(左右各2=4)
+	innerWidth := popupWidth - 6
+	if innerWidth < 30 {
+		innerWidth = 30
+	}
 
-	// 应用卡片样式
-	globalCard := cardStyle.Render(globalKeys)
-	nodesCard := cardStyle.Render(nodesKeys)
-	connCard := cardStyle.Render(connKeys)
-	logsCard := cardStyle.Render(logsKeys)
-	rulesCard := cardStyle.Render(rulesKeys)
-	settingsCard := cardStyle.Render(settingsKeys)
-	latencyCard := cardStyle.Render(latencyInfo)
+	// 列数
+	cols := 3
+	if innerWidth < 80 {
+		cols = 2
+	}
+	if innerWidth < 48 {
+		cols = 1
+	}
 
-	// 根据宽度决定布局
-	var content string
-	if width >= 100 {
-		// 宽屏：三列布局
-		col1 := lipgloss.JoinVertical(lipgloss.Left, globalCard, latencyCard)
-		col2 := lipgloss.JoinVertical(lipgloss.Left, nodesCard, logsCard)
-		col3 := lipgloss.JoinVertical(lipgloss.Left, connCard, rulesCard, settingsCard)
-		content = lipgloss.JoinHorizontal(lipgloss.Top, col1, col2, col3)
-	} else if width >= 70 {
-		// 中等宽度：两列布局
-		col1 := lipgloss.JoinVertical(lipgloss.Left, globalCard, nodesCard, logsCard)
-		col2 := lipgloss.JoinVertical(lipgloss.Left, connCard, rulesCard, settingsCard, latencyCard)
-		content = lipgloss.JoinHorizontal(lipgloss.Top, col1, col2)
+	// ── 标题行 ──
+	title := lipgloss.NewStyle().Bold(true).Foreground(colorTitle).Render("Mihosh 快捷键帮助")
+	closeHint := lipgloss.NewStyle().Foreground(colorDim).Render("? / Esc / q  关闭")
+	gap := innerWidth - lipgloss.Width(title) - lipgloss.Width(closeHint)
+	if gap < 1 {
+		gap = 1
+	}
+	titleLine := title + strings.Repeat(" ", gap) + closeHint
+
+	divider := lipgloss.NewStyle().Foreground(colorDim).Render(strings.Repeat("─", innerWidth))
+
+	// ── 各分区卡片 ──
+	colW := innerWidth/cols - 1
+	cards := make([]string, 0, len(helpSections))
+	for _, sec := range helpSections {
+		cards = append(cards, renderSection(sec, colW))
+	}
+
+	var colContents []string
+	cardsPerCol := (len(cards) + cols - 1) / cols
+	for c := 0; c < cols; c++ {
+		start := c * cardsPerCol
+		end := start + cardsPerCol
+		if end > len(cards) {
+			end = len(cards)
+		}
+		if start >= len(cards) {
+			break
+		}
+		colContents = append(colContents, lipgloss.JoinVertical(lipgloss.Left, cards[start:end]...))
+	}
+
+	var body string
+	if len(colContents) == 1 {
+		body = colContents[0]
 	} else {
-		// 窄屏：单列布局
-		content = lipgloss.JoinVertical(lipgloss.Left,
-			globalCard, nodesCard, connCard, logsCard, rulesCard, settingsCard, latencyCard,
+		body = lipgloss.JoinHorizontal(lipgloss.Top, colContents...)
+	}
+
+	// ── 组装并限高 ──
+	content := lipgloss.JoinVertical(lipgloss.Left, titleLine, divider, "", body)
+
+	contentLines := strings.Split(content, "\n")
+	maxLines := popupHeight - 4 // 边框2 + 内边距上下各1
+	if maxLines < 4 {
+		maxLines = 4
+	}
+	if len(contentLines) > maxLines {
+		contentLines = contentLines[:maxLines]
+		contentLines = append(contentLines,
+			lipgloss.NewStyle().Foreground(colorDim).Render("↓ 更多内容..."),
 		)
 	}
+	for len(contentLines) < maxLines {
+		contentLines = append(contentLines, "")
+	}
+	content = strings.Join(contentLines, "\n")
 
-	// 标题
-	title := titleStyle.Render("Mihosh 使用帮助")
+	// ── 弹窗外壳：圆角边框，无背景色 ──
+	popupStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colorBorder).
+		Padding(1, 2).
+		Width(popupWidth)
 
-	mainContent := lipgloss.JoinVertical(lipgloss.Left, title, "", content)
+	return popupStyle.Render(content)
+}
 
-	contentLines := strings.Count(mainContent, "\n") + 1
-	helpText := "💡 提示: 所有命令行功能都可以在这个TUI界面中完成！ [?]返回"
+// renderSection 渲染单个快捷键分区（无背景色）
+func renderSection(sec section, width int) string {
+	sectionStyle := lipgloss.NewStyle().Bold(true).Foreground(colorSection)
 
-	footer := common.RenderFooter(width, height, contentLines, helpText)
-	return mainContent + footer
+	keyWidth := 16
+	if width < 38 {
+		keyWidth = 12
+	}
+	keyStyle := lipgloss.NewStyle().Foreground(colorKey).Width(keyWidth)
+	descStyle := lipgloss.NewStyle().Foreground(colorDesc)
+
+	var lines []string
+	lines = append(lines, sectionStyle.Render(sec.title))
+
+	for _, b := range sec.bindings {
+		k := b.key
+		desc := b.desc
+
+		if sec.title == "延迟颜色" {
+			var dot string
+			switch {
+			case strings.Contains(k, "绿"):
+				dot = lipgloss.NewStyle().Foreground(colorGreen).Render("●")
+			case strings.Contains(k, "黄"):
+				dot = lipgloss.NewStyle().Foreground(colorYellow).Render("●")
+			case strings.Contains(k, "红"):
+				dot = lipgloss.NewStyle().Foreground(colorRed).Render("●")
+			default:
+				dot = "●"
+			}
+			lines = append(lines, "  "+dot+" "+descStyle.Render(desc))
+			continue
+		}
+
+		lines = append(lines, "  "+keyStyle.Render(k)+descStyle.Render(desc))
+	}
+
+	lines = append(lines, "") // 分区间距
+	return strings.Join(lines, "\n")
+}
+
+// RenderHelpPage 旧接口，保留供可能存在的引用
+func RenderHelpPage(width, height int) string {
+	return renderPopup(width, height)
 }

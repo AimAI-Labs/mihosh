@@ -68,7 +68,7 @@ func GetSettingValue(cfg *config.Config, index int) string {
 }
 
 // RenderSettingsPage 渲染设置页面
-func RenderSettingsPage(state PageState, width, height int) string {
+func RenderSettingsPage(state PageState, width, _ int) string {
 	// Toast 管理器
 	if state.Toast == nil {
 		state.Toast = common.NewToastManager()
@@ -101,17 +101,7 @@ func RenderSettingsPage(state PageState, width, height int) string {
 		descSection = descStyle.Render("💡 " + SettingDescs[state.SelectedSetting])
 	}
 
-	// 操作提示
-	var helpText string
-	if state.EditMode {
-		if state.SelectedSetting == LanguageSettingIndex() {
-			helpText = "[←/→/Tab]切换 [Enter]保存 [Esc]取消"
-		} else {
-			helpText = "[Enter]保存 [Esc]取消 [←/→]移动光标"
-		}
-	} else {
-		helpText = "[↑/↓]选择 [Enter/双击]编辑"
-	}
+	// 操作提示（不再使用，帮助由弹窗提供）
 
 	// 组装主要内容
 	mainContent := lipgloss.JoinVertical(
@@ -123,21 +113,11 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	// 包裹容器边距
 	mainContent = containerStyle.Render(mainContent)
 
-	// 计算内容高度
-	contentLines := strings.Count(mainContent, "\n") + 1
-
 	// 渲染 Toast（如果有）
 	toastStr := state.Toast.Render(width)
-	if toastStr != "" {
-		toastLines := strings.Count(toastStr, "\n") + 1
-		contentLines += toastLines
-	}
-
-	// 渲染底部提示
-	footer := common.RenderFooter(width, height, contentLines, helpText)
 
 	// 组装最终结果
-	result := mainContent + footer
+	result := mainContent
 
 	// 如果有 Toast，叠加在右上角
 	if toastStr != "" {

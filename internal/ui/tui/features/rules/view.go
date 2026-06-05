@@ -109,13 +109,8 @@ func RenderRulesPage(state PageState) string {
 	ruleList := renderRuleList(filteredRules, state.SelectedRule, state.ScrollTop, availableHeight, state.Width, state.ColorAdjustLight, state.ColorAdjustDark)
 	sections = append(sections, ruleList)
 
-	// 统一底部的提示信息
-	helpText := "[↑/↓]选择 [/]搜索 [t]类型筛选 [Esc]清除 [r]刷新"
 	mainContent := strings.Join(sections, "\n")
-	contentLines := strings.Count(mainContent, "\n") + 1
-
-	footer := common.RenderFooter(state.Width, state.Height, contentLines, helpText)
-	result := mainContent + footer
+	result := mainContent
 
 	// 如果显示类型筛选弹窗，叠加在页面之上
 	if state.ShowTypeFilter {

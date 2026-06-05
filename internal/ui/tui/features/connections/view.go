@@ -203,14 +203,6 @@ func RenderConnectionsPage(state PageState) string {
 		}
 	}
 
-	// 帮助提示
-	var helpText string
-	if state.ViewMode == 0 {
-		helpText = dimStyle.Render(i18n.T("conns.help_active"))
-	} else {
-		helpText = dimStyle.Render(i18n.T("conns.help_history"))
-	}
-
 	// 渲染模式切换组件（带边框）
 	modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width)
 
@@ -252,12 +244,7 @@ func RenderConnectionsPage(state PageState) string {
 	content = append(content, common.TableBorderStyle.Render(strings.Repeat("─", max(state.Width-2, 1))))
 	content = append(content, strings.Join(rows, "\n"))
 
-	// 统一底部的提示信息，固定到底部
-	mainContent := strings.Join(content, "\n")
-	contentLines := strings.Count(mainContent, "\n") + 1
-
-	footer := common.RenderFooter(state.Width, state.Height, contentLines, helpText)
-	return mainContent + footer
+	return strings.Join(content, "\n")
 }
 
 // filterConnections 过滤连接

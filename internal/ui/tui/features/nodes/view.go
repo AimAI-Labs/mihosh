@@ -56,11 +56,6 @@ func RenderNodesPage(state PageState) string {
 	metrics := calcNodesLayoutMetrics(state.Width, state.Height)
 	modeSwitch := RenderModeSwitchComponent(state.Mode, state.Width)
 
-	sortLabel := ""
-	if len(state.SortOrderLabels) > 0 && state.CurrentSortOrder < len(state.SortOrderLabels) {
-		sortLabel = state.SortOrderLabels[state.CurrentSortOrder]
-	}
-
 	// 搜索状态提示行
 	var searchLine string
 	if state.FilterMode {
@@ -68,8 +63,6 @@ func RenderNodesPage(state PageState) string {
 	} else if state.FilterText != "" {
 		searchLine = common.MutedStyle.Render(i18n.Tf("nodes.search_inactive", state.FilterText))
 	}
-
-	helpText := common.MutedStyle.Render(i18n.Tf("nodes.help", sortLabel))
 
 	var failureBadge string
 	if len(state.TestFailures) > 0 {
@@ -121,9 +114,7 @@ func RenderNodesPage(state PageState) string {
 		)
 	}
 
-	contentLines := strings.Count(mainContent, "\n") + 1
-	footer := common.RenderFooter(state.Width, state.Height, contentLines, helpText)
-	fullPage := mainContent + footer
+	fullPage := mainContent
 
 	if state.ShowFailureDetail {
 		modal := buildFailureModal(state)

@@ -69,6 +69,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// ── 全局：鼠标事件 ──
 	case tea.MouseMsg:
+		// 帮助弹窗打开时吞掉所有鼠标事件，防止穿透到底层
+		if m.showHelp {
+			// 左键点击任意位置关闭弹窗
+			if isMouseLeftPress(msg) {
+				m.showHelp = false
+			}
+			return m, nil
+		}
 		switch {
 		case isMouseLeftPress(msg):
 			if msg.Y >= 0 && msg.Y < layout.TopNavHeight {
