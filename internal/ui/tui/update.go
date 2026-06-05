@@ -137,26 +137,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.currentPage = (m.currentPage + layout.PageCount - 1) % layout.PageCount
 			return m, m.onPageChange()
 
-		case key.Matches(msg, common.Keys.Page1):
-			m.currentPage = layout.PageNodes
-			return m, m.onPageChange()
-
-		case key.Matches(msg, common.Keys.Page2):
-			m.currentPage = layout.PageConnections
-			return m, m.onPageChange()
-
-		case key.Matches(msg, common.Keys.Page3):
-			m.currentPage = layout.PageLogs
-			return m, m.onPageChange()
-
-		case key.Matches(msg, common.Keys.Page4):
-			m.currentPage = layout.PageRules
-			return m, m.onPageChange()
-
-		case key.Matches(msg, common.Keys.Page5):
-			m.currentPage = layout.PageSettings
-			return m, nil
-
 		case key.Matches(msg, common.Keys.Refresh):
 			return m, m.refreshCurrentPage()
 		}

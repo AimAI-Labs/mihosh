@@ -36,3 +36,4 @@ Thumbs.db
 .gomodcache/
 docs/*
 .spec-workflow/
+.kiro/
