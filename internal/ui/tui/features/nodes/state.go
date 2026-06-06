@@ -249,13 +249,7 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client, proxySvc *service.Prox
 	case key.Matches(msg, common.Keys.Test):
 		if len(display) > 0 && s.SelectedProxy < len(display) {
 			proxyName := display[s.SelectedProxy]
-			s.Testing = true
-			s.TestingTarget = proxyName
-			s.TestAllActive = false
-			s.TestAllPending = nil
-			s.TestAllRunning = nil
-			s.TestAllTotal = 0
-			s.TestAllDone = 0
+			s = s.StartSingleTest(proxyName)
 			return s, TestProxy(client, proxyName, testURL, timeout)
 		}
 
@@ -734,4 +728,44 @@ func (s *State) getProxyDelayUnsafe(name string) int {
 		return proxy.History[len(proxy.History)-1].Delay
 	}
 	return 0
+}
+
+// StartSingleTest 封装单节点测速的状态重置逻辑
+func (s State) StartSingleTest(proxyName string) State {
+	s.Testing = true
+	s.TestingTarget = proxyName
+	s.TestAllActive = false
+	s.TestAllPending = nil
+	s.TestAllRunning = nil
+	s.TestAllTotal = 0
+	s.TestAllDone = 0
+	return s
+}
+
+// GetActiveProxyAndDelay 获取当前推断的活跃节点及其延时
+func (s *State) GetActiveProxyAndDelay() (proxyName string, delay int, exists bool) {
+	if strings.EqualFold(s.Mode, "direct") {
+		return "", 0, false
+	}
+
+	if strings.EqualFold(s.Mode, "global") {
+		if group, ok := s.Groups["GLOBAL"]; ok && group.Now != "" {
+			return group.Now, s.getProxyDelayUnsafe(group.Now), true
+		}
+	} else if strings.EqualFold(s.Mode, "rule") {
+		priorityGroups := []string{"PROXIES", "Proxies", "Proxy", "proxy", "🚀 节点选择", "节点选择"}
+		for _, gName := range priorityGroups {
+			if group, ok := s.Groups[gName]; ok && group.Now != "" {
+				return group.Now, s.getProxyDelayUnsafe(group.Now), true
+			}
+		}
+	}
+	// Fallback to currently selected group in UI
+	if len(s.GroupNames) > 0 && s.SelectedGroup >= 0 && s.SelectedGroup < len(s.GroupNames) {
+		gName := s.GroupNames[s.SelectedGroup]
+		if group, ok := s.Groups[gName]; ok && group.Now != "" {
+			return group.Now, s.getProxyDelayUnsafe(group.Now), true
+		}
+	}
+	return "", 0, false
 }
