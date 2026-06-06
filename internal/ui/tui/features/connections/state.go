@@ -341,20 +341,18 @@ func (s State) HandleMouseLeft(
 			return s, nil
 		}
 
-		left, top, right, bottom := components.ResolveConnectionDetailModalBounds(
-			s.connDetailSnapshot,
-			s.connIPInfo,
-			pageWidth,
-			pageHeight,
-			s.connDetailLeftScroll,
-			s.connDetailRightScroll,
-			s.connDetailFocusPanel,
-		)
-		insideModal := pageX >= left && pageX < right && pageY >= top && pageY < bottom
-		if !insideModal {
+		hit := ResolveMouseHit(s.ToPageState(chartData, pageWidth, pageHeight), pageX, pageY)
+		if hit.Target == MouseTargetViewTraffic || hit.Target == MouseTargetViewActive || hit.Target == MouseTargetViewHistory {
 			s.closeConnectionDetail()
+			// 落下到下方的 switch hit.Target 中处理模式切换
+		} else {
+			now := time.Now()
+			// 在详情页区域双击则退出
+			if s.isMouseDoubleClick(ConnectionsMouseTargetNone, 0, now) {
+				s.closeConnectionDetail()
+			}
+			return s, nil
 		}
-		return s, nil
 	}
 
 	if s.topNModalMode {
@@ -462,11 +460,10 @@ func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight in
 	}
 
 	if s.connDetailMode {
-		innerW := mainWidth - 6
 		isRightSide := false
-		if innerW >= 100 {
-			// 宽屏布局，左右排布，分界点大概是 innerW * 4 / 10 + 左侧边距
-			isRightSide = mainX > (mainWidth * 4 / 10)
+		if mainWidth >= 100 {
+			// 宽屏布局，左右排布，分界点大概是 mainWidth / 3
+			isRightSide = mainX > (mainWidth / 3)
 		} else {
 			// 窄屏布局，上下排布，分界点大概是 mainHeight / 2
 			isRightSide = mainY > (mainHeight / 2)

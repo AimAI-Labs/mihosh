@@ -54,12 +54,20 @@ func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 		return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}
 	}
 
+	// 详情模式优先级最高：只有模式切换栏和详情区域
+	if state.DetailMode && state.SelectedConnection != nil {
+		if hit, ok := resolveViewModeHit(state, pageX, pageY); ok {
+			return hit
+		}
+		return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}
+	}
+
 	if state.TopNModalMode {
 		left, top, right, bottom := components.ResolveTopNModalBounds(state.TopNModalItems, state.Width, state.Height, state.TopNModalScroll)
 		if pageX >= left && pageX < right && pageY >= top && pageY < bottom {
 			// 点击在弹窗内。
-			// 1(border) + 1(padding) + 2(title area) = 4
-			localY := pageY - top - 4
+			// 1(border with title) + 1(padding \n) = 2
+			localY := pageY - top - 2
 			if localY < 0 {
 				return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}
 			}

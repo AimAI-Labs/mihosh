@@ -32,7 +32,8 @@ func RenderTopNSection(items []TopNItem, width int) string {
 	contentWidth := panelWidth - 4
 
 	var lines []string
-	title := titleStyle.Render("Top 5 吞吐量排行 (过去5分钟)")
+	titleStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue).Bold(true)
+	title := titleStyle.Render("Top 5 吞吐量(5min)")
 	lines = append(lines, title)
 
 	maxBytes := items[0].TotalBytes // 第一项是最大的
@@ -54,18 +55,10 @@ func RenderTopNSection(items []TopNItem, width int) string {
 
 	for _, item := range items {
 		name := item.Name
-		nameRunes := []rune(name)
-		if len(nameRunes) > nameWidth {
-			name = string(nameRunes[:nameWidth-3]) + "..."
-			nameRunes = []rune(name)
-		}
+		name = common.TruncateDisplay(name, nameWidth)
+		name = common.PadString(name, nameWidth)
 
-		// 格式化名字固定宽度
-		padLen := nameWidth - len(nameRunes)
-		if padLen < 0 {
-			padLen = 0
-		}
-		nameStr := nameStyle.Render(name + strings.Repeat(" ", padLen))
+		nameStr := nameStyle.Render(name)
 
 		// 格式化数值，固定宽度 10
 		bytesStr := FormatMemory(item.TotalBytes)

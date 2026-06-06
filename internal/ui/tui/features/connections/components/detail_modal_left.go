@@ -13,19 +13,20 @@ import (
 
 // RenderDetailModalLeft 渲染详情模态框的左侧（基础信息和地理信息）
 func RenderDetailModalLeft(conn *model.Connection, ipInfo *model.IPInfo, width, height, scrollTop int, isFocused bool) string {
-	// 调整高度，为边框和标题留出空间
-	maxHeight := height - 4
+	// 左侧面板本身不需要再包一个大边框，它是由两个小的带边框面板组成的
+	// 上下各有一行滚动提示，所以可见内容高度为 height - 2
+	maxHeight := height - 2
 	if maxHeight < 5 {
 		maxHeight = 5
 	}
 
 	// 准备连接信息表格
 	connRows := getConnInfoRows(conn)
-	connTable := renderInfoTable("连接详情", connRows, width, isFocused)
+	connTable := renderInfoPanel("连接详情", connRows, width, isFocused)
 
 	// 准备IP地理信息表格
 	ipRows := getIPGeoInfoRows(ipInfo)
-	ipTable := renderInfoTable("目标 IP 地理信息", ipRows, width, isFocused)
+	ipTable := renderInfoPanel("目标 IP 地理信息", ipRows, width, isFocused)
 
 	// 合并表格
 	content := lipgloss.JoinVertical(lipgloss.Left, connTable, "", ipTable)
@@ -157,34 +158,30 @@ func getIPGeoInfoRows(ipInfo *model.IPInfo) [][]string {
 	return rows
 }
 
-func renderInfoTable(title string, rows [][]string, width int, isFocused bool) string {
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(common.TokyoBlue).
-		MarginBottom(1)
-
+func renderInfoPanel(title string, rows [][]string, width int, isFocused bool) string {
+	borderColor := common.TokyoMuted
+	titleColor := common.TokyoBlue
 	if isFocused {
-		titleStyle = titleStyle.Foreground(common.TokyoCyan)
+		borderColor = common.TokyoPurple
+		titleColor = common.TokyoCyan
 	}
 
 	// 基础样式
 	baseStyle := lipgloss.NewStyle().Padding(0, 1)
 
 	// 设置列宽
+	// RenderBorderedPanel: innerWidth=width-2, contentWidth=innerWidth-2=width-4
+	// table with HiddenBorder: tableWidth = keyWidth + valWidth + 3 (overhead)
+	// so valWidth = contentWidth - keyWidth - 3 = (width-4) - keyWidth - 3
+	contentWidth := width - 4
 	keyWidth := 10
-	valWidth := width - keyWidth - 6 // 考虑 padding 和边框
+	valWidth := contentWidth - keyWidth - 3
 	if valWidth < 10 {
 		valWidth = 10
 	}
 
-	borderColor := common.TokyoMuted
-	if isFocused {
-		borderColor = common.TokyoPurple
-	}
-
 	t := table.New().
-		Border(lipgloss.RoundedBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(borderColor)).
+		Border(lipgloss.HiddenBorder()).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if col == 0 {
 				return baseStyle.
@@ -197,5 +194,5 @@ func renderInfoTable(title string, rows [][]string, width int, isFocused bool) s
 		}).
 		Rows(rows...)
 
-	return lipgloss.JoinVertical(lipgloss.Left, titleStyle.Render(title), t.Render())
+	return common.RenderBorderedPanel(title, t.Render(), width, borderColor, titleColor)
 }

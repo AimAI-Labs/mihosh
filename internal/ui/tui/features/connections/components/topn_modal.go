@@ -127,7 +127,8 @@ func buildTopNModal(items []TopNItem, width, height, scroll int) string {
 		barWidth = remaining - nameColWidth
 		if barWidth > 40 { // 进度条不要太夸张
 			barWidth = 40
-			// 多出来的给名称或留白，这里保持 nameColWidth
+			// 必须同步缩小 innerW，否则右侧会有大量留白
+			innerW = rankColWidth + nameColWidth + barWidth + bytesColWidth + 4
 		}
 	}
 
@@ -147,12 +148,8 @@ func buildTopNModal(items []TopNItem, width, height, scroll int) string {
 			if name == "" {
 				name = "-"
 			}
-			name = truncateRunes(name, nameColWidth)
-
-			nameRunes := []rune(name)
-			if len(nameRunes) < nameColWidth {
-				name += strings.Repeat(" ", nameColWidth-len(nameRunes))
-			}
+			name = common.TruncateDisplay(name, nameColWidth)
+			name = common.PadString(name, nameColWidth)
 
 			rank := rankStyle.Render(fmt.Sprintf("%2d. ", i+1))
 			nameText := nameStyle.Render(name)

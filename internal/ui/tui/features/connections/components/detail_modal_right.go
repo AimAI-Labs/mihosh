@@ -12,22 +12,14 @@ import (
 
 // RenderDetailModalRight 渲染详情模态框的右侧（JSON详情）
 func RenderDetailModalRight(conn *model.Connection, width, height, scrollTop int, isFocused bool) string {
-	// 调整高度，为边框和标题留出空间
+	// maxHeight = height - 4 是因为：
+	// 上下边框占 2 行
+	// 上下滚动提示占 2 行
+	// 调整高度，为边框留出空间
 	maxHeight := height - 4
 	if maxHeight < 5 {
 		maxHeight = 5
 	}
-
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(common.TokyoBlue).
-		MarginBottom(1)
-
-	if isFocused {
-		titleStyle = titleStyle.Foreground(common.TokyoCyan)
-	}
-
-	title := titleStyle.Render("JSON 详情")
 
 	// 获取JSON数据
 	jsonLines, err := getJSONLines(conn)
@@ -101,7 +93,16 @@ func RenderDetailModalRight(conn *model.Connection, width, height, scrollTop int
 		output = append(output, "") // 占位
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, title, strings.Join(output, "\n"))
+	body := strings.Join(output, "\n")
+
+	borderColor := common.TokyoMuted
+	titleColor := common.TokyoBlue
+	if isFocused {
+		borderColor = common.TokyoPurple
+		titleColor = common.TokyoCyan
+	}
+
+	return common.RenderBorderedPanel("JSON 详情", body, width, borderColor, titleColor)
 }
 
 func getJSONLines(conn *model.Connection) ([]string, error) {

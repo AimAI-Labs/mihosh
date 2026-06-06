@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mattn/go-runewidth"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // ============================================================
@@ -61,7 +61,7 @@ func TokyoBlueStyle() lipgloss.Style {
 
 // DisplayWidth 计算字符串的显示宽度（精确处理中文等宽字符）
 func DisplayWidth(s string) int {
-	return runewidth.StringWidth(s)
+	return ansi.StringWidth(s)
 }
 
 // PadString 将字符串填充到指定显示宽度
@@ -82,21 +82,7 @@ func TruncateDisplay(s string, width int) string {
 		return "~"
 	}
 
-	var b strings.Builder
-	current := 0
-	for _, r := range s {
-		rw := runewidth.RuneWidth(r)
-		if rw < 0 {
-			rw = 0
-		}
-		if current+rw > width-1 {
-			break
-		}
-		b.WriteRune(r)
-		current += rw
-	}
-	b.WriteRune('~')
-	return b.String()
+	return ansi.Truncate(s, width, "~")
 }
 
 // ============================================================
@@ -143,6 +129,55 @@ func RenderTokyoPanel(title, body string, width int) string {
 			line +
 			strings.Repeat(" ", pad) +
 			TokyoBlueStyle().Render(" │")
+		middleLines = append(middleLines, middleLine)
+	}
+
+	return topLine + "\n" + strings.Join(middleLines, "\n") + "\n" + bottomLine
+}
+
+// RenderBorderedPanel 渲染自定义边框颜色的圆角面板（支持标题嵌入）
+// 标题嵌入顶部边框：╭─ title ───╮
+func RenderBorderedPanel(title, body string, width int, borderColor lipgloss.Color, titleColor lipgloss.Color) string {
+	if width < 24 {
+		width = 24
+	}
+	innerWidth := width - 2
+
+	titleLen := DisplayWidth(title)
+	maxTitleLen := innerWidth - 6
+	if maxTitleLen > 0 && titleLen > maxTitleLen {
+		title = TruncateDisplay(title, maxTitleLen)
+	}
+
+	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
+	titleStyle := lipgloss.NewStyle().Foreground(titleColor).Bold(true)
+
+	topBorderStart := "╭─ "
+	topBorderEnd := " "
+	dashCount := innerWidth + 1 - DisplayWidth(topBorderStart) - DisplayWidth(title) - DisplayWidth(topBorderEnd)
+	if dashCount < 0 {
+		dashCount = 0
+	}
+	topBorderEnd += strings.Repeat("─", dashCount) + "╮"
+
+	topLine := borderStyle.Render(topBorderStart) + titleStyle.Render(title) + borderStyle.Render(topBorderEnd)
+	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
+
+	bodyLines := strings.Split(body, "\n")
+	var middleLines []string
+	contentWidth := innerWidth - 2
+
+	for _, line := range bodyLines {
+		lineLen := lipgloss.Width(line)
+		pad := contentWidth - lineLen
+		if pad < 0 {
+			line = TruncateDisplay(line, contentWidth)
+			pad = 0
+		}
+		middleLine := borderStyle.Render("│ ") +
+			line +
+			strings.Repeat(" ", pad) +
+			borderStyle.Render(" │")
 		middleLines = append(middleLines, middleLine)
 	}
 

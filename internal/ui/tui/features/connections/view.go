@@ -43,18 +43,28 @@ type PageState struct {
 
 // RenderConnectionsPage 渲染连接监控页面
 func RenderConnectionsPage(state PageState) string {
-	// 详情模式：渲染连接详情
+	// 详情模式优先级最高：渲染沉浸式连接详情（位于模式切换栏下方）
 	if state.DetailMode && state.SelectedConnection != nil {
-		return components.RenderConnectionDetailModal(
+		modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width)
+		modeSwitchHeight := lipgloss.Height(modeSwitch)
+		remainingHeight := state.Height - modeSwitchHeight - 1
+		if remainingHeight < 5 {
+			remainingHeight = 5
+		}
+
+		detailView := components.RenderConnectionDetailImmersive(
 			state.SelectedConnection,
 			state.IPInfo,
 			state.Width,
-			state.Height,
+			remainingHeight,
 			state.DetailLeftScroll,
 			state.DetailRightScroll,
 			state.DetailFocusPanel,
 		)
+
+		return lipgloss.JoinVertical(lipgloss.Left, modeSwitch, "", detailView)
 	}
+
 	if state.TopNModalMode {
 		return components.RenderTopNModal(state.TopNModalItems, state.Width, state.Height, state.TopNModalScroll)
 	}

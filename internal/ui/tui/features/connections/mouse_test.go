@@ -327,11 +327,12 @@ func TestConnsHandleMouseLeft_DoubleClickTopNModalItemEntersDetail(t *testing.T)
 		t.Fatalf("expected detail snapshot for conn-top-1, got %#v", next.connDetailSnapshot)
 	}
 
-	// 模拟点击详情弹窗外以关闭它
-	// 详情弹窗在 120x30 下通常居中，点击左上角 (0,0) 应该是在弹窗外
-	next, cmd = next.HandleMouseLeft(0, 0, width, height, nil, 3000)
+	// 模拟双击详情页面区域以关闭它
+	// 双击 (10, 10)
+	next, cmd = next.HandleMouseLeft(10, 10, width, height, nil, 3000)
+	next, cmd = next.HandleMouseLeft(10, 10, width, height, nil, 3000)
 	if next.connDetailMode {
-		t.Fatalf("expected detail mode closed after outside click")
+		t.Fatalf("expected detail mode closed after double click")
 	}
 	if !next.topNModalMode {
 		t.Fatalf("expected topN modal still active after closing detail")
@@ -376,7 +377,7 @@ func TestConnsHandleMouseLeft_ClickOutsideTopNModalCloses(t *testing.T) {
 	}
 }
 
-func TestConnsHandleMouseLeft_ClickOutsideDetailClosesModal(t *testing.T) {
+func TestConnsHandleMouseLeft_ClickTabClosesDetail(t *testing.T) {
 	state := State{
 		connDetailMode: true,
 		connDetailSnapshot: &model.Connection{
@@ -393,12 +394,18 @@ func TestConnsHandleMouseLeft_ClickOutsideDetailClosesModal(t *testing.T) {
 	}
 
 	const width, height = 120, 30
-	next, cmd := state.HandleMouseLeft(0, height-1, width, height, nil, 3000)
+	// 找到模式切换栏的某个按钮（例如历史记录按钮）
+	x, y, ok := findConnMousePoint(state, width, height, MouseTargetViewHistory, -1)
+	if !ok {
+		t.Fatalf("failed to locate history tab mouse point")
+	}
+	
+	next, cmd := state.HandleMouseLeft(x, y, width, height, nil, 3000)
 	if cmd != nil {
-		t.Fatalf("expected nil cmd when closing detail by outside click")
+		t.Fatalf("expected nil cmd when closing detail by tab click")
 	}
 	if next.connDetailMode {
-		t.Fatalf("expected detail mode closed by outside click")
+		t.Fatalf("expected detail mode closed by tab click")
 	}
 	if next.connDetailSnapshot != nil {
 		t.Fatalf("expected detail snapshot cleared after close")
@@ -414,7 +421,7 @@ func TestConnsHandleMouseLeft_ClickOutsideDetailClosesModal(t *testing.T) {
 	}
 }
 
-func TestConnsHandleMouseLeft_ClickInsideDetailKeepsModal(t *testing.T) {
+func TestConnsHandleMouseLeft_DoubleClickDetailClosesModal(t *testing.T) {
 	state := State{
 		connDetailMode: true,
 		connDetailSnapshot: &model.Connection{
@@ -427,30 +434,28 @@ func TestConnsHandleMouseLeft_ClickInsideDetailKeepsModal(t *testing.T) {
 	}
 
 	const width, height = 120, 30
-	left, top, right, bottom := components.ResolveConnectionDetailModalBounds(
-		state.connDetailSnapshot,
-		state.connIPInfo,
-		width,
-		height,
-		state.connDetailLeftScroll,
-		state.connDetailRightScroll,
-		state.connDetailFocusPanel,
-	)
-	if right <= left || bottom <= top {
-		t.Fatalf("invalid modal bounds: left=%d top=%d right=%d bottom=%d", left, top, right, bottom)
-	}
-	clickX := left
-	clickY := top
+	// 点击详情区域（在模式切换栏下方），y = 10
+	clickX := 10
+	clickY := 10
 
 	next, cmd := state.HandleMouseLeft(clickX, clickY, width, height, nil, 3000)
 	if cmd != nil {
-		t.Fatalf("expected nil cmd when clicking inside detail modal")
+		t.Fatalf("expected nil cmd when clicking inside detail")
 	}
 	if !next.connDetailMode {
-		t.Fatalf("expected detail mode keep open when clicking inside modal")
+		t.Fatalf("expected detail mode keep open on single click")
 	}
 	if next.connDetailSnapshot == nil || next.connDetailSnapshot.ID != "conn-1" {
 		t.Fatalf("expected detail snapshot retained, got %#v", next.connDetailSnapshot)
+	}
+
+	// 双击退出
+	next, cmd = next.HandleMouseLeft(clickX, clickY, width, height, nil, 3000)
+	if cmd != nil {
+		t.Fatalf("expected nil cmd on double click")
+	}
+	if next.connDetailMode {
+		t.Fatalf("expected detail mode close on double click")
 	}
 }
 
