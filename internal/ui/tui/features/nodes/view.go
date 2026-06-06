@@ -56,12 +56,16 @@ func RenderNodesPage(state PageState) string {
 	metrics := calcNodesLayoutMetrics(state.Width, state.Height)
 	modeSwitch := RenderModeSwitchComponent(state.Mode, state.Width)
 
-	// 搜索状态提示行
+	// ── 底部固定行：搜索提示 + 失败徽标 ──────────────────────────────
+	// 搜索行始终占一行（空行或内容行），确保其位置固定在底栏上方，
+	// 不随策略组/节点面板内容多少而上下漂移。
 	var searchLine string
 	if state.FilterMode {
 		searchLine = common.TableHeaderStyle.Render(i18n.Tf("nodes.search_active", state.FilterText))
 	} else if state.FilterText != "" {
 		searchLine = common.MutedStyle.Render(i18n.Tf("nodes.search_inactive", state.FilterText))
+	} else {
+		searchLine = "" // 占位空行由 clampPanelArea 负责填充
 	}
 
 	var failureBadge string
@@ -70,7 +74,20 @@ func RenderNodesPage(state PageState) string {
 			" " + common.MutedStyle.Render(i18n.T("nodes.view_failure"))
 	}
 
-	var mainContent string
+	// 底部固定区域占用的行数：搜索行(1) + 失败徽标(0或1)
+	bottomLines := 1 // 搜索行始终占 1 行
+	if failureBadge != "" {
+		bottomLines++
+	}
+
+	// panel 区域可用高度 = 总高度 - 底部固定行数
+	panelAreaHeight := state.Height - bottomLines
+	if panelAreaHeight < nodesMinHeight {
+		panelAreaHeight = nodesMinHeight
+	}
+
+	// ── 面板区域渲染 ─────────────────────────────────────────────────
+	var panelArea string
 	if metrics.Wide {
 		groupPanel := renderTokyoPanel(
 			i18n.Tf("nodes.group_header", state.SelectedGroup+1, len(state.GroupNames)),
@@ -83,18 +100,11 @@ func RenderNodesPage(state PageState) string {
 			metrics.ProxyPanelWidth,
 		)
 		panels := lipgloss.JoinHorizontal(lipgloss.Top, groupPanel, strings.Repeat(" ", nodesPanelGap), proxyPanel)
-		mainContent = lipgloss.JoinVertical(
-			lipgloss.Left,
-			modeSwitch,
-			"",
-			panels,
-			searchLine,
-			failureBadge,
-		)
+		panelArea = lipgloss.JoinVertical(lipgloss.Left, modeSwitch, "", panels)
 	} else {
 		groupList := RenderGroupListComponentWidth(state, metrics.GroupMaxLines, state.Width-6)
 		proxyList := RenderProxyListComponentWidth(state, metrics.ProxyMaxLines, state.Width-6)
-		mainContent = lipgloss.JoinVertical(
+		panelArea = lipgloss.JoinVertical(
 			lipgloss.Left,
 			modeSwitch,
 			"",
@@ -109,18 +119,42 @@ func RenderNodesPage(state PageState) string {
 				proxyList,
 				state.Width-2,
 			),
-			searchLine,
-			failureBadge,
 		)
 	}
 
-	fullPage := mainContent
+	// 将面板区域精确约束到 panelAreaHeight 行，确保底部固定行不随内容漂移
+	panelArea = clampToLines(panelArea, panelAreaHeight)
+
+	// ── 拼接：面板区 + 搜索行 + 失败徽标 ────────────────────────────
+	bottomParts := []string{searchLine}
+	if failureBadge != "" {
+		bottomParts = append(bottomParts, failureBadge)
+	}
+	mainContent := lipgloss.JoinVertical(lipgloss.Left,
+		append([]string{panelArea}, bottomParts...)...,
+	)
 
 	if state.ShowFailureDetail {
 		modal := buildFailureModal(state)
-		return overlayCenter(fullPage, modal, state.Width, state.Height)
+		return overlayCenter(mainContent, modal, state.Width, state.Height)
 	}
-	return fullPage
+	return mainContent
+}
+
+// clampToLines 将字符串精确约束为 h 行：不足时末尾补空行，超出时截断。
+func clampToLines(content string, h int) string {
+	if h <= 0 {
+		return content
+	}
+	lines := strings.Split(content, "\n")
+	if len(lines) < h {
+		for len(lines) < h {
+			lines = append(lines, "")
+		}
+	} else if len(lines) > h {
+		lines = lines[:h]
+	}
+	return strings.Join(lines, "\n")
 }
 
 
