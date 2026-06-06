@@ -53,15 +53,6 @@ func RenderTopNModal(items []TopNItem, width, height, scroll int) string {
 }
 
 func buildTopNModal(items []TopNItem, width, height, scroll int) string {
-	modalStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(common.TokyoBlue).
-		Padding(1, 2)
-
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(common.TokyoCyan)
-
 	rankStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted)
 	nameStyle := lipgloss.NewStyle().Foreground(common.TokyoForeground)
 	bytesStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue)
@@ -107,8 +98,8 @@ func buildTopNModal(items []TopNItem, width, height, scroll int) string {
 	}
 
 	// 2. 根据最长名称动态确定弹窗宽度 (但不能超过 maxInnerW)
-	// rank(4) + name + sep(3) + bar(15) + bytes(12) = 34 + name
-	idealInnerW := rankColWidth + maxNameLen + 3 + barBaseWidth + bytesColWidth
+	// rank(4) + name + sep(3) + bar(15) + sep(1) + bytes(12) = 35 + name
+	idealInnerW := rankColWidth + maxNameLen + 3 + barBaseWidth + 1 + bytesColWidth
 	if innerW < idealInnerW {
 		innerW = idealInnerW
 	}
@@ -121,7 +112,7 @@ func buildTopNModal(items []TopNItem, width, height, scroll int) string {
 	nameColWidth := maxNameLen
 
 	// 如果总宽度不足以容纳，则先压缩进度条，再压缩名称
-	remaining := innerW - rankColWidth - bytesColWidth - 3 // 减去固定列和分隔符
+	remaining := innerW - rankColWidth - bytesColWidth - 4 // 减去固定列和分隔符
 	if remaining < nameColWidth+barWidth {
 		// 尝试压缩进度条到最小 10
 		if remaining-nameColWidth >= 10 {
@@ -214,9 +205,10 @@ func buildTopNModal(items []TopNItem, width, height, scroll int) string {
 		content = append(content, common.DimStyle.Render(fmt.Sprintf("↓ 还有 %d 项", totalRows-end)))
 	}
 
-	title := titleStyle.Render("吞吐量排行 (过去5分钟)")
-	modalContent := lipgloss.JoinVertical(lipgloss.Left, title, "", strings.Join(content, "\n"))
-	return modalStyle.Render(modalContent)
+	// 加上下空行使其有类似 Padding(1, 0) 的效果
+	body := "\n" + strings.Join(content, "\n") + "\n"
+	panelWidth := innerW + 4 // 对应 contentWidth = innerW
+	return common.RenderTokyoPanel("吞吐量排行 (过去5分钟)", body, panelWidth)
 }
 
 func truncateRunes(s string, limit int) string {
