@@ -125,7 +125,7 @@ func RenderConnectionsPage(state PageState) string {
 				layoutCols = 3
 			}
 			cardRows := (len(state.SiteTests) + layoutCols - 1) / layoutCols
-			usedLines += 2 + cardRows*5 + 1 // 标题+间距+卡片行+间距
+			usedLines += 1 + cardRows*5 + 1 // 间距+卡片行+间距
 		}
 		if len(state.TopNItems) > 0 {
 			usedLines += len(state.TopNItems) + 2

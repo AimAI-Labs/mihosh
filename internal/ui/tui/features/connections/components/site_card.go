@@ -10,18 +10,6 @@ import (
 
 // RenderSiteTestSection 渲染网站测速区域
 func RenderSiteTestSection(siteTests []model.SiteTest, selectedIdx int, width int) string {
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(styles.ColorPrimary)
-
-	dimStyle := lipgloss.NewStyle().
-		Foreground(styles.ColorSecondary)
-
-	// 标题行
-	title := headerStyle.Render("⚡ 网站测试")
-	testAllBtn := dimStyle.Render("[S]测试全部")
-	titleLine := title + "  " + testAllBtn
-
 	// 根据宽度动态计算每行卡片数和卡片宽度
 	layoutCols := 4
 	if width < 60 {
@@ -55,71 +43,81 @@ func RenderSiteTestSection(siteTests []model.SiteTest, selectedIdx int, width in
 	}
 
 	cardsContent := lipgloss.JoinVertical(lipgloss.Left, cardRows...)
-	return lipgloss.JoinVertical(lipgloss.Left, titleLine, "", cardsContent)
+	return lipgloss.JoinVertical(lipgloss.Left, "", cardsContent)
 }
 
 // RenderSiteCard 渲染单个网站测速卡片
 func RenderSiteCard(site model.SiteTest, selected bool, width int) string {
-	// 卡片样式
+	innerWidth := width - 4 // 减去 border(2) + padding(2)
+
+	// 卡片边框样式
+	var borderColor lipgloss.Color
+	if selected {
+		borderColor = styles.ColorPrimary
+	} else {
+		borderColor = lipgloss.Color("#444")
+	}
+
 	cardStyle := lipgloss.NewStyle().
 		Width(width).
 		Padding(0, 1).
-		MarginRight(1)
+		MarginRight(1).
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(borderColor)
 
-	if selected {
-		cardStyle = cardStyle.
-			Background(lipgloss.Color("#333")).
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(styles.ColorPrimary)
-	} else {
-		cardStyle = cardStyle.
-			Background(lipgloss.Color("#1a1a2e")).
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#444"))
-	}
-
-	// 图标样式
+	// 图标
 	iconStyle := lipgloss.NewStyle().
 		Bold(true).
+		Width(innerWidth).
+		Align(lipgloss.Center).
 		Foreground(lipgloss.Color("#FFF"))
 
-	// 名称样式
+	// 名称：truncate 防止溢出
+	name := site.Name
+	if len([]rune(name)) > innerWidth {
+		name = string([]rune(name)[:innerWidth-1]) + "…"
+	}
 	nameStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#CCC")).
-		Width(width - 4).
+		Foreground(lipgloss.Color("#AAA")).
+		Width(innerWidth).
 		Align(lipgloss.Center)
 
-	// 延迟样式
+	// 延迟 / 状态
 	var delayStr string
-	var delayStyle lipgloss.Style
+	var delayColor lipgloss.Color
 
-	if site.Testing {
-		delayStr = "测试中..."
-		delayStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700"))
-	} else if site.Error != "" {
-		delayStr = site.Error
-		delayStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6B6B"))
-	} else if site.Delay > 0 {
+	switch {
+	case site.Testing:
+		delayStr = "⟳"
+		delayColor = lipgloss.Color("#FFD700")
+	case site.Error != "":
+		delayStr = "✗"
+		delayColor = lipgloss.Color("#FF6B6B")
+	case site.Delay > 0:
 		delayStr = fmt.Sprintf("%dms", site.Delay)
-		// 根据延迟着色
-		if site.Delay < 500 {
-			delayStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF7F")) // 绿色
-		} else if site.Delay < 1000 {
-			delayStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700")) // 黄色
-		} else {
-			delayStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6B6B")) // 红色
+		switch {
+		case site.Delay < 300:
+			delayColor = lipgloss.Color("#00E676") // 绿
+		case site.Delay < 800:
+			delayColor = lipgloss.Color("#FFD700") // 黄
+		default:
+			delayColor = lipgloss.Color("#FF6B6B") // 红
 		}
-	} else {
-		delayStr = "-"
-		delayStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#666"))
+	default:
+		delayStr = "—"
+		delayColor = lipgloss.Color("#555")
 	}
-	delayStyle = delayStyle.Width(width - 4).Align(lipgloss.Center)
 
-	// 组装卡片内容
-	icon := iconStyle.Render(site.Icon)
-	name := nameStyle.Render(site.Name)
-	delay := delayStyle.Render(delayStr)
+	delayStyle := lipgloss.NewStyle().
+		Bold(site.Delay > 0 || site.Testing).
+		Foreground(delayColor).
+		Width(innerWidth).
+		Align(lipgloss.Center)
 
-	content := lipgloss.JoinVertical(lipgloss.Center, icon, name, delay)
+	content := lipgloss.JoinVertical(lipgloss.Center,
+		iconStyle.Render(site.Icon),
+		nameStyle.Render(name),
+		delayStyle.Render(delayStr),
+	)
 	return cardStyle.Render(content)
 }
