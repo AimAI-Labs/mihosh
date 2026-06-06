@@ -58,16 +58,16 @@ func RenderTopNModal(items []TopNItem, width, height, scroll int) string {
 func buildTopNModal(items []TopNItem, width, height, scroll int) string {
 	modalStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(common.CSecondary).
+		BorderForeground(common.TokyoPurple).
 		Padding(1, 2)
 
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(common.CWarning)
+		Foreground(common.TokyoCyan)
 
-	rankStyle := lipgloss.NewStyle().Foreground(common.CSecondary)
-	nameStyle := lipgloss.NewStyle().Foreground(common.CWhite)
-	bytesStyle := lipgloss.NewStyle().Foreground(common.CPrimary)
+	rankStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted)
+	nameStyle := lipgloss.NewStyle().Foreground(common.TokyoForeground)
+	bytesStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue)
 
 	innerW := width - 20
 	maxInnerW := width - 8
@@ -143,7 +143,7 @@ func buildTopNModal(items []TopNItem, width, height, scroll int) string {
 		}
 	}
 
-	barColor := lipgloss.Color("#9370DB") // 紫色进度条
+	barColor := common.TokyoPurple // Tokyo Night 紫色进度条
 
 	var maxBytes int64
 	if len(items) > 0 {

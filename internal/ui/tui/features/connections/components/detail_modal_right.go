@@ -20,11 +20,11 @@ func RenderDetailModalRight(conn *model.Connection, width, height, scrollTop int
 
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(common.CSecondary).
+		Foreground(common.TokyoBlue).
 		MarginBottom(1)
 
 	if isFocused {
-		titleStyle = titleStyle.Foreground(lipgloss.Color("#00FF00"))
+		titleStyle = titleStyle.Foreground(common.TokyoCyan)
 	}
 
 	title := titleStyle.Render("JSON 详情")
@@ -67,8 +67,8 @@ func RenderDetailModalRight(conn *model.Connection, width, height, scrollTop int
 
 	visibleLines := jsonLines[scrollTop:endIdx]
 
-	// 样式
-	jsonStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00"))
+	// 样式 — Tokyo Night JSON 高亮
+	jsonStyle := lipgloss.NewStyle().Foreground(common.TokyoGreen)
 
 	var contentLines []string
 	for _, line := range visibleLines {
@@ -79,7 +79,7 @@ func RenderDetailModalRight(conn *model.Connection, width, height, scrollTop int
 	var output []string
 	dimStyle := common.DimStyle
 	if isFocused {
-		dimStyle = dimStyle.Foreground(lipgloss.Color("#00FF00"))
+		dimStyle = dimStyle.Foreground(common.TokyoCyan)
 	}
 
 	if scrollTop > 0 {

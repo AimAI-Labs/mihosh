@@ -68,15 +68,15 @@ func buildConnectionDetailModal(
 	ipInfo *model.IPInfo,
 	width, height, leftScroll, rightScroll, focusPanel int,
 ) string {
-	// 模态框边框和标题样式
+	// 模态框边框和标题样式 — Tokyo Night
 	modalStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(common.CSecondary).
+		BorderForeground(common.TokyoPurple).
 		Padding(1, 2)
 
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(common.CWarning)
+		Foreground(common.TokyoCyan)
 
 	host := firstNonEmpty(conn.Metadata.Host, conn.Metadata.SniffHost, conn.Metadata.DestinationIP, "-")
 	title := titleStyle.Render("🔗 连接详情 - " + host)

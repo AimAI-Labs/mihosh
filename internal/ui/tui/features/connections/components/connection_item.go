@@ -74,9 +74,11 @@ func calcColumnWidths(pageWidth int) columnWidths {
 }
 
 // RenderTableHeader 渲染表头
+// 前缀占位与数据行的 prefix（"► " / "  "）保持相同宽度（2 字符）
 func RenderTableHeader(style lipgloss.Style, pageWidth int) string {
 	cols := calcColumnWidths(pageWidth)
-	header := strings.Join([]string{
+	const prefixPlaceholder = "  " // 与 SymbolSelectActive/SymbolSelectInactive 等宽
+	header := prefixPlaceholder + strings.Join([]string{
 		alignCenter("", cols.Close),
 		alignLeft("主机", cols.Host),
 		alignLeft("类型", cols.Type),

@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	connectionsBaseUsedLines    = 10 // 模式切换(3) + 间距(1) + 统计(1) + 表头(1) + 分隔线(1) + 底部(3)
+	connectionsBaseUsedLines    = 9 // 模式切换(3) + 间距(1) + 表头(1) + 分隔线(1) + 底部(3)
 	connectionsMinDisplayRows   = 5
 	connectionsSiteCardsTopLine = 2
 	connectionsSiteCardHeight   = 5
@@ -124,11 +124,11 @@ func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 		}
 	}
 
-	line++ // 统计行
+	line++ // 表头行
+	line++ // 分隔线
 	if state.FilterMode || state.FilterText != "" {
 		line++ // 过滤行
 	}
-	line += 2 // 表头 + 分隔线
 
 	filteredConns := filterConnections(connectionsByViewMode(state), state.FilterText)
 	if len(filteredConns) == 0 {

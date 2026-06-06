@@ -50,12 +50,12 @@ func RenderSiteTestSection(siteTests []model.SiteTest, selectedIdx int, width in
 func RenderSiteCard(site model.SiteTest, selected bool, width int) string {
 	innerWidth := width - 4 // 减去 border(2) + padding(2)
 
-	// 卡片边框样式
+	// 卡片边框样式 — Tokyo Night
 	var borderColor lipgloss.Color
 	if selected {
-		borderColor = styles.ColorPrimary
+		borderColor = styles.ColorPrimary   // #7AA2F7 蓝
 	} else {
-		borderColor = lipgloss.Color("#444")
+		borderColor = styles.ColorBorder    // #414868 暗边框
 	}
 
 	cardStyle := lipgloss.NewStyle().
@@ -70,7 +70,7 @@ func RenderSiteCard(site model.SiteTest, selected bool, width int) string {
 		Bold(true).
 		Width(innerWidth).
 		Align(lipgloss.Center).
-		Foreground(lipgloss.Color("#FFF"))
+		Foreground(styles.ColorText)
 
 	// 名称：truncate 防止溢出
 	name := site.Name
@@ -78,7 +78,7 @@ func RenderSiteCard(site model.SiteTest, selected bool, width int) string {
 		name = string([]rune(name)[:innerWidth-1]) + "…"
 	}
 	nameStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#AAA")).
+		Foreground(styles.ColorGray).
 		Width(innerWidth).
 		Align(lipgloss.Center)
 
@@ -89,23 +89,23 @@ func RenderSiteCard(site model.SiteTest, selected bool, width int) string {
 	switch {
 	case site.Testing:
 		delayStr = "⟳"
-		delayColor = lipgloss.Color("#FFD700")
+		delayColor = styles.ColorWarning  // #E0AF68 黄
 	case site.Error != "":
 		delayStr = "✗"
-		delayColor = lipgloss.Color("#FF6B6B")
+		delayColor = styles.ColorDanger   // #F7768E 红
 	case site.Delay > 0:
 		delayStr = fmt.Sprintf("%dms", site.Delay)
 		switch {
 		case site.Delay < 300:
-			delayColor = lipgloss.Color("#00E676") // 绿
+			delayColor = styles.ColorSuccess  // #9ECE6A 绿
 		case site.Delay < 800:
-			delayColor = lipgloss.Color("#FFD700") // 黄
+			delayColor = styles.ColorWarning  // #E0AF68 黄
 		default:
-			delayColor = lipgloss.Color("#FF6B6B") // 红
+			delayColor = styles.ColorDanger   // #F7768E 红
 		}
 	default:
 		delayStr = "—"
-		delayColor = lipgloss.Color("#555")
+		delayColor = styles.ColorBorder   // #414868 暗灰
 	}
 
 	delayStyle := lipgloss.NewStyle().

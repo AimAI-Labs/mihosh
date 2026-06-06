@@ -10,6 +10,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -35,7 +36,7 @@ type State struct {
 	selectedConn          int
 	connScrollTop         int
 	connFilterMode        bool
-	connFilter            string
+	connFilter            textinput.Model
 	connDetailMode        bool
 	connDetailSnapshot    *model.Connection
 	connIPInfo            *model.IPInfo
@@ -58,9 +59,13 @@ type State struct {
 
 // NewConnsState 初始化连接状态
 func NewState(proxyAddr string, siteTests []model.SiteTest) State {
+	ti := textinput.New()
+	ti.Placeholder = "filter..."
+	ti.CharLimit = 100
 	return State{
-		proxyAddr: proxyAddr,
-		siteTests: siteTests,
+		proxyAddr:  proxyAddr,
+		siteTests:  siteTests,
+		connFilter: ti,
 	}
 }
 
@@ -160,7 +165,8 @@ func (s State) ToPageState(chartData *model.ChartData, width, height int) PageSt
 		Height:             height,
 		SelectedIndex:      s.selectedConn,
 		ScrollTop:          s.connScrollTop,
-		FilterText:         s.connFilter,
+		FilterText:         s.connFilter.Value(),
+		FilterInput:        s.connFilter.View(),
 		FilterMode:         s.connFilterMode,
 		DetailMode:         s.connDetailMode,
 		SelectedConnection: s.connDetailSnapshot,
@@ -271,6 +277,7 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client, timeout int) (State, t
 
 	case msg.String() == "/":
 		s.connFilterMode = true
+		s.connFilter.Focus()
 
 	case msg.String() == "h":
 		s.setConnViewMode((s.connViewMode + 1) % 2)
@@ -297,8 +304,8 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client, timeout int) (State, t
 		}
 
 	case key.Matches(msg, common.Keys.Escape):
-		if s.connFilter != "" {
-			s.connFilter = ""
+		if s.connFilter.Value() != "" {
+			s.connFilter.Reset()
 			s.selectedConn = 0
 			s.connScrollTop = 0
 		}
@@ -702,21 +709,16 @@ func (s State) handleConnFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	switch {
 	case key.Matches(msg, common.Keys.Escape):
 		s.connFilterMode = false
+		s.connFilter.Blur()
 	case key.Matches(msg, common.Keys.Enter):
 		s.connFilterMode = false
+		s.connFilter.Blur()
 		s.selectedConn = 0
 		s.connScrollTop = 0
-	case key.Matches(msg, common.Keys.Backspace):
-		if len(s.connFilter) > 0 {
-			runes := []rune(s.connFilter)
-			s.connFilter = string(runes[:len(runes)-1])
-		}
 	default:
-		input := msg.String()
-		runes := []rune(input)
-		if len(runes) == 1 && runes[0] >= 32 {
-			s.connFilter += input
-		}
+		var cmd tea.Cmd
+		s.connFilter, cmd = s.connFilter.Update(msg)
+		return s, cmd
 	}
 	return s, nil
 }
@@ -732,11 +734,11 @@ func (s State) filteredConnCount() int {
 	} else {
 		conns = s.ClosedConnections()
 	}
-	if s.connFilter == "" {
+	if s.connFilter.Value() == "" {
 		return len(conns)
 	}
 	count := 0
-	filter := strings.ToLower(s.connFilter)
+	filter := strings.ToLower(s.connFilter.Value())
 	for _, conn := range conns {
 		if connMatchesFilter(conn, filter) {
 			count++
@@ -761,14 +763,14 @@ func (s State) selectedConnection() *model.Connection {
 		conns = closed
 	}
 
-	if s.connFilter == "" {
+	if s.connFilter.Value() == "" {
 		if s.selectedConn >= 0 && s.selectedConn < len(conns) {
 			return &conns[s.selectedConn]
 		}
 		return nil
 	}
 
-	filter := strings.ToLower(s.connFilter)
+	filter := strings.ToLower(s.connFilter.Value())
 	idx := 0
 	for i := range conns {
 		if connMatchesFilter(conns[i], filter) {

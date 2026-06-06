@@ -51,7 +51,7 @@ func RenderDetailModalLeft(conn *model.Connection, ipInfo *model.IPInfo, width, 
 	var output []string
 	dimStyle := common.DimStyle
 	if isFocused {
-		dimStyle = dimStyle.Foreground(lipgloss.Color("#00FF00"))
+		dimStyle = dimStyle.Foreground(common.TokyoCyan)
 	}
 
 	if scrollTop > 0 {
@@ -160,11 +160,11 @@ func getIPGeoInfoRows(ipInfo *model.IPInfo) [][]string {
 func renderInfoTable(title string, rows [][]string, width int, isFocused bool) string {
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(common.CSecondary).
+		Foreground(common.TokyoBlue).
 		MarginBottom(1)
 
 	if isFocused {
-		titleStyle = titleStyle.Foreground(lipgloss.Color("#00FF00"))
+		titleStyle = titleStyle.Foreground(common.TokyoCyan)
 	}
 
 	// 基础样式
@@ -177,17 +177,22 @@ func renderInfoTable(title string, rows [][]string, width int, isFocused bool) s
 		valWidth = 10
 	}
 
+	borderColor := common.TokyoMuted
+	if isFocused {
+		borderColor = common.TokyoPurple
+	}
+
 	t := table.New().
 		Border(lipgloss.RoundedBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("#444444"))).
+		BorderStyle(lipgloss.NewStyle().Foreground(borderColor)).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if col == 0 {
 				return baseStyle.
-					Foreground(common.CPrimary).
+					Foreground(common.TokyoBlue).
 					Width(keyWidth)
 			}
 			return baseStyle.
-				Foreground(lipgloss.Color("#E5E7EB")).
+				Foreground(common.TokyoForeground).
 				Width(valWidth)
 		}).
 		Rows(rows...)

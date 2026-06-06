@@ -1,14 +1,12 @@
 package connections
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
-	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -20,6 +18,7 @@ type PageState struct {
 	SelectedIndex      int
 	ScrollTop          int
 	FilterText         string
+	FilterInput        string // textinput.View() 渲染结果
 	FilterMode         bool
 	DetailMode         bool              // 是否显示详情
 	SelectedConnection *model.Connection // 选中的连接
@@ -60,11 +59,18 @@ func RenderConnectionsPage(state PageState) string {
 		return components.RenderTopNModal(state.TopNModalItems, state.Width, state.Height, state.TopNModalScroll)
 	}
 
-	// 样式定义
-	headerStyle := common.BoldStyle.Foreground(common.CSecondary)
-	selectedStyle := common.SelectedStyle
-	normalStyle := lipgloss.NewStyle().Foreground(common.CWhite)
-	dimStyle := common.MutedStyle
+	// 样式定义 — Tokyo Night
+	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(common.TokyoBlue)
+	// 历史连接行用偏暗的前景色，与活跃连接做视觉区分
+	isHistory := state.ViewMode == ConnViewHistory
+	var normalStyle lipgloss.Style
+	if isHistory {
+		normalStyle = lipgloss.NewStyle().Foreground(common.TokyoMuted)
+	} else {
+		normalStyle = lipgloss.NewStyle().Foreground(common.TokyoForeground)
+	}
+	selectedStyle := lipgloss.NewStyle().Background(common.TokyoSelected).Foreground(common.TokyoCyan).Bold(true)
+	dimStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted)
 
 	// 根据视图模式选择数据源
 	var connList []model.Connection
@@ -82,24 +88,10 @@ func RenderConnectionsPage(state PageState) string {
 	// 过滤连接
 	filteredConns := filterConnections(connList, state.FilterText)
 
-	// 统计信息
-	var stats string
-	if state.ViewMode == 0 && state.Connections != nil {
-		stats = i18n.Tf("conns.stats_active",
-			headerStyle.Render(fmt.Sprintf("%d", len(filteredConns))),
-			headerStyle.Render(utils.FormatBytes(state.Connections.UploadTotal)),
-			headerStyle.Render(utils.FormatBytes(state.Connections.DownloadTotal)),
-		)
-	} else {
-		stats = i18n.Tf("conns.stats_history",
-			headerStyle.Render(fmt.Sprintf("%d", len(filteredConns))),
-		)
-	}
-
 	// 过滤输入框
 	filterLine := ""
 	if state.FilterMode {
-		filterLine = i18n.Tf("conns.filter_active", state.FilterText)
+		filterLine = state.FilterInput
 	} else if state.FilterText != "" {
 		filterLine = dimStyle.Render(i18n.Tf("conns.filter_inactive", state.FilterText))
 	}
@@ -236,7 +228,6 @@ func RenderConnectionsPage(state PageState) string {
 		}
 	}
 
-	content = append(content, stats)
 	if filterLine != "" {
 		content = append(content, filterLine)
 	}
