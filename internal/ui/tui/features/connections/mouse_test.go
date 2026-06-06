@@ -204,8 +204,27 @@ func TestConnsHandleMouseLeft_DoubleClickChartOpensTopNModal(t *testing.T) {
 		t.Fatalf("expected topN modal closed by default")
 	}
 
-	// 图表区域位于页面顶部（标题与空行之后）。
-	const chartX, chartY = 1, 2
+	// 图表区域位于模式切换栏之后，通过 findConnMousePoint 定位实际坐标。
+	chartX, chartY, ok := findConnMousePoint(state, width, height, MouseTargetChart, -1)
+	if !ok {
+		// chart 需要 chartData，使用带 chartData 的 pageState 查找
+		pageStateWithChart := state.ToPageState(chart, width, height)
+		for y := 0; y < height; y++ {
+			for x := 0; x < width; x++ {
+				hit := ResolveMouseHit(pageStateWithChart, x, y)
+				if hit.Target == MouseTargetChart {
+					chartX, chartY, ok = x, y, true
+					break
+				}
+			}
+			if ok {
+				break
+			}
+		}
+	}
+	if !ok {
+		t.Fatalf("failed to locate chart area mouse point")
+	}
 	next, cmd := state.HandleMouseLeft(chartX, chartY, width, height, chart, 3000)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd on first chart click, got non-nil")

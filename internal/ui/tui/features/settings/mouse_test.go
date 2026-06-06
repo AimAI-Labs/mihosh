@@ -19,7 +19,7 @@ func TestHandleMouseLeft_SingleClickSelectsSetting(t *testing.T) {
 	}
 	configSvc := service.NewConfigService()
 
-	next, _, _ := state.HandleMouseLeft(0, 5, cfg, configSvc)
+	next, _, _ := state.HandleMouseLeft(0, 3, cfg, configSvc)
 	if next.selectedSetting != 1 {
 		t.Fatalf("expected selectedSetting=1, got %d", next.selectedSetting)
 	}
@@ -35,7 +35,7 @@ func TestHandleMouseLeft_DoubleClickEntersEditMode(t *testing.T) {
 	}
 	configSvc := service.NewConfigService()
 
-	const timeoutRowY = 7 // timeout index=3, offset=4
+	const timeoutRowY = 5 // timeout index=3, offset=2
 	next, _, _ := state.HandleMouseLeft(0, timeoutRowY, cfg, configSvc)
 	if next.editMode {
 		t.Fatalf("expected editMode=false on first click")
@@ -74,7 +74,7 @@ func TestHandleMouseLeft_ClickLanguageTabSavesImmediately(t *testing.T) {
 	configSvc := service.NewConfigService()
 	state := State{}
 
-	const languageRowY = 9
+	const languageRowY = 7
 	const zhCNTabX = settingsContainerLeft + settingsRowPaddingLeft + settingsLabelWidth + len("auto") + 2 + 1
 	next, newCfg, _ := state.HandleMouseLeft(zhCNTabX, languageRowY, &cfg, configSvc)
 
@@ -107,3 +107,58 @@ func TestSettingsIncludesAutoRefreshInterval(t *testing.T) {
 		t.Fatalf("expected auto refresh interval value 7, got %q", got)
 	}
 }
+
+func TestHandleMouseLeft_ClickOutsideClosesEdit(t *testing.T) {
+	state := State{
+		selectedSetting: 0,
+		editMode:        true,
+		editValue:       "http://127.0.0.1:9090",
+		editCursor:      21,
+	}
+	cfg := &config.Config{}
+	configSvc := service.NewConfigService()
+
+	// 点击无效行 (pageY = 0, yOffset=2，所以 idx = -2)
+	next, _, _ := state.HandleMouseLeft(0, 0, cfg, configSvc)
+	if next.editMode {
+		t.Fatalf("expected editMode to be false after clicking outside")
+	}
+	if next.editValue != "" {
+		t.Fatalf("expected editValue to be cleared")
+	}
+}
+
+func TestHandleMouseLeft_ClickInvalidRowDoesNothing(t *testing.T) {
+	state := State{
+		selectedSetting: 2,
+		editMode:        false,
+	}
+	cfg := &config.Config{}
+	configSvc := service.NewConfigService()
+
+	// 键盘模式或非编辑模式下，点击无效的行应该直接返回原状态，不改变选中状态
+	next, _, _ := state.HandleMouseLeft(0, 0, cfg, configSvc)
+	if next.selectedSetting != 2 {
+		t.Fatalf("expected selectedSetting to remain 2, got %d", next.selectedSetting)
+	}
+}
+
+func TestHandleMouseLeft_LanguageClickSaveFailure(t *testing.T) {
+	state := State{
+		selectedSetting: LanguageSettingIndex(),
+		editMode:        true,
+		editValue:       "auto",
+	}
+	cfg := &config.Config{Language: "auto"}
+	configSvc := service.NewConfigService()
+
+	// 点击非 Tab 区域的 X 坐标 (如 X = 0)
+	next, newCfg, _ := state.HandleMouseLeft(0, 7, cfg, configSvc)
+	if !next.editMode {
+		t.Fatalf("expected editMode to remain true when clicking language row but missing tabs")
+	}
+	if newCfg != cfg {
+		t.Fatalf("expected config to be unchanged")
+	}
+}
+

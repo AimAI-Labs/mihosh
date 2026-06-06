@@ -33,7 +33,7 @@ func TestRenderLogsPage_LongLogLine_NoTruncationOverflow(t *testing.T) {
 
 	hasLongLine := false
 	for _, line := range lines {
-		if len(line) > 200 {
+		if lipgloss.Width(line) > state.Width {
 			hasLongLine = true
 			break
 		}

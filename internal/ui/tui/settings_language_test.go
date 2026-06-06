@@ -87,7 +87,7 @@ func TestSettingsLanguageMouseClickAppliesI18nImmediately(t *testing.T) {
 	}
 
 	const pageX = 42
-	const pageY = 9
+	const pageY = 7
 	const rawX = pageX
 	const rawY = pageY + layout.TopNavHeight
 
