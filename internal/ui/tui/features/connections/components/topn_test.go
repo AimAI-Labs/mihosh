@@ -20,8 +20,7 @@ func TestRenderTopNSection(t *testing.T) {
 		}
 
 		result := RenderTopNSection(items, 60)
-		// 原本应该包含标题，但不带边框
-		if !strings.Contains(result, "Top 5 吞吐量排行") {
+		if !strings.Contains(result, "Top 5 吞吐量（5min）") {
 			t.Errorf("expected output to contain title, got %q", result)
 		}
 		if !strings.Contains(result, "google.com") {

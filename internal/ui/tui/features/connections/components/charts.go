@@ -80,7 +80,6 @@ func RenderChartsSection(chartData *model.ChartData, width int, maxHeight int) s
 	return common.RenderTokyoPanel("上传/下载速度", body, panelWidth)
 }
 
-
 // FormatSpeed 格式化速度
 func FormatSpeed(bytesPerSec int64) string {
 	if bytesPerSec < 1024 {
@@ -138,9 +137,9 @@ func RenderSymmetricBarChart(uploadData, downloadData []int64, formatFunc func(i
 		chartWidth = 8
 	}
 
-	// 采样数据
-	sampledUp := common.SampleData(uploadData, chartWidth)
-	sampledDown := common.SampleData(downloadData, chartWidth)
+	// 流量监控图通常比历史窗口更宽；拉伸采样能避免少量数据被挤到最右侧。
+	sampledUp := sampleChartData(uploadData, chartWidth)
+	sampledDown := sampleChartData(downloadData, chartWidth)
 
 	// 颜色样式
 	purpleStyle := lipgloss.NewStyle().Foreground(common.TokyoPurple)
@@ -223,4 +222,27 @@ func RenderSymmetricBarChart(uploadData, downloadData []int64, formatFunc func(i
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+func sampleChartData(data []int64, width int) []int64 {
+	if width <= 0 {
+		return nil
+	}
+	if len(data) == 0 {
+		return make([]int64, width)
+	}
+	if len(data) == 1 {
+		result := make([]int64, width)
+		for i := range result {
+			result[i] = data[0]
+		}
+		return result
+	}
+
+	result := make([]int64, width)
+	for i := 0; i < width; i++ {
+		idx := i * (len(data) - 1) / max(width-1, 1)
+		result[i] = data[idx]
+	}
+	return result
 }
