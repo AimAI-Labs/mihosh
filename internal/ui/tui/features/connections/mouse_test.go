@@ -21,6 +21,7 @@ func TestConnsHandleMouseLeft_DoubleClickConnectionEntersDetail(t *testing.T) {
 				},
 			},
 		},
+		connViewMode: ConnViewActive,
 	}
 
 	const width, height = 120, 30
@@ -138,7 +139,8 @@ func TestConnsHandleMouseLeft_DoubleClickHistoryConnectionEntersDetail(t *testin
 
 func TestConnsHandleMouseLeft_DoubleClickSiteTestTriggersSiteProbe(t *testing.T) {
 	state := State{
-		Connections: &model.ConnectionsResponse{},
+		Connections:  &model.ConnectionsResponse{},
+		connViewMode: ConnViewTraffic,
 		siteTests: []model.SiteTest{
 			{Name: "A", URL: "http://a.test"},
 			{Name: "B", URL: "http://b.test"},
@@ -186,6 +188,7 @@ func TestConnsHandleMouseLeft_DoubleClickChartOpensTopNModal(t *testing.T) {
 				{ID: "c7", Upload: 70, Download: 700, Metadata: model.Metadata{Process: "app-7"}},
 			},
 		},
+		connViewMode: ConnViewTraffic,
 	}
 
 	chart := model.NewChartData(60)
@@ -254,6 +257,7 @@ func TestConnsHandleMouseLeft_DoubleClickTopNOpensTopNModal(t *testing.T) {
 				{ID: "c2", Upload: 20, Download: 200, Metadata: model.Metadata{Process: "app-2"}},
 			},
 		},
+		connViewMode: ConnViewTraffic,
 	}
 
 	const width, height = 120, 30

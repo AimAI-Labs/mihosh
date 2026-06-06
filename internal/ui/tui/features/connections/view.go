@@ -29,7 +29,7 @@ type PageState struct {
 	// 图表数据
 	ChartData *model.ChartData
 	// 视图模式
-	ViewMode          int                // 0=活跃连接, 1=历史连接
+	ViewMode          int                // 0=流量监控, 1=活跃连接, 2=历史连接
 	ClosedConnections []model.Connection // 已关闭的连接历史
 	// 网站测速
 	SiteTests        []model.SiteTest // 网站测试数据
@@ -59,9 +59,56 @@ func RenderConnectionsPage(state PageState) string {
 		return components.RenderTopNModal(state.TopNModalItems, state.Width, state.Height, state.TopNModalScroll)
 	}
 
+	// 渲染模式切换组件（带边框）
+	modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width)
+
+	// 组装页面
+	var content []string
+	content = append(content, modeSwitch)
+	content = append(content, "")
+
+	// 流量监控 tab：图表 + TopN + 站点卡片（无连接表格）
+	if state.ViewMode == ConnViewTraffic {
+		return renderTrafficTab(state, content)
+	}
+
+	// 活跃/历史连接 tab：表格独占
+	return renderConnectionListTab(state, content)
+}
+
+// renderTrafficTab 渲染流量监控 tab
+func renderTrafficTab(state PageState, content []string) string {
+	maxChartHeight := calcMaxChartHeight(state)
+
+	// 渲染监控图表区域
+	chartsSection := components.RenderChartsSection(state.ChartData, state.Width, maxChartHeight)
+	if chartsSection != "" {
+		content = append(content, chartsSection)
+		content = append(content, "")
+	}
+
+	// 渲染 Top N 大盘
+	if len(state.TopNItems) > 0 {
+		topNSection := components.RenderTopNSection(state.TopNItems, state.Width)
+		if topNSection != "" {
+			content = append(content, topNSection)
+			content = append(content, "")
+		}
+	}
+
+	// 渲染网站测速区域
+	if len(state.SiteTests) > 0 {
+		siteTestSection := components.RenderSiteTestSection(state.SiteTests, state.SelectedSiteTest, state.Width)
+		content = append(content, siteTestSection)
+	}
+
+	return strings.Join(content, "\n")
+}
+
+// renderConnectionListTab 渲染活跃/历史连接 tab（表格独占）
+func renderConnectionListTab(state PageState, content []string) string {
 	// 样式定义 — Tokyo Night
 	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(common.TokyoBlue)
-	// 历史连接行用偏暗的前景色，与活跃连接做视觉区分
 	isHistory := state.ViewMode == ConnViewHistory
 	var normalStyle lipgloss.Style
 	if isHistory {
@@ -74,14 +121,12 @@ func RenderConnectionsPage(state PageState) string {
 
 	// 根据视图模式选择数据源
 	var connList []model.Connection
-	if state.ViewMode == 0 {
-		// 活跃连接
+	if state.ViewMode == ConnViewActive {
 		if state.Connections == nil {
 			return i18n.T("conns.loading")
 		}
 		connList = state.Connections.Connections
 	} else {
-		// 历史连接
 		connList = state.ClosedConnections
 	}
 
@@ -99,32 +144,8 @@ func RenderConnectionsPage(state PageState) string {
 	// 表头
 	tableHeader := components.RenderTableHeader(headerStyle, state.Width)
 
-	// 计算图表可用高度（响应式：根据终端高度动态调整图表大小）
-	maxChartHeight := calcMaxChartHeight(state)
-
-	// 计算使用的行数 (Header + Stats + Spacers + TableHeader + Divider + Footer)
+	// 计算使用的行数（表格独占，不含图表/TopN/站点）
 	usedLines := connectionsBaseUsedLines
-
-	// 加上图表和测试区域的行数
-	if state.ViewMode == 0 {
-		chartHeight := components.ComputeChartSectionHeight(maxChartHeight)
-		usedLines += chartHeight
-		if len(state.SiteTests) > 0 {
-			layoutCols := 4
-			if state.Width < 60 {
-				layoutCols = 2
-			} else if state.Width < 90 {
-				layoutCols = 3
-			}
-			cardRows := (len(state.SiteTests) + layoutCols - 1) / layoutCols
-			usedLines += 1 + cardRows*5 + 1 // 间距+卡片行+间距
-		}
-		if len(state.TopNItems) > 0 {
-			usedLines += len(state.TopNItems) + 2
-		}
-	}
-
-	// 加上过滤器行数
 	if filterLine != "" {
 		usedLines++
 	}
@@ -132,10 +153,8 @@ func RenderConnectionsPage(state PageState) string {
 	// 计算列表可显示的行数
 	maxDisplay := state.Height - usedLines
 	if maxDisplay < 3 {
-		maxDisplay = 3 // 至少显示 3 行，如果高度实在太小，可能会挤出底部
+		maxDisplay = 3
 	}
-
-	// 如果 height 特别小，确保不要溢出
 	if usedLines+maxDisplay > state.Height {
 		maxDisplay = state.Height - usedLines
 		if maxDisplay < 1 {
@@ -148,7 +167,6 @@ func RenderConnectionsPage(state PageState) string {
 	if len(filteredConns) == 0 {
 		rows = append(rows, dimStyle.Render(i18n.T("conns.empty_active")))
 	} else {
-		// 确保选中索引在有效范围内
 		selectedIdx := state.SelectedIndex
 		if selectedIdx >= len(filteredConns) {
 			selectedIdx = len(filteredConns) - 1
@@ -157,7 +175,6 @@ func RenderConnectionsPage(state PageState) string {
 			selectedIdx = 0
 		}
 
-		// 计算滚动范围
 		scrollTop := state.ScrollTop
 		if selectedIdx >= scrollTop+maxDisplay {
 			scrollTop = selectedIdx - maxDisplay + 1
@@ -186,45 +203,11 @@ func RenderConnectionsPage(state PageState) string {
 			rows = append(rows, row)
 		}
 
-		// 显示滚动提示
 		if scrollTop > 0 {
 			rows = append([]string{dimStyle.Render(i18n.Tf("conns.scroll_up", scrollTop))}, rows...)
 		}
 		if endIdx < len(filteredConns) {
 			rows = append(rows, dimStyle.Render(i18n.Tf("conns.scroll_down", len(filteredConns)-endIdx)))
-		}
-	}
-
-	// 渲染模式切换组件（带边框）
-	modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width)
-
-	// 组装页面
-	var content []string
-	content = append(content, modeSwitch)
-	content = append(content, "")
-
-	// 渲染监控图表区域（仅在活跃连接视图显示）
-	if state.ViewMode == 0 {
-		chartsSection := components.RenderChartsSection(state.ChartData, state.Width, maxChartHeight)
-		if chartsSection != "" {
-			content = append(content, chartsSection)
-			content = append(content, "")
-		}
-
-		// 渲染 Top N 大盘
-		if len(state.TopNItems) > 0 {
-			topNSection := components.RenderTopNSection(state.TopNItems, state.Width)
-			if topNSection != "" {
-				content = append(content, topNSection)
-				content = append(content, "")
-			}
-		}
-
-		// 渲染网站测速区域
-		if len(state.SiteTests) > 0 {
-			siteTestSection := components.RenderSiteTestSection(state.SiteTests, state.SelectedSiteTest, state.Width)
-			content = append(content, siteTestSection)
-			content = append(content, "")
 		}
 	}
 

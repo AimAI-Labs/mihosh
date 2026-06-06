@@ -15,8 +15,9 @@ import (
 )
 
 const (
-	ConnViewActive  = 0
-	ConnViewHistory = 1
+	ConnViewTraffic = 0 // 流量监控（默认）
+	ConnViewActive  = 1 // 活跃连接
+	ConnViewHistory = 2 // 历史连接
 
 	connsDoubleClickThreshold = 350 * time.Millisecond
 	connsChartDoubleClickMax  = 650 * time.Millisecond
@@ -44,7 +45,7 @@ type State struct {
 	connDetailRightScroll    int
 	connDetailFocusPanel     int // 0=左侧(基础+地理), 1=右侧(JSON)
 	connDetailJSONLineCount  int // JSON行数缓存，用于滚动上限约束
-	connViewMode          int // 0=活跃, 1=历史
+	connViewMode          int // 0=流量监控, 1=活跃, 2=历史
 
 	siteTests        []model.SiteTest
 	selectedSiteTest int
@@ -242,6 +243,37 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client, timeout int) (State, t
 		return s.handleConnFilterMode(msg)
 	}
 
+	// tab 切换键（所有 viewMode 通用）
+	if msg.String() == "h" {
+		s.setConnViewMode((s.connViewMode + 1) % 3)
+		return s, nil
+	}
+
+	// 流量监控 tab：仅响应站点测速和选择
+	if s.connViewMode == ConnViewTraffic {
+		switch {
+		case msg.String() == "s":
+			return s.triggerSiteTestByIndex(s.selectedSiteTest, timeout)
+		case msg.String() == "S":
+			if len(s.siteTests) > 0 {
+				for i := range s.siteTests {
+					s.siteTests[i].Testing = true
+				}
+				return s, TestAllSites(s.proxyAddr, s.siteTests, timeout)
+			}
+		case key.Matches(msg, common.Keys.Left):
+			if s.selectedSiteTest > 0 {
+				s.selectedSiteTest--
+			}
+		case key.Matches(msg, common.Keys.Right):
+			if s.selectedSiteTest < len(s.siteTests)-1 {
+				s.selectedSiteTest++
+			}
+		}
+		return s, nil
+	}
+
+	// 活跃/历史连接 tab：连接列表操作
 	switch {
 	case key.Matches(msg, common.Keys.Up):
 		if s.selectedConn > 0 {
@@ -261,47 +293,27 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client, timeout int) (State, t
 		return s.openSelectedConnectionDetail()
 
 	case msg.String() == "x":
-		conn := s.selectedConnection()
-		if conn != nil {
+		if s.connViewMode == ConnViewActive {
+			conn := s.selectedConnection()
+			if conn != nil {
+				return s, tea.Batch(
+					CloseConnection(client, conn.ID),
+					FetchConnections(client),
+				)
+			}
+		}
+
+	case msg.String() == "X":
+		if s.connViewMode == ConnViewActive {
 			return s, tea.Batch(
-				CloseConnection(client, conn.ID),
+				CloseAllConnections(client),
 				FetchConnections(client),
 			)
 		}
 
-	case msg.String() == "X":
-		return s, tea.Batch(
-			CloseAllConnections(client),
-			FetchConnections(client),
-		)
-
 	case msg.String() == "/":
 		s.connFilterMode = true
 		s.connFilter.Focus()
-
-	case msg.String() == "h":
-		s.setConnViewMode((s.connViewMode + 1) % 2)
-
-	case msg.String() == "s":
-		return s.triggerSiteTestByIndex(s.selectedSiteTest, timeout)
-
-	case msg.String() == "S":
-		if len(s.siteTests) > 0 {
-			for i := range s.siteTests {
-				s.siteTests[i].Testing = true
-			}
-			return s, TestAllSites(s.proxyAddr, s.siteTests, timeout)
-		}
-
-	case key.Matches(msg, common.Keys.Left):
-		if s.selectedSiteTest > 0 {
-			s.selectedSiteTest--
-		}
-
-	case key.Matches(msg, common.Keys.Right):
-		if s.selectedSiteTest < len(s.siteTests)-1 {
-			s.selectedSiteTest++
-		}
 
 	case key.Matches(msg, common.Keys.Escape):
 		if s.connFilter.Value() != "" {
@@ -395,6 +407,10 @@ func (s State) HandleMouseLeft(
 			s.topNModalMode = true
 			s.topNModalScroll = 0
 		}
+		return s, nil
+
+	case MouseTargetViewTraffic:
+		s.setConnViewMode(ConnViewTraffic)
 		return s, nil
 
 	case MouseTargetViewActive:
@@ -696,8 +712,8 @@ func (s *State) closeTopNModal() {
 }
 
 func (s *State) setConnViewMode(mode int) {
-	if mode < ConnViewActive || mode > ConnViewHistory {
-		mode = ConnViewActive
+	if mode < ConnViewTraffic || mode > ConnViewHistory {
+		mode = ConnViewTraffic
 	}
 	s.connViewMode = mode
 	s.selectedConn = 0
@@ -725,6 +741,9 @@ func (s State) handleConnFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 
 // filteredConnCount 过滤后的连接数量
 func (s State) filteredConnCount() int {
+	if s.connViewMode == ConnViewTraffic {
+		return 0
+	}
 	var conns []model.Connection
 	if s.connViewMode == ConnViewActive {
 		if s.Connections == nil {
@@ -749,6 +768,9 @@ func (s State) filteredConnCount() int {
 
 // selectedConnection 获取当前选中的连接
 func (s State) selectedConnection() *model.Connection {
+	if s.connViewMode == ConnViewTraffic {
+		return nil
+	}
 	var conns []model.Connection
 	if s.connViewMode == ConnViewActive {
 		if s.Connections == nil || len(s.Connections.Connections) == 0 {

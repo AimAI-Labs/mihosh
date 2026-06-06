@@ -28,6 +28,7 @@ const (
 	ConnectionsMouseTargetNone MouseTarget = iota
 	MouseTargetConnection
 	MouseTargetSiteTest
+	MouseTargetViewTraffic
 	MouseTargetViewActive
 	MouseTargetViewHistory
 	MouseTargetChart
@@ -84,13 +85,10 @@ func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 	if hit, ok := resolveViewModeHit(state, pageX, pageY); ok {
 		return hit
 	}
-	if state.ViewMode == 0 && state.Connections == nil {
-		return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}
-	}
 
 	line := connectionsModeSwitchHeight + 1 // 模式切换(3) + 空行(1)
 
-	if state.ViewMode == 0 {
+	if state.ViewMode == ConnViewTraffic {
 		if state.ChartData != nil {
 			chartsSection := components.RenderChartsSection(state.ChartData, state.Width, calcMaxChartHeight(state))
 			if chartsSection != "" {
@@ -98,7 +96,7 @@ func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 				if pageY >= line && pageY < line+h {
 					return MouseHit{Target: MouseTargetChart}
 				}
-				line += h + 1 // 图表区域 + 空行
+				line += h + 1
 			}
 		}
 		if len(state.TopNItems) > 0 {
@@ -108,7 +106,7 @@ func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 				if pageY >= line && pageY < line+h {
 					return MouseHit{Target: MouseTargetTopN}
 				}
-				line += h + 1 // TopN 区域 + 空行
+				line += h + 1
 			}
 		}
 		if len(state.SiteTests) > 0 {
@@ -119,9 +117,13 @@ func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 					Index:  idx,
 				}
 			}
-			siteSection := components.RenderSiteTestSection(state.SiteTests, state.SelectedSiteTest, state.Width)
-			line += lipgloss.Height(siteSection) + 1 // 网站测速区域 + 空行
 		}
+		return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}
+	}
+
+	// 活跃/历史连接 tab：仅检测连接列表
+	if state.ViewMode == ConnViewActive && state.Connections == nil {
+		return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}
 	}
 
 	line++ // 表头行
@@ -153,26 +155,25 @@ func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 
 func resolveViewModeHit(state PageState, pageX, pageY int) (MouseHit, bool) {
 	// 模式切换菜单位于最顶部，占据第 0-2 行（带边框）。
-	// 格式：╭─────────────────╮
-	//       │ 活跃连接 │ 历史连接 │
-	//       ╰─────────────────╯
 	if pageY >= 0 && pageY < connectionsModeSwitchHeight && pageX >= 0 {
 		// 只检测中间行（Y=1）的按钮点击
 		if pageY == 1 {
-			// 按钮从第 1 个字符开始（跳过左边框 │）
 			buttonWidths := []int{
+				lipgloss.Width(" " + i18n.T("conns.tab_traffic") + " "),
 				lipgloss.Width(" " + i18n.T("conns.tab_active") + " "),
 				lipgloss.Width(" " + i18n.T("conns.tab_history") + " "),
+			}
+			targets := []MouseTarget{
+				MouseTargetViewTraffic,
+				MouseTargetViewActive,
+				MouseTargetViewHistory,
 			}
 			separatorWidth := 1
 
 			x := 1 // 跳过左边框
 			for i, bw := range buttonWidths {
 				if pageX >= x && pageX < x+bw {
-					if i == 0 {
-						return MouseHit{Target: MouseTargetViewActive, Index: -1}, true
-					}
-					return MouseHit{Target: MouseTargetViewHistory, Index: -1}, true
+					return MouseHit{Target: targets[i], Index: -1}, true
 				}
 				x += bw
 				if i < len(buttonWidths)-1 {
@@ -186,15 +187,19 @@ func resolveViewModeHit(state PageState, pageX, pageY int) (MouseHit, bool) {
 	return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}, false
 }
 
-func connectionTabLabels(viewMode int) (activeLabel, historyLabel string) {
+func connectionTabLabels(viewMode int) (trafficLabel, activeLabel, historyLabel string) {
+	trafficLabel = i18n.T("conns.tab_traffic")
 	activeLabel = i18n.T("conns.tab_active")
 	historyLabel = i18n.T("conns.tab_history")
-	if viewMode == ConnViewActive {
+	switch viewMode {
+	case ConnViewTraffic:
+		trafficLabel = "● " + trafficLabel
+	case ConnViewActive:
 		activeLabel = "● " + activeLabel
-	} else {
+	case ConnViewHistory:
 		historyLabel = "● " + historyLabel
 	}
-	return activeLabel, historyLabel
+	return trafficLabel, activeLabel, historyLabel
 }
 
 // RenderConnModeSwitchComponent 渲染连接页面模式切换按钮（带边框，与节点模式切换风格一致）
@@ -203,6 +208,7 @@ func RenderConnModeSwitchComponent(viewMode int, width int) string {
 		Label string
 		Value int
 	}{
+		{i18n.T("conns.tab_traffic"), ConnViewTraffic},
 		{i18n.T("conns.tab_active"), ConnViewActive},
 		{i18n.T("conns.tab_history"), ConnViewHistory},
 	}
@@ -329,37 +335,12 @@ func resolveConnectionsListWindow(state PageState, total int) connectionsListWin
 // calcMaxChartHeight 计算图表区域可用的最大高度。
 // 扣除基础布局、TopN、网站测速、过滤器和连接列表最小行数后，剩余空间给图表。
 func calcMaxChartHeight(state PageState) int {
-	if state.ViewMode != 0 || state.ChartData == nil {
+	if state.ChartData == nil {
 		return 0
 	}
-	otherUsed := connectionsBaseUsedLines
-	if len(state.SiteTests) > 0 {
-		layoutCols := 4
-		if state.Width < 60 {
-			layoutCols = 2
-		} else if state.Width < 90 {
-			layoutCols = 3
-		}
-		cardRows := (len(state.SiteTests) + layoutCols - 1) / layoutCols
-		otherUsed += 2 + cardRows*5 + 1
-	}
-	if len(state.TopNItems) > 0 {
-		otherUsed += len(state.TopNItems) + 2
-	}
-	if state.FilterMode || state.FilterText != "" {
-		otherUsed++
-	}
-	return state.Height - otherUsed - connectionsMinDisplayRows
-}
-
-func calcConnectionsMaxDisplay(state PageState) int {
-	usedLines := connectionsBaseUsedLines
-	if state.ViewMode == 0 {
-		chartHeight := components.ComputeChartSectionHeight(calcMaxChartHeight(state))
-		usedLines += chartHeight
-		if len(state.TopNItems) > 0 {
-			usedLines += len(state.TopNItems) + 2
-		}
+	// 流量监控 tab：图表可使用更多空间（不需要为连接列表预留行数）
+	if state.ViewMode == ConnViewTraffic {
+		otherUsed := connectionsModeSwitchHeight + 2 // 模式切换(3) + 空行(1) + 底部留白(1)
 		if len(state.SiteTests) > 0 {
 			layoutCols := 4
 			if state.Width < 60 {
@@ -368,9 +349,20 @@ func calcConnectionsMaxDisplay(state PageState) int {
 				layoutCols = 3
 			}
 			cardRows := (len(state.SiteTests) + layoutCols - 1) / layoutCols
-			usedLines += 2 + cardRows*5 + 1
+			otherUsed += 2 + cardRows*5 + 1
 		}
+		if len(state.TopNItems) > 0 {
+			otherUsed += len(state.TopNItems) + 2
+		}
+		return state.Height - otherUsed
 	}
+	// 活跃/历史 tab：不渲染图表
+	return 0
+}
+
+func calcConnectionsMaxDisplay(state PageState) int {
+	// 活跃/历史 tab：表格独占，不计算图表/TopN/站点卡片占用
+	usedLines := connectionsBaseUsedLines
 	if state.FilterMode || state.FilterText != "" {
 		usedLines++
 	}
@@ -383,11 +375,15 @@ func calcConnectionsMaxDisplay(state PageState) int {
 }
 
 func connectionsByViewMode(state PageState) []model.Connection {
-	if state.ViewMode == 0 {
+	switch state.ViewMode {
+	case ConnViewActive:
 		if state.Connections == nil {
 			return nil
 		}
 		return state.Connections.Connections
+	case ConnViewHistory:
+		return state.ClosedConnections
+	default:
+		return nil
 	}
-	return state.ClosedConnections
 }

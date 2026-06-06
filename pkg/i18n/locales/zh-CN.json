@@ -97,8 +97,10 @@
   "conns.empty_active": "  无活跃连接",
   "conns.scroll_up": "  ↑ 还有 %d 条",
   "conns.scroll_down": "  ↓ 还有 %d 条",
-  "conns.help_active": "[↑↓]选择 [x]关闭 [X]全部关闭 [/]搜索 [h]历史 [s]测速 [S]全测 [双击图表]排行 [r]刷新",
-  "conns.help_history": "[↑↓]选择 [Enter]详情 [/]搜索 [h]活跃",
+  "conns.help_active": "[↑↓]选择 [x]关闭 [X]全部关闭 [/]搜索 [h]切换 [r]刷新",
+  "conns.help_history": "[↑↓]选择 [Enter]详情 [/]搜索 [h]切换",
+  "conns.help_traffic": "[s]测速 [S]全测 [←→]选站 [双击图表]排行 [h]切换 [r]刷新",
+  "conns.tab_traffic": "流量监控",
   "conns.tab_active": "活跃连接",
   "conns.tab_history": "历史连接"
 }
