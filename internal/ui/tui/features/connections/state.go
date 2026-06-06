@@ -34,18 +34,18 @@ type State struct {
 	closedHead  int                             // 写入位置（下一条写入的索引）
 	closedCount int                             // 已写入的总条数（上限 ClosedConnCap）
 
-	selectedConn          int
-	connScrollTop         int
-	connFilterMode        bool
-	connFilter            textinput.Model
-	connDetailMode        bool
-	connDetailSnapshot    *model.Connection
-	connIPInfo            *model.IPInfo
-	connDetailLeftScroll  int
-	connDetailRightScroll    int
-	connDetailFocusPanel     int // 0=左侧(基础+地理), 1=右侧(JSON)
-	connDetailJSONLineCount  int // JSON行数缓存，用于滚动上限约束
-	connViewMode          int // 0=流量监控, 1=活跃, 2=历史
+	selectedConn            int
+	connScrollTop           int
+	connFilterMode          bool
+	connFilter              textinput.Model
+	connDetailMode          bool
+	connDetailSnapshot      *model.Connection
+	connIPInfo              *model.IPInfo
+	connDetailLeftScroll    int
+	connDetailRightScroll   int
+	connDetailFocusPanel    int // 0=左侧(基础+地理), 1=右侧(JSON)
+	connDetailJSONLineCount int // JSON行数缓存，用于滚动上限约束
+	connViewMode            int // 0=流量监控, 1=活跃, 2=历史
 
 	siteTests        []model.SiteTest
 	selectedSiteTest int
@@ -189,20 +189,6 @@ func (s State) ToPageState(chartData *model.ChartData, width, height int) PageSt
 
 // Update 处理连接页面按键
 func (s State) Update(msg tea.KeyMsg, client *api.Client, timeout int) (State, tea.Cmd) {
-	if s.topNModalMode {
-		switch {
-		case key.Matches(msg, common.Keys.Escape), key.Matches(msg, common.Keys.Enter), msg.String() == "q":
-			s.closeTopNModal()
-		case key.Matches(msg, common.Keys.Up), msg.String() == "k":
-			if s.topNModalScroll > 0 {
-				s.topNModalScroll--
-			}
-		case key.Matches(msg, common.Keys.Down), msg.String() == "j":
-			s.topNModalScroll++
-		}
-		return s, nil
-	}
-
 	// 详情模式
 	if s.connDetailMode {
 		switch {
@@ -234,6 +220,20 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client, timeout int) (State, t
 				s.connDetailRightScroll++
 				s.clampRightScroll()
 			}
+		}
+		return s, nil
+	}
+
+	if s.topNModalMode {
+		switch {
+		case key.Matches(msg, common.Keys.Escape), key.Matches(msg, common.Keys.Enter), msg.String() == "q":
+			s.closeTopNModal()
+		case key.Matches(msg, common.Keys.Up), msg.String() == "k":
+			if s.topNModalScroll > 0 {
+				s.topNModalScroll--
+			}
+		case key.Matches(msg, common.Keys.Down), msg.String() == "j":
+			s.topNModalScroll++
 		}
 		return s, nil
 	}
@@ -448,17 +448,6 @@ func (s State) HandleMouseLeft(
 
 // HandleMouseScroll 鼠标滚轮处理
 func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight int) State {
-	if s.topNModalMode {
-		if up {
-			if s.topNModalScroll > 0 {
-				s.topNModalScroll--
-			}
-		} else {
-			s.topNModalScroll++
-		}
-		return s
-	}
-
 	if s.connDetailMode {
 		isRightSide := false
 		if mainWidth >= 100 {
@@ -498,6 +487,18 @@ func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight in
 
 		return s
 	}
+
+	if s.topNModalMode {
+		if up {
+			if s.topNModalScroll > 0 {
+				s.topNModalScroll--
+			}
+		} else {
+			s.topNModalScroll++
+		}
+		return s
+	}
+
 	count := s.filteredConnCount()
 	if up {
 		if s.selectedConn > 0 {
