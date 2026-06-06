@@ -88,7 +88,7 @@ func buildTopNModal(items []TopNItem, width, height, scroll int) string {
 	// 1. 计算最长网址/名称宽度
 	maxNameLen := 0
 	for _, item := range items {
-		l := len([]rune(item.Name))
+		l := lipgloss.Width(item.Name)
 		if l > maxNameLen {
 			maxNameLen = l
 		}

@@ -32,18 +32,30 @@ func RenderTopNSection(items []TopNItem, width int) string {
 	contentWidth := panelWidth - 4
 
 	var lines []string
-	titleStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue).Bold(true)
-	title := titleStyle.Render("Top 5 吞吐量(5min)")
-	lines = append(lines, title)
+	lines = append(lines)
 
 	maxBytes := items[0].TotalBytes // 第一项是最大的
 
-	// 根据可用宽度动态调整列宽
-	// 窄屏时缩短名称列，确保进度条有空间
-	nameWidth := 20
-	if contentWidth < 60 {
-		nameWidth = 10
-	} else if contentWidth < 80 {
+	// 动态计算名称所需的最大宽度
+	maxNameWidth := 0
+	for _, item := range items {
+		w := lipgloss.Width(item.Name)
+		if w > maxNameWidth {
+			maxNameWidth = w
+		}
+	}
+
+	// 计算可用于名字的绝对最大宽度（预留约 30 字符给数值和进度条）
+	maxAllowedNameWidth := contentWidth - 30
+	if maxAllowedNameWidth < 10 {
+		maxAllowedNameWidth = 10
+	}
+
+	nameWidth := maxNameWidth
+	if nameWidth > maxAllowedNameWidth {
+		nameWidth = maxAllowedNameWidth
+	}
+	if nameWidth < 15 {
 		nameWidth = 15
 	}
 
@@ -88,5 +100,5 @@ func RenderTopNSection(items []TopNItem, width int) string {
 	}
 
 	body := strings.Join(lines, "\n")
-	return common.RenderTokyoPanel("Top 5 吞吐量排行", body, panelWidth)
+	return common.RenderTokyoPanel("Top 5 吞吐量（5min）", body, panelWidth)
 }

@@ -1,11 +1,13 @@
 package connections
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestConnsHandleMouseLeft_DoubleClickConnectionEntersDetail(t *testing.T) {
@@ -456,6 +458,47 @@ func TestConnsHandleMouseLeft_DoubleClickDetailClosesModal(t *testing.T) {
 	}
 	if next.connDetailMode {
 		t.Fatalf("expected detail mode close on double click")
+	}
+}
+
+func TestConnsDetailInputTakesPriorityOverTopNModal(t *testing.T) {
+	state := State{
+		topNModalMode: true,
+		Connections: &model.ConnectionsResponse{
+			Connections: []model.Connection{
+				{ID: "conn-1", Download: 100, Metadata: model.Metadata{Host: "example.com"}},
+			},
+		},
+		connDetailMode: true,
+		connDetailSnapshot: &model.Connection{
+			ID: "conn-1",
+			Metadata: model.Metadata{
+				Host:        "example.com",
+				ProcessPath: strings.Repeat("C:/very/long/path/", 20),
+			},
+			Chains: []string{"a", "b", "c", "d", "e", "f", "g", "h"},
+		},
+		connDetailFocusPanel:    1,
+		connDetailJSONLineCount: 40,
+	}
+
+	next, cmd := state.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}, nil, 3000)
+	if cmd != nil {
+		t.Fatalf("expected nil cmd while scrolling detail, got non-nil")
+	}
+	if next.connDetailRightScroll != 1 {
+		t.Fatalf("expected right detail scroll to advance, got %d", next.connDetailRightScroll)
+	}
+	if next.topNModalScroll != 0 {
+		t.Fatalf("expected hidden topN modal scroll unchanged, got %d", next.topNModalScroll)
+	}
+
+	next = next.HandleMouseScroll(false, 90, 10, 120, 30)
+	if next.connDetailRightScroll != 2 {
+		t.Fatalf("expected mouse wheel to advance right detail scroll, got %d", next.connDetailRightScroll)
+	}
+	if next.topNModalScroll != 0 {
+		t.Fatalf("expected hidden topN modal scroll unchanged after mouse wheel, got %d", next.topNModalScroll)
 	}
 }
 
