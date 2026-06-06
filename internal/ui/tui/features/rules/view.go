@@ -11,16 +11,16 @@ import (
 )
 
 const (
-	rulesFixedLines    = 5 // 头部组件(3) + 间距(1) + 底部(1)
-	rulesMinHeight     = 5
-	rulesScrollWidth   = 2
-	colorAnimationMs   = 250
-	rulesHeaderHeight  = 3 // 头部组件边框高度（搜索+统计行 + 上下边框）
+	rulesFixedLines   = 5 // 头部组件(3) + 间距(1) + 底部(1)
+	rulesMinHeight    = 5
+	rulesScrollWidth  = 1
+	colorAnimationMs  = 250
+	rulesHeaderHeight = 3 // 头部组件边框高度（搜索+统计行 + 上下边框）
 )
 
 var (
-	domainColorKey         = "Domain"
-	domainSuffixColorKey  = "DomainSuffix"
+	domainColorKey       = "Domain"
+	domainSuffixColorKey = "DomainSuffix"
 )
 
 // 规则类型颜色
@@ -241,7 +241,7 @@ func renderRuleList(rules []filteredRule, selectedIdx, scrollTop, maxLines, widt
 		return listStr
 	}
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, listStr, " "+barStr)
+	return lipgloss.JoinHorizontal(lipgloss.Top, listStr, barStr)
 }
 
 // buildScrollbar 构建高度为 viewHeight 的滚动条字符串（每行一个字符，换行连接）

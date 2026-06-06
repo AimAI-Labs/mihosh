@@ -122,11 +122,7 @@ func RenderSymmetricBarChart(uploadData, downloadData []int64, formatFunc func(i
 	}
 
 	labelMax := formatFunc(maxVal)
-	labelHalf := formatFunc(maxVal / 2)
 	labelWidth := len(labelMax)
-	if w := len(labelHalf); w > labelWidth {
-		labelWidth = w
-	}
 	if labelWidth < 8 {
 		labelWidth = 8
 	}
@@ -157,8 +153,6 @@ func RenderSymmetricBarChart(uploadData, downloadData []int64, formatFunc func(i
 		var label string
 		if row == 0 {
 			label = labelStyle.Render(fmt.Sprintf("%*s", labelWidth, labelMax))
-		} else if row == halfH/2 {
-			label = labelStyle.Render(fmt.Sprintf("%*s", labelWidth, labelHalf))
 		} else {
 			label = strings.Repeat(" ", labelWidth)
 		}
@@ -185,25 +179,13 @@ func RenderSymmetricBarChart(uploadData, downloadData []int64, formatFunc func(i
 	centerLabel.WriteString(axisStyle.Render(" ┼"))
 
 	for i := 0; i < chartWidth; i++ {
-		if sampledDown[i] > 0 {
-			centerLabel.WriteString(purpleStyle.Render("█"))
-		} else {
-			centerLabel.WriteString(axisStyle.Render("─"))
-		}
+		centerLabel.WriteString(axisStyle.Render("─"))
 	}
 	lines = append(lines, centerLabel.String())
 
 	// === 下半部分（上传柱，从中心轴向下生长） ===
 	for row := 0; row < halfH; row++ {
-		// Y 轴标签（靠近中轴时显示半值，最底部显示最大值）
-		var label string
-		if row == halfH-1 {
-			label = labelStyle.Render(fmt.Sprintf("%*s", labelWidth, labelMax))
-		} else if row == halfH/2 {
-			label = labelStyle.Render(fmt.Sprintf("%*s", labelWidth, labelHalf))
-		} else {
-			label = strings.Repeat(" ", labelWidth)
-		}
+		label := strings.Repeat(" ", labelWidth)
 
 		// 渲染柱子
 		var bars strings.Builder
