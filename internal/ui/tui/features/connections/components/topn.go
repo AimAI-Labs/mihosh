@@ -19,10 +19,17 @@ func RenderTopNSection(items []TopNItem, width int) string {
 		return ""
 	}
 
-	titleStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue).Bold(true)
 	nameStyle := lipgloss.NewStyle().Foreground(common.TokyoForeground)
 	bytesStyle := lipgloss.NewStyle().Foreground(common.TokyoCyan)
 	barColor := common.TokyoPurple // 紫色进度条
+
+	// 总面板宽度为 width - 4
+	panelWidth := width - 4
+	if panelWidth < 24 {
+		panelWidth = 24
+	}
+	// contentWidth = 面板宽度 - 左右边框(2) - 左右padding(2) = panelWidth - 4
+	contentWidth := panelWidth - 4
 
 	var lines []string
 	title := titleStyle.Render("Top 5 吞吐量排行 (过去5分钟)")
@@ -33,14 +40,14 @@ func RenderTopNSection(items []TopNItem, width int) string {
 	// 根据可用宽度动态调整列宽
 	// 窄屏时缩短名称列，确保进度条有空间
 	nameWidth := 20
-	if width < 60 {
+	if contentWidth < 60 {
 		nameWidth = 10
-	} else if width < 80 {
+	} else if contentWidth < 80 {
 		nameWidth = 15
 	}
 
 	// 15是数值留宽, 4 是边距（│ + 前后空格）
-	barsWidth := width - nameWidth - 15 - 4
+	barsWidth := contentWidth - nameWidth - 15 - 4
 	if barsWidth < 5 {
 		barsWidth = 5
 	}
@@ -87,5 +94,6 @@ func RenderTopNSection(items []TopNItem, width int) string {
 		lines = append(lines, line)
 	}
 
-	return strings.Join(lines, "\n")
+	body := strings.Join(lines, "\n")
+	return common.RenderTokyoPanel("Top 5 吞吐量排行", body, panelWidth)
 }
