@@ -18,7 +18,7 @@ func ResolveTopNModalBounds(items []TopNItem, width, height, scroll int) (left, 
 	modalWidth := lipgloss.Width(modal)
 	modalHeight := lipgloss.Height(modal)
 
-	containerHeight := height - 2
+	containerHeight := height
 	if containerHeight < 1 {
 		containerHeight = 1
 	}
@@ -42,23 +42,20 @@ func ResolveTopNModalBounds(items []TopNItem, width, height, scroll int) (left, 
 // RenderTopNModal 渲染吞吐量全量排行弹窗。
 func RenderTopNModal(items []TopNItem, width, height, scroll int) string {
 	modal := buildTopNModal(items, width, height, scroll)
-	helpText := common.DimStyle.Render("[↑/↓/k/j] 滚动  [q/Esc/Enter] 关闭")
 
-	centeredModal := lipgloss.Place(
+	return lipgloss.Place(
 		width,
-		height-2,
+		height,
 		lipgloss.Center,
 		lipgloss.Center,
 		modal,
 	)
-
-	return lipgloss.JoinVertical(lipgloss.Left, centeredModal, helpText)
 }
 
 func buildTopNModal(items []TopNItem, width, height, scroll int) string {
 	modalStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(common.TokyoPurple).
+		BorderForeground(common.TokyoBlue).
 		Padding(1, 2)
 
 	titleStyle := lipgloss.NewStyle().
