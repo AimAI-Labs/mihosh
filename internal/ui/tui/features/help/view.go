@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // keybinding 单条快捷键条目
@@ -114,10 +115,8 @@ var (
 //
 // 步骤：
 //  1. 对 base 每行整体套 Faint，让背景内容降亮但不消失
-//  2. 用 lipgloss.Place 把弹窗居中放到与终端等大的画布上
-//  3. 画布中有可见内容的行（弹窗区域）整行替换对应的暗化行
-//
-// 整行替换避免了对含 ANSI 序列的字符串做字节级切割。
+//  2. 渲染弹窗本体，并计算居中偏移量
+//  3. 逐行用 ansi.Cut 截取底层的左侧和右侧，将弹窗内容嵌入中间
 func OverlayHelpPopup(base string, width, height int) string {
 	// ── 1. 暗化底层 ──
 	baseLines := strings.Split(base, "\n")
@@ -134,27 +133,42 @@ func OverlayHelpPopup(base string, width, height int) string {
 		dimmed[i] = faint.Render(l)
 	}
 
-	// ── 2. 弹窗居中放入画布 ──
+	// ── 2. 弹窗居中计算 ──
 	popup := renderPopup(width, height)
-	canvas := lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, popup)
-	canvasLines := strings.Split(canvas, "\n")
-	for len(canvasLines) < height {
-		canvasLines = append(canvasLines, "")
+	popupLines := strings.Split(popup, "\n")
+	popupHeight := len(popupLines)
+	if popupHeight == 0 {
+		return strings.Join(dimmed, "\n")
 	}
 
-	// ── 3. 弹窗行整行替换暗化行 ──
-	result := make([]string, height)
-	copy(result, dimmed)
-	for i, cl := range canvasLines {
-		if i >= height {
+	popupWidth := lipgloss.Width(popupLines[0])
+	leftOffset := (width - popupWidth) / 2
+	if leftOffset < 0 {
+		leftOffset = 0
+	}
+	topOffset := (height - popupHeight) / 2
+	if topOffset < 0 {
+		topOffset = 0
+	}
+
+	// ── 3. 弹窗行嵌入暗化底层 ──
+	for i, pl := range popupLines {
+		y := topOffset + i
+		if y >= height {
 			break
 		}
-		if lipgloss.Width(strings.TrimSpace(cl)) > 0 {
-			result[i] = cl
+		
+		leftPart := ansi.Cut(dimmed[y], 0, leftOffset)
+		leftW := lipgloss.Width(leftPart)
+		if leftW < leftOffset {
+			leftPart += strings.Repeat(" ", leftOffset-leftW)
 		}
+
+		rightPart := ansi.Cut(dimmed[y], leftOffset+popupWidth, width)
+		dimmed[y] = leftPart + pl + rightPart
 	}
 
-	return strings.Join(result, "\n")
+	return strings.Join(dimmed, "\n")
 }
 
 // renderPopup 渲染帮助弹窗（无背景色，使用终端默认背景）
