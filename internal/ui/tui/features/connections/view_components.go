@@ -266,37 +266,39 @@ func RenderConnModeSwitchComponent(viewMode int, width int) string {
 }
 
 func resolveSiteTestMouseHit(state PageState, pageX int, siteSectionY int) int {
-	if siteSectionY < connectionsSiteCardsTopLine || siteSectionY >= connectionsSiteCardsTopLine+connectionsSiteCardHeight {
+	if siteSectionY < connectionsSiteCardsTopLine {
 		return -1
 	}
 
-	cardOuterWidth := calcSiteCardOuterWidth(state.Width)
+	numCards := len(state.SiteTests)
+	if numCards == 0 {
+		return -1
+	}
+
+	cols, cardWidth := components.GetSiteTestLayout(state.Width, numCards)
+	cardOuterWidth := cardWidth + connectionsSiteCardOuterPad
 	if cardOuterWidth <= 0 {
 		return -1
 	}
 
-	idx := pageX / cardOuterWidth
-	if idx < 0 || idx >= len(state.SiteTests) {
+	relativeY := siteSectionY - connectionsSiteCardsTopLine
+	rowIdx := relativeY / connectionsSiteCardHeight
+	
+	rows := (numCards + cols - 1) / cols
+	if rowIdx >= rows {
+		return -1
+	}
+
+	colIdx := pageX / cardOuterWidth
+	if colIdx >= cols {
+		return -1
+	}
+
+	idx := rowIdx*cols + colIdx
+	if idx < 0 || idx >= numCards {
 		return -1
 	}
 	return idx
-}
-
-func calcSiteCardOuterWidth(pageWidth int) int {
-	layoutCols := 4
-	if pageWidth < 60 {
-		layoutCols = 2
-	} else if pageWidth < 90 {
-		layoutCols = 3
-	}
-	cardWidth := (pageWidth - 10) / layoutCols
-	if cardWidth < connectionsSiteCardMinWidth {
-		cardWidth = connectionsSiteCardMinWidth
-	}
-	if cardWidth > connectionsSiteCardMaxWidth {
-		cardWidth = connectionsSiteCardMaxWidth
-	}
-	return cardWidth + connectionsSiteCardOuterPad
 }
 
 func resolveConnectionsListWindow(state PageState, total int) connectionsListWindow {
@@ -350,14 +352,9 @@ func calcMaxChartHeight(state PageState) int {
 	if state.ViewMode == ConnViewTraffic {
 		otherUsed := connectionsModeSwitchHeight + 2 // 模式切换(3) + 空行(1) + 底部留白(1)
 		if len(state.SiteTests) > 0 {
-			layoutCols := 4
-			if state.Width < 60 {
-				layoutCols = 2
-			} else if state.Width < 90 {
-				layoutCols = 3
-			}
+			layoutCols, _ := components.GetSiteTestLayout(state.Width, len(state.SiteTests))
 			cardRows := (len(state.SiteTests) + layoutCols - 1) / layoutCols
-			otherUsed += 2 + cardRows*5 + 1
+			otherUsed += 2 + cardRows*connectionsSiteCardHeight + 1
 		}
 		if len(state.TopNItems) > 0 {
 			otherUsed += len(state.TopNItems) + 2

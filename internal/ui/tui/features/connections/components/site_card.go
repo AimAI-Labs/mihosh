@@ -8,23 +8,35 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// RenderSiteTestSection 渲染网站测速区域
-func RenderSiteTestSection(siteTests []model.SiteTest, selectedIdx int, width int) string {
-	// 根据宽度动态计算每行卡片数和卡片宽度
-	layoutCols := 4
-	if width < 60 {
-		layoutCols = 2
-	} else if width < 90 {
-		layoutCols = 3
+// GetSiteTestLayout 根据页面宽度和卡片数量计算响应式的卡片列数和宽度
+func GetSiteTestLayout(width int, numCards int) (cols int, cardWidth int) {
+	if numCards <= 0 {
+		numCards = 1
 	}
-
-	cardWidth := (width - 10) / layoutCols
+	avail := width - 2
+	if avail < 15 {
+		return 1, 12
+	}
+	cols = avail / 15
+	if cols < 1 {
+		cols = 1
+	}
+	if cols > numCards {
+		cols = numCards
+	}
+	cardWidth = (avail / cols) - 3
 	if cardWidth < 12 {
 		cardWidth = 12
 	}
 	if cardWidth > 20 {
 		cardWidth = 20
 	}
+	return cols, cardWidth
+}
+
+// RenderSiteTestSection 渲染网站测速区域
+func RenderSiteTestSection(siteTests []model.SiteTest, selectedIdx int, width int) string {
+	layoutCols, cardWidth := GetSiteTestLayout(width, len(siteTests))
 
 	// 渲染网站卡片，按行分组
 	var rowGroups [][]string
@@ -48,7 +60,7 @@ func RenderSiteTestSection(siteTests []model.SiteTest, selectedIdx int, width in
 
 // RenderSiteCard 渲染单个网站测速卡片
 func RenderSiteCard(site model.SiteTest, selected bool, width int) string {
-	innerWidth := width - 4 // 减去 border(2) + padding(2)
+	innerWidth := width - 2 // 减去 padding(2)，border 绘制在 width 外部
 
 	// 卡片边框样式 — Tokyo Night
 	var borderColor lipgloss.Color

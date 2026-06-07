@@ -33,5 +33,40 @@ func DefaultSiteTests() []SiteTest {
 			URL:  "http://www.youtube.com/generate_204",
 			Icon: "\uf16a",
 		},
+		{
+			Name: "Cloudflare",
+			URL:  "http://www.cloudflare.com",
+			Icon: "\uf0c2",
+		},
+		{
+			Name: "Baidu",
+			URL:  "http://www.baidu.com",
+			Icon: "\uf1b0",
+		},
+		{
+			Name: "X",
+			URL:  "https://x.com",
+			Icon: "\uf099",
+		},
+		{
+			Name: "ChatGPT",
+			URL:  "https://api.openai.com",
+			Icon: "\uf544",
+		},
+		{
+			Name: "Claude",
+			URL:  "https://api.anthropic.com",
+			Icon: "\uf544",
+		},
+		{
+			Name: "jsDelivr",
+			URL:  "https://cdn.jsdelivr.net",
+			Icon: "\uf1b2",
+		},
+		{
+			Name: "npmjs",
+			URL:  "https://registry.npmjs.org",
+			Icon: "\ue71e",
+		},
 	}
 }
