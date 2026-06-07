@@ -33,8 +33,12 @@ func TestRenderRuleList_AppendsScrollbarWithoutGap(t *testing.T) {
 		if !strings.HasSuffix(plain, common.SymbolScrollbarTrack) && !strings.HasSuffix(plain, common.SymbolScrollbarThumb) {
 			t.Fatalf("line %d should end with scrollbar glyph, got %q", i, plain)
 		}
-		if strings.HasSuffix(plain, " "+common.SymbolScrollbarTrack) || strings.HasSuffix(plain, " "+common.SymbolScrollbarThumb) {
-			t.Fatalf("line %d should not include a gap before scrollbar, got %q", i, plain)
+	}
+
+	// 所有行宽度应一致，确保滚动条不会因行宽变化而坍缩
+	for i := 1; i < len(lines); i++ {
+		if lipgloss.Width(lines[i]) != lipgloss.Width(lines[0]) {
+			t.Fatalf("line %d width (%d) differs from line 0 width (%d)", i, lipgloss.Width(lines[i]), lipgloss.Width(lines[0]))
 		}
 	}
 }

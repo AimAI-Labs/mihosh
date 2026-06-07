@@ -241,7 +241,9 @@ func renderRuleList(rules []filteredRule, selectedIdx, scrollTop, maxLines, widt
 		return listStr
 	}
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, listStr, barStr)
+	// 将列表整体设置为固定宽度，确保每行等宽，避免滚动条因行宽不一致而坍缩
+	fixedList := lipgloss.NewStyle().Width(listWidth).Render(listStr)
+	return lipgloss.JoinHorizontal(lipgloss.Top, fixedList, barStr)
 }
 
 // buildScrollbar 构建高度为 viewHeight 的滚动条字符串（每行一个字符，换行连接）
