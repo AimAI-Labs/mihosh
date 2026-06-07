@@ -60,7 +60,7 @@ func RenderChartsSection(chartData *model.ChartData, width int, maxHeight int) s
 		return ""
 	}
 
-	panelWidth := width - 4 // 页面左右边距
+	panelWidth := width // 与导航栏宽度对齐
 	if panelWidth < chartPanelMinW {
 		panelWidth = chartPanelMinW
 	}

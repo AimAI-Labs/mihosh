@@ -23,8 +23,8 @@ func RenderTopNSection(items []TopNItem, width int) string {
 	bytesStyle := lipgloss.NewStyle().Foreground(common.TokyoCyan)
 	barColor := common.TokyoPurple // 紫色进度条
 
-	// 总面板宽度为 width - 4
-	panelWidth := width - 4
+	// 总面板宽度与导航栏对齐
+	panelWidth := width
 	if panelWidth < 24 {
 		panelWidth = 24
 	}

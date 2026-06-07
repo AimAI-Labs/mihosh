@@ -216,7 +216,7 @@ func calcNodesLayoutMetrics(width, height int) nodesLayoutMetrics {
 		return metrics
 	}
 
-	contentWidth := width - 4
+	contentWidth := width
 	if contentWidth < 40 {
 		contentWidth = 40
 	}
