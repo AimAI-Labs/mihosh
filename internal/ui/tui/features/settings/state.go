@@ -4,8 +4,10 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -32,11 +34,36 @@ type State struct {
 
 	// Toast 管理器
 	toastManager *common.ToastManager
+
+	// Mihomo 内核版本
+	mihomoVersion string
+	versionLoaded bool
 }
 
 // IsEditing 返回是否处于编辑模式
 func (s State) IsEditing() bool {
 	return s.editMode
+}
+
+// FetchMihomoVersion 返回一个拉取 Mihomo 版本信息的 Cmd
+func FetchMihomoVersion(client *api.Client) tea.Cmd {
+	return func() tea.Msg {
+		if client == nil {
+			return messages.MihomoVersionMsg{Version: "unknown"}
+		}
+		info, err := client.GetVersion()
+		if err != nil || info == nil {
+			return messages.MihomoVersionMsg{Version: "unknown"}
+		}
+		return messages.MihomoVersionMsg{Version: info.Version}
+	}
+}
+
+// ApplyMihomoVersion 应用版本信息
+func (s State) ApplyMihomoVersion(version string) State {
+	s.mihomoVersion = version
+	s.versionLoaded = true
+	return s
 }
 
 // ToPageState 转换为渲染层所需的 PageState
@@ -51,6 +78,7 @@ func (s State) ToPageState(cfg *config.Config) PageState {
 		EditValue:       s.editValue,
 		EditCursor:      s.editCursor,
 		Toast:           s.toastManager,
+		MihomoVersion:   s.mihomoVersion,
 	}
 }
 
@@ -147,6 +175,8 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 
 	return s, cfg, ""
 }
+
+
 
 // handleEditMode 处理编辑模式按键，返回更新后的 cfg 和 proxyAddr（空表示无变化）
 func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService) (State, *config.Config, string, tea.Cmd) {

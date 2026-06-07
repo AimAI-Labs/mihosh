@@ -1,4 +1,5 @@
 BINARY ?= mihosh
+LDFLAGS = -ldflags "-s -w -X github.com/AimAI-Labs/mihosh/internal/domain/model.Version=$(VERSION) -X github.com/AimAI-Labs/mihosh/internal/domain/model.Commit=$(COMMIT) -X github.com/AimAI-Labs/mihosh/internal/domain/model.Date=$(DATE)"
 
 .PHONY: fmt vet test build check clean
 
@@ -12,7 +13,7 @@ test:
 	go test ./...
 
 build:
-	go build -o $(BINARY) .
+	go build $(LDFLAGS) -o $(BINARY) .
 
 check: fmt vet test build
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
@@ -37,6 +38,8 @@ type PageState struct {
 	EditCursor      int
 	// Toast 状态
 	Toast *common.ToastManager
+
+	MihomoVersion string
 }
 
 // GetSettingValue 获取配置值
@@ -68,7 +71,7 @@ func GetSettingValue(cfg *config.Config, index int) string {
 }
 
 // RenderSettingsPage 渲染设置页面
-func RenderSettingsPage(state PageState, width, _ int) string {
+func RenderSettingsPage(state PageState, width, height int) string {
 	// Toast 管理器
 	if state.Toast == nil {
 		state.Toast = common.NewToastManager()
@@ -101,8 +104,6 @@ func RenderSettingsPage(state PageState, width, _ int) string {
 		descSection = descStyle.Render("💡 " + SettingDescs[state.SelectedSetting])
 	}
 
-	// 操作提示（不再使用，帮助由弹窗提供）
-
 	// 组装主要内容
 	mainContent := lipgloss.JoinVertical(
 		lipgloss.Left,
@@ -112,6 +113,33 @@ func RenderSettingsPage(state PageState, width, _ int) string {
 
 	// 包裹容器边距
 	mainContent = containerStyle.Render(mainContent)
+
+	// 渲染底部版本信息
+	footerStyle := lipgloss.NewStyle().
+		Foreground(common.TokyoMuted).
+		Align(lipgloss.Right).
+		Width(width - 2).
+		PaddingRight(2)
+
+	mihomoVer := state.MihomoVersion
+	if mihomoVer == "" {
+		mihomoVer = "..."
+	}
+
+	mihoshLink := utils.CreateHyperlink("https://github.com/AimAI-Labs/mihosh", "Mihosh "+model.Version)
+	mihomoLink := utils.CreateHyperlink("https://github.com/MetaCubeX/mihomo", "Mihomo "+mihomoVer)
+
+	footerText := fmt.Sprintf("%s | Built: %s | %s", mihoshLink, model.Date, mihomoLink)
+	footerContent := footerStyle.Render(footerText)
+
+	// 使用 lipgloss.Place 将内容和 footer 定位，如果高度不够，直接返回内容
+	if height > lipgloss.Height(mainContent)+2 {
+		mainContent = lipgloss.PlaceVertical(height-1, lipgloss.Top, mainContent)
+		mainContent = lipgloss.JoinVertical(lipgloss.Left, mainContent, footerContent)
+	} else {
+		// 如果高度不足，直接追加在后面
+		mainContent = lipgloss.JoinVertical(lipgloss.Left, mainContent, footerContent)
+	}
 
 	// 渲染 Toast（如果有）
 	toastStr := state.Toast.Render(width)

@@ -98,3 +98,7 @@ type ConnTickMsg time.Time
 type LogsTickMsg time.Time
 
 type AutoRefreshTickMsg time.Time
+
+type MihomoVersionMsg struct {
+	Version string
+}

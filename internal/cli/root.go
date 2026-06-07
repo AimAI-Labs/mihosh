@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui"
@@ -19,7 +20,7 @@ var rootCmd = &cobra.Command{
 	Use:           "mihosh",
 	Short:         i18n.T("cli.root.short"),
 	Long:          i18n.T("cli.root.long"),
-	Version:       Version,
+	Version:       model.Version,
 	SilenceErrors: true,
 	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {

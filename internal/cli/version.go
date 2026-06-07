@@ -5,14 +5,8 @@ import (
 	"io"
 	"os"
 
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/spf13/cobra"
-)
-
-// 通过 -ldflags "-X cmd.Version=x.y.z -X cmd.Commit=abc -X cmd.Date=2006-01-02" 注入
-var (
-	Version = "dev"
-	Commit  = "none"
-	Date    = "unknown"
 )
 
 var versionOutput string
@@ -40,19 +34,19 @@ func renderVersion(w io.Writer, format outputFormat) error {
 	switch format {
 	case outputFormatJSON:
 		return writeJSON(w, map[string]string{
-			"version": Version,
-			"commit":  Commit,
-			"date":    Date,
+			"version": model.Version,
+			"commit":  model.Commit,
+			"date":    model.Date,
 		})
 	case outputFormatTable:
 		tw := newTabWriter(w)
 		fmt.Fprintln(tw, "KEY\tVALUE")
-		fmt.Fprintf(tw, "VERSION\t%s\n", Version)
-		fmt.Fprintf(tw, "COMMIT\t%s\n", Commit)
-		fmt.Fprintf(tw, "DATE\t%s\n", Date)
+		fmt.Fprintf(tw, "VERSION\t%s\n", model.Version)
+		fmt.Fprintf(tw, "COMMIT\t%s\n", model.Commit)
+		fmt.Fprintf(tw, "DATE\t%s\n", model.Date)
 		return tw.Flush()
 	default:
-		fmt.Fprintf(w, "mihosh %s (commit: %s, built: %s)\n", Version, Commit, Date)
+		fmt.Fprintf(w, "mihosh %s (commit: %s, built: %s)\n", model.Version, model.Commit, model.Date)
 		return nil
 	}
 }

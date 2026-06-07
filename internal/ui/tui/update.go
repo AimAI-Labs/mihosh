@@ -4,6 +4,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
@@ -311,6 +312,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.nodesState.TestAllTotal = 0
 		m.nodesState.TestAllDone = 0
 		m.nodesState.TestPending = 0
+
+	case messages.MihomoVersionMsg:
+		m.settingsState = m.settingsState.ApplyMihomoVersion(msg.Version)
 	}
 
 	return m, nil
@@ -370,6 +374,8 @@ func (m *Model) onPageChange() tea.Cmd {
 		return logsTick()
 	case layout.PageRules:
 		return rules.FetchRules(m.client)
+	case layout.PageSettings:
+		return settings.FetchMihomoVersion(m.client)
 	}
 	return nil
 }

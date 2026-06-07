@@ -102,3 +102,24 @@ func (c *Client) NewHTTPClientWithProxy(proxyAddr string) (*http.Client, error) 
 		},
 	}, nil
 }
+
+// VersionInfo 表示 Mihomo 的版本信息
+type VersionInfo struct {
+	Premium bool   `json:"premium"`
+	Version string `json:"version"`
+	Meta    bool   `json:"meta"`
+}
+
+// GetVersion 获取 Mihomo 内核版本信息
+func (c *Client) GetVersion() (*VersionInfo, error) {
+	data, err := c.DoRequest(http.MethodGet, "/version", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var info VersionInfo
+	if err := json.Unmarshal(data, &info); err != nil {
+		return nil, err
+	}
+	return &info, nil
+}
