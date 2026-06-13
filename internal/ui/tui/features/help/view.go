@@ -87,9 +87,9 @@ func buildHelpSections(ctx HelpContext) []section {
 		sections = append(sections, section{
 			title: i18n.T("help.section.latency_colors"),
 			bindings: []keybinding{
-				{i18n.T("help.latency.green"), i18n.T("help.latency.green")},
-				{i18n.T("help.latency.yellow"), i18n.T("help.latency.yellow")},
-				{i18n.T("help.latency.red"), i18n.T("help.latency.red")},
+				{"green", i18n.T("help.latency.green")},
+				{"yellow", i18n.T("help.latency.yellow")},
+				{"red", i18n.T("help.latency.red")},
 			},
 		})
 	case PageConnections:
