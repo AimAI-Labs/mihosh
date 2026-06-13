@@ -132,6 +132,12 @@ func (s State) ApplyRules(rules []model.Rule) State {
 	return s
 }
 
+// ShowTypeFilter 返回是否显示类型筛选弹窗
+func (s State) ShowTypeFilter() bool { return s.showTypeFilter }
+
+// FilterMode 返回是否处于规则过滤模式
+func (s State) FilterMode() bool { return s.ruleFilterMode }
+
 // handleRuleFilterMode 规则过滤输入模式
 func (s State) handleRuleFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	switch {

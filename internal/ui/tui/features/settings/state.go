@@ -45,6 +45,16 @@ func (s State) IsEditing() bool {
 	return s.editMode
 }
 
+// SelectedSettingIndex 返回当前选中的设置项索引
+func (s State) SelectedSettingIndex() int {
+	return s.selectedSetting
+}
+
+// IsLanguageSelected 返回当前是否选中语言设置项
+func (s State) IsLanguageSelected() bool {
+	return s.selectedSetting == LanguageSettingIndex()
+}
+
 // FetchMihomoVersion 返回一个拉取 Mihomo 版本信息的 Cmd
 func FetchMihomoVersion(client *api.Client) tea.Cmd {
 	return func() tea.Msg {

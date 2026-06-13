@@ -97,10 +97,29 @@ func (m Model) View() string {
 
 	// ── 帮助弹窗叠加（lazygit 风格，叠加在完整页面之上）──
 	if m.showHelp {
-		return help.OverlayHelpPopup(fullPage, m.width, m.height)
+		return help.OverlayHelpPopup(fullPage, m.width, m.height, m.buildHelpContext())
 	}
 
 	return fullPage
+}
+
+// buildHelpContext 根据当前模型状态构建帮助弹窗上下文
+func (m Model) buildHelpContext() help.HelpContext {
+	return help.HelpContext{
+		CurrentPage:        int(m.currentPage),
+		ConnViewMode:       m.connsState.ViewMode(),
+		ConnDetail:         m.connsState.DetailMode(),
+		ConnTopN:           m.connsState.TopNModalMode(),
+		ConnFilter:         m.connsState.FilterMode(),
+		NodesFailureDetail: m.nodesState.ShowFailureDetail,
+		NodesFilterMode:    m.nodesState.NodeFilterMode,
+		LogsDetail:         m.logsState.DetailMode(),
+		LogsFilter:         m.logsState.FilterMode(),
+		RulesTypeFilter:    m.rulesState.ShowTypeFilter(),
+		RulesFilter:        m.rulesState.FilterMode(),
+		SettingsEdit:       m.settingsState.IsEditing(),
+		SettingsLanguage:   m.settingsState.IsLanguageSelected(),
+	}
 }
 
 // clampToHeight 将内容字符串精确约束为 h 行：

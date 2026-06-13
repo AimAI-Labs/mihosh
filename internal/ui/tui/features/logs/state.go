@@ -53,6 +53,12 @@ func NewState() State {
 	}
 }
 
+// DetailMode 返回是否处于详情模式
+func (s State) DetailMode() bool { return s.detailMode }
+
+// FilterMode 返回是否处于过滤模式
+func (s State) FilterMode() bool { return s.logFilterMode }
+
 // logs 返回日志列表（最新在前，用于渲染）
 func (s State) logs() []model.LogEntry {
 	if s.logCount == 0 {

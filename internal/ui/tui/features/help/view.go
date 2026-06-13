@@ -7,6 +7,49 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
+// ── 页面类型常量（与 layout 包保持一致，避免循环依赖）──
+const (
+	PageNodes       = 0
+	PageConnections = 1
+	PageLogs        = 2
+	PageRules       = 3
+	PageSettings    = 4
+)
+
+// ── 连接页视图模式常量（与 connections 包保持一致）──
+const (
+	ConnViewTraffic = 0
+	ConnViewActive  = 1
+	ConnViewHistory = 2
+)
+
+// HelpContext 帮助弹窗所需的当前界面上下文
+type HelpContext struct {
+	CurrentPage int // 当前页面（PageNodes / PageConnections / ...）
+
+	// 连接页子状态
+	ConnViewMode int  // ConnViewTraffic / ConnViewActive / ConnViewHistory
+	ConnDetail   bool // 连接详情弹窗
+	ConnTopN     bool // TopN 弹窗
+	ConnFilter   bool // 过滤输入
+
+	// 节点页子状态
+	NodesFailureDetail bool // 测速失败详情弹窗
+	NodesFilterMode    bool // 搜索输入
+
+	// 日志页子状态
+	LogsDetail bool // 日志详情弹窗
+	LogsFilter bool // 过滤输入
+
+	// 规则页子状态
+	RulesTypeFilter bool // 类型筛选弹窗
+	RulesFilter     bool // 过滤输入
+
+	// 设置页子状态
+	SettingsEdit     bool // 编辑模式
+	SettingsLanguage bool // 当前选中项是语言
+}
+
 // keybinding 单条快捷键条目
 type keybinding struct {
 	key  string
@@ -19,9 +62,12 @@ type section struct {
 	bindings []keybinding
 }
 
-// helpSections 所有快捷键分组定义
-var helpSections = []section{
-	{
+// buildHelpSections 根据当前上下文动态构建帮助分区
+func buildHelpSections(ctx HelpContext) []section {
+	var sections []section
+
+	// 1. 全局快捷键（始终显示）
+	sections = append(sections, section{
 		title: "全局",
 		bindings: []keybinding{
 			{"?", "显示/关闭帮助"},
@@ -30,9 +76,61 @@ var helpSections = []section{
 			{"r", "刷新当前页面"},
 			{"q / Ctrl+C", "退出程序"},
 		},
-	},
-	{
-		title: "节点管理 [1]",
+	})
+
+	// 2. 当前页面快捷键
+	switch ctx.CurrentPage {
+	case PageNodes:
+		sections = append(sections, buildNodesSections(ctx)...)
+		// 延迟颜色图例仅在节点页显示
+		sections = append(sections, section{
+			title: "延迟颜色",
+			bindings: []keybinding{
+				{"绿色 ●", "< 100ms"},
+				{"黄色 ●", "100 – 300ms"},
+				{"红色 ●", "> 300ms"},
+			},
+		})
+	case PageConnections:
+		sections = append(sections, buildConnectionsSections(ctx)...)
+	case PageLogs:
+		sections = append(sections, buildLogsSections(ctx)...)
+	case PageRules:
+		sections = append(sections, buildRulesSections(ctx)...)
+	case PageSettings:
+		sections = append(sections, buildSettingsSections(ctx)...)
+	}
+
+	return sections
+}
+
+// buildNodesSections 节点页帮助分区
+func buildNodesSections(ctx HelpContext) []section {
+	if ctx.NodesFilterMode {
+		return []section{{
+			title: "节点搜索",
+			bindings: []keybinding{
+				{"输入字符", "追加搜索关键词"},
+				{"Backspace", "删除末字符"},
+				{"Enter", "确认搜索"},
+				{"Esc", "取消搜索"},
+			},
+		}}
+	}
+
+	if ctx.NodesFailureDetail {
+		return []section{{
+			title: "测速失败详情",
+			bindings: []keybinding{
+				{"↑/↓  k/j", "滚动查看"},
+				{"Home / End", "跳到首尾"},
+				{"f / Esc", "关闭详情"},
+			},
+		}}
+	}
+
+	return []section{{
+		title: "节点管理",
 		bindings: []keybinding{
 			{"↑/↓  k/j", "选择节点"},
 			{"←/→  h/l", "切换策略组"},
@@ -44,61 +142,199 @@ var helpSections = []section{
 			{"/", "搜索节点"},
 			{"f", "查看测速失败详情"},
 		},
-	},
-	{
-		title: "连接监控 [2]",
-		bindings: []keybinding{
-			{"↑/↓  k/j", "选择连接"},
-			{"Enter", "查看连接详情"},
-			{"x", "关闭选中连接"},
-			{"X", "关闭所有连接"},
-			{"/", "搜索过滤"},
-			{"h", "切换流量/活跃/历史视图"},
-			{"s / S", "测速选中/全部站点"},
-			{"Esc", "清除过滤 / 返回"},
-		},
-	},
-	{
-		title: "日志 [3]",
+	}}
+}
+
+// buildConnectionsSections 连接页帮助分区
+func buildConnectionsSections(ctx HelpContext) []section {
+	if ctx.ConnDetail {
+		return []section{{
+			title: "连接详情",
+			bindings: []keybinding{
+				{"↑/↓  k/j", "滚动内容"},
+				{"←/→  h/l", "切换左右面板"},
+				{"Esc / q", "关闭详情"},
+			},
+		}}
+	}
+
+	if ctx.ConnTopN {
+		return []section{{
+			title: "Top N 吞吐量",
+			bindings: []keybinding{
+				{"↑/↓  k/j", "滚动列表"},
+				{"Enter", "查看连接详情"},
+				{"Esc / q", "关闭弹窗"},
+			},
+		}}
+	}
+
+	if ctx.ConnFilter {
+		return []section{{
+			title: "连接搜索",
+			bindings: []keybinding{
+				{"输入字符", "追加过滤关键词"},
+				{"Enter", "确认过滤"},
+				{"Esc", "取消过滤"},
+			},
+		}}
+	}
+
+	switch ctx.ConnViewMode {
+	case ConnViewTraffic:
+		return []section{{
+			title: "流量监控",
+			bindings: []keybinding{
+				{"h", "切换视图"},
+				{"←/→", "选择站点"},
+				{"s", "测速选中站点"},
+				{"S", "测速全部站点"},
+			},
+		}}
+
+	case ConnViewActive:
+		return []section{{
+			title: "活跃连接",
+			bindings: []keybinding{
+				{"↑/↓  k/j", "选择连接"},
+				{"Enter", "查看连接详情"},
+				{"x", "关闭选中连接"},
+				{"X", "关闭所有连接"},
+				{"/", "搜索过滤"},
+				{"h", "切换视图"},
+				{"Esc", "清除过滤 / 返回"},
+			},
+		}}
+
+	case ConnViewHistory:
+		return []section{{
+			title: "历史连接",
+			bindings: []keybinding{
+				{"↑/↓  k/j", "选择连接"},
+				{"Enter", "查看连接详情"},
+				{"/", "搜索过滤"},
+				{"h", "切换视图"},
+				{"Esc", "清除过滤 / 返回"},
+			},
+		}}
+	}
+
+	return nil
+}
+
+// buildLogsSections 日志页帮助分区
+func buildLogsSections(ctx HelpContext) []section {
+	if ctx.LogsDetail {
+		return []section{{
+			title: "日志详情",
+			bindings: []keybinding{
+				{"↑/↓  k/j", "滚动查看"},
+				{"Esc / q", "关闭详情"},
+			},
+		}}
+	}
+
+	if ctx.LogsFilter {
+		return []section{{
+			title: "日志搜索",
+			bindings: []keybinding{
+				{"输入字符", "追加搜索关键词"},
+				{"Backspace", "删除末字符"},
+				{"Enter", "确认搜索"},
+				{"Esc", "取消搜索"},
+			},
+		}}
+	}
+
+	return []section{{
+		title: "日志",
 		bindings: []keybinding{
 			{"↑/↓  k/j", "选择日志"},
 			{"Enter", "查看日志详情"},
 			{"[ / ]", "降低/提升日志级别"},
+			{"←/→  h/l", "水平滚动"},
 			{"/", "搜索过滤"},
 			{"c", "清空日志"},
 			{"Esc", "清除搜索"},
 		},
-	},
-	{
-		title: "规则 [4]",
+	}}
+}
+
+// buildRulesSections 规则页帮助分区
+func buildRulesSections(ctx HelpContext) []section {
+	if ctx.RulesTypeFilter {
+		return []section{{
+			title: "类型筛选",
+			bindings: []keybinding{
+				{"↑/↓  k/j", "选择类型"},
+				{"Space", "切换选中"},
+				{"输入字符", "搜索类型"},
+				{"Backspace", "删除搜索字符"},
+				{"Enter", "确认筛选"},
+				{"Esc", "取消筛选"},
+			},
+		}}
+	}
+
+	if ctx.RulesFilter {
+		return []section{{
+			title: "规则搜索",
+			bindings: []keybinding{
+				{"输入字符", "追加搜索关键词"},
+				{"Backspace", "删除末字符"},
+				{"Enter", "确认搜索"},
+				{"Esc", "取消搜索"},
+			},
+		}}
+	}
+
+	return []section{{
+		title: "规则",
 		bindings: []keybinding{
 			{"↑/↓  k/j", "选择规则"},
 			{"/", "搜索过滤"},
 			{"t", "类型筛选"},
 			{"Esc", "清除搜索 / 关闭筛选"},
 		},
-	},
-	{
-		title: "设置 [5]",
+	}}
+}
+
+// buildSettingsSections 设置页帮助分区
+func buildSettingsSections(ctx HelpContext) []section {
+	if ctx.SettingsEdit {
+		if ctx.SettingsLanguage {
+			return []section{{
+				title: "编辑语言",
+				bindings: []keybinding{
+					{"←/→ / Tab", "切换语言选项"},
+					{"Enter", "保存"},
+					{"Esc", "取消"},
+				},
+			}}
+		}
+		return []section{{
+			title: "编辑配置",
+			bindings: []keybinding{
+				{"←/→", "移动光标"},
+				{"Home / End", "跳到行首/行尾"},
+				{"Backspace", "删除前一字符"},
+				{"Delete", "删除当前字符"},
+				{"Enter", "保存"},
+				{"Esc", "取消"},
+			},
+		}}
+	}
+
+	return []section{{
+		title: "设置",
 		bindings: []keybinding{
 			{"↑/↓", "选择配置项"},
 			{"Enter / 双击", "编辑配置项"},
-			{"←/→ / Tab", "切换选项（语言）"},
-			{"s / Enter", "保存修改"},
-			{"Esc", "取消编辑"},
 		},
-	},
-	{
-		title: "延迟颜色",
-		bindings: []keybinding{
-			{"绿色 ●", "< 100ms"},
-			{"黄色 ●", "100 – 300ms"},
-			{"红色 ●", "> 300ms"},
-		},
-	},
+	}}
 }
 
-// 颜色常量 — Tokyo Night
+// ── 颜色常量 — Tokyo Night ──
 var (
 	colorBorder  = lipgloss.Color("#7aa2f7") // blue
 	colorTitle   = lipgloss.Color("#c0caf5") // foreground
@@ -117,7 +353,7 @@ var (
 //  1. 对 base 每行整体套 Faint，让背景内容降亮但不消失
 //  2. 渲染弹窗本体，并计算居中偏移量
 //  3. 逐行用 ansi.Cut 截取底层的左侧和右侧，将弹窗内容嵌入中间
-func OverlayHelpPopup(base string, width, height int) string {
+func OverlayHelpPopup(base string, width, height int, ctx HelpContext) string {
 	// ── 1. 暗化底层 ──
 	baseLines := strings.Split(base, "\n")
 	for len(baseLines) < height {
@@ -134,7 +370,7 @@ func OverlayHelpPopup(base string, width, height int) string {
 	}
 
 	// ── 2. 弹窗居中计算 ──
-	popup := renderPopup(width, height)
+	popup := renderPopup(width, height, ctx)
 	popupLines := strings.Split(popup, "\n")
 	popupHeight := len(popupLines)
 	if popupHeight == 0 {
@@ -157,7 +393,7 @@ func OverlayHelpPopup(base string, width, height int) string {
 		if y >= height {
 			break
 		}
-		
+
 		leftPart := ansi.Cut(dimmed[y], 0, leftOffset)
 		leftW := lipgloss.Width(leftPart)
 		if leftW < leftOffset {
@@ -172,7 +408,16 @@ func OverlayHelpPopup(base string, width, height int) string {
 }
 
 // renderPopup 渲染帮助弹窗（无背景色，使用终端默认背景）
-func renderPopup(termWidth, termHeight int) string {
+func renderPopup(termWidth, termHeight int, ctx HelpContext) string {
+	// ── 动态构建帮助分区 ──
+	helpSections := buildHelpSections(ctx)
+
+	// ── 计算每列内容行数（用于智能布局）──
+	sectionHeights := make([]int, len(helpSections))
+	for i, sec := range helpSections {
+		sectionHeights[i] = len(sec.bindings) + 2 // title + bindings + spacing
+	}
+
 	// ── 弹窗尺寸 ──
 	popupWidth := termWidth * 88 / 100
 	if popupWidth > 112 {
@@ -196,12 +441,19 @@ func renderPopup(termWidth, termHeight int) string {
 		innerWidth = 30
 	}
 
-	// 列数
-	cols := 3
+	// ── 智能列数：根据 section 数量和可用宽度决定 ──
+	maxCols := 3
 	if innerWidth < 80 {
-		cols = 2
+		maxCols = 2
 	}
 	if innerWidth < 48 {
+		maxCols = 1
+	}
+	cols := maxCols
+	if len(helpSections) < cols {
+		cols = len(helpSections)
+	}
+	if cols < 1 {
 		cols = 1
 	}
 
@@ -223,19 +475,8 @@ func renderPopup(termWidth, termHeight int) string {
 		cards = append(cards, renderSection(sec, colW))
 	}
 
-	var colContents []string
-	cardsPerCol := (len(cards) + cols - 1) / cols
-	for c := 0; c < cols; c++ {
-		start := c * cardsPerCol
-		end := start + cardsPerCol
-		if end > len(cards) {
-			end = len(cards)
-		}
-		if start >= len(cards) {
-			break
-		}
-		colContents = append(colContents, lipgloss.JoinVertical(lipgloss.Left, cards[start:end]...))
-	}
+	// ── 按高度贪心分配列（避免内容高度差异过大）──
+	colContents := distributeCardsToColumns(cards, sectionHeights, cols, colW)
 
 	var body string
 	if len(colContents) == 1 {
@@ -271,6 +512,48 @@ func renderPopup(termWidth, termHeight int) string {
 		Width(popupWidth)
 
 	return popupStyle.Render(content)
+}
+
+// distributeCardsToColumns 将卡片按高度贪心分配到指定列数，每列固定宽度并左对齐
+func distributeCardsToColumns(cards []string, heights []int, cols int, colWidth int) []string {
+	if len(cards) == 0 {
+		return nil
+	}
+	if cols <= 1 || len(cards) <= 1 {
+		return []string{lipgloss.JoinVertical(lipgloss.Left, cards...)}
+	}
+
+	// 贪心：每张卡片分配给当前最矮的列
+	colCards := make([][]string, cols)
+	colHeights := make([]int, cols)
+	for i := range colCards {
+		colCards[i] = make([]string, 0)
+	}
+
+	for i, card := range cards {
+		minCol := 0
+		for c := 1; c < cols; c++ {
+			if colHeights[c] < colHeights[minCol] {
+				minCol = c
+			}
+		}
+		colCards[minCol] = append(colCards[minCol], card)
+		if i < len(heights) {
+			colHeights[minCol] += heights[i]
+		}
+	}
+
+	// 固定列宽 + 左对齐，确保各列等宽、内容统一左对齐
+	colStyle := lipgloss.NewStyle().Width(colWidth).Align(lipgloss.Left)
+
+	var result []string
+	for _, cc := range colCards {
+		if len(cc) > 0 {
+			joined := lipgloss.JoinVertical(lipgloss.Left, cc...)
+			result = append(result, colStyle.Render(joined))
+		}
+	}
+	return result
 }
 
 // renderSection 渲染单个快捷键分区（无背景色）
@@ -314,7 +597,7 @@ func renderSection(sec section, width int) string {
 	return strings.Join(lines, "\n")
 }
 
-// RenderHelpPage 旧接口，保留供可能存在的引用
+// RenderHelpPage 旧接口，保留兼容（不传上下文时使用全局+颜色图例）
 func RenderHelpPage(width, height int) string {
-	return renderPopup(width, height)
+	return renderPopup(width, height, HelpContext{CurrentPage: PageNodes})
 }

@@ -638,6 +638,18 @@ func (s State) UpdateProxyAddr(addr string) State {
 	return s
 }
 
+// ViewMode 返回当前连接视图模式
+func (s State) ViewMode() int { return s.connViewMode }
+
+// DetailMode 返回是否处于详情模式
+func (s State) DetailMode() bool { return s.connDetailMode }
+
+// TopNModalMode 返回是否处于 TopN 弹窗模式
+func (s State) TopNModalMode() bool { return s.topNModalMode }
+
+// FilterMode 返回是否处于过滤模式
+func (s State) FilterMode() bool { return s.connFilterMode }
+
 func (s State) openSelectedConnectionDetail() (State, tea.Cmd) {
 	conn := s.selectedConnection()
 	if conn == nil {
