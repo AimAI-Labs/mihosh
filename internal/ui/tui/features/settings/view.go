@@ -7,6 +7,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -18,15 +19,45 @@ const (
 )
 
 var SettingKeys = []string{"api-address", "secret", "test-url", "timeout", "proxy-address", "language", "auto-refresh-interval"}
-var SettingLabels = []string{"API 地址", "密钥", "测速URL", "超时(ms)", "代理地址", "语言", "自动刷新(秒)"}
-var SettingDescs = []string{
-	"Clash API 服务地址",
-	"API 认证密钥",
-	"用于测试节点延迟的 URL",
-	"连接超时时间（毫秒）",
-	"HTTP/SOCKS5 代理地址",
-	"界面显示语言",
-	"数据自动刷新间隔（秒）",
+
+func GetSettingLabel(index int) string {
+	switch index {
+	case 0:
+		return i18n.T("settings.label.api_address")
+	case 1:
+		return i18n.T("settings.label.secret")
+	case 2:
+		return i18n.T("settings.label.test_url")
+	case 3:
+		return i18n.T("settings.label.timeout")
+	case 4:
+		return i18n.T("settings.label.proxy_address")
+	case 5:
+		return i18n.T("settings.label.language")
+	case 6:
+		return i18n.T("settings.label.auto_refresh_interval")
+	}
+	return ""
+}
+
+func GetSettingDesc(index int) string {
+	switch index {
+	case 0:
+		return i18n.T("settings.desc.api_address")
+	case 1:
+		return i18n.T("settings.desc.secret")
+	case 2:
+		return i18n.T("settings.desc.test_url")
+	case 3:
+		return i18n.T("settings.desc.timeout")
+	case 4:
+		return i18n.T("settings.desc.proxy_address")
+	case 5:
+		return i18n.T("settings.desc.language")
+	case 6:
+		return i18n.T("settings.desc.auto_refresh_interval")
+	}
+	return ""
 }
 
 // PageState 设置页面状态
@@ -85,23 +116,23 @@ func RenderSettingsPage(state PageState, width, height int) string {
 
 	// 渲染设置项列表
 	var settingItems []string
-	for i, label := range SettingLabels {
-		item := renderSettingItem(state, i, label, width)
+	for i := 0; i < len(SettingKeys); i++ {
+		item := renderSettingItem(state, i, GetSettingLabel(i), width)
 		settingItems = append(settingItems, item)
 	}
 
 	// 使用 Tokyo 面板包裹设置列表
 	listContent := strings.Join(settingItems, "\n")
-	settingsPanel := common.RenderTokyoPanel("配置项", listContent, width-4)
+	settingsPanel := common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width-4)
 
 	// 渲染当前选中项的描述
 	var descSection string
-	if state.SelectedSetting >= 0 && state.SelectedSetting < len(SettingDescs) {
+	if state.SelectedSetting >= 0 && state.SelectedSetting < len(SettingKeys) {
 		descStyle := lipgloss.NewStyle().
 			Foreground(common.TokyoMuted).
 			Italic(true).
 			MarginTop(1)
-		descSection = descStyle.Render("💡 " + SettingDescs[state.SelectedSetting])
+		descSection = descStyle.Render("💡 " + GetSettingDesc(state.SelectedSetting))
 	}
 
 	// 组装主要内容

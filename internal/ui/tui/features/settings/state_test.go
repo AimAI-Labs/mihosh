@@ -5,9 +5,14 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/viper"
 )
+
+func init() {
+	i18n.Init()
+}
 
 // setupTestConfig 辅助函数用于初始化一个带有临时文件的配置服务环境
 func setupTestConfig(t *testing.T, initialCfg *config.Config) (*service.ConfigService, *config.Config) {

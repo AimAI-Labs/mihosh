@@ -7,6 +7,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -77,7 +78,7 @@ func RenderChartsSection(chartData *model.ChartData, width int, maxHeight int) s
 		chartWidth,
 		halfH,
 	)
-	return common.RenderTokyoPanel("上传/下载速度", body, panelWidth)
+	return common.RenderTokyoPanel(i18n.T("conns.chart_title"), body, panelWidth)
 }
 
 // FormatSpeed 格式化速度

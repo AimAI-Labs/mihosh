@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -141,7 +142,7 @@ func buildTopNModal(items []TopNItem, width, height, scroll int) string {
 
 	var rows []string
 	if len(items) == 0 {
-		rows = append(rows, common.DimStyle.Render("暂无吞吐量数据"))
+		rows = append(rows, common.DimStyle.Render(i18n.T("conns.topn_modal_empty")))
 	} else {
 		for i, item := range items {
 			name := item.Name
@@ -195,17 +196,17 @@ func buildTopNModal(items []TopNItem, width, height, scroll int) string {
 
 	var content []string
 	if scroll > 0 {
-		content = append(content, common.DimStyle.Render(fmt.Sprintf("↑ 还有 %d 项", scroll)))
+		content = append(content, common.DimStyle.Render(i18n.Tf("conns.topn_modal_more_up", scroll)))
 	}
 	content = append(content, rows[scroll:end]...)
 	if end < totalRows {
-		content = append(content, common.DimStyle.Render(fmt.Sprintf("↓ 还有 %d 项", totalRows-end)))
+		content = append(content, common.DimStyle.Render(i18n.Tf("conns.topn_modal_more_down", totalRows-end)))
 	}
 
 	// 加上下空行使其有类似 Padding(1, 0) 的效果
 	body := "\n" + strings.Join(content, "\n") + "\n"
 	panelWidth := innerW + 4 // 对应 contentWidth = innerW
-	return common.RenderTokyoPanel("吞吐量排行 (过去5分钟)", body, panelWidth)
+	return common.RenderTokyoPanel(i18n.T("conns.topn_modal_title"), body, panelWidth)
 }
 
 func truncateRunes(s string, limit int) string {

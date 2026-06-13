@@ -6,12 +6,15 @@ import (
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/mattn/go-runewidth"
 )
 
 var ansiPattern = regexp.MustCompile("\x1b\\[[0-9;?]*[ -/]*[@-~]")
 
 func TestDetailModalPanelsCloseRightBorderWithLongContent(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("zh-CN")
 	conn := &model.Connection{
 		ID:          strings.Repeat("conn-", 20),
 		Rule:        "DomainSuffix",
@@ -50,6 +53,8 @@ func TestDetailModalPanelsCloseRightBorderWithLongContent(t *testing.T) {
 }
 
 func TestConnectionDetailImmersiveDoesNotOverflowRequestedWidth(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("zh-CN")
 	const width = 160
 
 	conn := &model.Connection{

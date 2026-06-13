@@ -5,23 +5,24 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
 
 func renderTargetIPGeoSection(ipInfo *model.IPInfo, s detailStyles) []string {
 	lines := []string{
-		s.SectionTitle.Render("─── 目标 IP 地理信息 ───"),
+		s.SectionTitle.Render(fmt.Sprintf("─── %s ───", i18n.T("conns.detail.title_geo"))),
 		"",
 	}
 
 	if ipInfo == nil {
-		lines = append(lines, s.Dim.Render("正在加载 IP 信息..."))
+		lines = append(lines, s.Dim.Render(i18n.T("conns.detail.loading_geo")))
 		return lines
 	}
 
 	ip := firstNonEmpty(ipInfo.IP, ipInfo.Query, "-")
 	location := strings.Join(nonEmptyStrings(ipInfo.Country, ipInfo.RegionName, ipInfo.City), ", ")
 	if location == "" {
-		location = "未知"
+		location = i18n.T("conns.detail.unknown")
 	}
 
 	asn := firstNonEmpty(
@@ -34,18 +35,18 @@ func renderTargetIPGeoSection(ipInfo *model.IPInfo, s detailStyles) []string {
 
 	network := firstNonEmpty(ipInfo.ISP, ipInfo.Org, ipInfo.Organization, ipInfo.ASNOrganization, "-")
 
-	lines = append(lines, renderKVLine("IP", ip, s))
-	lines = append(lines, renderKVLine("位置", location, s))
-	lines = append(lines, renderKVLine("ASN", asn, s))
-	lines = append(lines, renderKVLine("网络", network, s))
+	lines = append(lines, renderKVLine(i18n.T("conns.detail.label.ip"), ip, s))
+	lines = append(lines, renderKVLine(i18n.T("conns.detail.label.location"), location, s))
+	lines = append(lines, renderKVLine(i18n.T("conns.detail.label.asn"), asn, s))
+	lines = append(lines, renderKVLine(i18n.T("conns.detail.label.network"), network, s))
 
 	if timezone := firstNonEmpty(ipInfo.Timezone); timezone != "" {
-		lines = append(lines, renderKVLine("时区", timezone, s))
+		lines = append(lines, renderKVLine(i18n.T("conns.detail.label.timezone"), timezone, s))
 	}
 
 	lat, lon, hasCoord := coordinates(ipInfo)
 	if hasCoord {
-		lines = append(lines, renderKVLine("坐标", fmt.Sprintf("%.3f, %.3f", lat, lon), s))
+		lines = append(lines, renderKVLine(i18n.T("conns.detail.label.coordinates"), fmt.Sprintf("%.3f, %.3f", lat, lon), s))
 	}
 
 	return lines

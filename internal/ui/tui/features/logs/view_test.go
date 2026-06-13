@@ -7,7 +7,12 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
+
+func init() {
+	i18n.Init()
+}
 
 func TestRenderLogEntry_HOffsetZero(t *testing.T) {
 	log := model.LogEntry{

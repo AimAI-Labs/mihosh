@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -80,13 +81,13 @@ func RenderTableHeader(style lipgloss.Style, pageWidth int) string {
 	const prefixPlaceholder = "  " // 与 SymbolSelectActive/SymbolSelectInactive 等宽
 	header := prefixPlaceholder + strings.Join([]string{
 		alignCenter("", cols.Close),
-		alignLeft("主机", cols.Host),
-		alignLeft("类型", cols.Type),
-		alignLeft("规则", cols.Rule),
-		alignLeft("代理链", cols.Chain),
-		alignRight("↓下载", cols.DL),
-		alignRight("↑上传", cols.UL),
-		alignRight("时长", cols.Time),
+		alignLeft(i18n.T("conns.col_host"), cols.Host),
+		alignLeft(i18n.T("conns.col_type"), cols.Type),
+		alignLeft(i18n.T("conns.col_rule"), cols.Rule),
+		alignLeft(i18n.T("conns.col_chain"), cols.Chain),
+		alignRight(i18n.T("conns.col_dl"), cols.DL),
+		alignRight(i18n.T("conns.col_ul"), cols.UL),
+		alignRight(i18n.T("conns.col_time"), cols.Time),
 	}, " ")
 	return style.Render(header)
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -95,7 +96,7 @@ func RenderLogsPage(state PageState) string {
 	}
 
 	// 渲染统计信息
-	stats := fmt.Sprintf("共 %d 条日志 (级别: %s)", len(filteredLogs), logLevels[state.LogLevel])
+	stats := i18n.Tf("logs.stats", len(filteredLogs), logLevels[state.LogLevel])
 	sections = append(sections, common.MutedStyle.Render(stats))
 	sections = append(sections, "")
 
@@ -227,12 +228,12 @@ func ClickedLevel(pageX int, pageWidth int, selectedLevel int) int {
 func renderLogSearchBox(filterText string, filterMode bool) string {
 	if filterMode {
 		inputStyle := lipgloss.NewStyle().Foreground(common.CWhite).Background(common.CHighlight)
-		label := common.MutedStyle.Render("搜索: ")
+		label := common.MutedStyle.Render(i18n.T("logs.search"))
 		input := inputStyle.Render(filterText + "█")
 		return label + input
 	}
 
-	label := common.MutedStyle.Render("搜索: ")
+	label := common.MutedStyle.Render(i18n.T("logs.search"))
 	input := lipgloss.NewStyle().Foreground(common.CWhite).Render(filterText)
 	return label + input
 }
@@ -250,7 +251,7 @@ func getLevelIndex(level string) int {
 // renderLogList 渲染日志列表
 func renderLogList(logs []model.LogEntry, selectedIdx, scrollTop, maxLines, width, hOffset int) string {
 	if len(logs) == 0 {
-		return common.MutedStyle.Render("暂无日志")
+		return common.MutedStyle.Render(i18n.T("logs.empty"))
 	}
 
 	var lines []string

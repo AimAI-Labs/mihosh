@@ -6,6 +6,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -88,9 +89,9 @@ func RenderRulesPage(state PageState) string {
 	}
 
 	// 渲染统计信息
-	stats := fmt.Sprintf("共 %d 条规则", len(filteredRules))
+	stats := i18n.Tf("rules.stats", len(filteredRules))
 	if state.FilterText != "" || len(state.SelectedTypes) > 0 {
-		stats += fmt.Sprintf(" (过滤自 %d 条)", len(state.Rules))
+		stats += i18n.Tf("rules.stats_filtered", len(state.Rules))
 	}
 
 	// 渲染带边框的头部组件（包含标题、统计和搜索框）
@@ -167,7 +168,7 @@ func renderRuleSearchBox(filterText string, filterMode bool, selectedTypes []str
 		inputStyle = inputStyle.Background(common.CHighlight)
 	}
 
-	label := common.MutedStyle.Render("搜索: ")
+	label := common.MutedStyle.Render(i18n.T("rules.search"))
 	input := inputStyle.Render(filterText)
 
 	if filterMode {
@@ -176,7 +177,7 @@ func renderRuleSearchBox(filterText string, filterMode bool, selectedTypes []str
 
 	hint := ""
 	if filterText == "" {
-		hint = common.MutedStyle.Render(" 空格分隔多词")
+		hint = common.MutedStyle.Render(i18n.T("rules.search_hint"))
 	}
 	if len(selectedTypes) > 0 {
 		typeNames := strings.Join(selectedTypes, ", ")
@@ -191,7 +192,7 @@ func renderRuleSearchBox(filterText string, filterMode bool, selectedTypes []str
 // renderRuleList 渲染规则列表（含整体垂直滚动条）
 func renderRuleList(rules []filteredRule, selectedIdx, scrollTop, maxLines, width int, colorAdjustLight, colorAdjustDark float64) string {
 	if len(rules) == 0 {
-		return common.MutedStyle.Render("暂无规则")
+		return common.MutedStyle.Render(i18n.T("rules.empty"))
 	}
 
 	// 检测 Domain 和 DomainSuffix 是否共享相同颜色，如果是则应用颜色区分
@@ -509,12 +510,12 @@ func renderTypeFilterOverlay(background string, state PageState, width, height i
 		Foreground(common.CWarning)
 
 	// 标题
-	title := titleStyle.Render("🔍 规则类型筛选")
+	title := titleStyle.Render(i18n.T("rules.filter_title"))
 
 	// 搜索框
 	searchBoxStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#FFFFFF"))
-	searchText := "搜索: "
+	searchText := i18n.T("rules.search")
 	if state.TypeFilterSearch == "" {
 		searchText += "_"
 	} else {
@@ -588,14 +589,14 @@ func renderTypeFilterOverlay(background string, state PageState, width, height i
 	typeList := strings.Join(typeLines, "\n")
 
 	// 统计信息
-	statsText := fmt.Sprintf("已选 %d/%d 个类型", len(state.SelectedTypes), len(state.AvailableTypes))
+	statsText := i18n.Tf("rules.filter_stats", len(state.SelectedTypes), len(state.AvailableTypes))
 	if state.TypeFilterSearch != "" {
-		statsText += fmt.Sprintf(" (搜索匹配 %d 个)", len(filteredTypes))
+		statsText += i18n.Tf("rules.filter_stats_search", len(filteredTypes))
 	}
 	stats := common.MutedStyle.Render(statsText)
 
 	// 帮助提示
-	helpText := common.DimStyle.Render("[↑/↓]移动 [Space]选择 [Enter]确认 [Esc]取消")
+	helpText := common.DimStyle.Render(i18n.T("rules.filter_help"))
 
 	// 组装弹窗内容
 	modalContent := lipgloss.JoinVertical(lipgloss.Left,

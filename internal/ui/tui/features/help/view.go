@@ -3,6 +3,7 @@ package help
 import (
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -68,13 +69,13 @@ func buildHelpSections(ctx HelpContext) []section {
 
 	// 1. 全局快捷键（始终显示）
 	sections = append(sections, section{
-		title: "全局",
+		title: i18n.T("help.section.global"),
 		bindings: []keybinding{
-			{"?", "显示/关闭帮助"},
-			{"Tab / Shift+Tab", "切换页面"},
-			{"1-5", "直接跳转页面"},
-			{"r", "刷新当前页面"},
-			{"q / Ctrl+C", "退出程序"},
+			{"?", i18n.T("help.global.toggle")},
+			{"Tab / Shift+Tab", i18n.T("help.global.switch")},
+			{"1-5", i18n.T("help.global.go")},
+			{"r", i18n.T("help.global.refresh")},
+			{"q / Ctrl+C", i18n.T("help.global.quit")},
 		},
 	})
 
@@ -84,11 +85,11 @@ func buildHelpSections(ctx HelpContext) []section {
 		sections = append(sections, buildNodesSections(ctx)...)
 		// 延迟颜色图例仅在节点页显示
 		sections = append(sections, section{
-			title: "延迟颜色",
+			title: i18n.T("help.section.latency_colors"),
 			bindings: []keybinding{
-				{"绿色 ●", "< 100ms"},
-				{"黄色 ●", "100 – 300ms"},
-				{"红色 ●", "> 300ms"},
+				{i18n.T("help.latency.green"), i18n.T("help.latency.green")},
+				{i18n.T("help.latency.yellow"), i18n.T("help.latency.yellow")},
+				{i18n.T("help.latency.red"), i18n.T("help.latency.red")},
 			},
 		})
 	case PageConnections:
@@ -108,39 +109,39 @@ func buildHelpSections(ctx HelpContext) []section {
 func buildNodesSections(ctx HelpContext) []section {
 	if ctx.NodesFilterMode {
 		return []section{{
-			title: "节点搜索",
+			title: i18n.T("help.section.nodes_search"),
 			bindings: []keybinding{
-				{"输入字符", "追加搜索关键词"},
-				{"Backspace", "删除末字符"},
-				{"Enter", "确认搜索"},
-				{"Esc", "取消搜索"},
+				{"输入字符", i18n.T("help.nodes_search.append")},
+				{"Backspace", i18n.T("help.nodes_search.backspace")},
+				{"Enter", i18n.T("help.nodes_search.confirm")},
+				{"Esc", i18n.T("help.nodes_search.cancel")},
 			},
 		}}
 	}
 
 	if ctx.NodesFailureDetail {
 		return []section{{
-			title: "测速失败详情",
+			title: i18n.T("help.section.nodes_failure"),
 			bindings: []keybinding{
-				{"↑/↓  k/j", "滚动查看"},
-				{"Home / End", "跳到首尾"},
-				{"f / Esc", "关闭详情"},
+				{"↑/↓  k/j", i18n.T("help.nodes_failure.scroll")},
+				{"Home / End", i18n.T("help.nodes_failure.jump")},
+				{"f / Esc", i18n.T("help.nodes_failure.close")},
 			},
 		}}
 	}
 
 	return []section{{
-		title: "节点管理",
+		title: i18n.T("help.section.nodes_mgr"),
 		bindings: []keybinding{
-			{"↑/↓  k/j", "选择节点"},
-			{"←/→  h/l", "切换策略组"},
-			{"Enter", "切换到选中节点"},
-			{"t", "测速当前节点"},
-			{"a", "测速当前组所有节点"},
-			{"m", "切换代理模式"},
-			{"s", "切换排序方式"},
-			{"/", "搜索节点"},
-			{"f", "查看测速失败详情"},
+			{"↑/↓  k/j", i18n.T("help.nodes.select")},
+			{"←/→  h/l", i18n.T("help.nodes.switch_group")},
+			{"Enter", i18n.T("help.nodes.switch_node")},
+			{"t", i18n.T("help.nodes.test")},
+			{"a", i18n.T("help.nodes.test_all")},
+			{"m", i18n.T("help.nodes.mode")},
+			{"s", i18n.T("help.nodes.sort")},
+			{"/", i18n.T("help.nodes.search")},
+			{"f", i18n.T("help.nodes.failure_detail")},
 		},
 	}}
 }
@@ -149,33 +150,33 @@ func buildNodesSections(ctx HelpContext) []section {
 func buildConnectionsSections(ctx HelpContext) []section {
 	if ctx.ConnDetail {
 		return []section{{
-			title: "连接详情",
+			title: i18n.T("help.section.conns_detail"),
 			bindings: []keybinding{
-				{"↑/↓  k/j", "滚动内容"},
-				{"←/→  h/l", "切换左右面板"},
-				{"Esc / q", "关闭详情"},
+				{"↑/↓  k/j", i18n.T("help.conns_detail.scroll")},
+				{"←/→  h/l", i18n.T("help.conns_detail.switch_panel")},
+				{"Esc / q", i18n.T("help.conns_detail.close")},
 			},
 		}}
 	}
 
 	if ctx.ConnTopN {
 		return []section{{
-			title: "Top N 吞吐量",
+			title: i18n.T("help.section.conns_topn"),
 			bindings: []keybinding{
-				{"↑/↓  k/j", "滚动列表"},
-				{"Enter", "查看连接详情"},
-				{"Esc / q", "关闭弹窗"},
+				{"↑/↓  k/j", i18n.T("help.conns_topn.scroll")},
+				{"Enter", i18n.T("help.conns_topn.detail")},
+				{"Esc / q", i18n.T("help.conns_topn.close")},
 			},
 		}}
 	}
 
 	if ctx.ConnFilter {
 		return []section{{
-			title: "连接搜索",
+			title: i18n.T("help.section.conns_search"),
 			bindings: []keybinding{
-				{"输入字符", "追加过滤关键词"},
-				{"Enter", "确认过滤"},
-				{"Esc", "取消过滤"},
+				{"输入字符", i18n.T("help.conns_search.append")},
+				{"Enter", i18n.T("help.conns_search.confirm")},
+				{"Esc", i18n.T("help.conns_search.cancel")},
 			},
 		}}
 	}
@@ -183,38 +184,38 @@ func buildConnectionsSections(ctx HelpContext) []section {
 	switch ctx.ConnViewMode {
 	case ConnViewTraffic:
 		return []section{{
-			title: "流量监控",
+			title: i18n.T("help.section.conns_traffic"),
 			bindings: []keybinding{
-				{"h", "切换视图"},
-				{"←/→", "选择站点"},
-				{"s", "测速选中站点"},
-				{"S", "测速全部站点"},
+				{"h", i18n.T("help.conns_traffic.switch")},
+				{"←/→", i18n.T("help.conns_traffic.select_site")},
+				{"s", i18n.T("help.conns_traffic.test_site")},
+				{"S", i18n.T("help.conns_traffic.test_all")},
 			},
 		}}
 
 	case ConnViewActive:
 		return []section{{
-			title: "活跃连接",
+			title: i18n.T("help.section.conns_active"),
 			bindings: []keybinding{
-				{"↑/↓  k/j", "选择连接"},
-				{"Enter", "查看连接详情"},
-				{"x", "关闭选中连接"},
-				{"X", "关闭所有连接"},
-				{"/", "搜索过滤"},
-				{"h", "切换视图"},
-				{"Esc", "清除过滤 / 返回"},
+				{"↑/↓  k/j", i18n.T("help.conns_active.select")},
+				{"Enter", i18n.T("help.conns_active.detail")},
+				{"x", i18n.T("help.conns_active.close_conn")},
+				{"X", i18n.T("help.conns_active.close_all")},
+				{"/", i18n.T("help.conns_active.search")},
+				{"h", i18n.T("help.conns_active.switch")},
+				{"Esc", i18n.T("help.conns_active.clear")},
 			},
 		}}
 
 	case ConnViewHistory:
 		return []section{{
-			title: "历史连接",
+			title: i18n.T("help.section.conns_history"),
 			bindings: []keybinding{
-				{"↑/↓  k/j", "选择连接"},
-				{"Enter", "查看连接详情"},
-				{"/", "搜索过滤"},
-				{"h", "切换视图"},
-				{"Esc", "清除过滤 / 返回"},
+				{"↑/↓  k/j", i18n.T("help.conns_history.select")},
+				{"Enter", i18n.T("help.conns_history.detail")},
+				{"/", i18n.T("help.conns_history.search")},
+				{"h", i18n.T("help.conns_history.switch")},
+				{"Esc", i18n.T("help.conns_history.clear")},
 			},
 		}}
 	}
@@ -226,36 +227,36 @@ func buildConnectionsSections(ctx HelpContext) []section {
 func buildLogsSections(ctx HelpContext) []section {
 	if ctx.LogsDetail {
 		return []section{{
-			title: "日志详情",
+			title: i18n.T("help.section.logs_detail"),
 			bindings: []keybinding{
-				{"↑/↓  k/j", "滚动查看"},
-				{"Esc / q", "关闭详情"},
+				{"↑/↓  k/j", i18n.T("help.logs_detail.scroll")},
+				{"Esc / q", i18n.T("help.logs_detail.close")},
 			},
 		}}
 	}
 
 	if ctx.LogsFilter {
 		return []section{{
-			title: "日志搜索",
+			title: i18n.T("help.section.logs_search"),
 			bindings: []keybinding{
-				{"输入字符", "追加搜索关键词"},
-				{"Backspace", "删除末字符"},
-				{"Enter", "确认搜索"},
-				{"Esc", "取消搜索"},
+				{"输入字符", i18n.T("help.logs_search.append")},
+				{"Backspace", i18n.T("help.logs_search.backspace")},
+				{"Enter", i18n.T("help.logs_search.confirm")},
+				{"Esc", i18n.T("help.logs_search.cancel")},
 			},
 		}}
 	}
 
 	return []section{{
-		title: "日志",
+		title: i18n.T("help.section.logs"),
 		bindings: []keybinding{
-			{"↑/↓  k/j", "选择日志"},
-			{"Enter", "查看日志详情"},
-			{"[ / ]", "降低/提升日志级别"},
-			{"←/→  h/l", "水平滚动"},
-			{"/", "搜索过滤"},
-			{"c", "清空日志"},
-			{"Esc", "清除搜索"},
+			{"↑/↓  k/j", i18n.T("help.logs.select")},
+			{"Enter", i18n.T("help.logs.detail")},
+			{"[ / ]", i18n.T("help.logs.level_down")},
+			{"←/→  h/l", i18n.T("help.logs.scroll")},
+			{"/", i18n.T("help.logs.search")},
+			{"c", i18n.T("help.logs.clear")},
+			{"Esc", i18n.T("help.logs.clear_search")},
 		},
 	}}
 }
@@ -264,37 +265,37 @@ func buildLogsSections(ctx HelpContext) []section {
 func buildRulesSections(ctx HelpContext) []section {
 	if ctx.RulesTypeFilter {
 		return []section{{
-			title: "类型筛选",
+			title: i18n.T("help.section.rules_type_filter"),
 			bindings: []keybinding{
-				{"↑/↓  k/j", "选择类型"},
-				{"Space", "切换选中"},
-				{"输入字符", "搜索类型"},
-				{"Backspace", "删除搜索字符"},
-				{"Enter", "确认筛选"},
-				{"Esc", "取消筛选"},
+				{"↑/↓  k/j", i18n.T("help.rules_filter.select")},
+				{"Space", i18n.T("help.rules_filter.toggle")},
+				{"输入字符", i18n.T("help.rules_filter.search")},
+				{"Backspace", i18n.T("help.rules_filter.backspace")},
+				{"Enter", i18n.T("help.rules_filter.confirm")},
+				{"Esc", i18n.T("help.rules_filter.cancel")},
 			},
 		}}
 	}
 
 	if ctx.RulesFilter {
 		return []section{{
-			title: "规则搜索",
+			title: i18n.T("help.section.rules_search"),
 			bindings: []keybinding{
-				{"输入字符", "追加搜索关键词"},
-				{"Backspace", "删除末字符"},
-				{"Enter", "确认搜索"},
-				{"Esc", "取消搜索"},
+				{"输入字符", i18n.T("help.rules_search.append")},
+				{"Backspace", i18n.T("help.rules_search.backspace")},
+				{"Enter", i18n.T("help.rules_search.confirm")},
+				{"Esc", i18n.T("help.rules_search.cancel")},
 			},
 		}}
 	}
 
 	return []section{{
-		title: "规则",
+		title: i18n.T("help.section.rules"),
 		bindings: []keybinding{
-			{"↑/↓  k/j", "选择规则"},
-			{"/", "搜索过滤"},
-			{"t", "类型筛选"},
-			{"Esc", "清除搜索 / 关闭筛选"},
+			{"↑/↓  k/j", i18n.T("help.rules.select")},
+			{"/", i18n.T("help.rules.search")},
+			{"t", i18n.T("help.rules.type")},
+			{"Esc", i18n.T("help.rules.clear")},
 		},
 	}}
 }
@@ -304,32 +305,32 @@ func buildSettingsSections(ctx HelpContext) []section {
 	if ctx.SettingsEdit {
 		if ctx.SettingsLanguage {
 			return []section{{
-				title: "编辑语言",
+				title: i18n.T("help.section.settings_edit_lang"),
 				bindings: []keybinding{
-					{"←/→ / Tab", "切换语言选项"},
-					{"Enter", "保存"},
-					{"Esc", "取消"},
+					{"←/→ / Tab", i18n.T("help.settings_edit_lang.switch")},
+					{"Enter", i18n.T("help.settings_edit_lang.confirm")},
+					{"Esc", i18n.T("help.settings_edit_lang.cancel")},
 				},
 			}}
 		}
 		return []section{{
-			title: "编辑配置",
+			title: i18n.T("help.section.settings_edit_config"),
 			bindings: []keybinding{
-				{"←/→", "移动光标"},
-				{"Home / End", "跳到行首/行尾"},
-				{"Backspace", "删除前一字符"},
-				{"Delete", "删除当前字符"},
-				{"Enter", "保存"},
-				{"Esc", "取消"},
+				{"←/→", i18n.T("help.settings_edit_config.move")},
+				{"Home / End", i18n.T("help.settings_edit_config.jump")},
+				{"Backspace", i18n.T("help.settings_edit_config.backspace")},
+				{"Delete", i18n.T("help.settings_edit_config.delete")},
+				{"Enter", i18n.T("help.settings_edit_config.confirm")},
+				{"Esc", i18n.T("help.settings_edit_config.cancel")},
 			},
 		}}
 	}
 
 	return []section{{
-		title: "设置",
+		title: i18n.T("help.section.settings"),
 		bindings: []keybinding{
-			{"↑/↓", "选择配置项"},
-			{"Enter / 双击", "编辑配置项"},
+			{"↑/↓", i18n.T("help.settings.select")},
+			{"Enter / 双击", i18n.T("help.settings.edit")},
 		},
 	}}
 }
@@ -458,8 +459,8 @@ func renderPopup(termWidth, termHeight int, ctx HelpContext) string {
 	}
 
 	// ── 标题行 ──
-	title := lipgloss.NewStyle().Bold(true).Foreground(colorTitle).Render("Mihosh 快捷键帮助")
-	closeHint := lipgloss.NewStyle().Foreground(colorDim).Render("? / Esc / q  关闭")
+	title := lipgloss.NewStyle().Bold(true).Foreground(colorTitle).Render(i18n.T("help.popup_title"))
+	closeHint := lipgloss.NewStyle().Foreground(colorDim).Render(i18n.T("help.close_hint"))
 	gap := innerWidth - lipgloss.Width(title) - lipgloss.Width(closeHint)
 	if gap < 1 {
 		gap = 1
@@ -496,7 +497,7 @@ func renderPopup(termWidth, termHeight int, ctx HelpContext) string {
 	if len(contentLines) > maxLines {
 		contentLines = contentLines[:maxLines]
 		contentLines = append(contentLines,
-			lipgloss.NewStyle().Foreground(colorDim).Render("↓ 更多内容..."),
+			lipgloss.NewStyle().Foreground(colorDim).Render(i18n.T("help.more_hint")),
 		)
 	}
 	for len(contentLines) < maxLines {
@@ -574,14 +575,14 @@ func renderSection(sec section, width int) string {
 		k := b.key
 		desc := b.desc
 
-		if sec.title == "延迟颜色" {
+		if sec.title == i18n.T("help.section.latency_colors") {
 			var dot string
 			switch {
-			case strings.Contains(k, "绿"):
+			case strings.Contains(k, "绿") || strings.Contains(strings.ToLower(k), "green"):
 				dot = lipgloss.NewStyle().Foreground(colorGreen).Render("●")
-			case strings.Contains(k, "黄"):
+			case strings.Contains(k, "黄") || strings.Contains(strings.ToLower(k), "yellow"):
 				dot = lipgloss.NewStyle().Foreground(colorYellow).Render("●")
-			case strings.Contains(k, "红"):
+			case strings.Contains(k, "红") || strings.Contains(strings.ToLower(k), "red"):
 				dot = lipgloss.NewStyle().Foreground(colorRed).Render("●")
 			default:
 				dot = "●"

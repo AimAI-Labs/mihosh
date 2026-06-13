@@ -6,6 +6,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
@@ -22,11 +23,11 @@ func RenderDetailModalLeft(conn *model.Connection, ipInfo *model.IPInfo, width, 
 
 	// 准备连接信息表格
 	connRows := getConnInfoRows(conn)
-	connTable := renderInfoPanel("连接详情", connRows, width, isFocused)
+	connTable := renderInfoPanel(i18n.T("conns.detail.title"), connRows, width, isFocused)
 
 	// 准备IP地理信息表格
 	ipRows := getIPGeoInfoRows(ipInfo)
-	ipTable := renderInfoPanel("目标 IP 地理信息", ipRows, width, isFocused)
+	ipTable := renderInfoPanel(i18n.T("conns.detail.title_geo"), ipRows, width, isFocused)
 
 	// 合并表格
 	content := lipgloss.JoinVertical(lipgloss.Left, connTable, "", ipTable)
@@ -56,7 +57,7 @@ func RenderDetailModalLeft(conn *model.Connection, ipInfo *model.IPInfo, width, 
 	}
 
 	if scrollTop > 0 {
-		output = append(output, dimStyle.Render(fmt.Sprintf("↑ 还有 %d 行", scrollTop)))
+		output = append(output, dimStyle.Render(i18n.Tf("conns.detail.more_up", scrollTop)))
 	} else {
 		output = append(output, "") // 占位
 	}
@@ -69,7 +70,7 @@ func RenderDetailModalLeft(conn *model.Connection, ipInfo *model.IPInfo, width, 
 	}
 
 	if endIdx < totalLines {
-		output = append(output, dimStyle.Render(fmt.Sprintf("↓ 还有 %d 行", totalLines-endIdx)))
+		output = append(output, dimStyle.Render(i18n.Tf("conns.detail.more_down", totalLines-endIdx)))
 	} else {
 		output = append(output, "") // 占位
 	}
@@ -93,29 +94,29 @@ func getConnInfoRows(conn *model.Connection) [][]string {
 	}
 
 	rows := [][]string{
-		{"主机", host},
-		{"源地址", source},
-		{"目标地址", target},
-		{"协议", protocol},
-		{"规则链路", fmt.Sprintf("%s → %s", rule, chain)},
-		{"连接时长", utils.FormatDuration(conn.Start)},
-		{"流量", fmt.Sprintf("↓%s  ↑%s", utils.FormatBytes(conn.Download), utils.FormatBytes(conn.Upload))},
+		{i18n.T("conns.detail.label.host"), host},
+		{i18n.T("conns.detail.label.source"), source},
+		{i18n.T("conns.detail.label.target"), target},
+		{i18n.T("conns.detail.label.protocol"), protocol},
+		{i18n.T("conns.detail.label.rule_chain"), fmt.Sprintf("%s → %s", rule, chain)},
+		{i18n.T("conns.detail.label.duration"), utils.FormatDuration(conn.Start)},
+		{i18n.T("conns.detail.label.traffic"), fmt.Sprintf("↓%s  ↑%s", utils.FormatBytes(conn.Download), utils.FormatBytes(conn.Upload))},
 	}
 
 	if conn.UploadSpeed > 0 || conn.DownloadSpeed > 0 {
 		rows = append(rows, []string{
-			"实时速率",
+			i18n.T("conns.detail.label.speed"),
 			fmt.Sprintf("↓%s/s  ↑%s/s", utils.FormatBytes(conn.DownloadSpeed), utils.FormatBytes(conn.UploadSpeed)),
 		})
 	}
 
 	if conn.RulePayload != "" {
-		rows = append(rows, []string{"规则负载", conn.RulePayload})
+		rows = append(rows, []string{i18n.T("conns.detail.label.rule_payload"), conn.RulePayload})
 	}
 
 	process := firstNonEmpty(conn.Metadata.Process, conn.Metadata.ProcessPath)
 	if process != "" {
-		rows = append(rows, []string{"进程", process})
+		rows = append(rows, []string{i18n.T("conns.detail.label.process"), process})
 	}
 
 	return rows
@@ -123,13 +124,13 @@ func getConnInfoRows(conn *model.Connection) [][]string {
 
 func getIPGeoInfoRows(ipInfo *model.IPInfo) [][]string {
 	if ipInfo == nil {
-		return [][]string{{"状态", "正在加载 IP 信息..."}}
+		return [][]string{{i18n.T("conns.detail.label.status"), i18n.T("conns.detail.loading_geo")}}
 	}
 
 	ip := firstNonEmpty(ipInfo.IP, ipInfo.Query, "-")
 	location := strings.Join(nonEmptyStrings(ipInfo.Country, ipInfo.RegionName, ipInfo.City), ", ")
 	if location == "" {
-		location = "未知"
+		location = i18n.T("conns.detail.unknown")
 	}
 
 	asn := firstNonEmpty(formatASNInt(ipInfo.ASN), ipInfo.AS)
@@ -140,19 +141,19 @@ func getIPGeoInfoRows(ipInfo *model.IPInfo) [][]string {
 	network := firstNonEmpty(ipInfo.ISP, ipInfo.Org, ipInfo.Organization, ipInfo.ASNOrganization, "-")
 
 	rows := [][]string{
-		{"IP", ip},
-		{"位置", location},
-		{"ASN", asn},
-		{"网络", network},
+		{i18n.T("conns.detail.label.ip"), ip},
+		{i18n.T("conns.detail.label.location"), location},
+		{i18n.T("conns.detail.label.asn"), asn},
+		{i18n.T("conns.detail.label.network"), network},
 	}
 
 	if timezone := firstNonEmpty(ipInfo.Timezone); timezone != "" {
-		rows = append(rows, []string{"时区", timezone})
+		rows = append(rows, []string{i18n.T("conns.detail.label.timezone"), timezone})
 	}
 
 	lat, lon, hasCoord := coordinates(ipInfo)
 	if hasCoord {
-		rows = append(rows, []string{"坐标", fmt.Sprintf("%.3f, %.3f", lat, lon)})
+		rows = append(rows, []string{i18n.T("conns.detail.label.coordinates"), fmt.Sprintf("%.3f, %.3f", lat, lon)})
 	}
 
 	return rows

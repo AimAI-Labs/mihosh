@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 )
 
@@ -24,32 +25,32 @@ func renderConnectionInfoSection(conn *model.Connection, s detailStyles) []strin
 	}
 
 	lines := []string{
-		s.SectionTitle.Render("─── 连接详情 ───"),
+		s.SectionTitle.Render(fmt.Sprintf("─── %s ───", i18n.T("conns.detail.title"))),
 		"",
-		renderKVLine("主机", host, s),
-		renderKVLine("源地址", source, s),
-		renderKVLine("目标地址", target, s),
-		renderKVLine("协议", protocol, s),
-		renderKVLine("规则链路", fmt.Sprintf("%s → %s", rule, chain), s),
-		renderKVLine("连接时长", utils.FormatDuration(conn.Start), s),
-		renderKVLine("流量", fmt.Sprintf("↓%s  ↑%s", utils.FormatBytes(conn.Download), utils.FormatBytes(conn.Upload)), s),
+		renderKVLine(i18n.T("conns.detail.label.host"), host, s),
+		renderKVLine(i18n.T("conns.detail.label.source"), source, s),
+		renderKVLine(i18n.T("conns.detail.label.target"), target, s),
+		renderKVLine(i18n.T("conns.detail.label.protocol"), protocol, s),
+		renderKVLine(i18n.T("conns.detail.label.rule_chain"), fmt.Sprintf("%s → %s", rule, chain), s),
+		renderKVLine(i18n.T("conns.detail.label.duration"), utils.FormatDuration(conn.Start), s),
+		renderKVLine(i18n.T("conns.detail.label.traffic"), fmt.Sprintf("↓%s  ↑%s", utils.FormatBytes(conn.Download), utils.FormatBytes(conn.Upload)), s),
 	}
 
 	if conn.UploadSpeed > 0 || conn.DownloadSpeed > 0 {
 		lines = append(lines, renderKVLine(
-			"实时速率",
+			i18n.T("conns.detail.label.speed"),
 			fmt.Sprintf("↓%s/s  ↑%s/s", utils.FormatBytes(conn.DownloadSpeed), utils.FormatBytes(conn.UploadSpeed)),
 			s,
 		))
 	}
 
 	if conn.RulePayload != "" {
-		lines = append(lines, renderKVLine("规则负载", conn.RulePayload, s))
+		lines = append(lines, renderKVLine(i18n.T("conns.detail.label.rule_payload"), conn.RulePayload, s))
 	}
 
 	process := firstNonEmpty(conn.Metadata.Process, conn.Metadata.ProcessPath)
 	if process != "" {
-		lines = append(lines, renderKVLine("进程", process, s))
+		lines = append(lines, renderKVLine(i18n.T("conns.detail.label.process"), process, s))
 	}
 
 	return lines

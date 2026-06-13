@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -100,5 +101,5 @@ func RenderTopNSection(items []TopNItem, width int) string {
 	}
 
 	body := strings.Join(lines, "\n")
-	return common.RenderTokyoPanel("Top 5 吞吐量（5min）", body, panelWidth)
+	return common.RenderTokyoPanel(i18n.T("conns.topn_title"), body, panelWidth)
 }

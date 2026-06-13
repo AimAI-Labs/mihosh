@@ -8,6 +8,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -143,10 +144,10 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 					s.editMode = false
 					s.editValue = ""
 					s.editCursor = 0
-					s.showToast("语言设置已保存", common.ToastSuccess)
+					s.showToast(i18n.T("settings.toast.save_success_lang"), common.ToastSuccess)
 					return s, newCfg, newCfg.ProxyAddress
 				}
-				s.showToast("保存失败", common.ToastError)
+				s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
 				return s, cfg, ""
 			}
 		}
@@ -169,10 +170,10 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 		if lang, ok := resolveLanguageMouseTarget(pageX); ok {
 			if err := configSvc.SetConfigValue(SettingKeys[settingIdx], lang); err == nil {
 				newCfg, _ := configSvc.LoadConfig()
-				s.showToast("语言设置已保存", common.ToastSuccess)
+				s.showToast(i18n.T("settings.toast.save_success_lang"), common.ToastSuccess)
 				return s, newCfg, newCfg.ProxyAddress
 			}
-			s.showToast("保存失败", common.ToastError)
+			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
 		}
 	}
 
@@ -201,10 +202,10 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 				newCfg, _ := configSvc.LoadConfig()
 				s.editMode = false
 				s.editValue = ""
-				s.showToast("语言设置已保存", common.ToastSuccess)
+				s.showToast(i18n.T("settings.toast.save_success_lang"), common.ToastSuccess)
 				return s, newCfg, newCfg.ProxyAddress, nil
 			}
-			s.showToast("保存失败", common.ToastError)
+			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
 		case msg.String() == "left":
 			s.editValue = prevLanguage(s.editValue)
 		case msg.String() == "right", msg.String() == "tab":
@@ -223,14 +224,14 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 		settingKey := SettingKeys[s.selectedSetting]
 		if err := configSvc.SetConfigValue(settingKey, s.editValue); err != nil {
 			// 保存失败：保持编辑模式，显示错误提示
-			s.showToast("保存失败: "+err.Error(), common.ToastError)
+			s.showToast(i18n.Tf("settings.toast.save_failed_with_err", err.Error()), common.ToastError)
 			return s, cfg, "", nil
 		}
 		newCfg, _ := configSvc.LoadConfig()
 		s.editMode = false
 		s.editValue = ""
 		s.editCursor = 0
-		s.showToast("设置已保存", common.ToastSuccess)
+		s.showToast(i18n.T("settings.toast.save_success"), common.ToastSuccess)
 		return s, newCfg, newCfg.ProxyAddress, nil
 
 	case msg.String() == "left":

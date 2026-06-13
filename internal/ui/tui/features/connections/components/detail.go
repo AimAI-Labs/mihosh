@@ -1,12 +1,11 @@
 package components
 
 import (
-	"fmt"
-
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/styles"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -43,14 +42,14 @@ func RenderConnectionDetail(conn *model.Connection, ipInfo *model.IPInfo, height
 
 	// 构建完整内容
 	var allLines []string
-	allLines = append(allLines, s.Header.Render("连接详情"))
+	allLines = append(allLines, s.Header.Render(i18n.T("conns.detail.title")))
 	allLines = append(allLines, "")
 	allLines = append(allLines, renderConnectionInfoSection(conn, s)...)
 	allLines = append(allLines, "")
 
 	jsonLines, err := renderJSONDetailSection(conn, s)
 	if err != nil {
-		return fmt.Sprintf("无法解析连接信息: %v", err)
+		return i18n.Tf("conns.detail.parse_failed", err)
 	}
 	allLines = append(allLines, jsonLines...)
 	allLines = append(allLines, "")
@@ -88,19 +87,19 @@ func RenderConnectionDetail(conn *model.Connection, ipInfo *model.IPInfo, height
 
 	// 滚动提示（上方）
 	if scrollTop > 0 {
-		output = append(output, s.Dim.Render(fmt.Sprintf("↑ 还有 %d 行", scrollTop)))
+		output = append(output, s.Dim.Render(i18n.Tf("conns.detail.more_up", scrollTop)))
 	}
 
 	output = append(output, visibleLines...)
 
 	// 滚动提示（下方）
 	if endIdx < totalLines {
-		output = append(output, s.Dim.Render(fmt.Sprintf("↓ 还有 %d 行", totalLines-endIdx)))
+		output = append(output, s.Dim.Render(i18n.Tf("conns.detail.more_down", totalLines-endIdx)))
 	}
 
 	// 帮助提示
 	output = append(output, "")
-	output = append(output, s.Dim.Render("[↑↓] 滚动 [Esc/Enter] 返回列表"))
+	output = append(output, s.Dim.Render(i18n.T("conns.detail.help")))
 
 	return strings.Join(output, "\n")
 }

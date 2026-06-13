@@ -3,7 +3,13 @@ package components
 import (
 	"strings"
 	"testing"
+
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
+
+func init() {
+	i18n.Init()
+}
 
 func TestRenderTopNSection(t *testing.T) {
 	t.Run("empty items", func(t *testing.T) {

@@ -3,7 +3,13 @@ package components
 import (
 	"strings"
 	"testing"
+
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
+
+func init() {
+	i18n.Init()
+}
 
 func TestRenderTopNModal(t *testing.T) {
 	items := []TopNItem{

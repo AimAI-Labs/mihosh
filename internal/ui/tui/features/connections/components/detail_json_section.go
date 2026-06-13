@@ -2,8 +2,10 @@ package components
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
 
 func renderJSONDetailSection(conn *model.Connection, s detailStyles) ([]string, error) {
@@ -13,7 +15,7 @@ func renderJSONDetailSection(conn *model.Connection, s detailStyles) ([]string, 
 	}
 
 	lines := []string{
-		s.SectionTitle.Render("─── JSON 详情 ───"),
+		s.SectionTitle.Render(fmt.Sprintf("─── %s ───", i18n.T("conns.detail.title_json"))),
 		"",
 	}
 

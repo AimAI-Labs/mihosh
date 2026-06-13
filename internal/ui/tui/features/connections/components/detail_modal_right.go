@@ -2,11 +2,11 @@ package components
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -24,7 +24,7 @@ func RenderDetailModalRight(conn *model.Connection, width, height, scrollTop int
 	// 获取JSON数据
 	jsonLines, err := getJSONLines(conn)
 	if err != nil {
-		jsonLines = []string{fmt.Sprintf("无法解析连接信息: %v", err)}
+		jsonLines = []string{i18n.Tf("conns.detail.parse_failed", err)}
 	}
 
 	// 为长行添加截断，防止破坏布局
@@ -75,7 +75,7 @@ func RenderDetailModalRight(conn *model.Connection, width, height, scrollTop int
 	}
 
 	if scrollTop > 0 {
-		output = append(output, dimStyle.Render(fmt.Sprintf("↑ 还有 %d 行", scrollTop)))
+		output = append(output, dimStyle.Render(i18n.Tf("conns.detail.more_up", scrollTop)))
 	} else {
 		output = append(output, "") // 占位
 	}
@@ -88,7 +88,7 @@ func RenderDetailModalRight(conn *model.Connection, width, height, scrollTop int
 	}
 
 	if endIdx < totalLines {
-		output = append(output, dimStyle.Render(fmt.Sprintf("↓ 还有 %d 行", totalLines-endIdx)))
+		output = append(output, dimStyle.Render(i18n.Tf("conns.detail.more_down", totalLines-endIdx)))
 	} else {
 		output = append(output, "") // 占位
 	}
@@ -102,7 +102,7 @@ func RenderDetailModalRight(conn *model.Connection, width, height, scrollTop int
 		titleColor = common.TokyoCyan
 	}
 
-	return common.RenderBorderedPanel("JSON 详情", body, width, borderColor, titleColor)
+	return common.RenderBorderedPanel(i18n.T("conns.detail.title_json"), body, width, borderColor, titleColor)
 }
 
 func getJSONLines(conn *model.Connection) ([]string, error) {

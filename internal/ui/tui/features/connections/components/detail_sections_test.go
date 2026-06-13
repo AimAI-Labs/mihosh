@@ -5,10 +5,13 @@ import (
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
 
 func TestRenderConnectionInfoSection(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("zh-CN")
 	s := plainDetailStyles()
 	conn := &model.Connection{
 		ID:   "c1",
@@ -42,6 +45,8 @@ func TestRenderConnectionInfoSection(t *testing.T) {
 }
 
 func TestRenderJSONDetailSection(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("zh-CN")
 	s := plainDetailStyles()
 	conn := &model.Connection{
 		ID:   "conn-1",
@@ -63,6 +68,8 @@ func TestRenderJSONDetailSection(t *testing.T) {
 }
 
 func TestRenderTargetIPGeoSection(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("zh-CN")
 	s := plainDetailStyles()
 
 	nilContent := strings.Join(renderTargetIPGeoSection(nil, s), "\n")
