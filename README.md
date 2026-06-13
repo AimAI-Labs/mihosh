@@ -25,12 +25,12 @@ A full-featured terminal UI (TUI) management tool for mihomo, allowing you to el
 
 | Page | Description |
 |------|-------------|
-| 🎯 **Nodes** | Switch proxy nodes quickly, single/batch latency testing |
-| 📊 **Connections** | Real-time active connections, traffic/memory charts, close connections |
-| 📝 **Logs** | Live log streaming with level filtering and keyword search |
-| 📋 **Rules** | View proxy rules with multi-keyword search |
-| ⚙️ **Settings** | Modify configuration directly in the UI |
-| ❓ **Help** | Built-in keyboard shortcuts reference |
+| 🎯 **Nodes** | Switch proxy nodes quickly, single/batch latency testing (click bottom bar delay to test) |
+| 📊 **Connections** | Traffic, Active, and History tabs, traffic/memory charts, close connections |
+| 📝 **Logs** | Live log streaming, level/keyword filtering, detailed JSON view with mouse scroll |
+| 📋 **Rules** | View proxy rules with multi-keyword search and optimized scrollbar |
+| ⚙️ **Settings** | Modify configuration directly in the UI, view version info |
+| ❓ **Help** | Built-in keyboard shortcuts reference (non-blocking overlay) |
 
 ## Installation
 

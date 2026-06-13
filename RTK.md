@@ -1,10 +1,10 @@
-# RTK - Rust Token Killer (Codex CLI)
+# RTK - Rust Token Killer
 
 **Usage**: Token-optimized CLI proxy for shell commands.
 
 ## Rule
 
-Always prefix shell commands with `rtk`.
+In Linux environment, you must always prefix shell commands with `rtk`.
 
 Examples:
 
