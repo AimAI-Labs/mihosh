@@ -58,24 +58,13 @@ func (m Model) View() string {
 		downloadTotal = m.connsState.Connections.DownloadTotal
 	}
 
-	// 提取当前活动节点信息（优先 GLOBAL 组，即实际代理出口）
+	// 提取当前活动节点信息（复用 GetActiveProxyAndDelay 统一逻辑）
 	var groupName, nodeName string
 	var delay int
-	// 优先查找 GLOBAL 组
-	if group, ok := m.nodesState.Groups["GLOBAL"]; ok {
-		groupName = "GLOBAL"
-		nodeName = group.Now
-	} else if len(m.nodesState.GroupNames) > 0 {
-		// 回退到第一个策略组
-		groupName = m.nodesState.GroupNames[0]
-		if group, ok := m.nodesState.Groups[groupName]; ok {
-			nodeName = group.Now
-		}
-	}
+	nodeName, delay, _ = m.nodesState.GetActiveProxyAndDelay()
 	if nodeName != "" {
-		if proxy, ok := m.nodesState.Proxies[nodeName]; ok && len(proxy.History) > 0 {
-			delay = proxy.History[len(proxy.History)-1].Delay
-		}
+		// 根据模式反推所属策略组名
+		groupName = m.nodesState.ResolveActiveGroupName()
 	}
 
 	statusBar := layout.RenderStatusBar(

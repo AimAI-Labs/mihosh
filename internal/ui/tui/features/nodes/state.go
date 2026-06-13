@@ -769,3 +769,31 @@ func (s *State) GetActiveProxyAndDelay() (proxyName string, delay int, exists bo
 	}
 	return "", 0, false
 }
+
+// ResolveActiveGroupName 返回当前活跃代理所属的策略组名称，逻辑与 GetActiveProxyAndDelay 一致
+func (s *State) ResolveActiveGroupName() string {
+	if strings.EqualFold(s.Mode, "direct") {
+		return ""
+	}
+
+	if strings.EqualFold(s.Mode, "global") {
+		if group, ok := s.Groups["GLOBAL"]; ok && group.Now != "" {
+			return "GLOBAL"
+		}
+	} else if strings.EqualFold(s.Mode, "rule") {
+		priorityGroups := []string{"PROXIES", "Proxies", "Proxy", "proxy", "🚀 节点选择", "节点选择"}
+		for _, gName := range priorityGroups {
+			if group, ok := s.Groups[gName]; ok && group.Now != "" {
+				return gName
+			}
+		}
+	}
+	// Fallback to currently selected group in UI
+	if len(s.GroupNames) > 0 && s.SelectedGroup >= 0 && s.SelectedGroup < len(s.GroupNames) {
+		gName := s.GroupNames[s.SelectedGroup]
+		if group, ok := s.Groups[gName]; ok && group.Now != "" {
+			return gName
+		}
+	}
+	return ""
+}
