@@ -326,10 +326,12 @@ func (s State) handleNodeFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		if len(s.NodeFilter) > 0 {
 			// 正确截断多字节字符
 			runes := []rune(s.NodeFilter)
-			s.NodeFilter = string(runes[:len(runes)-1])
-			s.updateFilteredProxies()
-			s.SelectedProxy = 0
-			s.ProxyScrollTop = 0
+			if len(runes) > 0 {
+				s.NodeFilter = string(runes[:len(runes)-1])
+				s.updateFilteredProxies()
+				s.SelectedProxy = 0
+				s.ProxyScrollTop = 0
+			}
 		}
 	default:
 		input := msg.String()

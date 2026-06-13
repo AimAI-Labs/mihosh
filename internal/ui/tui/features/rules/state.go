@@ -149,8 +149,11 @@ func (s State) handleRuleFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		s.ruleScrollTop = 0
 	case key.Matches(msg, common.Keys.Backspace):
 		if len(s.ruleFilter) > 0 {
-			s.ruleFilter = s.ruleFilter[:len(s.ruleFilter)-1]
-			s.updateFilteredRules()
+			runes := []rune(s.ruleFilter)
+			if len(runes) > 0 {
+				s.ruleFilter = string(runes[:len(runes)-1])
+				s.updateFilteredRules()
+			}
 		}
 	default:
 		input := msg.String()
@@ -263,8 +266,11 @@ func (s State) handleTypeFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 
 	case key.Matches(msg, common.Keys.Backspace):
 		if len(s.typeFilterSearch) > 0 {
-			s.typeFilterSearch = s.typeFilterSearch[:len(s.typeFilterSearch)-1]
-			s.typeFilterCursor = 0
+			runes := []rune(s.typeFilterSearch)
+			if len(runes) > 0 {
+				s.typeFilterSearch = string(runes[:len(runes)-1])
+				s.typeFilterCursor = 0
+			}
 		}
 
 	default:
