@@ -3,6 +3,7 @@ package nodes
 import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -385,12 +386,55 @@ func (s *State) updateFilteredProxies() {
 	if s.NodeFilter == "" {
 		return
 	}
-	filter := strings.ToLower(s.NodeFilter)
+
+	filter := s.NodeFilter
+
+	var re *regexp.Regexp
+	if s.FilterEngine == FilterEngineRegex {
+		var err error
+		re, err = regexp.Compile("(?i)" + filter)
+		if err != nil {
+			// invalid regex, match nothing
+			return
+		}
+	} else if s.FilterEngine == FilterEngineSubstring {
+		filter = strings.ToLower(filter)
+	}
+
 	for i, name := range s.CurrentProxies {
-		if strings.Contains(strings.ToLower(name), filter) {
+		matched := false
+		switch s.FilterEngine {
+		case FilterEngineRegex:
+			matched = re.MatchString(name)
+		case FilterEngineFuzzy:
+			matched = fuzzyMatch(filter, name)
+		case FilterEngineSubstring:
+			fallthrough
+		default:
+			matched = strings.Contains(strings.ToLower(name), filter)
+		}
+
+		if matched {
 			s.FilteredProxyIndices = append(s.FilteredProxyIndices, i)
 		}
 	}
+}
+
+// fuzzyMatch checks if all characters of pattern appear in text sequentially, case-insensitive.
+func fuzzyMatch(pattern, text string) bool {
+	if pattern == "" {
+		return true
+	}
+	pattern = strings.ToLower(pattern)
+	text = strings.ToLower(text)
+
+	pIdx := 0
+	for i := 0; i < len(text) && pIdx < len(pattern); i++ {
+		if text[i] == pattern[pIdx] {
+			pIdx++
+		}
+	}
+	return pIdx == len(pattern)
 }
 
 // HandleMouseLeft 处理 nodes 页面左键单击/双击

@@ -90,3 +90,32 @@ func TestNodesState_FilterEngineToggle(t *testing.T) {
 		t.Fatalf("expected FilterEngineSubstring after second Ctrl+F, got %v", state.FilterEngine)
 	}
 }
+
+func TestNodesState_UpdateFilteredProxies(t *testing.T) {
+	state := State{
+		CurrentProxies: []string{"HK-01", "HK-02", "SG-01", "US-01"},
+		NodeFilter:     "^hk",
+		FilterEngine:   FilterEngineRegex,
+	}
+
+	state.updateFilteredProxies()
+	if len(state.FilteredProxyIndices) != 2 {
+		t.Fatalf("regex expected 2 matches, got %d", len(state.FilteredProxyIndices))
+	}
+
+	state.NodeFilter = "^hk(" // invalid regex
+	state.updateFilteredProxies()
+	if len(state.FilteredProxyIndices) != 0 {
+		t.Fatalf("invalid regex expected 0 matches, got %d", len(state.FilteredProxyIndices))
+	}
+
+	state.FilterEngine = FilterEngineFuzzy
+	state.NodeFilter = "h1" // should match HK-01
+	state.updateFilteredProxies()
+	if len(state.FilteredProxyIndices) != 1 {
+		t.Fatalf("fuzzy expected 1 match, got %d", len(state.FilteredProxyIndices))
+	}
+	if state.FilteredProxyIndices[0] != 0 {
+		t.Fatalf("fuzzy expected HK-01 (index 0), got %d", state.FilteredProxyIndices[0])
+	}
+}
