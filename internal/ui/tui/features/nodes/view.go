@@ -61,10 +61,18 @@ func RenderNodesPage(state PageState) string {
 	// 搜索行始终占一行（空行或内容行），确保其位置固定在底栏上方，
 	// 不随策略组/节点面板内容多少而上下漂移。
 	var searchLine string
+	var engineIndicator string
+	switch state.FilterEngine {
+	case FilterEngineRegex:
+		engineIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("#A855F7")).Render(" [RE]")
+	case FilterEngineFuzzy:
+		engineIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B")).Render(" [Fuzzy]")
+	}
+
 	if state.FilterMode {
-		searchLine = common.TableHeaderStyle.Render(i18n.Tf("nodes.search_active", state.FilterText))
+		searchLine = common.TableHeaderStyle.Render(i18n.Tf("nodes.search_active", state.FilterText)) + engineIndicator
 	} else if state.FilterText != "" {
-		searchLine = common.MutedStyle.Render(i18n.Tf("nodes.search_inactive", state.FilterText))
+		searchLine = common.MutedStyle.Render(i18n.Tf("nodes.search_inactive", state.FilterText)) + engineIndicator
 	} else {
 		searchLine = "" // 占位空行由 clampPanelArea 负责填充
 	}
