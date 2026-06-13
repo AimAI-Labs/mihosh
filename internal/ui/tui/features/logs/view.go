@@ -24,11 +24,11 @@ var logLevels = []string{"debug", "info", "warning", "error", "silent"}
 
 // 日志级别颜色
 var logLevelColors = map[string]lipgloss.Color{
-	"debug":   common.CMuted,
-	"info":    common.CSecondary,
-	"warning": common.CWarning,
-	"error":   common.CDanger,
-	"silent":  common.CPurple,
+	"debug":   common.TokyoMuted,
+	"info":    common.TokyoBlue,
+	"warning": common.TokyoYellow,
+	"error":   common.TokyoRed,
+	"silent":  common.TokyoPurple,
 }
 
 type logLevelTabStyle struct {
@@ -60,21 +60,7 @@ type PageState struct {
 	DetailScroll        int
 }
 
-// RenderLogsPage 渲染日志页面
 func RenderLogsPage(state PageState) string {
-	// 详情模式：渲染日志详情弹窗
-	if state.DetailMode && state.DetailLog != nil {
-		return renderLogDetailModal(
-			state.DetailLog,
-			state.DetailParsed,
-			state.DetailResolved,
-			state.DetailSourcePrivate,
-			state.Width,
-			state.Height,
-			state.DetailScroll,
-		)
-	}
-
 	var sections []string
 
 	// 渲染日志级别标签栏
@@ -110,7 +96,25 @@ func RenderLogsPage(state PageState) string {
 	logList := renderLogList(filteredLogs, state.SelectedLog, state.ScrollTop, availableHeight, state.Width, state.HScrollOffset)
 	sections = append(sections, logList)
 
-	return strings.Join(sections, "\n")
+	base := strings.Join(sections, "\n")
+
+	// 详情模式：渲染日志详情弹窗
+	if state.DetailMode && state.DetailLog != nil {
+		return OverlayLogDetailPopup(
+			base,
+			state.DetailLog,
+			state.DetailParsed,
+			state.DetailResolved,
+			state.DetailSourcePrivate,
+			state.Width,
+			state.Height,
+			state.DetailScroll,
+		)
+	}
+
+	return base
+
+
 }
 
 // renderLevelBar 渲染日志级别标签栏（带边框）
@@ -227,14 +231,14 @@ func ClickedLevel(pageX int, pageWidth int, selectedLevel int) int {
 // renderLogSearchBox 渲染搜索框
 func renderLogSearchBox(filterText string, filterMode bool) string {
 	if filterMode {
-		inputStyle := lipgloss.NewStyle().Foreground(common.CWhite).Background(common.CHighlight)
-		label := common.MutedStyle.Render(i18n.T("logs.search"))
+		inputStyle := lipgloss.NewStyle().Foreground(common.TokyoPanel).Background(common.TokyoCyan)
+		label := common.TokyoMutedStyle().Render(i18n.T("logs.search"))
 		input := inputStyle.Render(filterText + "█")
 		return label + input
 	}
 
-	label := common.MutedStyle.Render(i18n.T("logs.search"))
-	input := lipgloss.NewStyle().Foreground(common.CWhite).Render(filterText)
+	label := common.TokyoMutedStyle().Render(i18n.T("logs.search"))
+	input := lipgloss.NewStyle().Foreground(common.TokyoForeground).Render(filterText)
 	return label + input
 }
 
@@ -283,7 +287,7 @@ func renderLogList(logs []model.LogEntry, selectedIdx, scrollTop, maxLines, widt
 func renderLogEntry(log model.LogEntry, selected bool, maxWidth int, hOffset int) string {
 	color := logLevelColors[log.Type]
 	if color == "" {
-		color = common.CMuted
+		color = common.TokyoMuted
 	}
 
 	levelStyle := lipgloss.NewStyle().
@@ -293,7 +297,7 @@ func renderLogEntry(log model.LogEntry, selected bool, maxWidth int, hOffset int
 	timeStr := log.Timestamp.Format("15:04:05")
 	timePart := common.DimStyle.Render(timeStr)
 
-	contentStyle := lipgloss.NewStyle().Foreground(common.CMuted)
+	contentStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted)
 
 	content := log.Payload
 	if decoded, err := url.QueryUnescape(content); err == nil {
@@ -336,7 +340,7 @@ func renderLogEntry(log model.LogEntry, selected bool, maxWidth int, hOffset int
 
 	if selected {
 		line = lipgloss.NewStyle().
-			Background(common.CHighlight).
+			Background(common.TokyoSelected).
 			Render(common.SymbolSelectActive + line)
 	} else {
 		line = common.SymbolSelectInactive + line

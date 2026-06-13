@@ -321,6 +321,17 @@ func (s State) HandleMouseLeft(pageY int, pageX int, pageWidth int, resolver *se
 
 // HandleMouseScroll 鼠标滚轮处理
 func (s State) HandleMouseScroll(up bool) State {
+	if s.detailMode {
+		if up {
+			if s.detailScroll > 0 {
+				s.detailScroll--
+			}
+		} else {
+			s.detailScroll++
+		}
+		return s
+	}
+
 	count := len(s.filteredLogIndices)
 	if up {
 		if s.selectedLog > 0 {

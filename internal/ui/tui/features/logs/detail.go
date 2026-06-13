@@ -8,39 +8,88 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
+	"github.com/charmbracelet/x/ansi"
 )
 
-// renderLogDetailModal 渲染日志详情模态弹窗（单列布局）
-func renderLogDetailModal(
+// OverlayLogDetailPopup 将日志详情弹窗叠加在 base 页面之上
+func OverlayLogDetailPopup(
+	base string,
 	log *model.LogEntry,
 	parsed *ParsedLog,
 	resolved *model.ResolvedIP,
 	sourcePrivate bool,
 	width, height, scroll int,
 ) string {
-	modalStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(common.CSecondary).
-		Padding(1, 2)
-
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(common.CWarning)
-
-	title := titleStyle.Render("📋 日志详情")
-
-	// 计算内部可用尺寸
-	innerW := width - 12
-	maxInnerW := width - 6
-	if maxInnerW < 1 {
-		maxInnerW = 1
+	// ── 1. 暗化底层 ──
+	baseLines := strings.Split(base, "\n")
+	for len(baseLines) < height {
+		baseLines = append(baseLines, "")
 	}
-	if innerW < 40 {
-		innerW = 40
+	if len(baseLines) > height {
+		baseLines = baseLines[:height]
 	}
-	if innerW > maxInnerW {
-		innerW = maxInnerW
+
+	faint := lipgloss.NewStyle().Faint(true)
+	dimmed := make([]string, height)
+	for i, l := range baseLines {
+		dimmed[i] = faint.Render(l)
 	}
+
+	// ── 2. 弹窗居中计算 ──
+	popup := renderLogDetailPopup(log, parsed, resolved, sourcePrivate, width, height, scroll)
+	popupLines := strings.Split(popup, "\n")
+	popupHeight := len(popupLines)
+	if popupHeight == 0 {
+		return strings.Join(dimmed, "\n")
+	}
+
+	popupWidth := lipgloss.Width(popupLines[0])
+	leftOffset := (width - popupWidth) / 2
+	if leftOffset < 0 {
+		leftOffset = 0
+	}
+	topOffset := (height - popupHeight) / 2
+	if topOffset < 0 {
+		topOffset = 0
+	}
+
+	// ── 3. 弹窗行嵌入暗化底层 ──
+	for i, pl := range popupLines {
+		y := topOffset + i
+		if y >= height {
+			break
+		}
+
+		leftPart := ansi.Cut(dimmed[y], 0, leftOffset)
+		leftW := lipgloss.Width(leftPart)
+		if leftW < leftOffset {
+			leftPart += strings.Repeat(" ", leftOffset-leftW)
+		}
+
+		rightPart := ansi.Cut(dimmed[y], leftOffset+popupWidth, width)
+		dimmed[y] = leftPart + pl + rightPart
+	}
+
+	return strings.Join(dimmed, "\n")
+}
+
+// renderLogDetailPopup 渲染日志详情模态弹窗（单列布局）
+func renderLogDetailPopup(
+	log *model.LogEntry,
+	parsed *ParsedLog,
+	resolved *model.ResolvedIP,
+	sourcePrivate bool,
+	width, height, scroll int,
+) string {
+	popupWidth := width - 4
+	if popupWidth < 50 {
+		popupWidth = 50
+	}
+	if popupWidth > width-2 {
+		popupWidth = width - 2
+	}
+
+	innerW := popupWidth - 4 // RenderTokyoPanel 内部会减2（边框）再减2（padding）
 
 	innerH := height - 8
 	maxInnerH := height - 6
@@ -68,13 +117,10 @@ func renderLogDetailModal(
 
 	// 原始日志
 	sections = append(sections, "")
-	rawTitle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(common.CSecondary).
+	rawTitle := common.TokyoHeaderStyle().
 		MarginBottom(1).
 		Render("原始日志")
-	rawContent := lipgloss.NewStyle().
-		Foreground(common.CMuted).
+	rawContent := common.TokyoMutedStyle().
 		Width(innerW).
 		Render(log.Payload)
 	sections = append(sections, rawTitle)
@@ -110,22 +156,12 @@ func renderLogDetailModal(
 		output = append(output, common.DimStyle.Render(fmt.Sprintf("↓ 还有 %d 行", totalLines-endIdx)))
 	}
 
-	modalContent := lipgloss.JoinVertical(lipgloss.Left, title, "", strings.Join(output, "\n"))
-	modal := modalStyle.Render(modalContent)
-
-	helpText := common.DimStyle.Render("[↑/↓] 滚动  [Esc/Enter/q] 关闭")
-
-	centered := lipgloss.Place(width, height-2, lipgloss.Center, lipgloss.Center, modal)
-	return lipgloss.JoinVertical(lipgloss.Left, centered, helpText)
+	body := strings.Join(output, "\n")
+	return common.RenderTokyoPanel("📋 日志详情", body, popupWidth)
 }
 
 // renderLogInfoTable 渲染基础信息表格
 func renderLogInfoTable(log *model.LogEntry, parsed *ParsedLog, width int) string {
-	sectionTitle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(common.CSecondary).
-		MarginBottom(1)
-
 	rows := [][]string{
 		{"时间", log.Timestamp.Format("15:04:05")},
 		{"级别", strings.ToUpper(log.Type)},
@@ -139,19 +175,18 @@ func renderLogInfoTable(log *model.LogEntry, parsed *ParsedLog, width int) strin
 		rows = append(rows, []string{"代理链", parsed.ProxyChain})
 	}
 
-	t := buildDetailTable(rows, width)
-	return lipgloss.JoinVertical(lipgloss.Left, sectionTitle.Render("基础信息"), t)
+	return buildDetailTable(rows, width)
 }
 
 // renderSourceSection 渲染请求来源区域
 func renderSourceSection(resolved *model.ResolvedIP, width int) string {
 	sectionTitle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(common.CSecondary).
+		Foreground(common.TokyoCyan).
 		MarginBottom(1)
 
 	if resolved == nil {
-		loadingStyle := lipgloss.NewStyle().Foreground(common.CWarning)
+		loadingStyle := lipgloss.NewStyle().Foreground(common.TokyoYellow)
 		return lipgloss.JoinVertical(lipgloss.Left,
 			sectionTitle.Render("🔍 请求来源"),
 			loadingStyle.Render("  正在查询来源应用..."),
@@ -214,12 +249,12 @@ func buildDetailTable(rows [][]string, width int) string {
 
 	t := table.New().
 		Border(lipgloss.RoundedBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("#444444"))).
+		BorderStyle(lipgloss.NewStyle().Foreground(common.TokyoMuted)).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if col == 0 {
-				return baseStyle.Foreground(common.CPrimary).Width(keyWidth)
+				return baseStyle.Foreground(common.TokyoBlue).Width(keyWidth)
 			}
-			return baseStyle.Foreground(lipgloss.Color("#E5E7EB")).Width(valWidth)
+			return baseStyle.Foreground(common.TokyoForeground).Width(valWidth)
 		}).
 		Rows(rows...)
 
