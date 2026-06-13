@@ -173,6 +173,8 @@
   "help.section.nodes_search": "Node Search",
   "help.nodes_search.append": "Append Search Text",
   "help.nodes_search.backspace": "Delete Last Char",
+  "help.nodes_search.regex": "Toggle Regex Mode",
+  "help.nodes_search.fuzzy": "Toggle Fuzzy Mode",
   "help.nodes_search.confirm": "Confirm Search",
   "help.nodes_search.cancel": "Cancel Search",
 

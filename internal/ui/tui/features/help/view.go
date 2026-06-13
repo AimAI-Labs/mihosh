@@ -113,6 +113,8 @@ func buildNodesSections(ctx HelpContext) []section {
 			bindings: []keybinding{
 				{"输入字符", i18n.T("help.nodes_search.append")},
 				{"Backspace", i18n.T("help.nodes_search.backspace")},
+				{"Ctrl+R", i18n.T("help.nodes_search.regex")},
+				{"Ctrl+F", i18n.T("help.nodes_search.fuzzy")},
 				{"Enter", i18n.T("help.nodes_search.confirm")},
 				{"Esc", i18n.T("help.nodes_search.cancel")},
 			},

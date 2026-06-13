@@ -173,6 +173,8 @@
   "help.section.nodes_search": "节点搜索",
   "help.nodes_search.append": "追加搜索关键词",
   "help.nodes_search.backspace": "删除末字符",
+  "help.nodes_search.regex": "切换正则匹配模式",
+  "help.nodes_search.fuzzy": "切换模糊匹配模式",
   "help.nodes_search.confirm": "确认搜索",
   "help.nodes_search.cancel": "取消搜索",
 
