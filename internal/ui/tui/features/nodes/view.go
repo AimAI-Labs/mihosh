@@ -39,6 +39,7 @@ type PageState struct {
 	ProxyScrollTop    int    // 节点列表滚动偏移
 	FilterText        string // 节点搜索关键词
 	FilterMode        bool   // 是否处于搜索输入模式
+	FilterEngine      FilterEngine
 }
 
 // displayWidth 委托给 common.DisplayWidth

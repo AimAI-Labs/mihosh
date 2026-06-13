@@ -16,6 +16,14 @@ import (
 
 const testFailureCap = 100 // 最多保留最近 100 条测速失败记录
 
+type FilterEngine int
+
+const (
+	FilterEngineSubstring FilterEngine = iota
+	FilterEngineRegex
+	FilterEngineFuzzy
+)
+
 // ProxySortOrder 节点列表排序方式
 type ProxySortOrder int
 
@@ -67,6 +75,7 @@ type State struct {
 	// 搜索
 	NodeFilter           string
 	NodeFilterMode       bool
+	FilterEngine         FilterEngine
 	FilteredProxyIndices []int // 过滤结果的索引缓存（对应 CurrentProxies 的下标）
 	// 鼠标
 	MouseFocus      nodesMouseFocus
@@ -166,6 +175,7 @@ func (s State) ToPageState(width, height int) PageState {
 		ProxyScrollTop:    s.ProxyScrollTop,
 		FilterText:        s.NodeFilter,
 		FilterMode:        s.NodeFilterMode,
+		FilterEngine:      s.FilterEngine,
 	}
 }
 
@@ -312,6 +322,24 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client, proxySvc *service.Prox
 // handleNodeFilterMode 搜索输入模式处理
 func (s State) handleNodeFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	switch {
+	case msg.Type == tea.KeyCtrlR:
+		if s.FilterEngine == FilterEngineRegex {
+			s.FilterEngine = FilterEngineSubstring
+		} else {
+			s.FilterEngine = FilterEngineRegex
+		}
+		s.updateFilteredProxies()
+		s.SelectedProxy = 0
+		s.ProxyScrollTop = 0
+	case msg.Type == tea.KeyCtrlF:
+		if s.FilterEngine == FilterEngineFuzzy {
+			s.FilterEngine = FilterEngineSubstring
+		} else {
+			s.FilterEngine = FilterEngineFuzzy
+		}
+		s.updateFilteredProxies()
+		s.SelectedProxy = 0
+		s.ProxyScrollTop = 0
 	case key.Matches(msg, common.Keys.Escape):
 		s.NodeFilterMode = false
 		s.NodeFilter = ""

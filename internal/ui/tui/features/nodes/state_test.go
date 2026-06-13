@@ -66,3 +66,27 @@ func TestNodesState_FailureModalSupportsHomeAndEnd(t *testing.T) {
 		t.Fatalf("expected end to move scroll near bottom, got %d", state.FailureScrollTop)
 	}
 }
+
+func TestNodesState_FilterEngineToggle(t *testing.T) {
+	state := State{
+		NodeFilterMode: true,
+	}
+
+	// Toggle Regex
+	state, _ = state.Update(tea.KeyMsg{Type: tea.KeyCtrlR}, nil, nil, "", 0)
+	if state.FilterEngine != FilterEngineRegex {
+		t.Fatalf("expected FilterEngineRegex after Ctrl+R, got %v", state.FilterEngine)
+	}
+
+	// Toggle Fuzzy
+	state, _ = state.Update(tea.KeyMsg{Type: tea.KeyCtrlF}, nil, nil, "", 0)
+	if state.FilterEngine != FilterEngineFuzzy {
+		t.Fatalf("expected FilterEngineFuzzy after Ctrl+F, got %v", state.FilterEngine)
+	}
+
+	// Toggle Back to Substring
+	state, _ = state.Update(tea.KeyMsg{Type: tea.KeyCtrlF}, nil, nil, "", 0)
+	if state.FilterEngine != FilterEngineSubstring {
+		t.Fatalf("expected FilterEngineSubstring after second Ctrl+F, got %v", state.FilterEngine)
+	}
+}
