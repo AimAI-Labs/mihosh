@@ -273,7 +273,7 @@ func renderRuleList(rules []filteredRule, selectedIdx, scrollTop, maxLines, widt
 	scrollbarStr := buildScrollbar(maxLines, len(rules), scrollTop)
 
 	// 计算滚动块的起止行
-	thumbStart, thumbEnd := calcThumbRange(maxLines, len(rules), scrollTop)
+	thumbStart, thumbEnd := common.CalcThumbRange(maxLines, len(rules), scrollTop)
 
 	var barLines []string
 	for i, ch := range strings.Split(scrollbarStr, "\n") {
@@ -302,34 +302,13 @@ func buildScrollbar(viewHeight, total, scrollTop int) string {
 		lines[i] = common.SymbolScrollbarTrack
 	}
 	// 用实心块覆盖滑块区域
-	start, end := calcThumbRange(viewHeight, total, scrollTop)
+	start, end := common.CalcThumbRange(viewHeight, total, scrollTop)
 	for i := start; i < end; i++ {
 		if i < viewHeight {
 			lines[i] = common.SymbolScrollbarThumb
 		}
 	}
 	return strings.Join(lines, "\n")
-}
-
-// calcThumbRange 计算滑块在滚动条中的起止行（左闭右开）
-func calcThumbRange(viewHeight, total, scrollTop int) (start, end int) {
-	if total <= 0 {
-		return 0, viewHeight
-	}
-	thumbSize := float64(viewHeight) * float64(viewHeight) / float64(total)
-	if thumbSize < 1 {
-		thumbSize = 1
-	}
-	thumbStart := float64(scrollTop) * float64(viewHeight) / float64(total)
-	start = int(thumbStart)
-	end = start + int(thumbSize+0.5)
-	if end > viewHeight {
-		end = viewHeight
-	}
-	if start >= end {
-		end = start + 1
-	}
-	return
 }
 
 // renderRuleEntry 渲染单条规则

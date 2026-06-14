@@ -12,67 +12,81 @@ import (
 	"github.com/charmbracelet/lipgloss/table"
 )
 
-// RenderDetailModalLeft 渲染详情模态框的左侧（基础信息和地理信息）
+// RenderDetailModalLeft 渲染详情模态框的左侧（基础信息和地理信息）。
+//
+// 为与右侧 JSON 面板保持等高，左侧不再使用外部的滚动提示占位行，
+// 而是把左侧整体视为一个与右侧同高的可滚动视图：
+//   - 当内容不溢出时：两个子面板按自然高度渲染，底部用空行补齐到 height；
+//   - 当内容溢出时：按 scrollTop 切片后渲染，并保留顶/底的「更多」提示行。
 func RenderDetailModalLeft(conn *model.Connection, ipInfo *model.IPInfo, width, height, scrollTop int, isFocused bool) string {
-	// 左侧面板本身不需要再包一个大边框，它是由两个小的带边框面板组成的
-	// 上下各有一行滚动提示，所以可见内容高度为 height - 2
-	maxHeight := height - 2
-	if maxHeight < 5 {
-		maxHeight = 5
+	if height < 5 {
+		height = 5
 	}
 
-	// 准备连接信息表格
+	// 准备连接信息与 IP 地理信息行
 	connRows := getConnInfoRows(conn)
-	connTable := renderInfoPanel(i18n.T("conns.detail.title"), connRows, width, isFocused)
-
-	// 准备IP地理信息表格
 	ipRows := getIPGeoInfoRows(ipInfo)
-	ipTable := renderInfoPanel(i18n.T("conns.detail.title_geo"), ipRows, width, isFocused)
 
-	// 合并表格
+	connTable := renderInfoPanel(i18n.T("conns.detail.title"), connRows, width, len(connRows), isFocused)
+	ipTable := renderInfoPanel(i18n.T("conns.detail.title_geo"), ipRows, width, len(ipRows), isFocused)
+
+	// 合并两个面板（中间留 1 行间距）
 	content := lipgloss.JoinVertical(lipgloss.Left, connTable, "", ipTable)
 	lines := strings.Split(content, "\n")
 	totalLines := len(lines)
 
-	// 处理滚动
-	if scrollTop > totalLines-maxHeight {
-		scrollTop = totalLines - maxHeight
+	// 情况一：内容不溢出，直接补齐到目标高度
+	if totalLines <= height {
+		for len(lines) < height {
+			lines = append(lines, "")
+		}
+		return strings.Join(lines, "\n")
+	}
+
+	// 情况二：内容溢出，按滚动窗口渲染
+	// 视口高度 = height - 2（顶部、底部各保留 1 行滚动提示）
+	viewport := height - 2
+	if viewport < 3 {
+		viewport = 3
+	}
+
+	if scrollTop > totalLines-viewport {
+		scrollTop = totalLines - viewport
 	}
 	if scrollTop < 0 {
 		scrollTop = 0
 	}
 
-	endIdx := scrollTop + maxHeight
+	endIdx := scrollTop + viewport
 	if endIdx > totalLines {
 		endIdx = totalLines
 	}
 
 	visibleLines := lines[scrollTop:endIdx]
 
-	// 滚动提示
-	var output []string
 	dimStyle := common.DimStyle
 	if isFocused {
 		dimStyle = dimStyle.Foreground(common.TokyoCyan)
 	}
 
+	var output []string
 	if scrollTop > 0 {
 		output = append(output, dimStyle.Render(i18n.Tf("conns.detail.more_up", scrollTop)))
 	} else {
-		output = append(output, "") // 占位
+		output = append(output, "")
 	}
 
 	output = append(output, visibleLines...)
 
-	// 补齐高度
-	for len(output) < maxHeight+1 {
+	// 补齐到 height（视口 + 上下两行提示）
+	for len(output) < height {
 		output = append(output, "")
 	}
 
 	if endIdx < totalLines {
 		output = append(output, dimStyle.Render(i18n.Tf("conns.detail.more_down", totalLines-endIdx)))
 	} else {
-		output = append(output, "") // 占位
+		output = append(output, "")
 	}
 
 	return strings.Join(output, "\n")
@@ -159,7 +173,10 @@ func getIPGeoInfoRows(ipInfo *model.IPInfo) [][]string {
 	return rows
 }
 
-func renderInfoPanel(title string, rows [][]string, width int, isFocused bool) string {
+// renderInfoPanel 渲染一个带边框的信息面板。
+// targetRows 为目标正文行数：当大于实际行数时，用空行补齐，
+// 使面板整体高度固定，便于与右侧 JSON 面板对齐。
+func renderInfoPanel(title string, rows [][]string, width, targetRows int, isFocused bool) string {
 	borderColor := common.TokyoMuted
 	titleColor := common.TokyoBlue
 	if isFocused {
@@ -195,5 +212,13 @@ func renderInfoPanel(title string, rows [][]string, width int, isFocused bool) s
 		}).
 		Rows(rows...)
 
-	return common.RenderBorderedPanel(title, t.Render(), width, borderColor, titleColor)
+	body := t.Render()
+
+	// 用空行将正文补齐到 targetRows，保证面板高度固定
+	bodyLines := strings.Split(body, "\n")
+	for len(bodyLines) < targetRows {
+		bodyLines = append(bodyLines, "")
+	}
+
+	return common.RenderBorderedPanel(title, strings.Join(bodyLines, "\n"), width, borderColor, titleColor)
 }

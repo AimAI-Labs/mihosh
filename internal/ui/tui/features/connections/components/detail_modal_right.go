@@ -10,13 +10,13 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// RenderDetailModalRight 渲染详情模态框的右侧（JSON详情）
+// RenderDetailModalRight 渲染详情模态框的右侧（JSON详情）。
+//
+// 当内容超过可视区域时，不再使用「还有 N 行」文本提示，
+// 改为在正文右侧绘制一条垂直滚动条，与项目其它列表（rules/nodes）保持一致。
 func RenderDetailModalRight(conn *model.Connection, width, height, scrollTop int, isFocused bool) string {
-	// maxHeight = height - 4 是因为：
-	// 上下边框占 2 行
-	// 上下滚动提示占 2 行
-	// 调整高度，为边框留出空间
-	maxHeight := height - 4
+	// maxHeight = height - 2：上下边框各占 1 行，正文本身无额外的滚动提示行
+	maxHeight := height - 2
 	if maxHeight < 5 {
 		maxHeight = 5
 	}
@@ -27,17 +27,24 @@ func RenderDetailModalRight(conn *model.Connection, width, height, scrollTop int
 		jsonLines = []string{i18n.Tf("conns.detail.parse_failed", err)}
 	}
 
-	// 为长行添加截断，防止破坏布局
-	maxLineWidth := width - 4
-	if maxLineWidth < 10 {
-		maxLineWidth = 10
+	// 是否需要滚动条：仅当内容溢出可视区域时显示
+	needScrollbar := len(jsonLines) > maxHeight
+
+	// 为长行添加截断，防止破坏布局。
+	// 显示滚动条时，正文需预留 1 列宽度给滚动条。
+	contentWidth := width - 4
+	if needScrollbar {
+		contentWidth--
+	}
+	if contentWidth < 10 {
+		contentWidth = 10
 	}
 
 	for i, line := range jsonLines {
-		if lipgloss.Width(line) > maxLineWidth {
+		if lipgloss.Width(line) > contentWidth {
 			runes := []rune(line)
-			if len(runes) > maxLineWidth {
-				jsonLines[i] = string(runes[:maxLineWidth-3]) + "..."
+			if len(runes) > contentWidth {
+				jsonLines[i] = string(runes[:contentWidth-3]) + "..."
 			}
 		}
 	}
@@ -67,42 +74,49 @@ func RenderDetailModalRight(conn *model.Connection, width, height, scrollTop int
 		contentLines = append(contentLines, jsonStyle.Render(line))
 	}
 
-	// 滚动提示
-	var output []string
-	dimStyle := common.DimStyle
-	if isFocused {
-		dimStyle = dimStyle.Foreground(common.TokyoCyan)
+	// 补齐高度，保证面板与左侧等高
+	for len(contentLines) < maxHeight {
+		contentLines = append(contentLines, "")
 	}
 
-	if scrollTop > 0 {
-		output = append(output, dimStyle.Render(i18n.Tf("conns.detail.more_up", scrollTop)))
-	} else {
-		output = append(output, "") // 占位
+	// 仅在内容溢出时，将滚动条横向拼接到正文右侧
+	if needScrollbar {
+		scrollbar := common.BuildVerticalScrollbar(maxHeight, totalLines, scrollTop, isFocused)
+		fixedContent := lipgloss.NewStyle().Width(contentWidth).Render(strings.Join(contentLines, "\n"))
+		body := joinLineByLine(fixedContent, scrollbar)
+		return wrapDetailJSONPanel(body, width, isFocused)
 	}
 
-	output = append(output, contentLines...)
+	body := strings.Join(contentLines, "\n")
+	return wrapDetailJSONPanel(body, width, isFocused)
+}
 
-	// 补齐高度
-	for len(output) < maxHeight+1 {
-		output = append(output, "")
-	}
-
-	if endIdx < totalLines {
-		output = append(output, dimStyle.Render(i18n.Tf("conns.detail.more_down", totalLines-endIdx)))
-	} else {
-		output = append(output, "") // 占位
-	}
-
-	body := strings.Join(output, "\n")
-
+// wrapDetailJSONPanel 用带标题的圆角边框包裹 JSON 正文
+func wrapDetailJSONPanel(body string, width int, isFocused bool) string {
 	borderColor := common.TokyoMuted
 	titleColor := common.TokyoBlue
 	if isFocused {
 		borderColor = common.TokyoPurple
 		titleColor = common.TokyoCyan
 	}
-
 	return common.RenderBorderedPanel(i18n.T("conns.detail.title_json"), body, width, borderColor, titleColor)
+}
+
+// joinLineByLine 将两个多行字符串逐行横向拼接（左块右块行数应相同）
+func joinLineByLine(left, right string) string {
+	leftLines := strings.Split(left, "\n")
+	rightLines := strings.Split(right, "\n")
+
+	n := len(leftLines)
+	if len(rightLines) < n {
+		n = len(rightLines)
+	}
+
+	rows := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		rows = append(rows, leftLines[i]+rightLines[i])
+	}
+	return strings.Join(rows, "\n")
 }
 
 func getJSONLines(conn *model.Connection) ([]string, error) {
