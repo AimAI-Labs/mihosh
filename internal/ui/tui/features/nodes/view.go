@@ -156,8 +156,10 @@ func RenderNodesPage(state PageState) string {
 
 	if state.ShowTestDetail {
 		modal := buildTestResultModal(state)
-		return overlayCenter(mainContent, modal, state.Width, state.Height)
+		mainContent = overlayCenter(mainContent, modal, state.Width, state.Height)
 	}
+	// 始终显示右下角内联帮助提示面板
+	mainContent = renderNodesInlineHelp(mainContent, state)
 	return mainContent
 }
 

@@ -86,6 +86,7 @@ func (m Model) View() string {
 	fullPage := lipgloss.JoinVertical(lipgloss.Left, topNav, pageContent, statusBar)
 
 	// ── 帮助弹窗叠加（lazygit 风格，叠加在完整页面之上）──
+	// 节点页始终显示右下角内联帮助提示；按 ? 可叠加完整帮助弹窗
 	if m.showHelp {
 		return help.OverlayHelpPopup(fullPage, m.width, m.height, m.buildHelpContext())
 	}
