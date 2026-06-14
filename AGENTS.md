@@ -5,6 +5,7 @@
 
 ## 1. 技术栈与常用命令
 - **栈**: Go 1.24.0, Bubble Tea v1.3, cobra, viper, gorilla/websocket.
+- **构建**：项目使用了mise工具，可在项目目录里直接使用go命令。
 - **命令**: 
   - `go test ./...` (涉及渲染及逻辑时必须跑测试，不依赖真实服务端环境)
   - `go build -o mihosh .`（强制，构建后会自动杀死进程并重新运行）

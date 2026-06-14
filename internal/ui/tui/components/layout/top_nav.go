@@ -37,6 +37,7 @@ const TopNavHeight = 3
 type TopNavRefreshStatus struct {
 	Enabled          bool
 	SecondsRemaining int
+	Interval         int // configured refresh interval (seconds), used for stable width
 	Synced           bool
 }
 
@@ -200,12 +201,35 @@ func renderTopNavRefreshStatus(status TopNavRefreshStatus, includeLabel bool) st
 	if !status.Enabled {
 		return ""
 	}
-	text := fmt.Sprintf("%ds", status.SecondsRemaining)
-	if status.Synced {
-		text = "✔"
+	countdownStr := fmt.Sprintf("%ds", status.SecondsRemaining)
+
+	// Compute a stable value width from the configured interval so that both
+	// the countdown digits and the synced checkmark always occupy the same
+	// cell count, preventing layout jitter during state transitions.
+	ref := status.Interval
+	if ref < status.SecondsRemaining {
+		ref = status.SecondsRemaining
 	}
+	valueWidth := lipgloss.Width(fmt.Sprintf("%ds", ref))
+	if minW := lipgloss.Width("✔"); minW > valueWidth {
+		valueWidth = minW
+	}
+
+	var valueText string
+	if status.Synced {
+		valueText = "✔"
+		if pad := valueWidth - lipgloss.Width(valueText); pad > 0 {
+			valueText += strings.Repeat(" ", pad)
+		}
+	} else {
+		valueText = countdownStr
+		if pad := valueWidth - lipgloss.Width(valueText); pad > 0 {
+			valueText = strings.Repeat(" ", pad) + valueText
+		}
+	}
+	text := valueText
 	if includeLabel {
-		text = i18n.T("status.auto_refresh") + " " + text
+		text = i18n.T("status.auto_refresh") + " " + valueText
 	}
 	return lipgloss.NewStyle().
 		Align(lipgloss.Center).
