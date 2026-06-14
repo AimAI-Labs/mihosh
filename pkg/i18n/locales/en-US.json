@@ -138,10 +138,8 @@
   "rules.search": "Search: ",
   "rules.search_hint": " Separate words with space",
   "rules.empty": "No rules",
-  "rules.filter_title": "🔍 Filter Rule Types",
+  "rules.filter_title": "Filter Rule Types",
   "rules.filter_stats": "Selected %d/%d types",
-  "rules.filter_stats_search": " (%d search matches)",
-  "rules.filter_help": "[↑/↓]Move [Space]Select [Enter]Confirm [Esc]Cancel",
 
   "settings.panel_title": "Settings",
   "settings.label.api_address": "API Address",
@@ -291,8 +289,6 @@
   "help.section.rules_type_filter": "Type Filter",
   "help.rules_filter.select": "Select",
   "help.rules_filter.toggle": "Toggle",
-  "help.rules_filter.search": "Search",
-  "help.rules_filter.backspace": "Delete",
   "help.rules_filter.confirm": "Confirm",
   "help.rules_filter.cancel": "Cancel",
 

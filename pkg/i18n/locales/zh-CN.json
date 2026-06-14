@@ -138,10 +138,8 @@
   "rules.search": "搜索: ",
   "rules.search_hint": " 空格分隔多词",
   "rules.empty": "暂无规则",
-  "rules.filter_title": "🔍 规则类型筛选",
+  "rules.filter_title": "规则类型筛选",
   "rules.filter_stats": "已选 %d/%d 个类型",
-  "rules.filter_stats_search": " (搜索匹配 %d 个)",
-  "rules.filter_help": "[↑/↓]移动 [Space]选择 [Enter]确认 [Esc]取消",
 
   "settings.panel_title": "配置项",
   "settings.label.api_address": "API 地址",
@@ -291,8 +289,6 @@
   "help.section.rules_type_filter": "类型筛选",
   "help.rules_filter.select": "选择",
   "help.rules_filter.toggle": "勾选",
-  "help.rules_filter.search": "搜索",
-  "help.rules_filter.backspace": "删除",
   "help.rules_filter.confirm": "确认",
   "help.rules_filter.cancel": "取消",
 

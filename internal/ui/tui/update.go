@@ -114,6 +114,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.currentPage == layout.PageConnections {
 				return m.handleConnectionsMouseLeft(msg.X, msg.Y)
 			}
+			if m.currentPage == layout.PageRules {
+				return m.handleRulesMouseLeft(msg.X, msg.Y)
+			}
 			if m.currentPage == layout.PageSettings {
 				return m.handleSettingsMouseLeft(msg.X, msg.Y)
 			}
@@ -454,6 +457,17 @@ func (m Model) handleConnectionsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	m.connsState, cmd = m.connsState.HandleMouseLeft(pageX, pageY, pageWidth, pageHeight, m.chartData, m.timeout)
+	return m, cmd
+}
+
+func (m Model) handleRulesMouseLeft(x, y int) (tea.Model, tea.Cmd) {
+	pageX, pageY, pageWidth, pageHeight, ok := m.resolveMainPageMouseHit(x, y)
+	if !ok {
+		return m, nil
+	}
+
+	var cmd tea.Cmd
+	m.rulesState, cmd = m.rulesState.HandleMouseLeft(pageX, pageY, pageWidth, pageHeight)
 	return m, cmd
 }
 
