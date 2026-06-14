@@ -53,6 +53,15 @@
   "cli.root.err_init_config": "配置初始化失败",
   "cli.root.err_start": "启动失败",
 
+  "cli.proxy.empty_address": "代理地址为空，请先运行 `mihosh config set proxy_address <地址>`",
+  "cli.proxy.invalid_address": "代理地址无效: %s",
+  "cli.proxy.already_on": "✓ 当前终端已开启代理: %s",
+  "cli.proxy.partial_on": "⚠ 检测到代理已部分开启，将覆盖为: %s",
+  "cli.proxy.not_on": "✓ 当前终端未开启代理，无需关闭",
+  "cli.proxy.will_off": "⚠ 检测到代理: %s，即将关闭",
+  "cli.proxy.hint_eval_on": "在当前终端执行以生效：  eval \"$(mihosh on)\"",
+  "cli.proxy.hint_eval_off": "在当前终端执行以生效：  eval \"$(mihosh off)\"",
+
   "nodes.search_active": "搜索: %s▌",
   "nodes.search_inactive": "搜索: %s  [Esc]清除",
   "nodes.help": "[↑/↓]选择 [←/→]切组 [Enter]切换 [t]测速 [m]模式 [s]排序:%s [/]搜索 [r]刷新",

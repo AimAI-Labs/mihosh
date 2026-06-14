@@ -70,6 +70,8 @@ func init() {
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(serviceCmd)
 	rootCmd.AddCommand(doctorCmd)
+	rootCmd.AddCommand(proxyOnCmd)
+	rootCmd.AddCommand(proxyOffCmd)
 }
 
 // Execute 执行命令

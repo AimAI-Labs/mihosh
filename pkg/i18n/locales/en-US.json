@@ -53,6 +53,15 @@
   "cli.root.err_init_config": "Failed to init config",
   "cli.root.err_start": "Failed to start",
 
+  "cli.proxy.empty_address": "Proxy address is empty. Run `mihosh config set proxy_address <addr>` first",
+  "cli.proxy.invalid_address": "Invalid proxy address: %s",
+  "cli.proxy.already_on": "✓ Proxy already enabled in this terminal: %s",
+  "cli.proxy.partial_on": "⚠ Proxy partially enabled, will override to: %s",
+  "cli.proxy.not_on": "✓ Proxy not enabled in this terminal, nothing to disable",
+  "cli.proxy.will_off": "⚠ Detected proxy: %s, will disable",
+  "cli.proxy.hint_eval_on": "Run in this terminal to apply:  eval \"$(mihosh on)\"",
+  "cli.proxy.hint_eval_off": "Run in this terminal to apply:  eval \"$(mihosh off)\"",
+
   "nodes.search_active": "Search: %s▌",
   "nodes.search_inactive": "Search: %s  [Esc]Clear",
   "nodes.help": "[↑/↓]Sel [←/→]Grp [Enter]Sw [t]Test [m]Mode [s]Sort:%s [/]Search [r]Refresh",
