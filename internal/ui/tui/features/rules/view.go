@@ -115,10 +115,58 @@ func RenderRulesPage(state PageState) string {
 
 	// 如果显示类型筛选弹窗，叠加在页面之上
 	if state.ShowTypeFilter {
-		return renderTypeFilterOverlay(result, state, state.Width, state.Height)
+		result = renderTypeFilterOverlay(result, state, state.Width, state.Height)
 	}
 
-	return result
+	return renderRulesInlineHelp(result, state)
+}
+
+// ============================================================
+//  内联帮助提示面板（右下角浮层）
+// ============================================================
+//
+// 渲染逻辑（InlineHelpHint / FormatInlineHintRow / OverlayHelpAtBottomRight）
+// 共享自 components/common。
+
+// buildRulesInlineHelpHints 根据规则页上下文构建内联帮助条目
+func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
+	// 类型筛选弹窗：移动 + 切换 + 确认 + 取消
+	if state.ShowTypeFilter {
+		return []common.InlineHelpHint{
+			{Key: "↑/↓", Desc: i18n.T("help.rules_filter.select")},
+			{Key: "Space", Desc: i18n.T("help.rules_filter.toggle")},
+			{Key: "Enter", Desc: i18n.T("help.rules_filter.confirm")},
+			{Key: "Esc", Desc: i18n.T("help.rules_filter.cancel")},
+		}
+	}
+
+	// 过滤输入模式：确认 + 取消 + 删除
+	if state.FilterMode {
+		return []common.InlineHelpHint{
+			{Key: "Enter", Desc: i18n.T("help.rules_search.confirm")},
+			{Key: "Esc", Desc: i18n.T("help.rules_search.cancel")},
+			{Key: "⌫", Desc: i18n.T("help.rules_search.backspace")},
+		}
+	}
+
+	// 普通模式：核心操作
+	return []common.InlineHelpHint{
+		{Key: "↑↓", Desc: i18n.T("help.rules.hint_select")},
+		{Key: "/", Desc: i18n.T("help.rules.hint_search")},
+		{Key: "t", Desc: i18n.T("help.rules.hint_type")},
+		{Key: "r", Desc: i18n.T("help.rules.hint_refresh")},
+	}
+}
+
+// renderRulesInlineHelp 渲染右下角内联帮助面板并叠加到页面上
+func renderRulesInlineHelp(page string, state PageState) string {
+	hints := buildRulesInlineHelpHints(state)
+	if len(hints) == 0 {
+		return page
+	}
+
+	body := common.FormatInlineHintRow(hints)
+	return common.OverlayHelpAtBottomRight(page, body, state.Width, state.Height)
 }
 
 // RenderRulesHeaderComponent 渲染规则页面头部组件（带边框，包含统计和搜索框）

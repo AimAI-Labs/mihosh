@@ -62,11 +62,13 @@ func RenderConnectionsPage(state PageState) string {
 			state.DetailFocusPanel,
 		)
 
-		return lipgloss.JoinVertical(lipgloss.Left, modeSwitch, "", detailView)
+		mainContent := lipgloss.JoinVertical(lipgloss.Left, modeSwitch, "", detailView)
+		return renderConnectionsInlineHelp(mainContent, state)
 	}
 
 	if state.TopNModalMode {
-		return components.RenderTopNModal(state.TopNModalItems, state.Width, state.Height, state.TopNModalScroll)
+		mainContent := components.RenderTopNModal(state.TopNModalItems, state.Width, state.Height, state.TopNModalScroll)
+		return renderConnectionsInlineHelp(mainContent, state)
 	}
 
 	// 渲染模式切换组件（带边框）
@@ -79,11 +81,13 @@ func RenderConnectionsPage(state PageState) string {
 
 	// 流量监控 tab：图表 + TopN + 站点卡片（无连接表格）
 	if state.ViewMode == ConnViewTraffic {
-		return renderTrafficTab(state, content)
+		mainContent := renderTrafficTab(state, content)
+		return renderConnectionsInlineHelp(mainContent, state)
 	}
 
 	// 活跃/历史连接 tab：表格独占
-	return renderConnectionListTab(state, content)
+	mainContent := renderConnectionListTab(state, content)
+	return renderConnectionsInlineHelp(mainContent, state)
 }
 
 // renderTrafficTab 渲染流量监控 tab

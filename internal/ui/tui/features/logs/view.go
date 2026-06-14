@@ -100,7 +100,7 @@ func RenderLogsPage(state PageState) string {
 
 	// 详情模式：渲染日志详情弹窗
 	if state.DetailMode && state.DetailLog != nil {
-		return OverlayLogDetailPopup(
+		mainContent := OverlayLogDetailPopup(
 			base,
 			state.DetailLog,
 			state.DetailParsed,
@@ -110,11 +110,60 @@ func RenderLogsPage(state PageState) string {
 			state.Height,
 			state.DetailScroll,
 		)
+		return renderLogsInlineHelp(mainContent, state)
 	}
 
-	return base
+	return renderLogsInlineHelp(base, state)
 
 
+}
+
+// ============================================================
+//  内联帮助提示面板（右下角浮层）
+// ============================================================
+//
+// 渲染逻辑（InlineHelpHint / FormatInlineHintRow / OverlayHelpAtBottomRight）
+// 共享自 components/common。
+
+// buildLogsInlineHelpHints 根据日志页上下文构建内联帮助条目
+func buildLogsInlineHelpHints(state PageState) []common.InlineHelpHint {
+	// 详情模式：滚动 + 关闭
+	if state.DetailMode {
+		return []common.InlineHelpHint{
+			{Key: "↑/↓", Desc: i18n.T("help.logs_detail.scroll")},
+			{Key: "Esc/q", Desc: i18n.T("help.logs_detail.close")},
+		}
+	}
+
+	// 过滤输入模式：确认 + 取消 + 删除
+	if state.FilterMode {
+		return []common.InlineHelpHint{
+			{Key: "Enter", Desc: i18n.T("help.logs_search.confirm")},
+			{Key: "Esc", Desc: i18n.T("help.logs_search.cancel")},
+			{Key: "⌫", Desc: i18n.T("help.logs_search.backspace")},
+		}
+	}
+
+	// 普通模式：核心操作
+	return []common.InlineHelpHint{
+		{Key: "↑↓", Desc: i18n.T("help.logs.hint_select")},
+		{Key: "Enter", Desc: i18n.T("help.logs.hint_detail")},
+		{Key: "[/]", Desc: i18n.T("help.logs.hint_level")},
+		{Key: "←→", Desc: i18n.T("help.logs.hint_scroll")},
+		{Key: "/", Desc: i18n.T("help.logs.hint_search")},
+		{Key: "c", Desc: i18n.T("help.logs.hint_clear")},
+	}
+}
+
+// renderLogsInlineHelp 渲染右下角内联帮助面板并叠加到页面上
+func renderLogsInlineHelp(page string, state PageState) string {
+	hints := buildLogsInlineHelpHints(state)
+	if len(hints) == 0 {
+		return page
+	}
+
+	body := common.FormatInlineHintRow(hints)
+	return common.OverlayHelpAtBottomRight(page, body, state.Width, state.Height)
 }
 
 // renderLevelBar 渲染日志级别标签栏（带边框）

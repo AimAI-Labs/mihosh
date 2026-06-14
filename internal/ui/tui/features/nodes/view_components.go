@@ -9,7 +9,6 @@ import (
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 )
 
 var hexColorRegex = regexp.MustCompile(`#([0-9a-fA-F]{6})`)
@@ -699,52 +698,43 @@ func renderTokyoPanel(title, body string, width int) string {
 }
 
 // ============================================================
-//  内联帮助提示面板（右下角浮层，替代居中弹窗）
+//  内联帮助提示面板（右下角浮层）
 // ============================================================
-
-var (
-	helpInlineKey  = lipgloss.NewStyle().Foreground(common.TokyoYellow)
-	helpInlineDim  = lipgloss.NewStyle().Foreground(common.TokyoMuted)
-	helpInlineDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("#A9B1D6"))
-)
-
-// inlineHelpHint 内联帮助条目
-type inlineHelpHint struct {
-	key  string
-	desc string
-}
+//
+// 通用渲染逻辑（InlineHelpHint / FormatInlineHintRow /
+// OverlayHelpAtBottomRight）已抽取至 components/common，
+// 各页面共享，避免重复实现。
 
 // buildNodesInlineHelpHints 根据节点页上下文构建内联帮助条目
-func buildNodesInlineHelpHints(state PageState) []inlineHelpHint {
+func buildNodesInlineHelpHints(state PageState) []common.InlineHelpHint {
 	if state.FilterMode {
-		return []inlineHelpHint{
-			{"Enter", i18n.T("help.nodes_search.confirm")},
-			{"Esc", i18n.T("help.nodes_search.cancel")},
-			{"Ctrl+R", "Regex"},
-			{"Ctrl+F", "Fuzzy"},
+		return []common.InlineHelpHint{
+			{Key: "Enter", Desc: i18n.T("help.nodes_search.confirm")},
+			{Key: "Esc", Desc: i18n.T("help.nodes_search.cancel")},
+			{Key: "Ctrl+R/F", Desc: "正则/模糊"},
 		}
 	}
 
 	if state.ShowTestDetail {
-		return []inlineHelpHint{
-			{"↑/↓", i18n.T("help.nodes_test_detail.scroll")},
-			{"Home/End", i18n.T("help.nodes_test_detail.jump")},
-			{"Esc", i18n.T("help.nodes_test_detail.close")},
+		return []common.InlineHelpHint{
+			{Key: "↑/↓", Desc: i18n.T("help.nodes_test_detail.scroll")},
+			{Key: "Home/End", Desc: i18n.T("help.nodes_test_detail.jump")},
+			{Key: "f/Esc", Desc: i18n.T("help.nodes_test_detail.close")},
 		}
 	}
 
 	// 普通模式：单行精简提示（核心操作 + ? 打开完整帮助）
-	return []inlineHelpHint{
-		{"↑↓", i18n.T("help.nodes.hint_select")},
-		{"←→", i18n.T("help.nodes.hint_group")},
-		{"Enter", i18n.T("help.nodes.hint_switch")},
-		{"t", i18n.T("help.nodes.hint_test")},
-		{"a", i18n.T("help.nodes.hint_test_all")},
-		{"m", i18n.T("help.nodes.hint_mode")},
-		{"s", i18n.T("help.nodes.hint_sort")},
-		{"/", i18n.T("help.nodes.hint_search")},
-		{"f", i18n.T("help.nodes.hint_result")},
-		{"?", i18n.T("help.nodes.hint_more")},
+	return []common.InlineHelpHint{
+		{Key: "↑↓", Desc: i18n.T("help.nodes.hint_select")},
+		{Key: "←→", Desc: i18n.T("help.nodes.hint_group")},
+		{Key: "Enter", Desc: i18n.T("help.nodes.hint_switch")},
+		{Key: "t", Desc: i18n.T("help.nodes.hint_test")},
+		{Key: "a", Desc: i18n.T("help.nodes.hint_test_all")},
+		{Key: "m", Desc: i18n.T("help.nodes.hint_mode")},
+		{Key: "s", Desc: i18n.T("help.nodes.hint_sort")},
+		{Key: "/", Desc: i18n.T("help.nodes.hint_search")},
+		{Key: "f", Desc: i18n.T("help.nodes.hint_result")},
+		{Key: "?", Desc: i18n.T("help.nodes.hint_more")},
 	}
 }
 
@@ -756,77 +746,7 @@ func renderNodesInlineHelp(page string, state PageState) string {
 	}
 
 	// 单行精简展示（无边框，紧贴底栏上边）
-	body := formatInlineHintRow(hints)
+	body := common.FormatInlineHintRow(hints)
 
-	return overlayHelpAtBottomRight(page, body, state.Width, state.Height)
-}
-
-// formatInlineHintRow 将一组帮助条目格式化为 "key desc  key desc" 单行
-func formatInlineHintRow(hints []inlineHelpHint) string {
-	sep := helpInlineDim.Render(" · ")
-	var parts []string
-	for _, h := range hints {
-		parts = append(parts, helpInlineKey.Render(h.key)+" "+helpInlineDesc.Render(h.desc))
-	}
-	return strings.Join(parts, sep)
-}
-
-// overlayHelpAtBottomRight 将帮助面板叠加在页面右下角（底栏上方）
-func overlayHelpAtBottomRight(base, panel string, width, height int) string {
-	baseLines := strings.Split(base, "\n")
-	for len(baseLines) < height {
-		baseLines = append(baseLines, "")
-	}
-
-	panelLines := strings.Split(panel, "\n")
-	panelH := len(panelLines)
-	if panelH == 0 {
-		return base
-	}
-	panelW := 0
-	for _, l := range panelLines {
-		if w := lipgloss.Width(l); w > panelW {
-			panelW = w
-		}
-	}
-
-	// 定位：紧贴底栏上边（pageContent 最后一行），距右 1 字符
-	startRow := len(baseLines) - panelH
-	if startRow < 0 {
-		startRow = 0
-	}
-	startCol := width - panelW - 1
-	if startCol < 0 {
-		startCol = 0
-	}
-
-	for i, pl := range panelLines {
-		row := startRow + i
-		if row >= len(baseLines) {
-			break
-		}
-		bl := baseLines[row]
-		blW := lipgloss.Width(bl)
-		plW := lipgloss.Width(pl)
-
-		// 截取底层左侧
-		leftPart := ""
-		if startCol > 0 {
-			leftPart = ansi.Cut(bl, 0, startCol)
-			lw := lipgloss.Width(leftPart)
-			if lw < startCol {
-				leftPart += strings.Repeat(" ", startCol-lw)
-			}
-		}
-
-		// 截取底层右侧
-		rightPart := ""
-		if blW > startCol+plW {
-			rightPart = ansi.Cut(bl, startCol+plW, blW)
-		}
-
-		baseLines[row] = leftPart + pl + rightPart
-	}
-
-	return strings.Join(baseLines, "\n")
+	return common.OverlayHelpAtBottomRight(page, body, state.Width, state.Height)
 }

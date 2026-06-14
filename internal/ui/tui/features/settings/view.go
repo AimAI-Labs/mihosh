@@ -183,7 +183,52 @@ func RenderSettingsPage(state PageState, width, height int) string {
 		result = overlayToast(result, toastStr, width)
 	}
 
-	return result
+	return renderSettingsInlineHelp(result, state, width, height)
+}
+
+// ============================================================
+//  内联帮助提示面板（右下角浮层）
+// ============================================================
+//
+// 渲染逻辑（InlineHelpHint / FormatInlineHintRow / OverlayHelpAtBottomRight）
+// 共享自 components/common。
+
+// buildSettingsInlineHelpHints 根据设置页上下文构建内联帮助条目
+func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
+	// 编辑模式：根据是否语言项分流
+	if state.EditMode {
+		if state.SelectedSetting == LanguageSettingIndex() {
+			// 语言项：Tab/方向键切换 + 保存 + 取消
+			return []common.InlineHelpHint{
+				{Key: "←→/Tab", Desc: i18n.T("help.settings_edit_lang.switch")},
+				{Key: "Enter", Desc: i18n.T("help.settings_edit_lang.confirm")},
+				{Key: "Esc", Desc: i18n.T("help.settings_edit_lang.cancel")},
+			}
+		}
+		// 普通编辑项：移动光标 + 保存 + 取消
+		return []common.InlineHelpHint{
+			{Key: "←→", Desc: i18n.T("help.settings_edit_config.move")},
+			{Key: "Enter", Desc: i18n.T("help.settings_edit_config.confirm")},
+			{Key: "Esc", Desc: i18n.T("help.settings_edit_config.cancel")},
+		}
+	}
+
+	// 普通模式：选择 + 编辑
+	return []common.InlineHelpHint{
+		{Key: "↑↓", Desc: i18n.T("help.settings.hint_select")},
+		{Key: "Enter", Desc: i18n.T("help.settings.hint_edit")},
+	}
+}
+
+// renderSettingsInlineHelp 渲染右下角内联帮助面板并叠加到页面上
+func renderSettingsInlineHelp(page string, state PageState, width, height int) string {
+	hints := buildSettingsInlineHelpHints(state)
+	if len(hints) == 0 {
+		return page
+	}
+
+	body := common.FormatInlineHintRow(hints)
+	return common.OverlayHelpAtBottomRight(page, body, width, height)
 }
 
 // renderSettingItem 渲染单个设置项

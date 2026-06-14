@@ -392,3 +392,81 @@ func connectionsByViewMode(state PageState) []model.Connection {
 		return nil
 	}
 }
+
+// ============================================================
+//  内联帮助提示面板（右下角浮层）
+// ============================================================
+//
+// 渲染逻辑（InlineHelpHint / FormatInlineHintRow / OverlayHelpAtBottomRight）
+// 共享自 components/common。
+
+// buildConnectionsInlineHelpHints 根据连接页上下文构建内联帮助条目
+func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
+	// 详情模式：左右面板切换 + 滚动 + 关闭
+	if state.DetailMode {
+		return []common.InlineHelpHint{
+			{Key: "↑/↓", Desc: i18n.T("help.conns_detail.scroll")},
+			{Key: "←/→", Desc: i18n.T("help.conns_detail.switch_panel")},
+			{Key: "Esc/q", Desc: i18n.T("help.conns_detail.close")},
+		}
+	}
+
+	// TopN 弹窗：滚动 + 关闭
+	if state.TopNModalMode {
+		return []common.InlineHelpHint{
+			{Key: "↑/↓", Desc: i18n.T("help.conns_topn.scroll")},
+			{Key: "Esc/q", Desc: i18n.T("help.conns_topn.close")},
+		}
+	}
+
+	// 过滤输入模式：确认 + 取消
+	if state.FilterMode {
+		return []common.InlineHelpHint{
+			{Key: "Enter", Desc: i18n.T("help.conns_search.confirm")},
+			{Key: "Esc", Desc: i18n.T("help.conns_search.cancel")},
+		}
+	}
+
+	// 按 tab 分流
+	switch state.ViewMode {
+	case ConnViewTraffic:
+		// 流量监控 tab：测速 + 选站 + 切换
+		return []common.InlineHelpHint{
+			{Key: "h", Desc: i18n.T("help.conns.hint_switch")},
+			{Key: "s/S", Desc: i18n.T("help.conns.hint_test")},
+			{Key: "←→", Desc: i18n.T("help.conns.hint_site")},
+		}
+
+	case ConnViewActive:
+		// 活跃连接 tab：选择 + 详情 + 关闭 + 搜索 + 切换
+		return []common.InlineHelpHint{
+			{Key: "↑↓", Desc: i18n.T("help.conns.hint_select")},
+			{Key: "Enter", Desc: i18n.T("help.conns.hint_detail")},
+			{Key: "x/X", Desc: i18n.T("help.conns.hint_close")},
+			{Key: "/", Desc: i18n.T("help.conns.hint_search")},
+			{Key: "h", Desc: i18n.T("help.conns.hint_switch")},
+		}
+
+	case ConnViewHistory:
+		// 历史连接 tab：选择 + 详情 + 搜索 + 切换
+		return []common.InlineHelpHint{
+			{Key: "↑↓", Desc: i18n.T("help.conns.hint_select")},
+			{Key: "Enter", Desc: i18n.T("help.conns.hint_detail")},
+			{Key: "/", Desc: i18n.T("help.conns.hint_search")},
+			{Key: "h", Desc: i18n.T("help.conns.hint_switch")},
+		}
+	}
+
+	return nil
+}
+
+// renderConnectionsInlineHelp 渲染右下角内联帮助面板并叠加到页面上
+func renderConnectionsInlineHelp(page string, state PageState) string {
+	hints := buildConnectionsInlineHelpHints(state)
+	if len(hints) == 0 {
+		return page
+	}
+
+	body := common.FormatInlineHintRow(hints)
+	return common.OverlayHelpAtBottomRight(page, body, state.Width, state.Height)
+}
