@@ -62,6 +62,7 @@ type PageState struct {
 	FilteredRuleIndices []int        // 过滤后的规则索引
 	FilterText          string       // 搜索关键词
 	FilterMode          bool         // 是否处于过滤输入模式
+	FilterEngine        FilterEngine // 搜索匹配引擎
 	SelectedRule        int          // 选中的规则索引
 	ScrollTop           int          // 滚动偏移
 	Width               int          // 页面宽度
@@ -95,7 +96,7 @@ func RenderRulesPage(state PageState) string {
 	}
 
 	// 渲染带边框的头部组件（包含标题、统计和搜索框）
-	searchBox := renderRuleSearchBox(state.FilterText, state.FilterMode, state.SelectedTypes)
+	searchBox := renderRuleSearchBox(state.FilterText, state.FilterMode, state.FilterEngine, state.SelectedTypes)
 	header := RenderRulesHeaderComponent(stats, searchBox, state.Width)
 	sections = append(sections, header)
 	sections = append(sections, "")
@@ -140,12 +141,13 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 		}
 	}
 
-	// 过滤输入模式：确认 + 取消 + 删除
+	// 过滤输入模式：确认 + 取消 + 删除 + 引擎切换
 	if state.FilterMode {
 		return []common.InlineHelpHint{
 			{Key: "Enter", Desc: i18n.T("help.rules_search.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.rules_search.cancel")},
 			{Key: "⌫", Desc: i18n.T("help.rules_search.backspace")},
+			{Key: "Ctrl+R/F", Desc: i18n.T("help.rules_search.regex_fuzzy")},
 		}
 	}
 
@@ -209,7 +211,7 @@ func RenderRulesHeaderComponent(stats string, searchBox string, width int) strin
 }
 
 // renderRuleSearchBox 渲染搜索框
-func renderRuleSearchBox(filterText string, filterMode bool, selectedTypes []string) string {
+func renderRuleSearchBox(filterText string, filterMode bool, engine FilterEngine, selectedTypes []string) string {
 	inputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF"))
 
 	if filterMode {
@@ -223,18 +225,34 @@ func renderRuleSearchBox(filterText string, filterMode bool, selectedTypes []str
 		input += inputStyle.Render("█")
 	}
 
+	// 引擎徽标（与 nodes 配色一致）
+	var engineIndicator string
+	switch engine {
+	case FilterEngineRegex:
+		engineIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("#A855F7")).Render(" [RE]")
+	case FilterEngineFuzzy:
+		engineIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B")).Render(" [Fuzzy]")
+	}
+
 	hint := ""
 	if filterText == "" {
-		hint = common.MutedStyle.Render(i18n.T("rules.search_hint"))
+		switch engine {
+		case FilterEngineRegex:
+			hint = common.MutedStyle.Render(i18n.T("rules.search_hint_regex"))
+		case FilterEngineFuzzy:
+			hint = common.MutedStyle.Render(i18n.T("rules.search_hint_fuzzy"))
+		default:
+			hint = common.MutedStyle.Render(i18n.T("rules.search_hint"))
+		}
 	}
 	if len(selectedTypes) > 0 {
 		typeNames := strings.Join(selectedTypes, ", ")
 		typeIndicator := lipgloss.NewStyle().
 			Foreground(common.CSuccess).
 			Render(fmt.Sprintf(" [%s]", typeNames))
-		return label + input + hint + typeIndicator
+		return label + input + hint + engineIndicator + typeIndicator
 	}
-	return label + input + hint
+	return label + input + hint + engineIndicator
 }
 
 // renderRuleList 渲染规则列表（含整体垂直滚动条）

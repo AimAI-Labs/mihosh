@@ -2,6 +2,7 @@ package rules
 
 import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"regexp"
 	"strings"
 	"time"
 
@@ -13,12 +14,22 @@ import (
 
 const rulesDoubleClickThreshold = 350 * time.Millisecond
 
+// FilterEngine 规则搜索匹配引擎
+type FilterEngine int
+
+const (
+	FilterEngineSubstring FilterEngine = iota // 普通子串（多关键词 AND）
+	FilterEngineRegex                         // 正则匹配
+	FilterEngineFuzzy                         // 模糊匹配（有序子序列）
+)
+
 // State 规则页面完整状态
 type State struct {
 	rules               []model.Rule
 	filteredRuleIndices []int // 预分配，重建时重用底层数组
 	ruleFilter          string
 	ruleFilterMode      bool
+	FilterEngine        FilterEngine // 当前搜索匹配引擎
 	selectedRule        int
 	ruleScrollTop       int
 
@@ -43,6 +54,7 @@ func (s State) ToPageState(width, height int) PageState {
 		FilteredRuleIndices: s.filteredRuleIndices,
 		FilterText:          s.ruleFilter,
 		FilterMode:          s.ruleFilterMode,
+		FilterEngine:        s.FilterEngine,
 		SelectedRule:        s.selectedRule,
 		ScrollTop:           s.ruleScrollTop,
 		Width:               width,
@@ -145,6 +157,26 @@ func (s State) FilterMode() bool { return s.ruleFilterMode }
 // handleRuleFilterMode 规则过滤输入模式
 func (s State) handleRuleFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	switch {
+	case msg.Type == tea.KeyCtrlR:
+		// Ctrl+R 切换 正则↔普通
+		if s.FilterEngine == FilterEngineRegex {
+			s.FilterEngine = FilterEngineSubstring
+		} else {
+			s.FilterEngine = FilterEngineRegex
+		}
+		s.updateFilteredRules()
+		s.selectedRule = 0
+		s.ruleScrollTop = 0
+	case msg.Type == tea.KeyCtrlF:
+		// Ctrl+F 切换 模糊↔普通
+		if s.FilterEngine == FilterEngineFuzzy {
+			s.FilterEngine = FilterEngineSubstring
+		} else {
+			s.FilterEngine = FilterEngineFuzzy
+		}
+		s.updateFilteredRules()
+		s.selectedRule = 0
+		s.ruleScrollTop = 0
 	case key.Matches(msg, common.Keys.Escape):
 		s.ruleFilterMode = false
 	case key.Matches(msg, common.Keys.Enter):
@@ -157,13 +189,19 @@ func (s State) handleRuleFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 			if len(runes) > 0 {
 				s.ruleFilter = string(runes[:len(runes)-1])
 				s.updateFilteredRules()
+				s.selectedRule = 0
+				s.ruleScrollTop = 0
 			}
 		}
 	default:
 		input := msg.String()
-		if len(input) == 1 && input[0] >= 32 && input[0] < 127 {
+		// 接受可打印的单字符（ASCII）或多字节字符（如中文）
+		runes := []rune(input)
+		if len(runes) == 1 && runes[0] >= 32 {
 			s.ruleFilter += input
 			s.updateFilteredRules()
+			s.selectedRule = 0
+			s.ruleScrollTop = 0
 		}
 	}
 	return s, nil
@@ -189,10 +227,22 @@ func (s *State) updateFilteredRules() {
 		return
 	}
 
-	// 准备关键词
+	// 预编译正则 / 预处理子串
+	var re *regexp.Regexp
 	var keywords []string
 	if hasTextFilter {
-		keywords = strings.Fields(strings.ToLower(s.ruleFilter))
+		switch s.FilterEngine {
+		case FilterEngineRegex:
+			var err error
+			re, err = regexp.Compile("(?i)" + s.ruleFilter)
+			if err != nil {
+				// 非法正则：文本过滤匹配为空（仍可能因类型过滤保留结果）
+				re = nil
+			}
+		case FilterEngineSubstring:
+			// 普通模式：保留多关键词 AND 语义
+			keywords = strings.Fields(strings.ToLower(s.ruleFilter))
+		}
 	}
 
 	for i, rule := range s.rules {
@@ -211,23 +261,55 @@ func (s *State) updateFilteredRules() {
 			}
 		}
 
-		// 文本过滤检查
-		if hasTextFilter && len(keywords) > 0 {
-			searchText := strings.ToLower(rule.Type + " " + rule.Payload + " " + rule.Proxy)
-			allMatch := true
-			for _, kw := range keywords {
-				if !strings.Contains(searchText, kw) {
-					allMatch = false
-					break
+		// 文本过滤检查（按引擎分派）
+		if hasTextFilter {
+			searchText := rule.Type + " " + rule.Payload + " " + rule.Proxy
+			switch s.FilterEngine {
+			case FilterEngineRegex:
+				if re == nil || !re.MatchString(searchText) {
+					continue
 				}
-			}
-			if !allMatch {
-				continue
+			case FilterEngineFuzzy:
+				if !fuzzyMatch(s.ruleFilter, searchText) {
+					continue
+				}
+			case FilterEngineSubstring:
+				fallthrough
+			default:
+				lower := strings.ToLower(searchText)
+				allMatch := true
+				for _, kw := range keywords {
+					if !strings.Contains(lower, kw) {
+						allMatch = false
+						break
+					}
+				}
+				if !allMatch {
+					continue
+				}
 			}
 		}
 
 		s.filteredRuleIndices = append(s.filteredRuleIndices, i)
 	}
+}
+
+// fuzzyMatch 检查 pattern 的所有字符是否按顺序出现于 text 中（大小写不敏感）。
+// 与 nodes 页面的实现保持一致。
+func fuzzyMatch(pattern, text string) bool {
+	if pattern == "" {
+		return true
+	}
+	pattern = strings.ToLower(pattern)
+	text = strings.ToLower(text)
+
+	pIdx := 0
+	for i := 0; i < len(text) && pIdx < len(pattern); i++ {
+		if text[i] == pattern[pIdx] {
+			pIdx++
+		}
+	}
+	return pIdx == len(pattern)
 }
 
 // handleTypeFilterMode 处理类型筛选弹窗的按键

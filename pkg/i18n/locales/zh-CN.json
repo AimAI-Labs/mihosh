@@ -137,6 +137,8 @@
   "rules.stats_filtered": " (过滤自 %d 条)",
   "rules.search": "搜索: ",
   "rules.search_hint": " 空格分隔多词",
+  "rules.search_hint_regex": " 输入正则表达式",
+  "rules.search_hint_fuzzy": " 模糊匹配（按顺序）",
   "rules.empty": "暂无规则",
   "rules.filter_title": "规则类型筛选",
   "rules.filter_stats": "已选 %d/%d 个类型",
@@ -297,6 +299,7 @@
   "help.rules_search.backspace": "删除",
   "help.rules_search.confirm": "确认",
   "help.rules_search.cancel": "取消",
+  "help.rules_search.regex_fuzzy": "正则/模糊",
 
   "help.section.rules": "规则",
   "help.rules.select": "选择",

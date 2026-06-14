@@ -137,6 +137,8 @@
   "rules.stats_filtered": " (filtered from %d)",
   "rules.search": "Search: ",
   "rules.search_hint": " Separate words with space",
+  "rules.search_hint_regex": " Type a regex",
+  "rules.search_hint_fuzzy": " Fuzzy (in order)",
   "rules.empty": "No rules",
   "rules.filter_title": "Filter Rule Types",
   "rules.filter_stats": "Selected %d/%d types",
@@ -297,6 +299,7 @@
   "help.rules_search.backspace": "Delete",
   "help.rules_search.confirm": "Confirm",
   "help.rules_search.cancel": "Cancel",
+  "help.rules_search.regex_fuzzy": "Regex/Fuzzy",
 
   "help.section.rules": "Rules",
   "help.rules.select": "Select",
