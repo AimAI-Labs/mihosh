@@ -151,8 +151,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// 设置页面编辑模式：优先分发到页面，避免全局快捷键拦截数字输入
-		if m.currentPage == layout.PageSettings && m.settingsState.IsEditing() {
+		// 输入捕获模式：当前页面正在编辑/过滤时，优先分发按键到页面，
+		// 避免全局快捷键（如 q/r/a/t/s/c）拦截输入字符。
+		if m.isInputCapturing() {
 			return m.dispatchKeyToPage(msg)
 		}
 
@@ -518,6 +519,25 @@ func (m *Model) advanceAutoRefreshTransientState() {
 }
 
 func (m Model) topNavActive() bool {
+	return false
+}
+
+// isInputCapturing 判断当前页面是否处于会捕获按键的输入/过滤模式。
+// 处于这些模式时，所有按键必须分发到页面用于文本输入或弹窗操作，
+// 避免被全局快捷键（q/r/a/t/s/c 等）拦截。
+func (m Model) isInputCapturing() bool {
+	switch m.currentPage {
+	case layout.PageNodes:
+		return m.nodesState.NodeFilterMode
+	case layout.PageConnections:
+		return m.connsState.FilterMode()
+	case layout.PageLogs:
+		return m.logsState.FilterMode()
+	case layout.PageRules:
+		return m.rulesState.FilterMode() || m.rulesState.ShowTypeFilter()
+	case layout.PageSettings:
+		return m.settingsState.IsEditing()
+	}
 	return false
 }
 
