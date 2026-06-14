@@ -29,9 +29,10 @@ type ConfigModeMsg struct {
 // ========= Node / Proxy Testing Messages =========
 
 type TestDoneMsg struct {
-	Name  string
-	Delay int
-	Err   error
+	Name    string
+	Delay   int
+	Err     error
+	TestURL string
 }
 
 type TestAllDoneMsg struct {

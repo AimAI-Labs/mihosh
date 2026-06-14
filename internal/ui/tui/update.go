@@ -234,7 +234,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.connsState = m.connsState.ApplySiteTestResult(msg.Name, msg.Delay, msg.Err)
 
 	case messages.TestDoneMsg:
-		m.nodesState = m.nodesState.ApplyTestDone(msg.Name, msg.Delay, msg.Err)
+		m.nodesState = m.nodesState.ApplyTestDone(msg.Name, msg.Delay, msg.Err, msg.TestURL)
 		// 如果是批量测速，需要补位
 		if m.nodesState.TestAllActive {
 			var batchCmd tea.Cmd

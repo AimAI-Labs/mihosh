@@ -8,6 +8,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -28,9 +29,9 @@ type PageState struct {
 	CurrentProxies    []string
 	Testing           bool
 	TestingTarget     string
-	TestFailures      []string
-	ShowFailureDetail bool     // 是否显示测速失败弹窗
-	FailureScrollTop  int      // 测速失败弹窗滚动偏移
+	TestResults       []TestResultEntry
+	ShowTestDetail    bool     // 是否显示测速结果弹窗
+	DetailScrollTop   int      // 测速结果弹窗滚动偏移
 	SortOrderLabels   []string // 排序选项文本
 	CurrentSortOrder  int      // 当前排序模式
 	Width             int
@@ -77,15 +78,25 @@ func RenderNodesPage(state PageState) string {
 		searchLine = "" // 占位空行由 clampPanelArea 负责填充
 	}
 
-	var failureBadge string
-	if len(state.TestFailures) > 0 {
-		failureBadge = common.ErrorStyle.Render(i18n.Tf("nodes.failure_badge", len(state.TestFailures))) +
-			" " + common.MutedStyle.Render(i18n.T("nodes.view_failure"))
+	var resultBadge string
+	if len(state.TestResults) > 0 {
+		failCount := 0
+		for _, r := range state.TestResults {
+			if r.Error != "" {
+				failCount++
+			}
+		}
+		badgeText := i18n.Tf("nodes.result_badge", len(state.TestResults))
+		if failCount > 0 {
+			badgeText += " " + common.ErrorStyle.Render(i18n.Tf("nodes.result_fail_count", failCount))
+		}
+		resultBadge = common.MutedStyle.Render(badgeText) +
+			" " + common.MutedStyle.Render(i18n.T("nodes.view_detail"))
 	}
 
-	// 底部固定区域占用的行数：搜索行(1) + 失败徽标(0或1)
+	// 底部固定区域占用的行数：搜索行(1) + 结果徽标(0或1)
 	bottomLines := 1 // 搜索行始终占 1 行
-	if failureBadge != "" {
+	if resultBadge != "" {
 		bottomLines++
 	}
 
@@ -134,17 +145,17 @@ func RenderNodesPage(state PageState) string {
 	// 将面板区域精确约束到 panelAreaHeight 行，确保底部固定行不随内容漂移
 	panelArea = clampToLines(panelArea, panelAreaHeight)
 
-	// ── 拼接：面板区 + 搜索行 + 失败徽标 ────────────────────────────
+	// ── 拼接：面板区 + 搜索行 + 结果徽标 ────────────────────
 	bottomParts := []string{searchLine}
-	if failureBadge != "" {
-		bottomParts = append(bottomParts, failureBadge)
+	if resultBadge != "" {
+		bottomParts = append(bottomParts, resultBadge)
 	}
 	mainContent := lipgloss.JoinVertical(lipgloss.Left,
 		append([]string{panelArea}, bottomParts...)...,
 	)
 
-	if state.ShowFailureDetail {
-		modal := buildFailureModal(state)
+	if state.ShowTestDetail {
+		modal := buildTestResultModal(state)
 		return overlayCenter(mainContent, modal, state.Width, state.Height)
 	}
 	return mainContent
@@ -168,9 +179,9 @@ func clampToLines(content string, h int) string {
 
 
 
-// buildFailureModal 构建测速失败详情弹窗字符串
-func buildFailureModal(state PageState) string {
-	failures := state.TestFailures
+// buildTestResultModal 构建测速结果详情弹窗字符串
+func buildTestResultModal(state PageState) string {
+	results := state.TestResults
 
 	// 弹窗内容区宽度（去掉左右边框各1 + 内边距各1 = 4）
 	modalWidth := state.Width - 10
@@ -192,14 +203,14 @@ func buildFailureModal(state PageState) string {
 		maxDisplay = 1
 	}
 
-	allLines := buildFailureDetailLines(failures, innerWidth)
+	allLines := buildTestResultDetailLines(results, innerWidth)
 	if len(allLines) == 0 {
-		allLines = []string{i18n.T("nodes.empty_failure")}
+		allLines = []string{i18n.T("nodes.empty_results")}
 	}
 	totalLines := len(allLines)
 
 	// 限制滚动范围
-	scrollTop := state.FailureScrollTop
+	scrollTop := state.DetailScrollTop
 	if scrollTop > totalLines-maxDisplay {
 		scrollTop = totalLines - maxDisplay
 	}
@@ -214,68 +225,73 @@ func buildFailureModal(state PageState) string {
 	// 构建内容行
 	var bodyLines []string
 	if scrollTop > 0 {
-		bodyLines = append(bodyLines, common.DimStyle.Render(i18n.Tf("nodes.failure_scroll_up", scrollTop)))
+		bodyLines = append(bodyLines, common.DimStyle.Render(i18n.Tf("nodes.result_scroll_up", scrollTop)))
 	}
 	for _, line := range allLines[scrollTop:endIdx] {
 		bodyLines = append(bodyLines, line)
 	}
 	if endIdx < totalLines {
-		bodyLines = append(bodyLines, common.DimStyle.Render(i18n.Tf("nodes.failure_scroll_down", totalLines-endIdx)))
+		bodyLines = append(bodyLines, common.DimStyle.Render(i18n.Tf("nodes.result_scroll_down", totalLines-endIdx)))
 	}
 	bodyLines = append(bodyLines, "")
-	bodyLines = append(bodyLines, common.MutedStyle.Render(i18n.T("nodes.failure_modal_help")))
+	bodyLines = append(bodyLines, common.MutedStyle.Render(i18n.T("nodes.result_modal_help")))
 
 	body := strings.Join(bodyLines, "\n")
 
-	title := common.ErrorStyle.Render(i18n.Tf("nodes.failure_modal_title", len(failures)))
-	subtitle := common.DimStyle.Render(i18n.T("nodes.failure_modal_subtitle"))
+	// 标题：显示总数和失败数
+	failCount := 0
+	for _, r := range results {
+		if r.Error != "" {
+			failCount++
+		}
+	}
+	title := common.TableHeaderStyle.Render(i18n.Tf("nodes.result_modal_title", len(results)))
+	if failCount > 0 {
+		title += " " + common.ErrorStyle.Render(i18n.Tf("nodes.result_fail_count", failCount))
+	}
+	subtitle := common.DimStyle.Render(i18n.T("nodes.result_modal_subtitle"))
 	separator := common.DimStyle.Render(strings.Repeat("─", innerWidth))
 	content := lipgloss.JoinVertical(lipgloss.Left, title, subtitle, separator, body)
 
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#E74C3C")).
+		BorderForeground(lipgloss.Color("#7aa2f7")).
 		Padding(0, 1).
 		Width(modalWidth).
 		Render(content)
 }
 
-func buildFailureDetailLines(failures []string, width int) []string {
+func buildTestResultDetailLines(results []TestResultEntry, width int) []string {
 	if width < 20 {
 		width = 20
 	}
 
-	lines := make([]string, 0, len(failures)*6)
-	for i, entry := range failures {
-		node, raw := splitFailureEntry(entry)
-		summary := summarizeFailure(raw)
-
-		lines = append(lines, fmt.Sprintf("[%02d] %s", i+1, node))
-		lines = append(lines, wrapWithPrefix(i18n.T("nodes.reason_prefix"), summary, width)...)
-		lines = append(lines, wrapWithPrefix(i18n.T("nodes.raw_prefix"), raw, width)...)
-		if i < len(failures)-1 {
+	lines := make([]string, 0, len(results)*4)
+	for i, entry := range results {
+		if entry.Error != "" {
+			// 失败条目
+			lines = append(lines, common.ErrorStyle.Render(fmt.Sprintf("[%02d] %s", i+1, entry.Name)))
+			summary := summarizeFailure(entry.Error)
+			lines = append(lines, wrapWithPrefix(i18n.T("nodes.reason_prefix"), summary, width)...)
+			rawMsg := entry.Error
+			if entry.TestURL != "" {
+				rawMsg = fmt.Sprintf("[%s] %s", entry.TestURL, entry.Error)
+			}
+			lines = append(lines, wrapWithPrefix(i18n.T("nodes.raw_prefix"), rawMsg, width)...)
+		} else {
+			// 成功条目
+			lines = append(lines, fmt.Sprintf("[%02d] %s", i+1, entry.Name))
+			delayText := fmt.Sprintf("%dms", entry.Delay)
+			lines = append(lines, wrapWithPrefix(i18n.T("nodes.delay_prefix"), delayText, width)...)
+			if entry.TestURL != "" {
+				lines = append(lines, wrapWithPrefix(i18n.T("nodes.raw_prefix"), entry.TestURL, width)...)
+			}
+		}
+		if i < len(results)-1 {
 			lines = append(lines, "")
 		}
 	}
 	return lines
-}
-
-func splitFailureEntry(entry string) (node string, raw string) {
-	parts := strings.SplitN(strings.TrimSpace(entry), ": ", 2)
-	if len(parts) == 2 {
-		node = strings.TrimSpace(parts[0])
-		raw = strings.TrimSpace(parts[1])
-	}
-	if node == "" {
-		node = i18n.T("nodes.unknown_node")
-	}
-	if raw == "" {
-		raw = strings.TrimSpace(entry)
-	}
-	if raw == "" {
-		raw = i18n.T("nodes.unknown_error")
-	}
-	return node, raw
 }
 
 func summarizeFailure(raw string) string {
@@ -412,23 +428,24 @@ func overlayCenter(base, overlay string, width, height int) string {
 			break
 		}
 		bl := result[row]
-		// 将底层行按显示宽度截断到 startCol，然后拼上弹窗行
-		blRunes := []rune(bl)
-		w, col := 0, 0
-		for col < len(blRunes) {
-			cw := runewidth.RuneWidth(blRunes[col])
-			if w+cw > startCol {
-				break
-			}
-			w += cw
-			col++
+
+		olWidth := displayWidth(ol)
+		blWidth := displayWidth(bl)
+
+		// 截取底层行左侧
+		leftPart := ansi.Cut(bl, 0, startCol)
+		lw := displayWidth(leftPart)
+		if lw < startCol {
+			leftPart += strings.Repeat(" ", startCol-lw)
 		}
-		prefix := string(blRunes[:col])
-		// 补齐空格到 startCol
-		if w < startCol {
-			prefix += strings.Repeat(" ", startCol-w)
+
+		// 截取底层行右侧
+		rightPart := ""
+		if blWidth > startCol+olWidth {
+			rightPart = ansi.Cut(bl, startCol+olWidth, blWidth)
 		}
-		result[row] = prefix + ol
+
+		result[row] = leftPart + ol + rightPart
 	}
 
 	return strings.Join(result, "\n")

@@ -15,7 +15,15 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-const testFailureCap = 100 // 最多保留最近 100 条测速失败记录
+const testResultCap = 100 // 最多保留最近 100 条测速结果记录
+
+// TestResultEntry 单条测速结果（成功或失败）
+type TestResultEntry struct {
+	Name    string // 节点名
+	Delay   int    // 延迟值（ms），失败时为 -1
+	Error   string // 错误信息，成功时为空
+	TestURL string // 测试的URL
+}
 
 type FilterEngine int
 
@@ -64,12 +72,12 @@ type State struct {
 	TestAllRunning []string
 	TestAllTotal   int
 	TestAllDone    int
-	// Ring Buffer for test failures
-	TestFailuresArr      [testFailureCap]string
-	failHead          int // 写入位置
-	failCount         int // 已写入总数（上限 testFailureCap）
-	ShowFailureDetail bool
-	FailureScrollTop  int
+	// Ring Buffer for test results (success + failure)
+	TestResultsArr [testResultCap]TestResultEntry
+	resultHead     int // 写入位置
+	resultCount    int // 已写入总数（上限 testResultCap）
+	ShowTestDetail bool
+	DetailScrollTop int
 	// 排序
 	ProxySortOrder  ProxySortOrder
 	OriginalProxies []string // 记录原始顺序，便于恢复
@@ -85,60 +93,62 @@ type State struct {
 	LastMouseAt     time.Time
 }
 
-// appendTestFailure 向 Ring Buffer 追加一条测速失败记录
-func (s *State) appendTestFailure(msg string) {
-	s.TestFailuresArr[s.failHead] = msg
-	s.failHead = (s.failHead + 1) % testFailureCap
-	if s.failCount < testFailureCap {
-		s.failCount++
+// appendTestResult 向 Ring Buffer 追加一条测速结果记录
+func (s *State) appendTestResult(entry TestResultEntry) {
+	s.TestResultsArr[s.resultHead] = entry
+	s.resultHead = (s.resultHead + 1) % testResultCap
+	if s.resultCount < testResultCap {
+		s.resultCount++
 	}
 }
 
-// TestFailures 返回测速失败列表（最新在前）
-func (s State) TestFailures() []string {
-	if s.failCount == 0 {
+// TestResults 返回测速结果列表（最新在前）
+func (s State) TestResults() []TestResultEntry {
+	if s.resultCount == 0 {
 		return nil
 	}
-	result := make([]string, s.failCount)
-	for i := 0; i < s.failCount; i++ {
-		idx := (s.failHead - 1 - i + testFailureCap) % testFailureCap
-		result[i] = s.TestFailuresArr[idx]
+	result := make([]TestResultEntry, s.resultCount)
+	for i := 0; i < s.resultCount; i++ {
+		idx := (s.resultHead - 1 - i + testResultCap) % testResultCap
+		result[i] = s.TestResultsArr[idx]
 	}
 	return result
 }
 
-// sortedTestFailures 返回按当前排序模式排列的测速失败列表
-func (s State) sortedTestFailures() []string {
-	result := s.TestFailures()
+// sortedTestResults 返回按当前排序模式排列的测速结果列表
+func (s State) sortedTestResults() []TestResultEntry {
+	result := s.TestResults()
 	if len(result) == 0 {
 		return result
-	}
-	// 格式为 "节点名: 错误信息"，按冒号前的节点名排序
-	nodeName := func(entry string) string {
-		if i := strings.Index(entry, ": "); i >= 0 {
-			return strings.ToLower(entry[:i])
-		}
-		return strings.ToLower(entry)
 	}
 	switch s.ProxySortOrder {
 	case SortOrderNameAsc:
 		sort.Slice(result, func(i, j int) bool {
-			return nodeName(result[i]) < nodeName(result[j])
+			return strings.ToLower(result[i].Name) < strings.ToLower(result[j].Name)
 		})
-	case SortOrderDelayAsc, SortOrderAvailable:
-		// 测速失败记录没有延迟数据，保持按名称排序以便查找
+	case SortOrderDelayAsc:
 		sort.Slice(result, func(i, j int) bool {
-			return nodeName(result[i]) < nodeName(result[j])
+			rank := func(e TestResultEntry) int {
+				if e.Error != "" || e.Delay <= 0 {
+					return 9999999
+				}
+				return e.Delay
+			}
+			return rank(result[i]) < rank(result[j])
 		})
-		// SortOrderOriginal: 保持 TestFailures() 返回的最新在前顺序
+	case SortOrderAvailable:
+		sort.Slice(result, func(i, j int) bool {
+			return strings.ToLower(result[i].Name) < strings.ToLower(result[j].Name)
+		})
+		// SortOrderOriginal: 保持 TestResults() 返回的最新在前顺序
 	}
 	return result
 }
 
-// clearTestFailures 清空测速失败记录
-func (s *State) clearTestFailures() {
-	s.failHead = 0
-	s.failCount = 0
+// clearTestResults 清空测速结果记录
+func (s *State) clearTestResults() {
+	s.resultHead = 0
+	s.resultCount = 0
 }
 
 // displayProxies 返回当前应显示的节点列表（搜索时返回过滤结果，否则返回全部）
@@ -156,27 +166,27 @@ func (s State) displayProxies() []string {
 // ToPageState 转换为渲染层所需的 PageState
 func (s State) ToPageState(width, height int) PageState {
 	return PageState{
-		Mode:              s.Mode,
-		Groups:            s.Groups,
-		Proxies:           s.Proxies,
-		GroupNames:        s.GroupNames,
-		SelectedGroup:     s.SelectedGroup,
-		SelectedProxy:     s.SelectedProxy,
-		CurrentProxies:    s.displayProxies(),
-		Testing:           s.Testing,
-		TestingTarget:     s.TestingTarget,
-		TestFailures:      s.sortedTestFailures(),
-		ShowFailureDetail: s.ShowFailureDetail,
-		FailureScrollTop:  s.FailureScrollTop,
-		SortOrderLabels:   sortOrderLabels,
-		CurrentSortOrder:  int(s.ProxySortOrder),
-		Width:             width,
-		Height:            height,
-		GroupScrollTop:    s.GroupScrollTop,
-		ProxyScrollTop:    s.ProxyScrollTop,
-		FilterText:        s.NodeFilter,
-		FilterMode:        s.NodeFilterMode,
-		FilterEngine:      s.FilterEngine,
+		Mode:             s.Mode,
+		Groups:           s.Groups,
+		Proxies:          s.Proxies,
+		GroupNames:       s.GroupNames,
+		SelectedGroup:    s.SelectedGroup,
+		SelectedProxy:    s.SelectedProxy,
+		CurrentProxies:   s.displayProxies(),
+		Testing:          s.Testing,
+		TestingTarget:    s.TestingTarget,
+		TestResults:      s.sortedTestResults(),
+		ShowTestDetail:   s.ShowTestDetail,
+		DetailScrollTop:  s.DetailScrollTop,
+		SortOrderLabels:  sortOrderLabels,
+		CurrentSortOrder: int(s.ProxySortOrder),
+		Width:            width,
+		Height:           height,
+		GroupScrollTop:   s.GroupScrollTop,
+		ProxyScrollTop:   s.ProxyScrollTop,
+		FilterText:       s.NodeFilter,
+		FilterMode:       s.NodeFilterMode,
+		FilterEngine:     s.FilterEngine,
 	}
 }
 
@@ -189,23 +199,23 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client, proxySvc *service.Prox
 		return s.handleNodeFilterMode(msg)
 	}
 
-	// 失败详情弹窗打开时，↑/↓ 控制弹窗滚动，f/Esc 关闭弹窗
-	if s.ShowFailureDetail {
+	// 测速结果弹窗打开时，↑/↓ 控制弹窗滚动，f/Esc 关闭弹窗
+	if s.ShowTestDetail {
 		switch {
 		case key.Matches(msg, common.Keys.Up):
-			if s.FailureScrollTop > 0 {
-				s.FailureScrollTop--
+			if s.DetailScrollTop > 0 {
+				s.DetailScrollTop--
 			}
 		case key.Matches(msg, common.Keys.Down):
-			s.FailureScrollTop++
+			s.DetailScrollTop++
 		case key.Matches(msg, common.Keys.Home):
-			s.FailureScrollTop = 0
+			s.DetailScrollTop = 0
 		case key.Matches(msg, common.Keys.End):
 			// 交由渲染层按可见行数钳制到末尾
-			s.FailureScrollTop = 1 << 30
+			s.DetailScrollTop = 1 << 30
 		case msg.String() == "f", msg.String() == "esc":
-			s.ShowFailureDetail = false
-			s.FailureScrollTop = 0
+			s.ShowTestDetail = false
+			s.DetailScrollTop = 0
 		}
 		return s, nil
 	}
@@ -267,8 +277,8 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client, proxySvc *service.Prox
 	case key.Matches(msg, common.Keys.TestAll):
 		if len(s.CurrentProxies) > 0 {
 			s.Testing = true
-			s.clearTestFailures()
-			s.ShowFailureDetail = false
+			s.clearTestResults()
+			s.ShowTestDetail = false
 			s.TestAllActive = true
 			s.TestAllPending = append([]string(nil), s.CurrentProxies...)
 			s.TestAllRunning = nil
@@ -278,10 +288,8 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client, proxySvc *service.Prox
 		}
 
 	case msg.String() == "f":
-		if s.failCount > 0 {
-			s.ShowFailureDetail = true
-			s.FailureScrollTop = 0
-		}
+		s.ShowTestDetail = true
+		s.DetailScrollTop = 0
 
 	case msg.String() == "m":
 		modes := []string{"rule", "global", "direct"}
@@ -439,7 +447,7 @@ func fuzzyMatch(pattern, text string) bool {
 
 // HandleMouseLeft 处理 nodes 页面左键单击/双击
 func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *api.Client) (State, tea.Cmd) {
-	if s.ShowFailureDetail {
+	if s.ShowTestDetail {
 		return s, nil
 	}
 
@@ -527,13 +535,13 @@ func (s *State) isMouseDoubleClick(target MouseTarget, idx int, now time.Time) b
 
 // HandleMouseScroll 处理鼠标滚轮（弹窗打开时控制弹窗滚动，否则根据鼠标位置或焦点控制列表滚动）
 func (s State) HandleMouseScroll(up bool, pageX, pageY, pageWidth, pageHeight int) State {
-	if s.ShowFailureDetail {
+	if s.ShowTestDetail {
 		if up {
-			if s.FailureScrollTop > 0 {
-				s.FailureScrollTop--
+			if s.DetailScrollTop > 0 {
+				s.DetailScrollTop--
 			}
 		} else {
-			s.FailureScrollTop++
+			s.DetailScrollTop++
 		}
 		return s
 	}
@@ -628,10 +636,14 @@ func (s State) ApplyProxies(Proxies map[string]model.Proxy) State {
 }
 
 // ApplyTestDone 单节点测速完成
-func (s State) ApplyTestDone(name string, delay int, err error) State {
+func (s State) ApplyTestDone(name string, delay int, err error, testURL string) State {
+	// 无论成功/失败都写入测速结果 ring buffer
+	entry := TestResultEntry{Name: name, Delay: delay, TestURL: testURL}
 	if err != nil {
-		s.appendTestFailure(fmt.Sprintf("%s: %s", name, err.Error()))
+		entry.Error = err.Error()
 	}
+	s.appendTestResult(entry)
+
 	if s.TestAllActive {
 		s.removeRunningTest(name)
 		s.TestAllDone++
@@ -665,9 +677,11 @@ func (s State) ApplyTestDone(name string, delay int, err error) State {
 // ApplyTestAllDone 批量测速完成
 func (s State) ApplyTestAllDone(results map[string]int) State {
 	for name, delay := range results {
+		entry := TestResultEntry{Name: name, Delay: delay}
 		if delay == -1 {
-			s.appendTestFailure(fmt.Sprintf("%s: timeout or error", name))
+			entry.Error = "timeout or error"
 		}
+		s.appendTestResult(entry)
 	}
 	s.Testing = false
 	s.TestingTarget = ""

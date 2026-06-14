@@ -35,7 +35,7 @@ type HelpContext struct {
 	ConnFilter   bool // 过滤输入
 
 	// 节点页子状态
-	NodesFailureDetail bool // 测速失败详情弹窗
+	NodesTestDetail bool // 测速结果详情弹窗
 	NodesFilterMode    bool // 搜索输入
 
 	// 日志页子状态
@@ -121,13 +121,13 @@ func buildNodesSections(ctx HelpContext) []section {
 		}}
 	}
 
-	if ctx.NodesFailureDetail {
+	if ctx.NodesTestDetail {
 		return []section{{
-			title: i18n.T("help.section.nodes_failure"),
+			title: i18n.T("help.section.nodes_test_detail"),
 			bindings: []keybinding{
-				{"↑/↓  k/j", i18n.T("help.nodes_failure.scroll")},
-				{"Home / End", i18n.T("help.nodes_failure.jump")},
-				{"f / Esc", i18n.T("help.nodes_failure.close")},
+				{"↑/↓  k/j", i18n.T("help.nodes_test_detail.scroll")},
+				{"Home / End", i18n.T("help.nodes_test_detail.jump")},
+				{"f / Esc", i18n.T("help.nodes_test_detail.close")},
 			},
 		}}
 	}
@@ -143,7 +143,7 @@ func buildNodesSections(ctx HelpContext) []section {
 			{"m", i18n.T("help.nodes.mode")},
 			{"s", i18n.T("help.nodes.sort")},
 			{"/", i18n.T("help.nodes.search")},
-			{"f", i18n.T("help.nodes.failure_detail")},
+			{"f", i18n.T("help.nodes.test_detail")},
 		},
 	}}
 }

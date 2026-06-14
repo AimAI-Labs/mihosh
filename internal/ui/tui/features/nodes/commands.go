@@ -41,9 +41,9 @@ func TestProxy(client *api.Client, name, testURL string, timeout int) tea.Cmd {
 	return func() tea.Msg {
 		delay, err := client.TestProxyDelay(name, testURL, timeout)
 		if err != nil {
-			return messages.TestDoneMsg{Name: name, Delay: -1, Err: err}
+			return messages.TestDoneMsg{Name: name, Delay: -1, Err: err, TestURL: testURL}
 		}
-		return messages.TestDoneMsg{Name: name, Delay: delay, Err: nil}
+		return messages.TestDoneMsg{Name: name, Delay: delay, Err: nil, TestURL: testURL}
 	}
 }
 

@@ -100,7 +100,7 @@ func (m Model) buildHelpContext() help.HelpContext {
 		ConnDetail:         m.connsState.DetailMode(),
 		ConnTopN:           m.connsState.TopNModalMode(),
 		ConnFilter:         m.connsState.FilterMode(),
-		NodesFailureDetail: m.nodesState.ShowFailureDetail,
+		NodesTestDetail:    m.nodesState.ShowTestDetail,
 		NodesFilterMode:    m.nodesState.NodeFilterMode,
 		LogsDetail:         m.logsState.DetailMode(),
 		LogsFilter:         m.logsState.FilterMode(),

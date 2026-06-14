@@ -37,33 +37,33 @@ func TestNodesState_ApplyTestDone_AdvancesBatchTarget(t *testing.T) {
 		TestAllDone:    0,
 	}
 
-	state = state.ApplyTestDone("HK-01", 123, nil)
+	state = state.ApplyTestDone("HK-01", 123, nil, "http://test.url")
 	if !state.Testing || !strings.Contains(state.TestingTarget, "JP-01") {
 		t.Fatalf("expected batch to continue with JP-01, got Testing=%v target=%q", state.Testing, state.TestingTarget)
 	}
 
-	state = state.ApplyTestDone("JP-01", 101, nil)
+	state = state.ApplyTestDone("JP-01", 101, nil, "http://test.url")
 	if state.Testing || state.TestingTarget != "" || state.TestAllActive {
 		t.Fatalf("expected batch to finish and clear status, got Testing=%v target=%q active=%v", state.Testing, state.TestingTarget, state.TestAllActive)
 	}
 }
 
-func TestNodesState_FailureModalSupportsHomeAndEnd(t *testing.T) {
+func TestNodesState_DetailModalSupportsHomeAndEnd(t *testing.T) {
 	state := State{
-		ShowFailureDetail: true,
-		FailureScrollTop:  5,
+		ShowTestDetail: true,
+		DetailScrollTop:  5,
 	}
 
 	homeMsg := tea.KeyMsg{Type: tea.KeyHome}
 	state, _ = state.Update(homeMsg, nil, nil, "", 0)
-	if state.FailureScrollTop != 0 {
-		t.Fatalf("expected home to jump top, got %d", state.FailureScrollTop)
+	if state.DetailScrollTop != 0 {
+		t.Fatalf("expected home to jump top, got %d", state.DetailScrollTop)
 	}
 
 	endMsg := tea.KeyMsg{Type: tea.KeyEnd}
 	state, _ = state.Update(endMsg, nil, nil, "", 0)
-	if state.FailureScrollTop <= 0 {
-		t.Fatalf("expected end to move scroll near bottom, got %d", state.FailureScrollTop)
+	if state.DetailScrollTop <= 0 {
+		t.Fatalf("expected end to move scroll near bottom, got %d", state.DetailScrollTop)
 	}
 }
 
