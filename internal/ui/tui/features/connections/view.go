@@ -47,7 +47,9 @@ func RenderConnectionsPage(state PageState) string {
 	if state.DetailMode && state.SelectedConnection != nil {
 		modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width)
 		modeSwitchHeight := lipgloss.Height(modeSwitch)
-		remainingHeight := state.Height - modeSwitchHeight - 1
+		// 再减 1 行，用于在详情面板下方预留底栏提示行，
+		// 避免 OverlayHelpAtBottomRight 将提示叠加到详情面板底边框（╰──╯）上。
+		remainingHeight := state.Height - modeSwitchHeight - 2
 		if remainingHeight < 5 {
 			remainingHeight = 5
 		}
@@ -62,7 +64,8 @@ func RenderConnectionsPage(state PageState) string {
 			state.DetailFocusPanel,
 		)
 
-		mainContent := lipgloss.JoinVertical(lipgloss.Left, modeSwitch, "", detailView)
+		// 详情面板下方留 1 行空白，供右下角内联帮助提示使用。
+		mainContent := lipgloss.JoinVertical(lipgloss.Left, modeSwitch, "", detailView, "")
 		return renderConnectionsInlineHelp(mainContent, state)
 	}
 
