@@ -125,52 +125,55 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	listContent := strings.Join(settingItems, "\n")
 	settingsPanel := common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width-4)
 
-	// 渲染当前选中项的描述
-	var descSection string
+	// 渲染选中项描述（信息行左侧）
+	var descPart string
 	if state.SelectedSetting >= 0 && state.SelectedSetting < len(SettingKeys) {
-		descStyle := lipgloss.NewStyle().
+		descPart = lipgloss.NewStyle().
 			Foreground(common.TokyoMuted).
 			Italic(true).
-			MarginTop(1)
-		descSection = descStyle.Render("💡 " + GetSettingDesc(state.SelectedSetting))
+			Render("💡 " + GetSettingDesc(state.SelectedSetting))
 	}
 
-	// 组装主要内容
+	// 渲染版本信息（信息行右侧，方框右下方）
+	mihomoVer := state.MihomoVersion
+	if mihomoVer == "" {
+		mihomoVer = "..."
+	}
+	mihoshLink := utils.CreateHyperlink("https://github.com/AimAI-Labs/mihosh", "Mihosh "+model.Version)
+	mihomoLink := utils.CreateHyperlink("https://github.com/MetaCubeX/mihomo", "Mihomo "+mihomoVer)
+	versionText := fmt.Sprintf("%s | Built: %s | %s", mihoshLink, model.Date, mihomoLink)
+
+	// 信息行：左侧描述、右侧版本信息，整体宽度对齐配置框
+	rowWidth := width - 4
+	versionSlot := rowWidth - lipgloss.Width(descPart)
+	if versionSlot < 0 {
+		versionSlot = 0
+	}
+	// 防止版本信息超长折行破坏布局
+	if lipgloss.Width(versionText) > versionSlot {
+		versionText = common.TruncateDisplay(versionText, versionSlot)
+	}
+	versionPart := lipgloss.NewStyle().
+		Foreground(common.TokyoMuted).
+		Align(lipgloss.Right).
+		Width(versionSlot).
+		Render(versionText)
+	infoRow := lipgloss.NewStyle().
+		MarginTop(1).
+		Render(lipgloss.JoinHorizontal(lipgloss.Top, descPart, versionPart))
+
+	// 组装主要内容：配置框 → 信息行（描述左 / 版本右）
 	mainContent := lipgloss.JoinVertical(
 		lipgloss.Left,
 		settingsPanel,
-		descSection,
+		infoRow,
 	)
 
 	// 包裹容器边距
 	mainContent = containerStyle.Render(mainContent)
 
-	// 渲染底部版本信息
-	footerStyle := lipgloss.NewStyle().
-		Foreground(common.TokyoMuted).
-		Align(lipgloss.Right).
-		Width(width - 2).
-		PaddingRight(2)
-
-	mihomoVer := state.MihomoVersion
-	if mihomoVer == "" {
-		mihomoVer = "..."
-	}
-
-	mihoshLink := utils.CreateHyperlink("https://github.com/AimAI-Labs/mihosh", "Mihosh "+model.Version)
-	mihomoLink := utils.CreateHyperlink("https://github.com/MetaCubeX/mihomo", "Mihomo "+mihomoVer)
-
-	footerText := fmt.Sprintf("%s | Built: %s | %s", mihoshLink, model.Date, mihomoLink)
-	footerContent := footerStyle.Render(footerText)
-
-	// 使用 lipgloss.Place 将内容和 footer 定位，如果高度不够，直接返回内容
-	if height > lipgloss.Height(mainContent)+2 {
-		mainContent = lipgloss.PlaceVertical(height-1, lipgloss.Top, mainContent)
-		mainContent = lipgloss.JoinVertical(lipgloss.Left, mainContent, footerContent)
-	} else {
-		// 如果高度不足，直接追加在后面
-		mainContent = lipgloss.JoinVertical(lipgloss.Left, mainContent, footerContent)
-	}
+	// 填充至页面高度，使右下角帮助提示浮层能正确定位到底部
+	mainContent = lipgloss.PlaceVertical(height, lipgloss.Top, mainContent)
 
 	// 渲染 Toast（如果有）
 	toastStr := state.Toast.Render(width)
