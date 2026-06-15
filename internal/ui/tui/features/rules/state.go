@@ -44,6 +44,10 @@ type State struct {
 	lastTypeFilterClickIdx int       // 上次点击的类型项索引
 	lastTypeFilterClickAt  time.Time // 上次点击时间
 
+	// 鼠标双击检测（用于策略选择二级弹窗内双击选中）
+	lastProxyPickerClickIdx int
+	lastProxyPickerClickAt  time.Time
+
 	// 添加自定义规则弹窗状态
 	showAddForm bool    // 是否显示添加规则弹窗
 	addForm     addForm // 表单状态（仅 showAddForm 为 true 时有意义）
@@ -236,8 +240,14 @@ func (s State) handleRuleFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 }
 
 // handleAddFormMode 处理「添加自定义规则」弹窗按键（吞掉所有按键）。
+// 若策略选择二级弹窗已打开，则优先分派至 handleProxyPickerMode。
 func (s State) handleAddFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	form := s.addForm
+
+	// 策略选择二级弹窗优先拦截（吞掉所有键）
+	if form.isProxyPickerOpen() {
+		return s.handleProxyPickerMode(msg)
+	}
 
 	switch {
 	case key.Matches(msg, common.Keys.Escape):
@@ -247,6 +257,12 @@ func (s State) handleAddFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		return s, nil
 
 	case key.Matches(msg, common.Keys.Enter):
+		// 策略行聚焦时 Enter 打开二级弹窗，不提交
+		if form.isProxyField() {
+			form.openProxyPicker()
+			s.addForm = form
+			return s, nil
+		}
 		ok, errKey := form.validate()
 		if !ok {
 			form.errMsg = i18n.T(errKey)
@@ -281,18 +297,13 @@ func (s State) handleAddFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		form.cycleField(1)
 
 	case key.Matches(msg, common.Keys.Left):
-		// 策略行聚焦时 ←/→ 循环切换策略；否则循环切换类型（◀ ▶ 横向）
-		if form.isProxyField() {
-			form.cycleProxy(-1)
-		} else {
+		// 策略行不再用 ←/→ 切换（改由二级弹窗），仅类型行横向翻页
+		if !form.isProxyField() {
 			form.cycleType(-1)
 		}
 
 	case key.Matches(msg, common.Keys.Right):
-		// 策略行聚焦时 ←/→ 循环切换策略；否则循环切换类型（◀ ▶ 横向）
-		if form.isProxyField() {
-			form.cycleProxy(1)
-		} else {
+		if !form.isProxyField() {
 			form.cycleType(1)
 		}
 
@@ -308,6 +319,55 @@ func (s State) handleAddFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		form.errMsg = "" // 输入即清除上次错误
 		s.addForm = form
 		return s, cmd
+	}
+
+	s.addForm = form
+	return s, nil
+}
+
+// handleProxyPickerMode 处理策略选择二级弹窗按键（吞掉所有键）。
+func (s State) handleProxyPickerMode(msg tea.KeyMsg) (State, tea.Cmd) {
+	form := s.addForm
+
+	switch {
+	case key.Matches(msg, common.Keys.Escape):
+		// Esc：关闭弹窗返回主表单，保留已选策略
+		form.pickerClose()
+
+	case key.Matches(msg, common.Keys.Enter):
+		// Enter：选中当前过滤项并回填
+		filtered := form.pickerFiltered()
+		if len(filtered) > 0 && form.pickerCursor < len(filtered) {
+			form.pickerChoose(filtered[form.pickerCursor])
+		}
+		// 过滤列表为空时忽略
+
+	case msg.String() == "tab":
+		form.cyclePickerTab(1)
+
+	case msg.String() == "shift+tab":
+		form.cyclePickerTab(-1)
+
+	case key.Matches(msg, common.Keys.Up):
+		form.movePickerCursor(-1)
+
+	case key.Matches(msg, common.Keys.Down):
+		form.movePickerCursor(1)
+
+	case key.Matches(msg, common.Keys.Backspace):
+		form.pickerBackspace()
+
+	default:
+		// 可打印字符追加到搜索框
+		runes := msg.Runes
+		if len(runes) == 0 && msg.Type == tea.KeyRunes {
+			runes = []rune(msg.String())
+		}
+		for _, r := range runes {
+			if r >= 32 {
+				form.pickerTypeChar(r)
+			}
+		}
 	}
 
 	s.addForm = form
@@ -478,8 +538,38 @@ func (s *State) cancelAndClose() {
 // HandleMouseLeft 处理规则页面鼠标左键事件。
 // 弹窗打开时：点击弹窗外则确认并关闭；点击列表项则移动光标，双击切换选中。
 func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, tea.Cmd) {
-	// 添加规则弹窗打开时：点击弹窗外则取消关闭
+	// 添加规则弹窗打开时
 	if s.showAddForm {
+		// 策略选择二级弹窗优先处理
+		if s.addForm.isProxyPickerOpen() {
+			pageState := s.ToPageState(pageWidth, pageHeight)
+			pLeft, pTop, pRight, pBottom := ResolveProxyPickerBounds(pageState, pageWidth, pageHeight)
+			if !(pageX >= pLeft && pageX < pRight && pageY >= pTop && pageY < pBottom) {
+				// 点击 picker 外：关闭 picker，保留已选
+				form := s.addForm
+				form.pickerClose()
+				s.addForm = form
+				return s, nil
+			}
+			// 点击在 picker 内：尝试映射到列表项
+			idx := ResolveProxyPickerListItemAt(pageState, pageX, pageY, pageWidth, pageHeight)
+			if idx < 0 {
+				return s, nil
+			}
+			form := s.addForm
+			now := time.Now()
+			isDouble := s.isProxyPickerDoubleClick(idx, now)
+			form.pickerCursor = idx
+			if isDouble {
+				filtered := form.pickerFiltered()
+				if idx < len(filtered) {
+					form.pickerChoose(filtered[idx])
+				}
+			}
+			s.addForm = form
+			return s, nil
+		}
+
 		pageState := PageState{
 			ShowAddForm: s.showAddForm,
 			AddForm:     s.addForm,
@@ -553,6 +643,16 @@ func (s *State) isTypeFilterDoubleClick(idx int, now time.Time) bool {
 		now.Sub(s.lastTypeFilterClickAt) <= rulesDoubleClickThreshold
 	s.lastTypeFilterClickIdx = idx
 	s.lastTypeFilterClickAt = now
+	return isDouble
+}
+
+// isProxyPickerDoubleClick 检测策略选择弹窗内的双击。
+func (s *State) isProxyPickerDoubleClick(idx int, now time.Time) bool {
+	isDouble := idx == s.lastProxyPickerClickIdx &&
+		!s.lastProxyPickerClickAt.IsZero() &&
+		now.Sub(s.lastProxyPickerClickAt) <= rulesDoubleClickThreshold
+	s.lastProxyPickerClickIdx = idx
+	s.lastProxyPickerClickAt = now
 	return isDouble
 }
 

@@ -82,53 +82,53 @@ func TestRenderRuleList_HidesScrollbarWhenAllRulesFit(t *testing.T) {
 	}
 }
 
-// TestBuildAddRuleModal_RendersProxyAsSelector 验证策略行渲染为 ◀ NAME ▶ 选择器（与类型行镜像），
-// 且不出现旧的 textinput 占位（如光标块或空值）。
+// TestBuildAddRuleModal_RendersProxyAsSelector 验证策略行渲染为 NAME + (Enter 改) 提示，
+// 且不出现旧的 ◀ ▶ 包裹或 textinput 占位。
 func TestBuildAddRuleModal_RendersProxyAsSelector(t *testing.T) {
-	form := newAddForm("") // 兜底策略 [DIRECT, REJECT]，默认 DIRECT
+	form := newAddForm("") // 兆底 groups=[DIRECT, REJECT]，默认 DIRECT
 	state := PageState{ShowAddForm: true, AddForm: form}
 
 	modal := buildAddRuleModal(state, 80, 24)
 	plain := stripANSI(modal)
 
-	if !strings.Contains(plain, "◀ DIRECT ▶") {
-		t.Fatalf("expected proxy row rendered as '◀ DIRECT ▶', got:\n%s", plain)
+	if !strings.Contains(plain, "DIRECT") {
+		t.Fatalf("expected proxy row rendered with 'DIRECT', got:\n%s", plain)
+	}
+	// 不应出现旧的 ◀ ▶ 包裹
+	if strings.Contains(plain, "◀ DIRECT ▶") {
+		t.Fatalf("stale '◀ DIRECT ▶' format should not be rendered, got:\n%s", plain)
 	}
 }
 
-// TestBuildAddRuleModal_ProxyRowReflectsSelection 验证切换策略后弹窗显示新策略名。
+// TestBuildAddRuleModal_ProxyRowReflectsSelection 验证通过 picker 选中后弹窗显示新策略名。
 func TestBuildAddRuleModal_ProxyRowReflectsSelection(t *testing.T) {
 	form := newAddForm("") // [DIRECT, REJECT]
-	form.cycleProxy(1)     // → REJECT
+	form.proxySelected = "REJECT"
 	state := PageState{ShowAddForm: true, AddForm: form}
 
 	modal := buildAddRuleModal(state, 80, 24)
 	plain := stripANSI(modal)
 
-	if !strings.Contains(plain, "◀ REJECT ▶") {
-		t.Fatalf("expected proxy row to show '◀ REJECT ▶' after cycling, got:\n%s", plain)
-	}
-	// 不应残留上一个策略
-	if strings.Contains(plain, "◀ DIRECT ▶") {
-		t.Fatalf("stale DIRECT still rendered after cycling to REJECT:\n%s", plain)
+	if !strings.Contains(plain, "REJECT") {
+		t.Fatalf("expected proxy row to show 'REJECT' after selection, got:\n%s", plain)
 	}
 }
 
-// TestBuildAddRuleModal_TypeAndProxyBothUseArrows 验证类型行与策略行都使用 ◀ ▶ 包裹，
-// 即两者视觉一致（镜像）。
-func TestBuildAddRuleModal_TypeAndProxyBothUseArrows(t *testing.T) {
+// TestBuildAddRuleModal_TypeUsesArrowsProxyDoesNot 验证类型行仍使用 ◀ ▶ 包裹，
+// 策略行不再使用 ◀ ▶ 而是直接显示名称。
+func TestBuildAddRuleModal_TypeUsesArrowsProxyDoesNot(t *testing.T) {
 	form := newAddForm("")
 	state := PageState{ShowAddForm: true, AddForm: form}
 
 	modal := buildAddRuleModal(state, 80, 24)
 	plain := stripANSI(modal)
 
-	// 默认类型 DOMAIN-SUFFIX
+	// 默认类型 DOMAIN-SUFFIX 仍用 ◀ ▶
 	if !strings.Contains(plain, "◀ DOMAIN-SUFFIX ▶") {
 		t.Fatalf("expected type row '◀ DOMAIN-SUFFIX ▶', got:\n%s", plain)
 	}
-	// 策略行
-	if !strings.Contains(plain, "◀ DIRECT ▶") {
-		t.Fatalf("expected proxy row '◀ DIRECT ▶', got:\n%s", plain)
+	// 策略行直接显示名称
+	if !strings.Contains(plain, "DIRECT") {
+		t.Fatalf("expected proxy row 'DIRECT', got:\n%s", plain)
 	}
 }

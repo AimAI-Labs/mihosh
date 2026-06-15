@@ -157,3 +157,73 @@ func TestNormalizeInsertIndex(t *testing.T) {
 	assert.Equal(t, 5, normalizeInsertIndex(6, 5))
 	assert.Equal(t, 5, normalizeInsertIndex(999, 5))
 }
+
+// TestExtractProxyPolicies_ReadsGroupsAndNodes 验证按分类返回：
+// groups = 内置 + proxy-groups；nodes = proxies；且去重、保留顺序。
+func TestExtractProxyPolicies_ReadsGroupsAndNodes(t *testing.T) {
+	path := writeTempConfig(t, `mixed-port: 7890
+proxies:
+  - name: SS-1
+  - name: SS-2
+proxy-groups:
+  - name: PROXY
+  - name: AUTO
+`)
+	groups, nodes, err := ExtractProxyPolicies(path)
+	require.NoError(t, err)
+
+	wantGroups := []string{"DIRECT", "REJECT", "PROXY", "AUTO"}
+	wantNodes := []string{"SS-1", "SS-2"}
+	assert.Equal(t, wantGroups, groups)
+	assert.Equal(t, wantNodes, nodes)
+}
+
+// TestExtractProxyPolicies_DedupAcrossGroupsAndNodes 验证同名跨分类去重：
+// 若同名同时出现在 proxy-groups 与 proxies，则只保留 groups 中首次出现项。
+func TestExtractProxyPolicies_DedupAcrossGroupsAndNodes(t *testing.T) {
+	path := writeTempConfig(t, `proxies:
+  - name: SS-1
+proxy-groups:
+  - name: SS-1
+  - name: AUTO
+`)
+	groups, nodes, err := ExtractProxyPolicies(path)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"DIRECT", "REJECT", "SS-1", "AUTO"}, groups)
+	// nodes 中 SS-1 已被 groups 占用，应被剔除 → nodes 为空
+	assert.Equal(t, []string{}, nodes)
+}
+
+// TestExtractProxyPolicies_MissingFileFallsBack 验证文件不存在时降级为内置策略。
+func TestExtractProxyPolicies_MissingFileFallsBack(t *testing.T) {
+	groups, nodes, err := ExtractProxyPolicies(filepath.Join(t.TempDir(), "does-not-exist.yaml"))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"DIRECT", "REJECT"}, groups)
+	assert.Equal(t, []string{}, nodes)
+}
+
+// TestExtractProxyPolicies_EmptyConfigFallsBack 验证无 proxies/groups 的配置仅返回内置策略。
+func TestExtractProxyPolicies_EmptyConfigFallsBack(t *testing.T) {
+	path := writeTempConfig(t, "mode: rule\n")
+	groups, nodes, err := ExtractProxyPolicies(path)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"DIRECT", "REJECT"}, groups)
+	assert.Equal(t, []string{}, nodes)
+}
+
+// TestExtractPolicies_FlatCompat 验证向后兼容的扁平 API：
+// 内置 → proxy-groups → proxies，去重，保留顺序。
+func TestExtractPolicies_FlatCompat(t *testing.T) {
+	path := writeTempConfig(t, `proxies:
+  - name: SS-1
+  - name: SS-2
+proxy-groups:
+  - name: PROXY
+  - name: AUTO
+`)
+	got, err := ExtractPolicies(path)
+	require.NoError(t, err)
+	want := []string{"DIRECT", "REJECT", "PROXY", "AUTO", "SS-1", "SS-2"}
+	assert.Equal(t, want, got)
+}

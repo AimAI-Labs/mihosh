@@ -234,49 +234,160 @@ func TestBuildRuleLine(t *testing.T) {
 }
 
 // ============================================================
-//  策略选择器行为（◀ ▶ 横向，与类型行镜像）
+//  策略选择器行为（二级弹窗）
 // ============================================================
 
-// TestAddForm_DefaultProxyIsDirect 验证无配置文件时兜底策略含 DIRECT 且默认选中 DIRECT。
+// TestAddForm_DefaultProxyIsDirect 验证无配置文件时兆底策略含 DIRECT 且默认选中 DIRECT。
 func TestAddForm_DefaultProxyIsDirect(t *testing.T) {
 	form := newAddForm("")
-	// 兜底列表为 [DIRECT, REJECT]
-	if !stringSlicesEqual(form.proxyPolicies, []string{defaultProxyPolicy, "REJECT"}) {
-		t.Fatalf("expected fallback policies [DIRECT REJECT], got %v", form.proxyPolicies)
+	// 兆底 groups 为 [DIRECT, REJECT]
+	if !stringSlicesEqual(form.proxyGroups, []string{defaultProxyPolicy, "REJECT"}) {
+		t.Fatalf("expected fallback groups [DIRECT REJECT], got %v", form.proxyGroups)
 	}
 	if got := form.currentProxy(); got != defaultProxyPolicy {
 		t.Fatalf("expected default proxy DIRECT, got %s", got)
 	}
 }
 
-// TestAddForm_LeftRightCyclesProxyWhenFocused 验证策略行聚焦时 ←/→ 循环切换策略，
-// 且不影响类型选择器。
-func TestAddForm_LeftRightCyclesProxyWhenFocused(t *testing.T) {
+// TestAddForm_ProxyFieldEnterOpensPicker 验证策略行聚焦时 Enter 打开二级弹窗。
+func TestAddForm_ProxyFieldEnterOpensPicker(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
 	s, _ = s.Update(keyMsg('n'), nil)
+	// Tab 到 proxy 字段
+	s, _ = s.Update(pressTab(), nil)
+	if !s.addForm.isProxyField() {
+		t.Fatal("expected focus on proxy field")
+	}
+	// Enter 打开二级弹窗
+	s, _ = s.Update(pressKey("enter"), nil)
+	if !s.addForm.isProxyPickerOpen() {
+		t.Fatal("expected proxy picker to open after Enter on proxy field")
+	}
+}
 
+// TestAddForm_PickerTabSwitch 验证 Tab 键在策略弹窗内切分类。
+func TestAddForm_PickerTabSwitch(t *testing.T) {
+	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
+	s, _ = s.Update(keyMsg('n'), nil)
+	// Tab → proxy, Enter → picker
+	s, _ = s.Update(pressTab(), nil)
+	s, _ = s.Update(pressKey("enter"), nil)
+	if s.addForm.pickerTab != addPickerTabGroup {
+		t.Fatalf("expected initial tab=group(0), got %d", s.addForm.pickerTab)
+	}
+	// Tab → 切到节点
+	s, _ = s.Update(pressTab(), nil)
+	if s.addForm.pickerTab != addPickerTabNode {
+		t.Fatalf("expected tab=node(1) after Tab, got %d", s.addForm.pickerTab)
+	}
+	// Shift+Tab → 回到策略组
+	s, _ = s.Update(pressShiftTab(), nil)
+	if s.addForm.pickerTab != addPickerTabGroup {
+		t.Fatalf("expected tab=group(0) after Shift+Tab, got %d", s.addForm.pickerTab)
+	}
+}
+
+// TestAddForm_PickerEscClosesKeepsSelection 验证 Esc 关闭弹窗保留已选策略。
+func TestAddForm_PickerEscClosesKeepsSelection(t *testing.T) {
+	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
+	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(pressTab(), nil) // → proxy
+	s, _ = s.Update(pressKey("enter"), nil) // open picker
+	s, _ = s.Update(pressKey("esc"), nil) // close picker
+	if s.addForm.isProxyPickerOpen() {
+		t.Fatal("expected picker closed after Esc")
+	}
+	if s.addForm.currentProxy() != defaultProxyPolicy {
+		t.Fatalf("expected proxy still DIRECT after Esc, got %s", s.addForm.currentProxy())
+	}
+}
+
+// TestAddForm_PickerUpDownMovesCursor 验证 ↑/↓ 在过滤列表中移动。
+func TestAddForm_PickerUpDownMovesCursor(t *testing.T) {
+	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
+	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(pressTab(), nil)
+	s, _ = s.Update(pressKey("enter"), nil) // open picker
+	// 初始光标 0
+	if s.addForm.pickerCursor != 0 {
+		t.Fatalf("expected initial picker cursor 0, got %d", s.addForm.pickerCursor)
+	}
+	// ↓ → 1
+	s, _ = s.Update(pressKey("down"), nil)
+	if s.addForm.pickerCursor != 1 {
+		t.Fatalf("expected picker cursor 1 after Down, got %d", s.addForm.pickerCursor)
+	}
+	// ↑ → 0
+	s, _ = s.Update(pressKey("up"), nil)
+	if s.addForm.pickerCursor != 0 {
+		t.Fatalf("expected picker cursor 0 after Up, got %d", s.addForm.pickerCursor)
+	}
+}
+
+// TestAddForm_PickerEnterSelects 验证 Enter 选中当前项并回填。
+func TestAddForm_PickerEnterSelects(t *testing.T) {
+	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
+	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(pressTab(), nil)
+	s, _ = s.Update(pressKey("enter"), nil) // open picker
+	// ↓ 移动到 REJECT (index 1)
+	s, _ = s.Update(pressKey("down"), nil)
+	// Enter 选中
+	s, _ = s.Update(pressKey("enter"), nil)
+	if s.addForm.isProxyPickerOpen() {
+		t.Fatal("expected picker closed after Enter selection")
+	}
+	if s.addForm.currentProxy() != "REJECT" {
+		t.Fatalf("expected proxy REJECT after selection, got %s", s.addForm.currentProxy())
+	}
+}
+
+// TestAddForm_PickerFuzzySearch 验证模糊搜索过滤列表。
+func TestAddForm_PickerFuzzySearch(t *testing.T) {
+	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
+	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(pressTab(), nil)
+	s, _ = s.Update(pressKey("enter"), nil) // open picker
+	// 输入 "rej" 应过滤出 REJECT
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("rej")}, nil)
+	filtered := s.addForm.pickerFiltered()
+	if len(filtered) != 1 || filtered[0] != "REJECT" {
+		t.Fatalf("expected [REJECT] after typing 'rej', got %v", filtered)
+	}
+}
+
+// TestAddForm_PickerBackspace 验证 Backspace 删除搜索字符。
+func TestAddForm_PickerBackspace(t *testing.T) {
+	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
+	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(pressTab(), nil)
+	s, _ = s.Update(pressKey("enter"), nil) // open picker
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("rej")}, nil)
+	// Backspace
+	s, _ = s.Update(pressKey("backspace"), nil)
+	if s.addForm.pickerSearch != "re" {
+		t.Fatalf("expected search 're' after backspace, got %q", s.addForm.pickerSearch)
+	}
+}
+
+// TestAddForm_LeftRightDoesNotChangeProxy 验证策略行聚焦时 ←/→ 不再切换策略。
+func TestAddForm_LeftRightDoesNotChangeProxy(t *testing.T) {
+	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
+	s, _ = s.Update(keyMsg('n'), nil)
 	// Tab 到 proxy 字段
 	s, _ = s.Update(pressTab(), nil)
 	if !s.addForm.isProxyField() {
 		t.Fatal("expected focus on proxy field")
 	}
 	proxyBefore := s.addForm.currentProxy()
-	typeBefore := s.addForm.currentType()
-
-	// → 切换策略
+	// ←/→ 不应改变策略
 	s, _ = s.Update(pressKey("right"), nil)
-	if s.addForm.currentProxy() == proxyBefore {
-		t.Fatalf("expected proxy to change after Right, still %s", proxyBefore)
+	if s.addForm.currentProxy() != proxyBefore {
+		t.Fatalf("proxy should not change on Right, was %s now %s", proxyBefore, s.addForm.currentProxy())
 	}
-	// 类型不应被影响（←/→ 在策略行聚焦时只动策略选择器）
-	if s.addForm.currentType() != typeBefore {
-		t.Fatalf("type changed unexpectedly: %s -> %s", typeBefore, s.addForm.currentType())
-	}
-
-	// ← 回到原策略
 	s, _ = s.Update(pressKey("left"), nil)
 	if s.addForm.currentProxy() != proxyBefore {
-		t.Fatalf("expected proxy back to %s after Left, got %s", proxyBefore, s.addForm.currentProxy())
+		t.Fatalf("proxy should not change on Left, was %s now %s", proxyBefore, s.addForm.currentProxy())
 	}
 }
 
@@ -319,16 +430,18 @@ func TestAddForm_ProxySelectorSubmitsCurrentProxy(t *testing.T) {
 	s, _ = s.Update(keyMsg('n'), nil)
 	// payload
 	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("example.com")}, nil)
-	// Tab → proxy，→ 切到 REJECT
+	// Tab → proxy, Enter 打开 picker
 	s, _ = s.Update(pressTab(), nil)
-	s, _ = s.Update(pressKey("right"), nil)
+	s, _ = s.Update(pressKey("enter"), nil)
+	// ↓ 移动到 REJECT，Enter 选中
+	s, _ = s.Update(pressKey("down"), nil)
+	s, _ = s.Update(pressKey("enter"), nil)
 	chosenProxy := s.addForm.currentProxy()
-	if chosenProxy == defaultProxyPolicy {
-		t.Fatalf("expected selected proxy to differ from default DIRECT")
+	if chosenProxy != "REJECT" {
+		t.Fatalf("expected REJECT after picker selection, got %s", chosenProxy)
 	}
 
-	// 提交；AddRuleCmd 在 lazy 执行时才调用，这里只断言表单内 currentProxy 即提交值。
-	// 回到 payload 焦点（确保不会因 index 字段为空失败）后提交。
+	// 提交；回到 payload 焦点后提交。
 	s, _ = s.Update(pressTab(), nil) // → index
 	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("1")}, nil)
 	s, _ = s.Update(pressKey("enter"), nil)
@@ -339,7 +452,7 @@ func TestAddForm_ProxySelectorSubmitsCurrentProxy(t *testing.T) {
 }
 
 // ============================================================
-//  配置提取（loadProxyPolicies）
+//  配置提取（newAddForm 使用 ExtractProxyPolicies）
 // ============================================================
 
 // writeAddFormTempConfig 写入临时配置文件并返回路径（与 config 包测试一致的风格）。
@@ -354,7 +467,7 @@ func writeAddFormTempConfig(t *testing.T, content string) string {
 }
 
 // TestLoadProxyPolicies_ReadsGroupsAndProxies 验证从源配置文件提取 proxy-groups 与 proxies 名称，
-// 且内置 DIRECT/REJECT 始终在前。
+// 且内置 DIRECT/REJECT 始终在 groups 前端。
 func TestLoadProxyPolicies_ReadsGroupsAndProxies(t *testing.T) {
 	path := writeAddFormTempConfig(t, `mixed-port: 7890
 proxies:
@@ -366,22 +479,30 @@ proxy-groups:
 `)
 	form := newAddForm(path)
 
-	// 预期顺序：内置在前，随后 proxy-groups，再 proxies
-	want := []string{defaultProxyPolicy, "REJECT", "PROXY", "AUTO", "SS-1", "SS-2"}
-	if !stringSlicesEqual(form.proxyPolicies, want) {
-		t.Fatalf("policies mismatch:\n got=%v\nwant=%v", form.proxyPolicies, want)
+	// groups：内置在前，随后 proxy-groups
+	wantGroups := []string{defaultProxyPolicy, "REJECT", "PROXY", "AUTO"}
+	if !stringSlicesEqual(form.proxyGroups, wantGroups) {
+		t.Fatalf("groups mismatch:\n got=%v\nwant=%v", form.proxyGroups, wantGroups)
 	}
-	// 默认选中 DIRECT（indexOfPolicy 命中内置 DIRECT）
+	// nodes：proxies
+	wantNodes := []string{"SS-1", "SS-2"}
+	if !stringSlicesEqual(form.proxyNodes, wantNodes) {
+		t.Fatalf("nodes mismatch:\n got=%v\nwant=%v", form.proxyNodes, wantNodes)
+	}
+	// 默认选中 DIRECT
 	if got := form.currentProxy(); got != defaultProxyPolicy {
 		t.Fatalf("expected default selected DIRECT, got %s", got)
 	}
 }
 
-// TestLoadProxyPolicies_FallbackOnMissingFile 验证配置文件不存在时降级为内置策略。
+// TestLoadProxyPolicies_FallbackOnMissingFile 验证配置文件不存在时兆底为内置策略。
 func TestLoadProxyPolicies_FallbackOnMissingFile(t *testing.T) {
 	form := newAddForm(filepath.Join(t.TempDir(), "does-not-exist.yaml"))
-	if !stringSlicesEqual(form.proxyPolicies, []string{defaultProxyPolicy, "REJECT"}) {
-		t.Fatalf("expected fallback [DIRECT REJECT], got %v", form.proxyPolicies)
+	if !stringSlicesEqual(form.proxyGroups, []string{defaultProxyPolicy, "REJECT"}) {
+		t.Fatalf("expected fallback groups [DIRECT REJECT], got %v", form.proxyGroups)
+	}
+	if len(form.proxyNodes) != 0 {
+		t.Fatalf("expected empty nodes on missing file, got %v", form.proxyNodes)
 	}
 	if got := form.currentProxy(); got != defaultProxyPolicy {
 		t.Fatalf("expected default DIRECT, got %s", got)
@@ -392,41 +513,28 @@ func TestLoadProxyPolicies_FallbackOnMissingFile(t *testing.T) {
 func TestLoadProxyPolicies_EmptyConfigFallsBack(t *testing.T) {
 	path := writeAddFormTempConfig(t, "mode: rule\n")
 	form := newAddForm(path)
-	if !stringSlicesEqual(form.proxyPolicies, []string{defaultProxyPolicy, "REJECT"}) {
-		t.Fatalf("expected only builtin policies, got %v", form.proxyPolicies)
+	if !stringSlicesEqual(form.proxyGroups, []string{defaultProxyPolicy, "REJECT"}) {
+		t.Fatalf("expected only builtin groups, got %v", form.proxyGroups)
+	}
+	if len(form.proxyNodes) != 0 {
+		t.Fatalf("expected empty nodes for empty config, got %v", form.proxyNodes)
 	}
 }
 
-// TestIndexOfPolicy_CaseInsensitive 验证 indexOfPolicy 大小写不敏感匹配。
-func TestIndexOfPolicy_CaseInsensitive(t *testing.T) {
-	policies := []string{"DIRECT", "REJECT", "PROXY"}
-	if i := indexOfPolicy(policies, "direct"); i != 0 {
-		t.Fatalf("expected index 0 for 'direct', got %d", i)
-	}
-	if i := indexOfPolicy(policies, "Proxy"); i != 2 {
-		t.Fatalf("expected index 2 for 'Proxy', got %d", i)
-	}
-	if i := indexOfPolicy(policies, "MISSING"); i != 0 {
-		t.Fatalf("expected index 0 (fallback) for missing, got %d", i)
-	}
-}
-
-// TestCycleProxy_WrapsAround 验证 cycleProxy 在列表边界循环。
-func TestCycleProxy_WrapsAround(t *testing.T) {
+// TestPickerFiltered_DirectRejectSearchable 验证内置 DIRECT/REJECT 在策略组 Tab 可被搜索。
+func TestPickerFiltered_DirectRejectSearchable(t *testing.T) {
 	form := newAddForm("")
-	// [DIRECT, REJECT]，初始在第 0 项 DIRECT
-	form.cycleProxy(1)
-	if got := form.currentProxy(); got != "REJECT" {
-		t.Fatalf("expected REJECT after +1, got %s", got)
+	form.openProxyPicker()
+	// 搜索 "dir" 应匹配 DIRECT
+	form.pickerSearch = "dir"
+	filtered := form.pickerFiltered()
+	if len(filtered) != 1 || filtered[0] != "DIRECT" {
+		t.Fatalf("expected [DIRECT] for search 'dir', got %v", filtered)
 	}
-	// 再 +1 应循环回 DIRECT
-	form.cycleProxy(1)
-	if got := form.currentProxy(); got != defaultProxyPolicy {
-		t.Fatalf("expected DIRECT after wrap, got %s", got)
-	}
-	// -1 应到 REJECT
-	form.cycleProxy(-1)
-	if got := form.currentProxy(); got != "REJECT" {
-		t.Fatalf("expected REJECT after -1, got %s", got)
+	// 搜索 "rej" 应匹配 REJECT
+	form.pickerSearch = "rej"
+	filtered = form.pickerFiltered()
+	if len(filtered) != 1 || filtered[0] != "REJECT" {
+		t.Fatalf("expected [REJECT] for search 'rej', got %v", filtered)
 	}
 }
