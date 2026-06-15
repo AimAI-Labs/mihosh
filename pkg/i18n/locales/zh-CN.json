@@ -148,6 +148,7 @@
   "rules.add_field_proxy": "策略:",
   "rules.add_field_index": "位置:",
   "rules.add_index_hint": "位置=配置文件中规则顺序；留空或 1=顶部（最高优先）",
+  "rules.add_proxy_hint": "策略来自源配置文件；←/→ 切换",
   "rules.add_err_payload": "匹配值不能为空",
   "rules.add_err_proxy": "策略不能为空",
   "rules.add_err_index": "位置必须是 >=1 的整数",

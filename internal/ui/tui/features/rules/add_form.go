@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -25,6 +26,9 @@ var ruleTypePresets = []string{
 	"MATCH",
 }
 
+// defaultProxyPolicy 是策略提取失败或列表为空时的兜底值。
+const defaultProxyPolicy = "DIRECT"
+
 // 表单字段索引（同时也是 Tab 循环顺序）。
 const (
 	addFieldPayload = 0 // 匹配值
@@ -37,15 +41,22 @@ const (
 //
 // textinput.Model 为值类型，State 在 Bubble Tea 中按值传递，每次更新都会
 // 复制整个 form；因此本结构的方法均以值接收者返回新值。
+//
+// 策略(proxy)字段为只读选择器：可选项来自 proxyPolicies（由源配置文件提取），
+// proxyCursor 指向当前选中项。addFieldProxy 槽位仍保留一个 textinput.Model
+// 仅作占位以维持字段索引与布局高度一致，其值不参与提交。
 type addForm struct {
-	fields      []textinput.Model // length == addFieldCount
-	fieldCursor int               // 当前聚焦字段
-	typeCursor  int               // 类型选择器光标（ruleTypePresets 索引）
-	errMsg      string            // 行内校验/写入错误
+	fields         []textinput.Model // length == addFieldCount；proxy 槽为占位
+	fieldCursor    int               // 当前聚焦字段
+	typeCursor     int               // 类型选择器光标（ruleTypePresets 索引）
+	proxyPolicies  []string          // 可选策略（来自源配置文件）
+	proxyCursor    int               // 策略选择器光标（proxyPolicies 索引）
+	errMsg         string            // 行内校验/写入错误
 }
 
 // newAddForm 构造初始表单：默认类型 DOMAIN-SUFFIX，位置字段留空（默认顶部）。
-func newAddForm() addForm {
+// 策略可选项由 configPath 指向的源配置文件提取（proxy-groups/proxies 名称 + 内置 DIRECT/REJECT）。
+func newAddForm(configPath string) addForm {
 	fields := make([]textinput.Model, addFieldCount)
 
 	payload := textinput.New()
@@ -54,9 +65,8 @@ func newAddForm() addForm {
 	payload.Prompt = ""
 	fields[addFieldPayload] = payload
 
+	// proxy 槽位保留 textinput.Model 仅作占位，实际值由选择器提供。
 	proxy := textinput.New()
-	proxy.Placeholder = "DIRECT"
-	proxy.CharLimit = 64
 	proxy.Prompt = ""
 	fields[addFieldProxy] = proxy
 
@@ -69,8 +79,30 @@ func newAddForm() addForm {
 	form := addForm{fields: fields, fieldCursor: addFieldPayload}
 	// 默认类型选择 DOMAIN-SUFFIX
 	form.typeCursor = indexOfPreset("DOMAIN-SUFFIX")
+	// 从源配置文件提取策略列表；提取失败时降级为内置策略
+	form.proxyPolicies = loadProxyPolicies(configPath)
+	form.proxyCursor = indexOfPolicy(form.proxyPolicies, defaultProxyPolicy)
 	form.focusCurrent()
 	return form
+}
+
+// loadProxyPolicies 从 configPath 提取策略列表；任何失败均降级为内置策略，保证表单可用。
+func loadProxyPolicies(configPath string) []string {
+	policies, err := config.ExtractPolicies(configPath)
+	if err != nil || len(policies) == 0 {
+		return []string{defaultProxyPolicy, "REJECT"}
+	}
+	return policies
+}
+
+// indexOfPolicy 在 policies 中查找（不区分大小写）；未命中返回 0。
+func indexOfPolicy(policies []string, name string) int {
+	for i, p := range policies {
+		if strings.EqualFold(p, name) {
+			return i
+		}
+	}
+	return 0
 }
 
 // indexOfPreset 在 ruleTypePresets 中查找（不区分大小写）；未命中返回 0。
@@ -120,6 +152,31 @@ func (f *addForm) cycleType(dir int) {
 	f.typeCursor = ((f.typeCursor+dir)%n + n) % n
 }
 
+// currentProxy 返回当前选中的策略字符串（始终非空：proxyPolicies 至少含兜底项）。
+func (f addForm) currentProxy() string {
+	if len(f.proxyPolicies) == 0 {
+		return defaultProxyPolicy
+	}
+	if f.proxyCursor < 0 || f.proxyCursor >= len(f.proxyPolicies) {
+		return f.proxyPolicies[0]
+	}
+	return f.proxyPolicies[f.proxyCursor]
+}
+
+// cycleProxy 循环切换策略（dir=1 下一项，dir=-1 上一项）。
+func (f *addForm) cycleProxy(dir int) {
+	n := len(f.proxyPolicies)
+	if n == 0 {
+		return
+	}
+	f.proxyCursor = ((f.proxyCursor+dir)%n + n) % n
+}
+
+// isProxyField 当前聚焦字段是否为策略选择器。
+func (f addForm) isProxyField() bool {
+	return f.fieldCursor == addFieldProxy
+}
+
 // resolveIndex 解析位置字段：空或非法视为 1（顶部，最高优先级）。
 func (f addForm) resolveIndex() int {
 	raw := strings.TrimSpace(f.fields[addFieldIndex].Value())
@@ -137,7 +194,7 @@ func (f addForm) resolveIndex() int {
 //
 // 校验规则：
 //   - 非 MATCH 类型 payload 必填；
-//   - proxy 必填；
+//   - 策略由选择器提供，proxyPolicies 为空时才报错（理论上不会发生）；
 //   - index 字段为空或可被 strconv.Atoi 解析为 >=1 的整数。
 func (f addForm) validate() (bool, string) {
 	if !f.isMatchType() {
@@ -145,7 +202,7 @@ func (f addForm) validate() (bool, string) {
 			return false, "rules.add_err_payload"
 		}
 	}
-	if strings.TrimSpace(f.fields[addFieldProxy].Value()) == "" {
+	if f.currentProxy() == "" {
 		return false, "rules.add_err_proxy"
 	}
 	if idxRaw := strings.TrimSpace(f.fields[addFieldIndex].Value()); idxRaw != "" {

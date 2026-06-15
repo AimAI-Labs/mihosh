@@ -126,7 +126,7 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client) (State, tea.Cmd) {
 	case msg.String() == "n":
 		// 打开添加自定义规则弹窗（每次打开重置为干净表单）
 		s.showAddForm = true
-		s.addForm = newAddForm()
+		s.addForm = newAddForm(s.configPath)
 
 	case key.Matches(msg, common.Keys.Refresh):
 		return s, FetchRules(client)
@@ -243,7 +243,7 @@ func (s State) handleAddFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	case key.Matches(msg, common.Keys.Escape):
 		// 放弃关闭，清空表单
 		s.showAddForm = false
-		s.addForm = newAddForm()
+		s.addForm = newAddForm(s.configPath)
 		return s, nil
 
 	case key.Matches(msg, common.Keys.Enter):
@@ -256,12 +256,12 @@ func (s State) handleAddFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		// 校验通过：发起写盘命令，重置表单
 		submit := form
 		s.showAddForm = false
-		s.addForm = newAddForm()
+		s.addForm = newAddForm(s.configPath)
 		cmd := AddRuleCmd(
 			s.configPath,
 			submit.currentType(),
 			submit.fields[addFieldPayload].Value(),
-			submit.fields[addFieldProxy].Value(),
+			submit.currentProxy(),
 			submit.resolveIndex(),
 		)
 		return s, cmd
@@ -281,16 +281,25 @@ func (s State) handleAddFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		form.cycleField(1)
 
 	case key.Matches(msg, common.Keys.Left):
-		// 类型选择器为 ◀ ▶ 横向，←/→ 循环切换类型
-		form.cycleType(-1)
+		// 策略行聚焦时 ←/→ 循环切换策略；否则循环切换类型（◀ ▶ 横向）
+		if form.isProxyField() {
+			form.cycleProxy(-1)
+		} else {
+			form.cycleType(-1)
+		}
 
 	case key.Matches(msg, common.Keys.Right):
-		// 类型选择器为 ◀ ▶ 横向，←/→ 循环切换类型
-		form.cycleType(1)
+		// 策略行聚焦时 ←/→ 循环切换策略；否则循环切换类型（◀ ▶ 横向）
+		if form.isProxyField() {
+			form.cycleProxy(1)
+		} else {
+			form.cycleType(1)
+		}
 
 	default:
 		// 透传给当前 textinput（Backspace / 可打印字符等）
-		if !isTextInputKey(msg) {
+		// 策略行为只读选择器，不接收文本输入
+		if form.isProxyField() || !isTextInputKey(msg) {
 			break
 		}
 		cur := form.fields[form.fieldCursor]
@@ -481,7 +490,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		if !(pageX >= left && pageX < right && pageY >= top && pageY < bottom) {
 			// 点击边框外：取消关闭
 			s.showAddForm = false
-			s.addForm = newAddForm()
+			s.addForm = newAddForm(s.configPath)
 		}
 		return s, nil
 	}

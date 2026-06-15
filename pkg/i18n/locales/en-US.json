@@ -148,6 +148,7 @@
   "rules.add_field_proxy": "Policy:",
   "rules.add_field_index": "Position:",
   "rules.add_index_hint": "Position = rule order in config; blank or 1 = top (highest priority)",
+  "rules.add_proxy_hint": "Policies are from the source config; ←/→ to switch",
   "rules.add_err_payload": "Payload cannot be empty",
   "rules.add_err_proxy": "Policy cannot be empty",
   "rules.add_err_index": "Position must be an integer >= 1",
