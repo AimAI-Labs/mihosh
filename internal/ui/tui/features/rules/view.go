@@ -911,7 +911,7 @@ func buildAddRuleModal(state PageState, width, height int) string {
 	// ── 字段渲染 ──
 	// MATCH 无 payload，省略匹配值字段
 	payloadRow := renderAddFormFieldRow(form, addFieldPayload, i18n.T("rules.add_field_payload"), innerWidth, form.isMatchType())
-	proxyRow := renderAddFormFieldRow(form, addFieldProxy, i18n.T("rules.add_field_proxy"), innerWidth, false)
+	proxyRow := renderAddFormProxyRow(form)
 	indexRow := renderAddFormFieldRow(form, addFieldIndex, i18n.T("rules.add_field_index"), innerWidth, false)
 
 	// ── 第二分隔行 ──
@@ -921,6 +921,9 @@ func buildAddRuleModal(state PageState, width, height int) string {
 	var footer string
 	if form.errMsg != "" {
 		footer = lipgloss.NewStyle().Foreground(common.CDanger).Render("✗ " + form.errMsg)
+	} else if form.isProxyField() {
+		// 策略行聚焦时提示 ←/→ 切换、来源为源配置文件
+		footer = common.TokyoMutedStyle().Render(i18n.T("rules.add_proxy_hint"))
 	} else {
 		footer = common.TokyoMutedStyle().Render(i18n.T("rules.add_index_hint"))
 	}
@@ -963,6 +966,22 @@ func renderAddFormFieldRow(form addForm, fieldIdx int, label string, innerWidth 
 	}
 
 	return labelText + " " + inputView
+}
+
+// renderAddFormProxyRow 渲染策略选择器行：策略: ◀ NAME ▶。
+// 策略为只读选择器（选项来自源配置文件），聚焦时青色高亮。
+func renderAddFormProxyRow(form addForm) string {
+	labelStyle := common.TokyoMutedStyle()
+	labelText := labelStyle.Render(i18n.T("rules.add_field_proxy"))
+
+	val := fmt.Sprintf("◀ %s ▶", form.currentProxy())
+	var valView string
+	if form.isProxyField() {
+		valView = lipgloss.NewStyle().Foreground(common.TokyoCyan).Bold(true).Render(val)
+	} else {
+		valView = lipgloss.NewStyle().Foreground(common.TokyoForeground).Render(val)
+	}
+	return labelText + " " + valView
 }
 
 // ResolveAddFormBounds 返回添加规则弹窗在页面坐标系中的边界（右下为开区间）。

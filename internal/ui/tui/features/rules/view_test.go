@@ -9,6 +9,27 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// stripANSI 移除 ANSI 转义序列，便于对纯文本断言。
+func stripANSI(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	inEscape := false
+	for _, r := range s {
+		switch {
+		case r == 0x1b:
+			inEscape = true
+		case inEscape:
+			// CSI 序列以字母（@~）结束
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+				inEscape = false
+			}
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 func TestRenderRuleList_AppendsScrollbarWithoutGap(t *testing.T) {
 	rules := make([]filteredRule, 0, 8)
 	for i := 0; i < 8; i++ {
@@ -58,5 +79,56 @@ func TestRenderRuleList_HidesScrollbarWhenAllRulesFit(t *testing.T) {
 	rendered := renderRuleList(rules, 0, 0, 4, 80, 0, 0)
 	if strings.Contains(rendered, common.SymbolScrollbarTrack) || strings.Contains(rendered, common.SymbolScrollbarThumb) {
 		t.Fatalf("expected no scrollbar when all rules fit, got %q", rendered)
+	}
+}
+
+// TestBuildAddRuleModal_RendersProxyAsSelector 验证策略行渲染为 ◀ NAME ▶ 选择器（与类型行镜像），
+// 且不出现旧的 textinput 占位（如光标块或空值）。
+func TestBuildAddRuleModal_RendersProxyAsSelector(t *testing.T) {
+	form := newAddForm("") // 兜底策略 [DIRECT, REJECT]，默认 DIRECT
+	state := PageState{ShowAddForm: true, AddForm: form}
+
+	modal := buildAddRuleModal(state, 80, 24)
+	plain := stripANSI(modal)
+
+	if !strings.Contains(plain, "◀ DIRECT ▶") {
+		t.Fatalf("expected proxy row rendered as '◀ DIRECT ▶', got:\n%s", plain)
+	}
+}
+
+// TestBuildAddRuleModal_ProxyRowReflectsSelection 验证切换策略后弹窗显示新策略名。
+func TestBuildAddRuleModal_ProxyRowReflectsSelection(t *testing.T) {
+	form := newAddForm("") // [DIRECT, REJECT]
+	form.cycleProxy(1)     // → REJECT
+	state := PageState{ShowAddForm: true, AddForm: form}
+
+	modal := buildAddRuleModal(state, 80, 24)
+	plain := stripANSI(modal)
+
+	if !strings.Contains(plain, "◀ REJECT ▶") {
+		t.Fatalf("expected proxy row to show '◀ REJECT ▶' after cycling, got:\n%s", plain)
+	}
+	// 不应残留上一个策略
+	if strings.Contains(plain, "◀ DIRECT ▶") {
+		t.Fatalf("stale DIRECT still rendered after cycling to REJECT:\n%s", plain)
+	}
+}
+
+// TestBuildAddRuleModal_TypeAndProxyBothUseArrows 验证类型行与策略行都使用 ◀ ▶ 包裹，
+// 即两者视觉一致（镜像）。
+func TestBuildAddRuleModal_TypeAndProxyBothUseArrows(t *testing.T) {
+	form := newAddForm("")
+	state := PageState{ShowAddForm: true, AddForm: form}
+
+	modal := buildAddRuleModal(state, 80, 24)
+	plain := stripANSI(modal)
+
+	// 默认类型 DOMAIN-SUFFIX
+	if !strings.Contains(plain, "◀ DOMAIN-SUFFIX ▶") {
+		t.Fatalf("expected type row '◀ DOMAIN-SUFFIX ▶', got:\n%s", plain)
+	}
+	// 策略行
+	if !strings.Contains(plain, "◀ DIRECT ▶") {
+		t.Fatalf("expected proxy row '◀ DIRECT ▶', got:\n%s", plain)
 	}
 }
