@@ -17,6 +17,16 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 )
 
+// newRulesState 构造规则页面初始状态，并注入当前 Mihomo 配置文件路径。
+// 路径解析失败时静默留空（用户尝试添加规则时会得到明确错误）。
+func newRulesState() rules.State {
+	s := rules.State{}
+	if path, err := config.GetMihomoConfigPath(); err == nil {
+		s = s.SetConfigPath(path)
+	}
+	return s
+}
+
 // Model TUI 主模型（仅保留全局共享状态）
 type Model struct {
 	// 基础设施
@@ -98,7 +108,7 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 		nodesState:           nodes.State{},
 		connsState:           connections.NewState(cfg.ProxyAddress, model.DefaultSiteTests()),
 		logsState:            logs.NewState(),
-		rulesState:           rules.State{},
+		rulesState:           newRulesState(),
 		settingsState:        settings.State{},
 		autoRefreshRemaining: cfg.AutoRefreshInterval,
 	}

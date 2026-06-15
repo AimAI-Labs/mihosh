@@ -66,6 +66,17 @@ type SiteTestMsg struct {
 
 type RulesMsg []model.Rule
 
+// RuleAddedMsg 自定义规则已成功写入配置文件（调用方负责热重载与刷新）。
+type RuleAddedMsg struct{}
+
+// RuleAddErrorMsg 写入自定义规则失败（解析/校验/写盘）。
+type RuleAddErrorMsg struct{ Err error }
+
+func (m RuleAddErrorMsg) Error() string { return m.Err.Error() }
+
+// ConfigReloadedMsg 调用 mihomo 核心 ReloadConfig 的结果。
+type ConfigReloadedMsg struct{ Err error }
+
 // ========= WebSocket Streaming Messages =========
 
 type MemoryWSMsg struct {
