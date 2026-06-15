@@ -7,6 +7,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
 	"time"
 
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
@@ -43,6 +44,23 @@ func autoRefreshTick() tea.Cmd {
 	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
 		return messages.AutoRefreshTickMsg(t)
 	})
+}
+
+// reloadConfigCmd 通知 mihomo 核心重新加载配置文件。
+// 失败回退为 ErrMsg（沿用现有全局错误显示），不回滚已写入的文件。
+func reloadConfigCmd(client interface {
+	ReloadConfig(path string) error
+}) tea.Cmd {
+	return func() tea.Msg {
+		path, err := config.GetMihomoConfigPath()
+		if err != nil {
+			return messages.ErrMsg{Err: err}
+		}
+		if err := client.ReloadConfig(path); err != nil {
+			return messages.ErrMsg{Err: err}
+		}
+		return messages.ConfigReloadedMsg{}
+	}
 }
 
 // Init 初始化
@@ -233,6 +251,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case messages.RulesMsg:
 		m.rulesState = m.rulesState.ApplyRules(msg)
+
+	case messages.RuleAddedMsg:
+		// 规则已写入配置文件：热重载核心 + 刷新规则列表 + 显示成功提示
+		m.notice = i18n.T("rules.added_toast")
+		m.noticeTicks = autoRefreshNoticeTicks
+		return m, tea.Batch(reloadConfigCmd(m.client), rules.FetchRules(m.client))
+
+	case messages.RuleAddErrorMsg:
+		// 写入失败：沿用全局错误显示
+		m.err = msg
+		m.notice = ""
+		m.noticeTicks = 0
 
 	case messages.SiteTestMsg:
 		m.connsState = m.connsState.ApplySiteTestResult(msg.Name, msg.Delay, msg.Err)
@@ -534,7 +564,7 @@ func (m Model) isInputCapturing() bool {
 	case layout.PageLogs:
 		return m.logsState.FilterMode()
 	case layout.PageRules:
-		return m.rulesState.FilterMode() || m.rulesState.ShowTypeFilter()
+		return m.rulesState.FilterMode() || m.rulesState.ShowTypeFilter() || m.rulesState.ShowAddForm()
 	case layout.PageSettings:
 		return m.settingsState.IsEditing()
 	}

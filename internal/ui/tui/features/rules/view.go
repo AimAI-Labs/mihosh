@@ -75,6 +75,10 @@ type PageState struct {
 	SelectedTypes    []string // 已选择的规则类型
 	AvailableTypes   []string // 可用规则类型列表
 	TypeFilterCursor int      // 光标位置
+
+	// 添加规则弹窗状态
+	ShowAddForm bool    // 是否显示添加规则弹窗
+	AddForm     addForm // 表单状态快照
 }
 
 // RenderRulesPage 渲染规则页面
@@ -119,6 +123,11 @@ func RenderRulesPage(state PageState) string {
 		result = renderTypeFilterOverlay(result, state, state.Width, state.Height)
 	}
 
+	// 如果显示添加规则弹窗，叠加在页面之上（优先级高于类型筛选）
+	if state.ShowAddForm {
+		result = renderAddRuleOverlay(result, state, state.Width, state.Height)
+	}
+
 	return renderRulesInlineHelp(result, state)
 }
 
@@ -131,6 +140,16 @@ func RenderRulesPage(state PageState) string {
 
 // buildRulesInlineHelpHints 根据规则页上下文构建内联帮助条目
 func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
+	// 添加规则弹窗：类型切换（横向 ◀▶）+ 字段切换（纵向）+ 确认 + 取消
+	if state.ShowAddForm {
+		return []common.InlineHelpHint{
+			{Key: "←/→", Desc: i18n.T("help.rules_add.type")},
+			{Key: "↑/↓", Desc: i18n.T("help.rules_add.field")},
+			{Key: "Enter", Desc: i18n.T("help.rules_add.confirm")},
+			{Key: "Esc", Desc: i18n.T("help.rules_add.cancel")},
+		}
+	}
+
 	// 类型筛选弹窗：移动 + 切换 + 确认 + 取消
 	if state.ShowTypeFilter {
 		return []common.InlineHelpHint{
@@ -156,6 +175,7 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 		{Key: "↑↓", Desc: i18n.T("help.rules.hint_select")},
 		{Key: "/", Desc: i18n.T("help.rules.hint_search")},
 		{Key: "t", Desc: i18n.T("help.rules.hint_type")},
+		{Key: "n", Desc: i18n.T("help.rules.hint_add")},
 		{Key: "r", Desc: i18n.T("help.rules.hint_refresh")},
 	}
 }
@@ -777,4 +797,195 @@ func buildTypeFilterModal(state PageState, width, height int) string {
 		common.TokyoBlue,
 		common.TokyoForeground,
 	)
+}
+
+// ============================================================
+//  添加自定义规则弹窗（renderAddRuleOverlay / buildAddRuleModal）
+// ============================================================
+//
+// 布局完全复刻类型筛选弹窗：暗化底层 → 居中弹窗 → 逐行嵌入。
+// 表单字段使用 bubbles/textinput 的 View() 渲染（自带光标）。
+
+// addFormModalWidth 弹窗整体宽度（含边框）。
+const addFormModalWidth = 54
+
+// addFormLayout 描述添加规则弹窗的内部布局，供渲染与鼠标命中复用。
+type addFormLayout struct {
+	modalWidth  int // 弹窗整体宽度（含边框）
+	modalHeight int // 弹窗整体高度（含边框）
+}
+
+// computeAddFormLayout 计算弹窗尺寸，需与 buildAddRuleModal 保持一致。
+func computeAddFormLayout(state PageState, width, height int) addFormLayout {
+	modalWidth := addFormModalWidth
+	if modalWidth > width-4 {
+		modalWidth = width - 4
+	}
+	if modalWidth < 24 {
+		modalWidth = 24
+	}
+	// 固定高度：上边框1 + 类型行1 + 分隔1 + 三字段3 + 分隔1 + 说明/错误1 + 下边框1 = 9
+	modalHeight := 9
+	if modalHeight > height-2 {
+		modalHeight = height - 2
+	}
+	return addFormLayout{modalWidth: modalWidth, modalHeight: modalHeight}
+}
+
+// renderAddRuleOverlay 渲染添加规则弹窗叠加层（同 renderTypeFilterOverlay 结构）。
+func renderAddRuleOverlay(background string, state PageState, width, height int) string {
+	// ── 1. 暗化底层 ──
+	baseLines := strings.Split(background, "\n")
+	for len(baseLines) < height {
+		baseLines = append(baseLines, "")
+	}
+	if len(baseLines) > height {
+		baseLines = baseLines[:height]
+	}
+
+	faint := lipgloss.NewStyle().Faint(true)
+	dimmed := make([]string, height)
+	for i, l := range baseLines {
+		dimmed[i] = faint.Render(l)
+	}
+
+	// ── 2. 弹窗居中计算 ──
+	modal := buildAddRuleModal(state, width, height)
+	modalLines := strings.Split(modal, "\n")
+	modalHeight := len(modalLines)
+	if modalHeight == 0 {
+		return strings.Join(dimmed, "\n")
+	}
+
+	modalWidth := lipgloss.Width(modalLines[0])
+	leftOffset := (width - modalWidth) / 2
+	if leftOffset < 0 {
+		leftOffset = 0
+	}
+	topOffset := (height - modalHeight) / 2
+	if topOffset < 0 {
+		topOffset = 0
+	}
+
+	// ── 3. 弹窗行嵌入暗化底层 ──
+	for i, pl := range modalLines {
+		y := topOffset + i
+		if y >= height {
+			break
+		}
+
+		leftPart := ansi.Cut(dimmed[y], 0, leftOffset)
+		leftW := lipgloss.Width(leftPart)
+		if leftW < leftOffset {
+			leftPart += strings.Repeat(" ", leftOffset-leftW)
+		}
+
+		rightPart := ansi.Cut(dimmed[y], leftOffset+modalWidth, width)
+		dimmed[y] = leftPart + pl + rightPart
+	}
+
+	return strings.Join(dimmed, "\n")
+}
+
+// buildAddRuleModal 渲染添加规则弹窗本体（无暗化背景）。
+// 尺寸计算与 computeAddFormLayout 必须一致。
+func buildAddRuleModal(state PageState, width, height int) string {
+	layout := computeAddFormLayout(state, width, height)
+	innerWidth := layout.modalWidth - 4 // 减去左右边框 + padding
+	if innerWidth < 10 {
+		innerWidth = 10
+	}
+
+	form := state.AddForm
+
+	// ── 类型行：◀ TYPE ▶ ──
+	typeColor := getAdjustedRuleTypeColor(form.currentType(), nil)
+	typeValStyle := lipgloss.NewStyle().Foreground(typeColor).Bold(true)
+	typeLabel := common.TokyoMutedStyle().Render(i18n.T("rules.add_field_type"))
+	typeVal := typeValStyle.Render(fmt.Sprintf("◀ %s ▶", form.currentType()))
+	typeRow := typeLabel + " " + typeVal
+
+	// ── 分隔行 ──
+	divider := lipgloss.NewStyle().Foreground(common.TokyoBlue).Render(strings.Repeat("─", innerWidth))
+
+	// ── 字段渲染 ──
+	// MATCH 无 payload，省略匹配值字段
+	payloadRow := renderAddFormFieldRow(form, addFieldPayload, i18n.T("rules.add_field_payload"), innerWidth, form.isMatchType())
+	proxyRow := renderAddFormFieldRow(form, addFieldProxy, i18n.T("rules.add_field_proxy"), innerWidth, false)
+	indexRow := renderAddFormFieldRow(form, addFieldIndex, i18n.T("rules.add_field_index"), innerWidth, false)
+
+	// ── 第二分隔行 ──
+	divider2 := divider
+
+	// ── 说明/错误行 ──
+	var footer string
+	if form.errMsg != "" {
+		footer = lipgloss.NewStyle().Foreground(common.CDanger).Render("✗ " + form.errMsg)
+	} else {
+		footer = common.TokyoMutedStyle().Render(i18n.T("rules.add_index_hint"))
+	}
+
+	var contentRows []string
+	contentRows = append(contentRows, typeRow, divider)
+	if payloadRow != "" {
+		contentRows = append(contentRows, payloadRow)
+	}
+	contentRows = append(contentRows, proxyRow, indexRow, divider2, footer)
+
+	modalContent := strings.Join(contentRows, "\n")
+
+	return common.RenderBorderedPanel(
+		i18n.T("rules.add_title"),
+		modalContent,
+		layout.modalWidth,
+		common.TokyoBlue,
+		common.TokyoForeground,
+	)
+}
+
+// renderAddFormFieldRow 渲染单个表单字段行（label + textinput.View）。
+// skip=true 时返回空字符串（用于 MATCH 类型省略 payload 字段）。
+func renderAddFormFieldRow(form addForm, fieldIdx int, label string, innerWidth int, skip bool) string {
+	if skip {
+		return ""
+	}
+	labelStyle := common.TokyoMutedStyle()
+	labelText := labelStyle.Render(label)
+
+	// textinput 的 View() 自带光标；为聚焦字段添加高亮背景
+	field := form.fields[fieldIdx]
+	inputView := field.View()
+	if form.fieldCursor == fieldIdx {
+		// 聚焦态：青色高亮
+		inputView = lipgloss.NewStyle().Foreground(common.TokyoCyan).Render(inputView)
+	} else {
+		inputView = lipgloss.NewStyle().Foreground(common.TokyoForeground).Render(inputView)
+	}
+
+	return labelText + " " + inputView
+}
+
+// ResolveAddFormBounds 返回添加规则弹窗在页面坐标系中的边界（右下为开区间）。
+// 通过渲染真实弹窗取尺寸，确保与 renderAddRuleOverlay 居中位置完全一致。
+func ResolveAddFormBounds(state PageState, width, height int) (left, top, right, bottom int) {
+	if width <= 0 || height <= 0 {
+		return 0, 0, 0, 0
+	}
+	modal := buildAddRuleModal(state, width, height)
+	modalWidth := lipgloss.Width(modal)
+	modalHeight := lipgloss.Height(modal)
+
+	leftGap := width - modalWidth
+	if leftGap < 0 {
+		leftGap = 0
+	}
+	topGap := height - modalHeight
+	if topGap < 0 {
+		topGap = 0
+	}
+	left = leftGap / 2
+	top = topGap / 2
+	right = left + modalWidth
+	bottom = top + modalHeight
+	return left, top, right, bottom
 }

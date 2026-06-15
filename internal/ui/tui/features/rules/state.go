@@ -2,6 +2,7 @@ package rules
 
 import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"regexp"
 	"strings"
 	"time"
@@ -43,6 +44,11 @@ type State struct {
 	lastTypeFilterClickIdx int       // 上次点击的类型项索引
 	lastTypeFilterClickAt  time.Time // 上次点击时间
 
+	// 添加自定义规则弹窗状态
+	showAddForm bool    // 是否显示添加规则弹窗
+	addForm     addForm // 表单状态（仅 showAddForm 为 true 时有意义）
+	configPath  string  // 当前 Mihomo 配置文件路径（由主 Model 注入）
+
 	ColorAdjustLight float64 // 0.2-0.4 建议明度增加比例
 	ColorAdjustDark  float64 // 0.15-0.25 建议明度降低比例
 }
@@ -66,11 +72,25 @@ func (s State) ToPageState(width, height int) PageState {
 		SelectedTypes:    s.selectedTypes,
 		AvailableTypes:   s.availableTypes,
 		TypeFilterCursor: s.typeFilterCursor,
+		// 添加规则弹窗状态
+		ShowAddForm: s.showAddForm,
+		AddForm:     s.addForm,
 	}
+}
+
+// SetConfigPath 由主 Model 在初始化时注入 Mihomo 配置文件路径。
+func (s State) SetConfigPath(path string) State {
+	s.configPath = path
+	return s
 }
 
 // Update 处理规则页面按键
 func (s State) Update(msg tea.KeyMsg, client *api.Client) (State, tea.Cmd) {
+	// 添加规则弹窗优先拦截（吞掉所有按键）
+	if s.showAddForm {
+		return s.handleAddFormMode(msg)
+	}
+
 	// 类型筛选弹窗模式优先处理
 	if s.showTypeFilter {
 		return s.handleTypeFilterMode(msg)
@@ -102,6 +122,11 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client) (State, tea.Cmd) {
 		s.showTypeFilter = true
 		s.typeFilterCursor = 0
 		s.extractAvailableTypes()
+
+	case msg.String() == "n":
+		// 打开添加自定义规则弹窗（每次打开重置为干净表单）
+		s.showAddForm = true
+		s.addForm = newAddForm()
 
 	case key.Matches(msg, common.Keys.Refresh):
 		return s, FetchRules(client)
@@ -150,6 +175,9 @@ func (s State) ApplyRules(rules []model.Rule) State {
 
 // ShowTypeFilter 返回是否显示类型筛选弹窗
 func (s State) ShowTypeFilter() bool { return s.showTypeFilter }
+
+// ShowAddForm 返回是否显示添加规则弹窗
+func (s State) ShowAddForm() bool { return s.showAddForm }
 
 // FilterMode 返回是否处于规则过滤模式
 func (s State) FilterMode() bool { return s.ruleFilterMode }
@@ -207,7 +235,76 @@ func (s State) handleRuleFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	return s, nil
 }
 
-// updateFilteredRules 重建规则过滤索引缓存（重用底层数组，避免频繁分配）
+// handleAddFormMode 处理「添加自定义规则」弹窗按键（吞掉所有按键）。
+func (s State) handleAddFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
+	form := s.addForm
+
+	switch {
+	case key.Matches(msg, common.Keys.Escape):
+		// 放弃关闭，清空表单
+		s.showAddForm = false
+		s.addForm = newAddForm()
+		return s, nil
+
+	case key.Matches(msg, common.Keys.Enter):
+		ok, errKey := form.validate()
+		if !ok {
+			form.errMsg = i18n.T(errKey)
+			s.addForm = form
+			return s, nil
+		}
+		// 校验通过：发起写盘命令，重置表单
+		submit := form
+		s.showAddForm = false
+		s.addForm = newAddForm()
+		cmd := AddRuleCmd(
+			s.configPath,
+			submit.currentType(),
+			submit.fields[addFieldPayload].Value(),
+			submit.fields[addFieldProxy].Value(),
+			submit.resolveIndex(),
+		)
+		return s, cmd
+
+	case msg.String() == "tab":
+		form.cycleField(1)
+
+	case msg.String() == "shift+tab":
+		form.cycleField(-1)
+
+	case key.Matches(msg, common.Keys.Up):
+		// 字段为垂直堆叠，↑/↓ 在字段间上下移动
+		form.cycleField(-1)
+
+	case key.Matches(msg, common.Keys.Down):
+		// 字段为垂直堆叠，↑/↓ 在字段间上下移动
+		form.cycleField(1)
+
+	case key.Matches(msg, common.Keys.Left):
+		// 类型选择器为 ◀ ▶ 横向，←/→ 循环切换类型
+		form.cycleType(-1)
+
+	case key.Matches(msg, common.Keys.Right):
+		// 类型选择器为 ◀ ▶ 横向，←/→ 循环切换类型
+		form.cycleType(1)
+
+	default:
+		// 透传给当前 textinput（Backspace / 可打印字符等）
+		if !isTextInputKey(msg) {
+			break
+		}
+		cur := form.fields[form.fieldCursor]
+		updated, cmd := cur.Update(msg)
+		form.fields[form.fieldCursor] = updated
+		form.errMsg = "" // 输入即清除上次错误
+		s.addForm = form
+		return s, cmd
+	}
+
+	s.addForm = form
+	return s, nil
+}
+
 func (s *State) updateFilteredRules() {
 	if len(s.rules) == 0 {
 		s.filteredRuleIndices = s.filteredRuleIndices[:0]
@@ -372,6 +469,23 @@ func (s *State) cancelAndClose() {
 // HandleMouseLeft 处理规则页面鼠标左键事件。
 // 弹窗打开时：点击弹窗外则确认并关闭；点击列表项则移动光标，双击切换选中。
 func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, tea.Cmd) {
+	// 添加规则弹窗打开时：点击弹窗外则取消关闭
+	if s.showAddForm {
+		pageState := PageState{
+			ShowAddForm: s.showAddForm,
+			AddForm:     s.addForm,
+			Width:       pageWidth,
+			Height:      pageHeight,
+		}
+		left, top, right, bottom := ResolveAddFormBounds(pageState, pageWidth, pageHeight)
+		if !(pageX >= left && pageX < right && pageY >= top && pageY < bottom) {
+			// 点击边框外：取消关闭
+			s.showAddForm = false
+			s.addForm = newAddForm()
+		}
+		return s, nil
+	}
+
 	// 仅在类型筛选弹窗打开时处理鼠标点击
 	if !s.showTypeFilter {
 		return s, nil
