@@ -29,6 +29,16 @@ var ruleTypePresets = []string{
 // defaultProxyPolicy 是策略提取失败或列表为空时的兜底值。
 const defaultProxyPolicy = "DIRECT"
 
+// addPickerTab 是策略选择二级弹窗的分类索引。
+const (
+	addPickerTabGroup = 0 // 策略组（含内置 DIRECT/REJECT）
+	addPickerTabNode  = 1 // 具体节点
+	addPickerTabCount = 2
+)
+
+// addPickerListMax 单屏最多展示的列表项数，超出则滚动。
+const addPickerListMax = 14
+
 // 表单字段索引（同时也是 Tab 循环顺序）。
 const (
 	addFieldPayload = 0 // 匹配值
@@ -42,20 +52,33 @@ const (
 // textinput.Model 为值类型，State 在 Bubble Tea 中按值传递，每次更新都会
 // 复制整个 form；因此本结构的方法均以值接收者返回新值。
 //
-// 策略(proxy)字段为只读选择器：可选项来自 proxyPolicies（由源配置文件提取），
-// proxyCursor 指向当前选中项。addFieldProxy 槽位仍保留一个 textinput.Model
-// 仅作占位以维持字段索引与布局高度一致，其值不参与提交。
+// 策略(proxy)字段为只读回填：选中值存于 proxySelected，点击策略行聚焦后按
+// Enter 可打开「选择策略」二级弹窗（picker 子状态）从中选定并回填。
+// addFieldProxy 槽位仍保留一个 textinput.Model 仅作占位以维持字段索引与
+// 布局高度一致，其值不参与提交。
 type addForm struct {
-	fields         []textinput.Model // length == addFieldCount；proxy 槽为占位
-	fieldCursor    int               // 当前聚焦字段
-	typeCursor     int               // 类型选择器光标（ruleTypePresets 索引）
-	proxyPolicies  []string          // 可选策略（来自源配置文件）
-	proxyCursor    int               // 策略选择器光标（proxyPolicies 索引）
-	errMsg         string            // 行内校验/写入错误
+	fields      []textinput.Model // length == addFieldCount；proxy 槽为占位
+	fieldCursor int               // 当前聚焦字段
+	typeCursor  int               // 类型选择器光标（ruleTypePresets 索引）
+
+	// 策略：分类候选 + 当前回填选中名
+	proxyGroups   []string // [DIRECT, REJECT, ...proxy-groups]
+	proxyNodes    []string // [...proxies]
+	proxySelected string   // 当前回填的选中策略名（始终非空：至少 DIRECT）
+
+	// 策略选择二级弹窗子状态（仅 showProxyPicker 为 true 时有意义）
+	showProxyPicker bool
+	pickerTab       int    // 0=策略组, 1=具体节点
+	pickerSearch    string // 模糊搜索文本
+	pickerCursor    int    // 在「过滤后」列表中的索引
+	pickerScrollTop int
+
+	errMsg string // 行内校验/写入错误
 }
 
 // newAddForm 构造初始表单：默认类型 DOMAIN-SUFFIX，位置字段留空（默认顶部）。
-// 策略可选项由 configPath 指向的源配置文件提取（proxy-groups/proxies 名称 + 内置 DIRECT/REJECT）。
+// 策略分类候选由 configPath 指向的源配置文件提取（proxy-groups / proxies 名称 +
+// 内置 DIRECT/REJECT）。proxySelected 默认 DIRECT。
 func newAddForm(configPath string) addForm {
 	fields := make([]textinput.Model, addFieldCount)
 
@@ -65,7 +88,7 @@ func newAddForm(configPath string) addForm {
 	payload.Prompt = ""
 	fields[addFieldPayload] = payload
 
-	// proxy 槽位保留 textinput.Model 仅作占位，实际值由选择器提供。
+	// proxy 槽位保留 textinput.Model 仅作占位，实际值由二级弹窗回填。
 	proxy := textinput.New()
 	proxy.Prompt = ""
 	fields[addFieldProxy] = proxy
@@ -76,34 +99,25 @@ func newAddForm(configPath string) addForm {
 	idx.Prompt = ""
 	fields[addFieldIndex] = idx
 
-	form := addForm{fields: fields, fieldCursor: addFieldPayload}
+	groups, nodes, _ := config.ExtractProxyPolicies(configPath)
+	if len(groups) == 0 {
+		groups = []string{defaultProxyPolicy, "REJECT"}
+	}
+
+	form := addForm{
+		fields:        fields,
+		fieldCursor:   addFieldPayload,
+		proxyGroups:   groups,
+		proxyNodes:    nodes,
+		proxySelected: defaultProxyPolicy,
+	}
 	// 默认类型选择 DOMAIN-SUFFIX
 	form.typeCursor = indexOfPreset("DOMAIN-SUFFIX")
-	// 从源配置文件提取策略列表；提取失败时降级为内置策略
-	form.proxyPolicies = loadProxyPolicies(configPath)
-	form.proxyCursor = indexOfPolicy(form.proxyPolicies, defaultProxyPolicy)
 	form.focusCurrent()
 	return form
 }
 
-// loadProxyPolicies 从 configPath 提取策略列表；任何失败均降级为内置策略，保证表单可用。
-func loadProxyPolicies(configPath string) []string {
-	policies, err := config.ExtractPolicies(configPath)
-	if err != nil || len(policies) == 0 {
-		return []string{defaultProxyPolicy, "REJECT"}
-	}
-	return policies
-}
 
-// indexOfPolicy 在 policies 中查找（不区分大小写）；未命中返回 0。
-func indexOfPolicy(policies []string, name string) int {
-	for i, p := range policies {
-		if strings.EqualFold(p, name) {
-			return i
-		}
-	}
-	return 0
-}
 
 // indexOfPreset 在 ruleTypePresets 中查找（不区分大小写）；未命中返回 0。
 func indexOfPreset(name string) int {
@@ -152,24 +166,116 @@ func (f *addForm) cycleType(dir int) {
 	f.typeCursor = ((f.typeCursor+dir)%n + n) % n
 }
 
-// currentProxy 返回当前选中的策略字符串（始终非空：proxyPolicies 至少含兜底项）。
+// currentProxy 返回当前选中的策略字符串（始终非空：至少含 DIRECT 兜底）。
 func (f addForm) currentProxy() string {
-	if len(f.proxyPolicies) == 0 {
+	if f.proxySelected == "" {
 		return defaultProxyPolicy
 	}
-	if f.proxyCursor < 0 || f.proxyCursor >= len(f.proxyPolicies) {
-		return f.proxyPolicies[0]
-	}
-	return f.proxyPolicies[f.proxyCursor]
+	return f.proxySelected
 }
 
-// cycleProxy 循环切换策略（dir=1 下一项，dir=-1 上一项）。
-func (f *addForm) cycleProxy(dir int) {
-	n := len(f.proxyPolicies)
+// isProxyPickerOpen 策略选择二级弹窗是否打开。
+func (f addForm) isProxyPickerOpen() bool { return f.showProxyPicker }
+
+// pickerCandidates 返回当前 Tab 的全量候选列表。
+func (f addForm) pickerCandidates() []string {
+	if f.pickerTab == addPickerTabNode {
+		return f.proxyNodes
+	}
+	return f.proxyGroups
+}
+
+// pickerFiltered 对当前 Tab 候选按 pickerSearch 做模糊匹配过滤。
+// 空搜索返回全量。
+func (f addForm) pickerFiltered() []string {
+	candidates := f.pickerCandidates()
+	if f.pickerSearch == "" {
+		return candidates
+	}
+	var result []string
+	for _, c := range candidates {
+		if fuzzyMatch(f.pickerSearch, c) {
+			result = append(result, c)
+		}
+	}
+	return result
+}
+
+// pickerChoose 选中指定策略，关闭弹窗并清空搜索/光标。
+func (f *addForm) pickerChoose(name string) {
+	f.proxySelected = name
+	f.showProxyPicker = false
+	f.pickerSearch = ""
+	f.pickerCursor = 0
+	f.pickerScrollTop = 0
+}
+
+// pickerClose 仅关闭弹窗（保留已选策略），不清空 proxySelected。
+func (f *addForm) pickerClose() {
+	f.showProxyPicker = false
+	f.pickerSearch = ""
+	f.pickerCursor = 0
+	f.pickerScrollTop = 0
+}
+
+// cyclePickerTab 切换策略弹窗 Tab（dir=1 下一个，dir=-1 上一个）。
+func (f *addForm) cyclePickerTab(dir int) {
+	f.pickerTab = ((f.pickerTab+dir)%addPickerTabCount + addPickerTabCount) % addPickerTabCount
+	f.pickerCursor = 0
+	f.pickerScrollTop = 0
+}
+
+// movePickerCursor 在过滤后列表中移动光标（dir=1 向下，dir=-1 向上），含滚动修正。
+func (f *addForm) movePickerCursor(dir int) {
+	filtered := f.pickerFiltered()
+	n := len(filtered)
 	if n == 0 {
 		return
 	}
-	f.proxyCursor = ((f.proxyCursor+dir)%n + n) % n
+	f.pickerCursor = ((f.pickerCursor+dir)%n + n) % n
+	// 滚动修正
+	if f.pickerCursor < f.pickerScrollTop {
+		f.pickerScrollTop = f.pickerCursor
+	}
+	if f.pickerCursor >= f.pickerScrollTop+addPickerListMax {
+		f.pickerScrollTop = f.pickerCursor - addPickerListMax + 1
+	}
+}
+
+// pickerTypeChar 向搜索框追加一个字符。
+func (f *addForm) pickerTypeChar(r rune) {
+	f.pickerSearch += string(r)
+	f.pickerCursor = 0
+	f.pickerScrollTop = 0
+}
+
+// pickerBackspace 删除搜索框最后一个字符。
+func (f *addForm) pickerBackspace() {
+	runes := []rune(f.pickerSearch)
+	if len(runes) > 0 {
+		f.pickerSearch = string(runes[:len(runes)-1])
+		f.pickerCursor = 0
+		f.pickerScrollTop = 0
+	}
+}
+
+// openProxyPicker 打开策略选择二级弹窗，重置搜索/光标。
+func (f *addForm) openProxyPicker() {
+	f.showProxyPicker = true
+	f.pickerTab = addPickerTabGroup
+	f.pickerSearch = ""
+	f.pickerCursor = 0
+	f.pickerScrollTop = 0
+}
+
+// isProxyGroupSelected 当前选中策略是否来自策略组（含内置 DIRECT/REJECT）。
+func (f addForm) isProxyGroupSelected() bool {
+	for _, g := range f.proxyGroups {
+		if g == f.proxySelected {
+			return true
+		}
+	}
+	return false
 }
 
 // isProxyField 当前聚焦字段是否为策略选择器。

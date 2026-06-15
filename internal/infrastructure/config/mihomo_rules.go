@@ -98,48 +98,71 @@ func CountRules(configPath string) (int, error) {
 	return len(seq.Content), nil
 }
 
-// builtinPolicies 是 Mihomo 始终可用的内置策略，列在提取结果最前。
+// builtinPolicies 是 Mihomo 始终可用的内置策略，列在「策略组」分类最前。
 var builtinPolicies = []string{"DIRECT", "REJECT"}
 
-// ExtractPolicies 从配置文件中提取可用的策略/代理名称列表。
+// ExtractProxyPolicies 从配置文件中分类提取可用的策略/代理名称。
 //
-// 收集顺序（去重）：
-//  1. 内置策略 DIRECT、REJECT（始终在前）；
-//  2. proxy-groups 下每个组的 name；
-//  3. proxies 下每个代理的 name。
+// 返回值（均已去重，保留首次出现顺序）：
+//   - groups：内置策略 DIRECT、REJECT 始终在前，随后是 proxy-groups 下每个组的 name；
+//   - nodes：proxies 下每个代理的 name。
 //
-// 配置文件不存在 / 解析失败 / 无 proxy-groups 与 proxies 时，仅返回内置策略。
-func ExtractPolicies(configPath string) ([]string, error) {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
+// 配置文件不存在 / 解析失败 / 无 proxy-groups 与 proxies 时，
+// groups 仅含内置策略、nodes 为空（保证调用方总有可用列表）。
+func ExtractProxyPolicies(configPath string) (groups, nodes []string, err error) {
+	data, readErr := os.ReadFile(configPath)
+	if readErr != nil {
 		// 文件不可读时降级为仅内置策略，保证调用方总有可用列表
-		return append([]string(nil), builtinPolicies...), nil
+		return append([]string(nil), builtinPolicies...), []string{}, nil
 	}
 
-	result := append([]string(nil), builtinPolicies...)
-	seen := make(map[string]struct{}, len(result))
-	for _, p := range result {
+	// 内置策略恒为 groups 首项
+	groups = append([]string(nil), builtinPolicies...)
+	seen := make(map[string]struct{}, len(groups))
+	for _, p := range groups {
 		seen[p] = struct{}{}
 	}
+	nodes = make([]string, 0)
 
 	if len(bytesTrimSpace(data)) == 0 {
-		return result, nil
+		return groups, nodes, nil
 	}
 
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		// 解析失败：仅内置策略，不报错（避免阻塞表单）
-		return result, nil
+		return groups, nodes, nil
 	}
 	root := mappingRoot(&doc)
 	if root == nil {
-		return result, nil
+		return groups, nodes, nil
 	}
 
-	// proxy-groups 优先（用户在规则中通常引用组）
-	appendUnique(findNamedSequence(root, "proxy-groups"), &result, &seen)
-	appendUnique(findNamedSequence(root, "proxies"), &result, &seen)
+	// proxy-groups 并入 groups；proxies 独立为 nodes
+	appendUnique(findNamedSequence(root, "proxy-groups"), &groups, &seen)
+	appendUnique(findNamedSequence(root, "proxies"), &nodes, &seen)
 
+	return groups, nodes, nil
+}
+
+// ExtractPolicies 从配置文件中提取可用的策略/代理名称列表（扁平，向后兼容）。
+//
+// 顺序（去重）：内置 DIRECT、REJECT → proxy-groups 的 name → proxies 的 name。
+// 内部委托 ExtractProxyPolicies 后拼回扁平列表。
+func ExtractPolicies(configPath string) ([]string, error) {
+	groups, nodes, _ := ExtractProxyPolicies(configPath)
+	result := append([]string{}, groups...)
+	seen := make(map[string]struct{}, len(result))
+	for _, p := range result {
+		seen[p] = struct{}{}
+	}
+	for _, n := range nodes {
+		if _, ok := seen[n]; ok {
+			continue
+		}
+		seen[n] = struct{}{}
+		result = append(result, n)
+	}
 	return result, nil
 }
 
