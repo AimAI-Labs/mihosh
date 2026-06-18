@@ -54,10 +54,10 @@ func reloadConfigCmd(client interface {
 	return func() tea.Msg {
 		path, err := config.GetMihomoConfigPath()
 		if err != nil {
-			return messages.ErrMsg{Err: err}
+			return messages.ConfigReloadedMsg{Err: err}
 		}
 		if err := client.ReloadConfig(path); err != nil {
-			return messages.ErrMsg{Err: err}
+			return messages.ConfigReloadedMsg{Err: err}
 		}
 		return messages.ConfigReloadedMsg{}
 	}
@@ -256,7 +256,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// 规则已写入配置文件：热重载核心 + 刷新规则列表 + 显示成功提示
 		m.notice = i18n.T("rules.added_toast")
 		m.noticeTicks = autoRefreshNoticeTicks
-		return m, tea.Batch(reloadConfigCmd(m.client), rules.FetchRules(m.client))
+		return m, reloadConfigCmd(m.client)
+
+	case messages.ConfigReloadedMsg:
+		if msg.Err != nil {
+			m.err = messages.ErrMsg{Err: msg.Err}
+			return m, nil
+		}
+		if m.currentPage == layout.PageRules {
+			return m, rules.FetchRules(m.client)
+		}
 
 	case messages.RuleAddErrorMsg:
 		// 写入失败：沿用全局错误显示
