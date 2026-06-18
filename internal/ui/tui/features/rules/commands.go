@@ -43,6 +43,8 @@ func buildRuleLine(ruleType, payload, proxy string) string {
 	ruleType = strings.TrimSpace(ruleType)
 	payload = strings.TrimSpace(payload)
 	proxy = strings.TrimSpace(proxy)
+
+
 	if strings.EqualFold(ruleType, "MATCH") {
 		return fmt.Sprintf("MATCH,%s", proxy)
 	}

@@ -160,6 +160,10 @@
   "rules.add_err_payload": "Payload cannot be empty",
   "rules.add_err_proxy": "Policy cannot be empty",
   "rules.add_err_index": "Position must be an integer >= 1",
+  "rules.add_err_comma": "Payload must not contain commas",
+  "rules.add_err_ip": "Invalid IP or CIDR format",
+  "rules.add_err_port": "Invalid port or port range",
+  "rules.add_err_domain": "Domains and keywords must not contain spaces",
   "rules.added_toast": "Rule added and core reloaded",
 
   "settings.panel_title": "Settings",

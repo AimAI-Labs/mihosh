@@ -1,6 +1,8 @@
 package rules
 
 import (
+	"net/netip"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -299,15 +301,60 @@ func (f addForm) resolveIndex() int {
 // validate 校验表单输入。返回 (ok, errorKey)，errorKey 为 i18n 键。
 //
 // 校验规则：
-//   - 非 MATCH 类型 payload 必填；
+//   - 非 MATCH 类型 payload 必填，且不允许包含逗号；
+//   - IP 类必须为合法的 IP 或 CIDR；
+//   - PORT 类必须为合法的端口或范围；
+//   - DOMAIN 类不得包含空格；
 //   - 策略由选择器提供，proxyPolicies 为空时才报错（理论上不会发生）；
 //   - index 字段为空或可被 strconv.Atoi 解析为 >=1 的整数。
 func (f addForm) validate() (bool, string) {
+	ruleType := strings.ToUpper(f.currentType())
+	payload := strings.TrimSpace(f.fields[addFieldPayload].Value())
+
 	if !f.isMatchType() {
-		if strings.TrimSpace(f.fields[addFieldPayload].Value()) == "" {
+		if payload == "" {
 			return false, "rules.add_err_payload"
 		}
 	}
+
+	// 1. 防逗号注入
+	if strings.Contains(payload, ",") {
+		return false, "rules.add_err_comma"
+	}
+
+	// 2. IP 格式强校验
+	if strings.HasSuffix(ruleType, "IP-CIDR") || ruleType == "IP-CIDR6" {
+		if _, err := netip.ParsePrefix(payload); err != nil {
+			return false, "rules.add_err_ip"
+		}
+	}
+
+	// 3. 端口格式校验
+	if ruleType == "DST-PORT" || ruleType == "SRC-PORT" {
+		re := regexp.MustCompile(`^(\d+)(?:[-\/](\d+))?$`)
+		matches := re.FindStringSubmatch(payload)
+		if len(matches) == 0 {
+			return false, "rules.add_err_port"
+		}
+		p1, _ := strconv.Atoi(matches[1])
+		if p1 < 0 || p1 > 65535 {
+			return false, "rules.add_err_port"
+		}
+		if matches[2] != "" {
+			p2, _ := strconv.Atoi(matches[2])
+			if p2 < 0 || p2 > 65535 {
+				return false, "rules.add_err_port"
+			}
+		}
+	}
+
+	// 4. 域名/关键字格式校验
+	if strings.HasPrefix(ruleType, "DOMAIN") {
+		if strings.ContainsAny(payload, " \t") {
+			return false, "rules.add_err_domain"
+		}
+	}
+
 	if f.currentProxy() == "" {
 		return false, "rules.add_err_proxy"
 	}

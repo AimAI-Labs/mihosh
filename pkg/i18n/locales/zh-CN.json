@@ -160,6 +160,10 @@
   "rules.add_err_payload": "匹配值不能为空",
   "rules.add_err_proxy": "策略不能为空",
   "rules.add_err_index": "位置必须是 >=1 的整数",
+  "rules.add_err_comma": "匹配值不能包含逗号",
+  "rules.add_err_ip": "无效的 IP 或 CIDR 格式",
+  "rules.add_err_port": "无效的端口或端口段格式",
+  "rules.add_err_domain": "域名或关键字不能包含空格",
   "rules.added_toast": "已添加规则并重载核心",
 
   "settings.panel_title": "配置项",

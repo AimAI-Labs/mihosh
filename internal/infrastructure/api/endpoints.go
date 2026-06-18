@@ -177,7 +177,9 @@ func (c *Client) GetRules() (*model.RulesResponse, error) {
 
 // ReloadConfig 通知 mihomo 核心重新加载配置文件
 func (c *Client) ReloadConfig(configPath string) error {
-	payload := map[string]string{"path": configPath}
+	// 无论 configPath 是什么，传递 path: "" 让 mihomo 重新加载其启动时的配置文件。
+	// 这避免了 Windows 下绝对路径可能导致的 400 Bad Request（路径无法解析或不匹配）问题。
+	payload := map[string]string{"path": ""}
 	_, err := c.DoRequest("PUT", "/configs?force=true", payload)
 	return err
 }
