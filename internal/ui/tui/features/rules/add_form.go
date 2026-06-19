@@ -49,11 +49,12 @@ const addPickerListMax = 14
 
 // 表单字段索引（同时也是 Tab 循环顺序）。
 const (
-	addFieldPayload   = 0 // 匹配值
-	addFieldProxy     = 1 // 策略
-	addFieldIndex     = 2 // 插入位置
-	addFieldNoResolve = 3 // no-resolve 复选框（仅 IP 类可见）
-	addFieldCount     = 4 // 字段数
+	addFieldType      = 0 // 类型（只读选择器，←/→ 切换）
+	addFieldPayload   = 1 // 匹配值
+	addFieldProxy     = 2 // 策略
+	addFieldIndex     = 3 // 插入位置
+	addFieldNoResolve = 4 // no-resolve 复选框（仅 IP 类可见）
+	addFieldCount     = 5 // 字段数
 )
 
 // addForm 维护「添加自定义规则」弹窗的表单状态。
@@ -65,8 +66,10 @@ const (
 // Enter 可打开「选择策略」二级弹窗（picker 子状态）从中选定并回填。
 // addFieldProxy 槽位仍保留一个 textinput.Model 仅作占位以维持字段索引与
 // 布局高度一致，其值不参与提交。
+// addFieldType / addFieldNoResolve 同样为只读选择器/复选框，槽位保留占位
+// textinput.Model 以避免 Focus() 空指针。
 type addForm struct {
-	fields      []textinput.Model // length == addFieldCount；proxy/noResolve 槽为占位
+	fields      []textinput.Model // length == addFieldCount；type/proxy/noResolve 槽为占位
 	fieldCursor int               // 当前聚焦字段
 	typeCursor  int               // 类型选择器光标（ruleTypePresets 索引）
 
@@ -90,9 +93,15 @@ type addForm struct {
 
 // newAddForm 构造初始表单：默认类型 DOMAIN-SUFFIX，位置字段留空（默认顶部）。
 // 策略分类候选由 configPath 指向的源配置文件提取（proxy-groups / proxies 名称 +
-// 内置 DIRECT/REJECT）。proxySelected 默认 DIRECT。
+// 内置 DIRECT/REJECT）。proxySelected 默认 DIRECT。默认焦点在 payload（最常用
+// 操作为输入匹配值）。
 func newAddForm(configPath string) addForm {
 	fields := make([]textinput.Model, addFieldCount)
+
+	// type 槽位保留 textinput.Model 仅作占位，实际值由 typeCursor + cycleType 切换。
+	typeSlot := textinput.New()
+	typeSlot.Prompt = ""
+	fields[addFieldType] = typeSlot
 
 	payload := textinput.New()
 	payload.Placeholder = "example.com"
@@ -171,12 +180,16 @@ func (f *addForm) focusCurrent() {
 }
 
 // cycleField 切换聚焦字段（dir=1 向下，dir=-1 向上），循环。
-// 非 IP 类型时自动跳过 addFieldNoResolve 字段。
+// 非 IP 类型时自动跳过 addFieldNoResolve 字段；MATCH 类型无 payload 时跳过。
 func (f *addForm) cycleField(dir int) {
 	n := addFieldCount
 	next := ((f.fieldCursor+dir)%n + n) % n
 	// 非 IP 类型跳过 noResolve 字段
 	if next == addFieldNoResolve && !f.isIPType() {
+		next = ((next+dir)%n + n) % n
+	}
+	// MATCH 类型无 payload，跳过
+	if next == addFieldPayload && f.isMatchType() {
 		next = ((next+dir)%n + n) % n
 	}
 	f.fieldCursor = next
@@ -308,6 +321,11 @@ func (f addForm) isProxyGroupSelected() bool {
 // isProxyField 当前聚焦字段是否为策略选择器。
 func (f addForm) isProxyField() bool {
 	return f.fieldCursor == addFieldProxy
+}
+
+// isTypeField 当前聚焦字段是否为类型选择器。
+func (f addForm) isTypeField() bool {
+	return f.fieldCursor == addFieldType
 }
 
 // isIPType 当前类型是否为 IP 类（IP-CIDR / IP-CIDR6 / SRC-IP-CIDR）。

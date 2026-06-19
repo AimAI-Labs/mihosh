@@ -64,6 +64,7 @@ func TestAddForm_EscClosesAndResets(t *testing.T) {
 }
 
 // TestAddForm_TabCyclesFields 验证 Tab 在字段间循环。
+// 字段顺序：type(0) → payload(1) → proxy(2) → index(3) → noResolve(4, 仅 IP 类)。
 func TestAddForm_TabCyclesFields(t *testing.T) {
 	s := State{}
 	s, _ = s.Update(keyMsg('n'), nil)
@@ -82,18 +83,30 @@ func TestAddForm_TabCyclesFields(t *testing.T) {
 	if s.addForm.fieldCursor != addFieldIndex {
 		t.Fatalf("expected cursor at index after 2x Tab, got %d", s.addForm.fieldCursor)
 	}
+	// Tab → type（非 IP 类型跳过 noResolve）
+	s, _ = s.Update(pressTab(), nil)
+	if s.addForm.fieldCursor != addFieldType {
+		t.Fatalf("expected cursor at type after 3x Tab, got %d", s.addForm.fieldCursor)
+	}
 	// Tab → 回到 payload（循环）
 	s, _ = s.Update(pressTab(), nil)
 	if s.addForm.fieldCursor != addFieldPayload {
-		t.Fatalf("expected cursor back at payload after 3x Tab, got %d", s.addForm.fieldCursor)
+		t.Fatalf("expected cursor back at payload after 4x Tab, got %d", s.addForm.fieldCursor)
 	}
 }
 
-// TestAddForm_LeftRightCyclesType 验证 ←/→ 循环切换规则类型（类型选择器为 ◀ ▶ 横向）。
+// TestAddForm_LeftRightCyclesType 验证类型行聚焦时 ←/→ 循环切换规则类型。
+// ←/→ 仅在类型行聚焦时切类型；payload/index 聚焦时 ←/→ 移动光标。
 func TestAddForm_LeftRightCyclesType(t *testing.T) {
 	s := State{}
 	s, _ = s.Update(keyMsg('n'), nil)
 	initialType := s.addForm.currentType()
+
+	// 聚焦到 type 行（默认 payload，Shift+Tab 上行一格即到 type）
+	s, _ = s.Update(pressShiftTab(), nil)
+	if !s.addForm.isTypeField() {
+		t.Fatalf("expected focus on type field, got %d", s.addForm.fieldCursor)
+	}
 
 	// → → 下一类型
 	s, _ = s.Update(pressKey("right"), nil)
@@ -133,6 +146,16 @@ func TestAddForm_UpDownCyclesField(t *testing.T) {
 	if s.addForm.fieldCursor != addFieldProxy {
 		t.Fatalf("expected cursor back at proxy after Up, got %d", s.addForm.fieldCursor)
 	}
+	// ↑ → 回到 payload
+	s, _ = s.Update(pressKey("up"), nil)
+	if s.addForm.fieldCursor != addFieldPayload {
+		t.Fatalf("expected cursor back at payload after 2x Up, got %d", s.addForm.fieldCursor)
+	}
+	// ↑ → type（payload 上一格即类型行）
+	s, _ = s.Update(pressKey("up"), nil)
+	if s.addForm.fieldCursor != addFieldType {
+		t.Fatalf("expected cursor at type after 3x Up, got %d", s.addForm.fieldCursor)
+	}
 }
 
 // TestAddForm_EnterValidationFailsOnEmpty 验证空 payload/proxy 时 Enter 校验失败、不关闭。
@@ -170,6 +193,12 @@ func TestAddForm_EnterSucceedsWithValidInput(t *testing.T) {
 func TestAddForm_MatchTypeSkipsPayload(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
 	s, _ = s.Update(keyMsg('n'), nil)
+
+	// 聚焦到 type 行后，←/→ 才切换类型
+	s, _ = s.Update(pressShiftTab(), nil)
+	if !s.addForm.isTypeField() {
+		t.Fatalf("expected focus on type field, got %d", s.addForm.fieldCursor)
+	}
 
 	// 循环 → 直到选中 MATCH
 	for i := 0; i < len(ruleTypePresets); i++ {
@@ -524,19 +553,25 @@ func TestAddForm_LeftRightDoesNotChangeProxy(t *testing.T) {
 	}
 }
 
-// TestAddForm_LeftRightCyclesTypeWhenProxyNotFocused 验证非策略行聚焦时 ←/→ 仍切换类型。
-func TestAddForm_LeftRightCyclesTypeWhenProxyNotFocused(t *testing.T) {
+// TestAddForm_LeftRightDoesNotCycleTypeWhenPayloadFocused 验证 payload 聚焦时 ←/→
+// 不再切换类型（改为移动光标），仅类型行聚焦时才切类型。
+func TestAddForm_LeftRightDoesNotCycleTypeWhenPayloadFocused(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
 	s, _ = s.Update(keyMsg('n'), nil)
-	// 焦点在 payload（非策略行）
-	if s.addForm.isProxyField() {
-		t.Fatal("expected focus NOT on proxy initially")
+	// 焦点在 payload（默认）
+	if !s.addForm.isTypeField() && s.addForm.fieldCursor != addFieldPayload {
+		t.Fatalf("expected focus on payload, got %d", s.addForm.fieldCursor)
 	}
 	typeBefore := s.addForm.currentType()
 
+	// payload 聚焦时 ←/→ 不应改变类型
 	s, _ = s.Update(pressKey("right"), nil)
-	if s.addForm.currentType() == typeBefore {
-		t.Fatalf("expected type to change when proxy not focused, still %s", typeBefore)
+	if s.addForm.currentType() != typeBefore {
+		t.Fatalf("type should not change when payload focused, was %s now %s", typeBefore, s.addForm.currentType())
+	}
+	s, _ = s.Update(pressKey("left"), nil)
+	if s.addForm.currentType() != typeBefore {
+		t.Fatalf("type should not change when payload focused, was %s now %s", typeBefore, s.addForm.currentType())
 	}
 }
 
@@ -669,5 +704,88 @@ func TestPickerFiltered_DirectRejectSearchable(t *testing.T) {
 	filtered = form.pickerFiltered()
 	if len(filtered) != 1 || filtered[0] != "REJECT" {
 		t.Fatalf("expected [REJECT] for search 'rej', got %v", filtered)
+	}
+}
+
+// ============================================================
+//  ←/→ 光标移动（核心修复验证）
+// ============================================================
+
+// TestAddForm_LeftRightMovesCursorInPayload 验证 payload 聚焦时 ←/→ 移动 textinput 光标，
+// 而非切换类型（这是本次修复的核心目标）。
+func TestAddForm_LeftRightMovesCursorInPayload(t *testing.T) {
+	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
+	s, _ = s.Update(keyMsg('n'), nil)
+	// 输入 "abc"，光标默认在末尾（pos=3）
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("abc")}, nil)
+	payload := s.addForm.fields[addFieldPayload]
+	if got := payload.Position(); got != 3 {
+		t.Fatalf("expected cursor at end (pos=3) after typing 'abc', got %d", got)
+	}
+	typeBefore := s.addForm.currentType()
+
+	// ← 光标左移一位，类型不变
+	s, _ = s.Update(pressKey("left"), nil)
+	if got := s.addForm.fields[addFieldPayload].Position(); got != 2 {
+		t.Fatalf("expected cursor pos=2 after Left, got %d", got)
+	}
+	if s.addForm.currentType() != typeBefore {
+		t.Fatalf("type should not change on Left in payload, was %s now %s", typeBefore, s.addForm.currentType())
+	}
+	// → 光标右移回末尾
+	s, _ = s.Update(pressKey("right"), nil)
+	if got := s.addForm.fields[addFieldPayload].Position(); got != 3 {
+		t.Fatalf("expected cursor pos=3 after Right, got %d", got)
+	}
+}
+
+// TestAddForm_LeftRightMovesCursorInIndex 验证 index 字段聚焦时 ←/→ 同样移动光标。
+func TestAddForm_LeftRightMovesCursorInIndex(t *testing.T) {
+	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
+	s, _ = s.Update(keyMsg('n'), nil)
+	// Tab 到 index：payload→proxy→index（两次 Tab）
+	s, _ = s.Update(pressTab(), nil) // → proxy
+	s, _ = s.Update(pressTab(), nil) // → index
+	if s.addForm.fieldCursor != addFieldIndex {
+		t.Fatalf("expected focus on index, got %d", s.addForm.fieldCursor)
+	}
+	// 输入 "12"，光标在末尾
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("12")}, nil)
+	if got := s.addForm.fields[addFieldIndex].Position(); got != 2 {
+		t.Fatalf("expected cursor pos=2 after typing '12', got %d", got)
+	}
+	// ← 左移
+	s, _ = s.Update(pressKey("left"), nil)
+	if got := s.addForm.fields[addFieldIndex].Position(); got != 1 {
+		t.Fatalf("expected cursor pos=1 after Left, got %d", got)
+	}
+}
+
+// TestAddForm_DefaultFocusIsPayload 验证打开表单后默认焦点在 payload（最常用操作）。
+func TestAddForm_DefaultFocusIsPayload(t *testing.T) {
+	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
+	s, _ = s.Update(keyMsg('n'), nil)
+	if s.addForm.fieldCursor != addFieldPayload {
+		t.Fatalf("expected default focus on payload(%d), got %d", addFieldPayload, s.addForm.fieldCursor)
+	}
+	if !s.addForm.fields[addFieldPayload].Focused() {
+		t.Fatal("expected payload textinput to be focused")
+	}
+}
+
+// TestAddForm_TypeFieldIgnoresTextInput 验证类型行为只读选择器，键入文本不影响类型值。
+func TestAddForm_TypeFieldIgnoresTextInput(t *testing.T) {
+	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
+	s, _ = s.Update(keyMsg('n'), nil)
+	// 聚焦到 type 行
+	s, _ = s.Update(pressShiftTab(), nil)
+	if !s.addForm.isTypeField() {
+		t.Fatalf("expected focus on type field, got %d", s.addForm.fieldCursor)
+	}
+	typeBefore := s.addForm.currentType()
+	// 键入文本应被吞掉，类型不变
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("XYZ")}, nil)
+	if s.addForm.currentType() != typeBefore {
+		t.Fatalf("type changed via text input on read-only field: %s -> %s", typeBefore, s.addForm.currentType())
 	}
 }

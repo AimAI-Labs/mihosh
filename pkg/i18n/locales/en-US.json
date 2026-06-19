@@ -148,6 +148,7 @@
   "rules.add_field_proxy": "Policy:",
   "rules.add_field_index": "Position:",
   "rules.add_field_noresolve": "no-resolve:",
+  "rules.add_type_hint": "←/→ to cycle rule type",
   "rules.add_index_hint": "Position = rule order in config; blank or 1 = top (highest priority)",
   "rules.add_noresolve_hint": "Space to toggle no-resolve (skip DNS resolution)",
   "rules.add_proxy_hint": "Policies are from the source config; Enter to open picker",

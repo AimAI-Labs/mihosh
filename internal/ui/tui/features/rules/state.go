@@ -298,14 +298,35 @@ func (s State) handleAddFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		form.cycleField(1)
 
 	case key.Matches(msg, common.Keys.Left):
-		// 策略行不再用 ←/→ 切换（改由二级弹窗），仅类型行横向翻页
-		if !form.isProxyField() && !form.isNoResolveField() {
+		// ←/→ 语义随焦点变化：
+		//   - 类型行聚焦 → 切换规则类型
+		//   - 匹配值/位置聚焦 → 透传 textinput 移动光标
+		//   - 策略/no-resolve（只读）→ 忽略
+		switch {
+		case form.isTypeField():
 			form.cycleType(-1)
+		case form.isProxyField(), form.isNoResolveField():
+			// 只读字段，忽略
+		default:
+			updated, cmd := form.fields[form.fieldCursor].Update(msg)
+			form.fields[form.fieldCursor] = updated
+			form.errMsg = ""
+			s.addForm = form
+			return s, cmd
 		}
 
 	case key.Matches(msg, common.Keys.Right):
-		if !form.isProxyField() && !form.isNoResolveField() {
+		switch {
+		case form.isTypeField():
 			form.cycleType(1)
+		case form.isProxyField(), form.isNoResolveField():
+			// 只读字段，忽略
+		default:
+			updated, cmd := form.fields[form.fieldCursor].Update(msg)
+			form.fields[form.fieldCursor] = updated
+			form.errMsg = ""
+			s.addForm = form
+			return s, cmd
 		}
 
 	case msg.String() == " ":

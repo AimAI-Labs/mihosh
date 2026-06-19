@@ -927,12 +927,8 @@ func buildAddRuleModal(state PageState, width, height int) string {
 
 	form := state.AddForm
 
-	// ── 类型行：◀ TYPE ▶ ──
-	typeColor := getAdjustedRuleTypeColor(form.currentType(), nil)
-	typeValStyle := lipgloss.NewStyle().Foreground(typeColor).Bold(true)
-	typeLabel := common.TokyoMutedStyle().Render(i18n.T("rules.add_field_type"))
-	typeVal := typeValStyle.Render(fmt.Sprintf("◀ %s ▶", form.currentType()))
-	typeRow := typeLabel + " " + typeVal
+	// ── 类型行：◀ TYPE ▶（可聚焦，聚焦时整体高亮 + ←/→ 切换提示）──
+	typeRow := renderAddFormTypeRow(form, innerWidth)
 
 	// ── 分隔行 ──
 	divider := lipgloss.NewStyle().Foreground(common.TokyoBlue).Render(strings.Repeat("─", innerWidth))
@@ -956,6 +952,8 @@ func buildAddRuleModal(state PageState, width, height int) string {
 	var footer string
 	if form.errMsg != "" {
 		footer = lipgloss.NewStyle().Foreground(common.CDanger).Render("✗ " + form.errMsg)
+	} else if form.isTypeField() {
+		footer = common.TokyoMutedStyle().Render(i18n.T("rules.add_type_hint"))
 	} else if form.isProxyField() {
 		// 策略行聚焦时提示 ←/→ 切换、来源为源配置文件
 		footer = common.TokyoMutedStyle().Render(i18n.T("rules.add_proxy_hint"))
@@ -1013,6 +1011,31 @@ func renderAddFormFieldRow(form addForm, fieldIdx int, label string, innerWidth 
 	}
 
 	return applyFieldRowBackground(labelText+" "+inputView, focused, innerWidth)
+}
+
+// renderAddFormTypeRow 渲染类型选择器行：类型: ◀ TYPE ▶。
+// 类型值颜色取自 ruleTypeColors；聚焦时标签青色 + 类型值加粗青色，
+// 整行铺满 TokyoSelected 背景（与 payload/proxy 行视觉一致）。
+func renderAddFormTypeRow(form addForm, innerWidth int) string {
+	focused := form.isTypeField()
+
+	labelStyle := common.TokyoMutedStyle()
+	if focused {
+		labelStyle = lipgloss.NewStyle().Foreground(common.TokyoCyan)
+	}
+	labelText := labelStyle.Render(i18n.T("rules.add_field_type"))
+
+	// 类型值颜色：聚焦时用青色强调（盖过类型配色），否则用类型自身配色
+	var typeVal string
+	if focused {
+		typeVal = lipgloss.NewStyle().Foreground(common.TokyoCyan).Bold(true).
+			Render(fmt.Sprintf("◀ %s ▶", form.currentType()))
+	} else {
+		typeColor := getAdjustedRuleTypeColor(form.currentType(), nil)
+		typeVal = lipgloss.NewStyle().Foreground(typeColor).Bold(true).
+			Render(fmt.Sprintf("◀ %s ▶", form.currentType()))
+	}
+	return applyFieldRowBackground(labelText+" "+typeVal, focused, innerWidth)
 }
 
 // renderAddFormProxyRow 渲染策略选择器行：策略: NAME (Enter 改)。
