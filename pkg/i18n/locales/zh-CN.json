@@ -149,7 +149,7 @@
   "rules.add_field_index": "位置:",
   "rules.add_field_noresolve": "no-resolve:",
   "rules.add_index_hint": "位置=配置文件中规则顺序；留空或 1=顶部（最高优先）",
-  "rules.add_noresolve_hint": "Space/Enter 切换 no-resolve（跳过 DNS 解析）",
+  "rules.add_noresolve_hint": "Space 切换 no-resolve（跳过 DNS 解析）",
   "rules.add_proxy_hint": "策略来自源配置文件；Enter 打开选择器",
   "rules.add_proxy_change": "(Enter 改)",
   "rules.picker_title": "选择策略",

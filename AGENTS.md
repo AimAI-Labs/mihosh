@@ -10,11 +10,12 @@
 
 ## 1. 技术栈与常用命令
 - **栈**: Go 1.24.0, Bubble Tea v1.3, cobra, viper, gorilla/websocket.
-- **环境**：执行命令前必须判断系统类型（Windows或Linux），使用兼容的命令。（win使用pwsh.exe执行）
-- **构建**：项目使用了mise工具，可在项目目录里**直接使用go命令**。
+- **环境**：执行命令前必须判断系统类型（Windows或Linux），使用兼容的命令执行。（win优先执行pwsh.exe）
+- **构建**：项目使用了mise工具。
 - **命令**: 
-  - `go test ./...` (涉及渲染及逻辑时必须跑测试，不依赖真实服务端环境)
-  - `go build -o mihosh .`（强制，构建后会自动杀死进程并重新运行）
+  - `mise exec go -- go test ./...` (涉及渲染及逻辑时必须跑测试，不依赖真实服务端环境)
+  - `mise exec go -- go build -o mihosh .`（强制，构建后会自动杀死进程并重新运行）
+- **构建后（本地为Win环境时执行）**：执行`.\deploy.ps1`
 
 ## 2. 架构约定
 - **CLI (`internal/cli`)**: 新增命令须支持 `--output plain|table|json`，以便脚本化。

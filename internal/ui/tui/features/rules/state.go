@@ -263,12 +263,6 @@ func (s State) handleAddFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 			s.addForm = form
 			return s, nil
 		}
-		// no-resolve 行聚焦时 Enter 切换复选框，不提交
-		if form.isNoResolveField() {
-			form.toggleNoResolve()
-			s.addForm = form
-			return s, nil
-		}
 		ok, errKey := form.validate()
 		if !ok {
 			form.errMsg = i18n.T(errKey)
