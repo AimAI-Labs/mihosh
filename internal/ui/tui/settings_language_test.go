@@ -5,6 +5,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
@@ -102,6 +103,58 @@ func TestSettingsLanguageMouseClickAppliesI18nImmediately(t *testing.T) {
 	}
 	if got := i18n.T("menu.nodes"); got != "Nodes" {
 		t.Fatalf("expected i18n to switch immediately, got %q", got)
+	}
+}
+
+func TestSettingsThemeMouseClickClearsScreen(t *testing.T) {
+	t.Cleanup(func() {
+		viper.Reset()
+		theme.SetTheme("tokyo-night")
+	})
+	viper.Reset()
+
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("USERPROFILE", tempHome)
+	t.Setenv("HOMEDRIVE", "")
+	t.Setenv("HOMEPATH", "")
+
+	cfg := config.DefaultConfig
+	cfg.Theme = "tokyo-night"
+	if err := config.Save(&cfg); err != nil {
+		t.Fatalf("Save() returned error: %v", err)
+	}
+	theme.SetTheme("tokyo-night")
+
+	model := Model{
+		currentPage: layout.PageSettings,
+		config:      &cfg,
+		configSvc:   service.NewConfigService(),
+		width:       120,
+		height:      30,
+	}
+
+	const pageX = 40
+	const pageY = 9
+	const rawX = pageX
+	const rawY = pageY + layout.TopNavHeight
+
+	next, cmd := model.handleSettingsMouseLeft(rawX, rawY)
+	if cmd == nil {
+		nextModel := next.(Model)
+		gotTheme := "<nil>"
+		if nextModel.config != nil {
+			gotTheme = nextModel.config.Theme
+		}
+		t.Fatalf("expected clear screen cmd after theme mouse change, config theme=%q current theme=%q", gotTheme, theme.CurrentName())
+	}
+	model = next.(Model)
+
+	if model.config.Theme != "catppuccin" {
+		t.Fatalf("expected model theme catppuccin, got %q", model.config.Theme)
+	}
+	if got := theme.CurrentName(); got != "catppuccin" {
+		t.Fatalf("expected current theme catppuccin, got %q", got)
 	}
 }
 

@@ -22,6 +22,8 @@ const (
 	settingsDoubleClickThreshold = 350 * time.Millisecond
 	settingsContainerLeft        = 2
 	settingsRowPaddingLeft       = 1
+	settingsTabHorizontalPadding = 2
+	settingsTabContentPadding    = 2
 )
 
 // State 设置页面完整状态
@@ -218,8 +220,6 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 
 	return s, cfg, ""
 }
-
-
 
 // handleEditMode 处理编辑模式按键，返回更新后的 cfg 和 proxyAddr（空表示无变化）
 func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService) (State, *config.Config, string, tea.Cmd) {
@@ -426,7 +426,7 @@ func resolveThemeMouseTarget(pageX int) (string, bool) {
 	cursor := valueStartX
 
 	for i, m := range themes {
-		tabWidth := len(m) + 2
+		tabWidth := settingsTabDisplayWidth(m)
 		if pageX >= cursor && pageX < cursor+tabWidth {
 			return m, true
 		}
@@ -449,7 +449,7 @@ func resolveLanguageMouseTarget(pageX int) (string, bool) {
 	cursor := valueStartX
 
 	for i, mode := range modes {
-		tabWidth := len(mode) + 2
+		tabWidth := settingsTabDisplayWidth(mode)
 		if pageX >= cursor && pageX < cursor+tabWidth {
 			return mode, true
 		}
@@ -460,4 +460,8 @@ func resolveLanguageMouseTarget(pageX int) (string, bool) {
 	}
 
 	return "", false
+}
+
+func settingsTabDisplayWidth(label string) int {
+	return len(label) + settingsTabContentPadding + settingsTabHorizontalPadding
 }

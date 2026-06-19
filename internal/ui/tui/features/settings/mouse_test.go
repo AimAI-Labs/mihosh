@@ -75,7 +75,7 @@ func TestHandleMouseLeft_ClickLanguageTabSavesImmediately(t *testing.T) {
 	state := State{}
 
 	const languageRowY = 7
-	const zhCNTabX = settingsContainerLeft + settingsRowPaddingLeft + settingsLabelWidth + len("auto") + 2 + 1
+	zhCNTabX := settingsContainerLeft + settingsRowPaddingLeft + settingsLabelWidth + settingsTabDisplayWidth("auto") + 1
 	next, newCfg, _ := state.HandleMouseLeft(zhCNTabX, languageRowY, &cfg, configSvc)
 
 	if next.selectedSetting != 5 {
@@ -89,6 +89,18 @@ func TestHandleMouseLeft_ClickLanguageTabSavesImmediately(t *testing.T) {
 	}
 	if next.editMode {
 		t.Fatalf("expected language click to save directly without entering edit mode")
+	}
+}
+
+func TestResolveThemeMouseTargetIncludesRenderedTabPadding(t *testing.T) {
+	valueStartX := settingsContainerLeft + settingsRowPaddingLeft + settingsLabelWidth
+
+	themeName, ok := resolveThemeMouseTarget(valueStartX + len("tokyo-night") + 3)
+	if !ok {
+		t.Fatalf("expected click in rendered theme tab padding to resolve")
+	}
+	if themeName != "tokyo-night" {
+		t.Fatalf("expected tokyo-night, got %q", themeName)
 	}
 }
 
@@ -164,4 +176,3 @@ func TestHandleMouseLeft_LanguageClickSaveFailure(t *testing.T) {
 		t.Fatalf("expected config to be unchanged")
 	}
 }
-

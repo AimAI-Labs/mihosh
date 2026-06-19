@@ -549,8 +549,10 @@ func (m Model) handleSettingsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 	}
 
 	oldLanguage := ""
+	oldTheme := ""
 	if m.config != nil {
 		oldLanguage = m.config.Language
+		oldTheme = m.config.Theme
 	}
 
 	var proxyAddr string
@@ -558,6 +560,9 @@ func (m Model) handleSettingsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 	if m.config != nil && m.config.Language != oldLanguage {
 		i18n.SetLanguageOverride(m.config.Language)
 		common.InitKeyBindings()
+		return m, tea.ClearScreen
+	}
+	if m.config != nil && m.config.Theme != oldTheme {
 		return m, tea.ClearScreen
 	}
 	if proxyAddr != "" {

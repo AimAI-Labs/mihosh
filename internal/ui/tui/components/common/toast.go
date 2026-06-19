@@ -121,16 +121,48 @@ func RenderToasts(toasts []Toast, width int) string {
 
 // ToastManager Toast 管理器
 type ToastManager struct {
-	toasts []Toast
+	toasts       []Toast
+	lastShown    map[string]time.Time // 记录每条消息最后显示的时间
+	throttleTime time.Duration        // 限流时间间隔
 }
 
 // NewToastManager 创建 Toast 管理器
 func NewToastManager() *ToastManager {
-	return &ToastManager{}
+	return &ToastManager{
+		lastShown:    make(map[string]time.Time),
+		throttleTime: 2 * time.Second, // 默认限流 2 秒
+	}
 }
 
-// Add 添加 Toast
+// SetThrottleTime 设置限流时间
+func (m *ToastManager) SetThrottleTime(duration time.Duration) {
+	m.throttleTime = duration
+}
+
+// shouldShowToast 检查是否应该显示该消息（限流检查）
+func (m *ToastManager) shouldShowToast(msg string) bool {
+	lastTime, exists := m.lastShown[msg]
+	if !exists {
+		return true
+	}
+	return time.Since(lastTime) >= m.throttleTime
+}
+
+// recordToast 记录消息已显示
+func (m *ToastManager) recordToast(msg string) {
+	m.lastShown[msg] = time.Now()
+}
+
+// Add 添加 Toast（带限流）
 func (m *ToastManager) Add(msg string, toastType ToastType, duration time.Duration) {
+	// 限流检查：如果相同消息在限流时间内已显示过，则忽略
+	if !m.shouldShowToast(msg) {
+		return
+	}
+	
+	// 记录该消息已显示
+	m.recordToast(msg)
+	
 	m.toasts = append(m.toasts, NewToast(msg, toastType, duration))
 }
 
@@ -159,7 +191,7 @@ func (m *ToastManager) Render(width int) string {
 	return RenderToasts(m.toasts, width)
 }
 
-// CleanExpired 清理过期的 Toast
+// CleanExpired 清理过期的 Toast 和限流记录
 func (m *ToastManager) CleanExpired() {
 	var valid []Toast
 	for _, t := range m.toasts {
@@ -168,4 +200,12 @@ func (m *ToastManager) CleanExpired() {
 		}
 	}
 	m.toasts = valid
+	
+	// 清理过期的限流记录（保留最近 10 秒的记录）
+	now := time.Now()
+	for msg, lastTime := range m.lastShown {
+		if now.Sub(lastTime) > 10*time.Second {
+			delete(m.lastShown, msg)
+		}
+	}
 }

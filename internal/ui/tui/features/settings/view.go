@@ -431,22 +431,22 @@ func renderThemeTabs(currentTheme string, editMode bool) string {
 	return lipgloss.JoinHorizontal(lipgloss.Left, parts...)
 }
 
-// overlayToast 在页面右上角叠加 Toast
+// overlayToast 在页面右上角叠加 Toast。
 func overlayToast(page, toast string, width int) string {
+	if toast == "" {
+		return page
+	}
+
 	pageLines := strings.Split(page, "\n")
 	toastLines := strings.Split(toast, "\n")
 
-	// 计算 Toast 应该放置的位置（右上角）
 	toastHeight := len(toastLines)
 	if toastHeight > len(pageLines) {
 		toastHeight = len(pageLines)
 	}
 
-	// 从顶部开始叠加
 	for i := 0; i < toastHeight; i++ {
-		if i < len(pageLines) {
-			pageLines[i] = toastLines[i]
-		}
+		pageLines[i] = toastLines[i]
 	}
 
 	return strings.Join(pageLines, "\n")
