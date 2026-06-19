@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -326,4 +327,79 @@ func bytesTrimSpace(b []byte) []byte {
 
 func isSpaceByte(c byte) bool {
 	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
+}
+
+// ParseRulesNoResolve 从配置文件中解析每条规则的 no-resolve 标记。
+//
+// 返回 map 的键为 "TYPE,PAYLOAD,PROXY"（大写类型 + 原始 payload + 原始 proxy），
+// 值为 true 表示该规则带有 no-resolve。
+// 配置文件不可读或解析失败时返回空 map（不报错，避免阻塞 UI）。
+func ParseRulesNoResolve(configPath string) map[string]bool {
+	result := make(map[string]bool)
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return result
+	}
+	if len(bytesTrimSpace(data)) == 0 {
+		return result
+	}
+
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return result
+	}
+	root := mappingRoot(&doc)
+	if root == nil {
+		return result
+	}
+	seq := findRulesSequence(root)
+	if seq == nil {
+		return result
+	}
+
+	for _, item := range seq.Content {
+		if item.Kind != yaml.ScalarNode {
+			continue
+		}
+		ruleStr := strings.TrimSpace(item.Value)
+		if ruleStr == "" {
+			continue
+		}
+		key, hasNR := parseRuleLine(ruleStr)
+		if key != "" {
+			result[key] = hasNR
+		}
+	}
+	return result
+}
+
+// parseRuleLine 解析一条 Mihomo 规则字符串，返回规范化键和 no-resolve 标记。
+//
+// 规则格式：
+//   - MATCH,PROXY
+//   - TYPE,PAYLOAD,PROXY[,no-resolve]
+//
+// 返回的 key 为 "TYPE,PAYLOAD,PROXY"（类型大写化），hasNR 表示是否带 no-resolve。
+func parseRuleLine(line string) (key string, hasNR bool) {
+	parts := strings.Split(line, ",")
+	if len(parts) < 2 {
+		return "", false
+	}
+
+	ruleType := strings.ToUpper(strings.TrimSpace(parts[0]))
+
+	// MATCH 类型：MATCH,PROXY
+	if ruleType == "MATCH" {
+		proxy := strings.TrimSpace(parts[1])
+		return ruleType + ",," + proxy, false
+	}
+
+	// 普通类型：TYPE,PAYLOAD,PROXY[,no-resolve]
+	if len(parts) < 3 {
+		return "", false
+	}
+	payload := strings.TrimSpace(parts[1])
+	proxy := strings.TrimSpace(parts[2])
+	hasNR = len(parts) >= 4 && strings.EqualFold(strings.TrimSpace(parts[3]), "no-resolve")
+	return ruleType + "," + payload + "," + proxy, hasNR
 }

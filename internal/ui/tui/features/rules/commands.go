@@ -10,15 +10,53 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// FetchRules 获取规则列表
+// FetchRules 获取规则列表，并从配置文件合并 no-resolve 标记。
 func FetchRules(client *api.Client) tea.Cmd {
 	return func() tea.Msg {
 		rules, err := client.GetRules()
 		if err != nil {
 			return messages.ErrMsg{Err: err}
 		}
+
+		// 从配置文件解析 no-resolve 信息（API 不返回此字段）
+		if configPath, pathErr := config.GetMihomoConfigPath(); pathErr == nil {
+			nrMap := config.ParseRulesNoResolve(configPath)
+			for i := range rules.Rules {
+				r := &rules.Rules[i]
+				key := normalizeRuleType(r.Type) + "," + r.Payload + "," + r.Proxy
+				if nrMap[key] {
+					r.NoResolve = true
+				}
+			}
+		}
+
 		return messages.RulesMsg(rules.Rules)
 	}
+}
+
+// camelToConfigType 将 Mihomo API 返回的 CamelCase 类型名转换为配置文件中使用的大写横杠分隔格式。
+// 例如: "IPCIDR" → "IP-CIDR", "DomainSuffix" → "DOMAIN-SUFFIX"。
+// ParseRulesNoResolve 使用 strings.ToUpper 标准化键，所以这里也必须输出大写格式。
+var camelToConfigType = map[string]string{
+	"Domain":        "DOMAIN",
+	"DomainSuffix":  "DOMAIN-SUFFIX",
+	"DomainKeyword": "DOMAIN-KEYWORD",
+	"IPCIDR":        "IP-CIDR",
+	"IPCIDR6":       "IP-CIDR6",
+	"SrcIPCIDR":     "SRC-IP-CIDR",
+	"GeoIP":         "GEOIP",
+	"GeoSite":       "GEOSITE",
+	"RuleSet":       "RULE-SET",
+	"Match":         "MATCH",
+}
+
+// normalizeRuleType 将 API 返回的规则类型标准化为配置文件格式（大写横杠分隔）。
+// 如果类型不在映射表中，回退为 strings.ToUpper。
+func normalizeRuleType(apiType string) string {
+	if mapped, ok := camelToConfigType[apiType]; ok {
+		return mapped
+	}
+	return strings.ToUpper(apiType)
 }
 
 // AddRuleCmd 把一条自定义规则写入 Mihomo 配置文件的 rules 列表。

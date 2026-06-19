@@ -377,12 +377,22 @@ func renderRuleEntry(rule model.Rule, index int, selected bool, width int, adjus
 	typeStyle := lipgloss.NewStyle().Foreground(color).Bold(true).Width(16)
 	typeStr := typeStyle.Render(rule.Type)
 
-	// Payload
-	payloadStyle := lipgloss.NewStyle().Foreground(common.CSecondary)
-	payloadWidth := width - 50
+	// no-resolve 标签 (固定列宽以保持对齐)
+	noResolveColWidth := 12
+	noResolveStyle := lipgloss.NewStyle().Width(noResolveColWidth)
+	var noResolveStr string
+	if rule.NoResolve {
+		noResolveStr = noResolveStyle.Foreground(common.CWarning).Render("no-resolve")
+	} else {
+		noResolveStr = noResolveStyle.Render("")
+	}
+
+	// Payload (减少宽度以为 no-resolve 列腾出空间)
+	payloadWidth := width - 65
 	if payloadWidth < 20 {
 		payloadWidth = 20
 	}
+	payloadStyle := lipgloss.NewStyle().Foreground(common.CSecondary)
 	payload := rule.Payload
 	if len(payload) > payloadWidth {
 		payload = payload[:payloadWidth-3] + "..."
@@ -393,8 +403,8 @@ func renderRuleEntry(rule model.Rule, index int, selected bool, width int, adjus
 	proxyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF"))
 	proxyStr := proxyStyle.Render(rule.Proxy)
 
-	// 构建行
-	line := fmt.Sprintf("%s %s %s %s", indexStr, typeStr, payloadStr, proxyStr)
+	// 构建行 (顺序: 序号 类型 Payload no-resolve 代理)
+	line := fmt.Sprintf("%s %s %s %s %s", indexStr, typeStr, payloadStr, noResolveStr, proxyStr)
 
 	// 选中样式
 	if selected {
