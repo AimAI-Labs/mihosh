@@ -287,15 +287,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case messages.ConfigEditFinishedMsg:
 		// 外部编辑器结束：失败沿用全局错误显示；成功热重载核心（随后刷新规则列表）
+		// tea.ExecProcess 期间会 ReleaseTerminal（禁用鼠标），但 RestoreTerminal
+		// 不恢复鼠标模式（Bubble Tea v1.3.10 缺陷），需显式重新启用，否则退出编辑器后鼠标失效。
+		reenableMouse := func() tea.Msg { return tea.EnableMouseCellMotion() }
 		if msg.Err != nil {
 			m.err = messages.ErrMsg{Err: msg.Err}
 			m.notice = ""
 			m.noticeTicks = 0
-			return m, nil
+			return m, reenableMouse
 		}
 		m.notice = i18n.T("rules.edited_toast")
 		m.noticeTicks = autoRefreshNoticeTicks
-		return m, reloadConfigCmd(m.client)
+		return m, tea.Batch(reenableMouse, reloadConfigCmd(m.client))
 
 	case messages.SiteTestMsg:
 		m.connsState = m.connsState.ApplySiteTestResult(msg.Name, msg.Delay, msg.Err)
