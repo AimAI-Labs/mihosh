@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/styles"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -72,17 +73,17 @@ func commonMinTopNavWidth() int {
 }
 
 func topNavBorderStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(styles.ColorBorder)
+	return lipgloss.NewStyle().Foreground(styles.Border())
 }
 
 func renderTopNavContent(currentPage PageType, width int, refreshStatus ...TopNavRefreshStatus) string {
 	items := getTopNavItems()
 	activeStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("#292E42")).
-		Foreground(styles.ColorPrimary).
+		Background(common.Selected()).
+		Foreground(styles.Primary()).
 		Bold(true)
-	inactiveStyle := lipgloss.NewStyle().Foreground(styles.ColorGray)
-	separatorStyle := lipgloss.NewStyle().Foreground(styles.ColorGray)
+	inactiveStyle := lipgloss.NewStyle().Foreground(styles.Gray())
+	separatorStyle := lipgloss.NewStyle().Foreground(styles.Gray())
 
 	parts := make([]string, 0, len(items)*2)
 	for i, item := range items {
@@ -233,7 +234,7 @@ func renderTopNavRefreshStatus(status TopNavRefreshStatus, includeLabel bool) st
 	}
 	return lipgloss.NewStyle().
 		Align(lipgloss.Center).
-		Foreground(styles.ColorSuccess).
+		Foreground(styles.Success()).
 		Render(text)
 }
 

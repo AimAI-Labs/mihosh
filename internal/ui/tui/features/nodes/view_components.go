@@ -34,18 +34,6 @@ const (
 	nodesModeSwitchHeight   = 3 // 模式切换栏边框高度
 )
 
-// Tokyo 颜色引用共享常量
-var (
-	tokyoForeground = common.TokyoForeground
-	tokyoMuted      = common.TokyoMuted
-	tokyoBlue       = common.TokyoBlue
-	tokyoCyan       = common.TokyoCyan
-	tokyoGreen      = common.TokyoGreen
-	tokyoRed        = common.TokyoRed
-	tokyoPanel      = common.TokyoPanel
-	tokyoSelected   = common.TokyoSelected
-)
-
 // MouseTarget 表示 nodes 页面鼠标命中的列表组件
 type MouseTarget int
 
@@ -375,13 +363,13 @@ func RenderGroupListComponentWidth(state PageState, groupMaxLines, width int) st
 		}
 
 		// 5. 智能右侧状态灯 ● (优先使用节点颜色码，其次是延迟色)
-		dotColor := tokyoMuted
+		dotColor := common.TokyoMuted()
 		if color, ok := parseHexColor(group.Now); ok {
 			dotColor = color
 		} else if group.Now == "REJECT" {
-			dotColor = tokyoRed
+			dotColor = common.TokyoRed()
 		} else if group.Now == "DIRECT" {
-			dotColor = tokyoMuted
+			dotColor = common.TokyoMuted()
 		} else if proxy, exists := state.Proxies[group.Now]; exists && len(proxy.History) > 0 {
 			lastDelay := proxy.History[len(proxy.History)-1].Delay
 			dotColor = utils.GetDelayColor(lastDelay)
@@ -469,9 +457,9 @@ func RenderProxyListComponentWidth(state PageState, proxyMaxLines, width int) st
 			lastEntry := proxy.History[len(proxy.History)-1]
 			nodeColor = utils.GetDelayColor(lastEntry.Delay)
 		} else if name == currentNode {
-			nodeColor = tokyoGreen
+			nodeColor = common.TokyoGreen()
 		} else {
-			nodeColor = tokyoForeground
+			nodeColor = common.TokyoForeground()
 		}
 
 		// 2. 节点名称着色
@@ -542,12 +530,12 @@ func RenderModeSwitchComponent(currentMode string, width int) string {
 	}
 
 	activeStyle := lipgloss.NewStyle().
-		Background(tokyoSelected).
-		Foreground(tokyoCyan).
+		Background(common.TokyoSelected()).
+		Foreground(common.TokyoCyan()).
 		Bold(true)
 	inactiveStyle := lipgloss.NewStyle().
-		Foreground(tokyoBlue)
-	separatorStyle := lipgloss.NewStyle().Foreground(tokyoMuted)
+		Foreground(common.TokyoBlue())
+	separatorStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted())
 
 	var parts []string
 	for i, m := range modes {
@@ -577,7 +565,7 @@ func RenderModeSwitchComponent(currentMode string, width int) string {
 	}
 
 	// 渲染带边框的模式切换栏
-	borderStyle := lipgloss.NewStyle().Foreground(tokyoBlue)
+	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
 	topLine := borderStyle.Render("╭" + strings.Repeat("─", innerWidth) + "╮")
 	middleLine := borderStyle.Render("│") + content + borderStyle.Render("│")
 	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
@@ -684,8 +672,8 @@ func tokyoBlueStyle() lipgloss.Style   { return common.TokyoBlueStyle() }
 
 func tokyoSelectedStyle(width int) lipgloss.Style {
 	style := lipgloss.NewStyle().
-		Background(common.TokyoSelected).
-		Foreground(common.TokyoCyan).
+		Background(common.TokyoSelected()).
+		Foreground(common.TokyoCyan()).
 		Bold(true)
 	if width > 0 {
 		style = style.Width(width)

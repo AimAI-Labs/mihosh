@@ -17,8 +17,8 @@ func TestRenderBorderedPanelKeepsEveryLineAtRequestedWidth(t *testing.T) {
 		"JSON 详情",
 		"short\n"+strings.Repeat("x", width),
 		width,
-		TokyoMuted,
-		TokyoBlue,
+		TokyoMuted(),
+		TokyoBlue(),
 	)
 
 	for i, line := range strings.Split(panel, "\n") {
@@ -32,9 +32,9 @@ func TestRenderBorderedPanelKeepsRightBorderAfterTruncatingStyledContent(t *test
 	const width = 32
 
 	longStyledLine := lipgloss.NewStyle().
-		Foreground(TokyoGreen).
+		Foreground(TokyoGreen()).
 		Render(strings.Repeat("x", width*2))
-	panel := RenderBorderedPanel("JSON 详情", longStyledLine, width, TokyoMuted, TokyoBlue)
+	panel := RenderBorderedPanel("JSON 详情", longStyledLine, width, TokyoMuted(), TokyoBlue())
 
 	lines := strings.Split(panel, "\n")
 	if len(lines) != 3 {

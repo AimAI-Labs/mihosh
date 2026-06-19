@@ -149,11 +149,11 @@ func renderLogDetailPopup(
 	// ── 可见内容 + 滚动提示 ──
 	var output []string
 	if scroll > 0 {
-		output = append(output, common.DimStyle.Render(fmt.Sprintf("↑ 还有 %d 行", scroll)))
+		output = append(output, common.DimStyle().Render(fmt.Sprintf("↑ 还有 %d 行", scroll)))
 	}
 	output = append(output, lines[scroll:endIdx]...)
 	if endIdx < totalLines {
-		output = append(output, common.DimStyle.Render(fmt.Sprintf("↓ 还有 %d 行", totalLines-endIdx)))
+		output = append(output, common.DimStyle().Render(fmt.Sprintf("↓ 还有 %d 行", totalLines-endIdx)))
 	}
 
 	body := strings.Join(output, "\n")
@@ -182,11 +182,11 @@ func renderLogInfoTable(log *model.LogEntry, parsed *ParsedLog, width int) strin
 func renderSourceSection(resolved *model.ResolvedIP, width int) string {
 	sectionTitle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(common.TokyoCyan).
+		Foreground(common.TokyoCyan()).
 		MarginBottom(1)
 
 	if resolved == nil {
-		loadingStyle := lipgloss.NewStyle().Foreground(common.TokyoYellow)
+		loadingStyle := lipgloss.NewStyle().Foreground(common.TokyoYellow())
 		return lipgloss.JoinVertical(lipgloss.Left,
 			sectionTitle.Render("🔍 请求来源"),
 			loadingStyle.Render("  正在查询来源应用..."),
@@ -249,12 +249,12 @@ func buildDetailTable(rows [][]string, width int) string {
 
 	t := table.New().
 		Border(lipgloss.RoundedBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(common.TokyoMuted)).
+		BorderStyle(lipgloss.NewStyle().Foreground(common.TokyoMuted())).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if col == 0 {
-				return baseStyle.Foreground(common.TokyoBlue).Width(keyWidth)
+				return baseStyle.Foreground(common.TokyoBlue()).Width(keyWidth)
 			}
-			return baseStyle.Foreground(common.TokyoForeground).Width(valWidth)
+			return baseStyle.Foreground(common.TokyoForeground()).Width(valWidth)
 		}).
 		Rows(rows...)
 

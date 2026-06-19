@@ -222,12 +222,12 @@ func RenderConnModeSwitchComponent(viewMode int, width int) string {
 	}
 
 	activeStyle := lipgloss.NewStyle().
-		Background(common.TokyoSelected).
-		Foreground(common.TokyoCyan).
+		Background(common.TokyoSelected()).
+		Foreground(common.TokyoCyan()).
 		Bold(true)
 	inactiveStyle := lipgloss.NewStyle().
-		Foreground(common.TokyoBlue)
-	separatorStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted)
+		Foreground(common.TokyoBlue())
+	separatorStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted())
 
 	var parts []string
 	for i, m := range modes {
@@ -257,7 +257,7 @@ func RenderConnModeSwitchComponent(viewMode int, width int) string {
 	}
 
 	// 渲染带边框的模式切换栏
-	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue)
+	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
 	topLine := borderStyle.Render("╭" + strings.Repeat("─", innerWidth) + "╮")
 	middleLine := borderStyle.Render("│") + content + borderStyle.Render("│")
 	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")

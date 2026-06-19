@@ -111,6 +111,7 @@ func (m Model) buildHelpContext() help.HelpContext {
 		RulesDeleteConfirm:  m.rulesState.ShowDeleteConfirm(),
 		SettingsEdit:       m.settingsState.IsEditing(),
 		SettingsLanguage:   m.settingsState.IsLanguageSelected(),
+		SettingsTheme:      m.settingsState.IsThemeSelected(),
 	}
 }
 

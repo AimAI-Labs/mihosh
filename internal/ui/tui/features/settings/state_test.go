@@ -5,6 +5,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/viper"
@@ -525,5 +526,57 @@ func TestLanguageHelpers(t *testing.T) {
 	_, ok = resolveLanguageMouseTarget(100)
 	if ok {
 		t.Errorf("expected ok=false for too large coordinate")
+	}
+}
+
+func TestThemeSettingIndex(t *testing.T) {
+	if ThemeSettingIndex() != 7 {
+		t.Fatalf("expected 7, got %d", ThemeSettingIndex())
+	}
+}
+
+func TestThemeTabSwitchNext(t *testing.T) {
+	if nextTheme("tokyo-night") != "catppuccin" {
+		t.Errorf("expected catppuccin, got %q", nextTheme("tokyo-night"))
+	}
+	if nextTheme("dracula") != "tokyo-night" {
+		t.Errorf("expected tokyo-night (wrap), got %q", nextTheme("dracula"))
+	}
+}
+
+func TestThemeTabSwitchPrev(t *testing.T) {
+	if prevTheme("catppuccin") != "tokyo-night" {
+		t.Errorf("expected tokyo-night, got %q", prevTheme("catppuccin"))
+	}
+	if prevTheme("tokyo-night") != "dracula" {
+		t.Errorf("expected dracula (wrap), got %q", prevTheme("tokyo-night"))
+	}
+}
+
+func TestThemeSwitchHotSwap(t *testing.T) {
+	defer theme.SetTheme("tokyo-night")
+	configSvc, cfg := setupTestConfig(t, nil)
+
+	s := State{
+		editMode:        true,
+		selectedSetting: ThemeSettingIndex(),
+		editValue:       "catppuccin",
+	}
+
+	// Enter 保存并热切换
+	next, newCfg, _, _ := s.Update(
+		tea.KeyMsg{Type: tea.KeyEnter},
+		cfg,
+		configSvc,
+	)
+
+	if next.editMode {
+		t.Error("expected editMode=false after Enter")
+	}
+	if theme.CurrentName() != "catppuccin" {
+		t.Fatalf("expected theme catppuccin, got %q", theme.CurrentName())
+	}
+	if newCfg.Theme != "catppuccin" {
+		t.Fatalf("expected cfg.Theme=catppuccin, got %q", newCfg.Theme)
 	}
 }

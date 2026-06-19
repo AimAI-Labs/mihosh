@@ -11,48 +11,35 @@ import (
 //  Tokyo Night — 共享调色板与面板组件
 // ============================================================
 
-// Tokyo Night 颜色常量
-var (
-	TokyoForeground = lipgloss.Color("#C0CAF5")
-	TokyoMuted      = lipgloss.Color("#565F89")
-	TokyoBlue       = lipgloss.Color("#7AA2F7")
-	TokyoCyan       = lipgloss.Color("#7DCFFF")
-	TokyoGreen      = lipgloss.Color("#9ECE6A")
-	TokyoRed        = lipgloss.Color("#F7768E")
-	TokyoYellow     = lipgloss.Color("#E0AF68")
-	TokyoPurple     = lipgloss.Color("#BB9AF7")
-	TokyoPanel      = lipgloss.Color("#1A1B26")
-	TokyoSelected   = lipgloss.Color("#292E42")
-)
-
-// Tokyo 样式函数
+// Tokyo 颜色访问函数定义于 colors.go（TokyoForeground/TokyoBlue 等），
+// 此处仅保留样式函数，动态读取当前主题。
 
 func TokyoTextStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(TokyoForeground)
+	return lipgloss.NewStyle().Foreground(TokyoForeground())
 }
 
 func TokyoHeaderStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(TokyoMuted).Bold(true)
+	return lipgloss.NewStyle().Foreground(TokyoMuted()).Bold(true)
 }
 
 func TokyoMutedStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(TokyoMuted)
+	return lipgloss.NewStyle().Foreground(TokyoMuted())
 }
 
 func TokyoCyanStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(TokyoCyan).Bold(true)
+	return lipgloss.NewStyle().Foreground(TokyoCyan()).Bold(true)
 }
 
 func TokyoGreenStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(TokyoGreen).Bold(true)
+	return lipgloss.NewStyle().Foreground(TokyoGreen()).Bold(true)
 }
 
 func TokyoRedStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(TokyoRed)
+	return lipgloss.NewStyle().Foreground(TokyoRed())
 }
 
 func TokyoBlueStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(TokyoBlue)
+	return lipgloss.NewStyle().Foreground(TokyoBlue())
 }
 
 // ============================================================

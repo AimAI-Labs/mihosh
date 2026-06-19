@@ -64,9 +64,9 @@ func RenderDetailModalLeft(conn *model.Connection, ipInfo *model.IPInfo, width, 
 
 	visibleLines := lines[scrollTop:endIdx]
 
-	dimStyle := common.DimStyle
+	dimStyle := common.DimStyle()
 	if isFocused {
-		dimStyle = dimStyle.Foreground(common.TokyoCyan)
+		dimStyle = dimStyle.Foreground(common.TokyoCyan())
 	}
 
 	var output []string
@@ -177,11 +177,11 @@ func getIPGeoInfoRows(ipInfo *model.IPInfo) [][]string {
 // targetRows 为目标正文行数：当大于实际行数时，用空行补齐，
 // 使面板整体高度固定，便于与右侧 JSON 面板对齐。
 func renderInfoPanel(title string, rows [][]string, width, targetRows int, isFocused bool) string {
-	borderColor := common.TokyoMuted
-	titleColor := common.TokyoBlue
+	borderColor := common.TokyoMuted()
+	titleColor := common.TokyoBlue()
 	if isFocused {
-		borderColor = common.TokyoPurple
-		titleColor = common.TokyoCyan
+		borderColor = common.TokyoPurple()
+		titleColor = common.TokyoCyan()
 	}
 
 	// 基础样式
@@ -203,11 +203,11 @@ func renderInfoPanel(title string, rows [][]string, width, targetRows int, isFoc
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if col == 0 {
 				return baseStyle.
-					Foreground(common.TokyoBlue).
+					Foreground(common.TokyoBlue()).
 					Width(keyWidth)
 			}
 			return baseStyle.
-				Foreground(common.TokyoForeground).
+				Foreground(common.TokyoForeground()).
 				Width(valWidth)
 		}).
 		Rows(rows...)

@@ -6,6 +6,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -54,6 +55,11 @@ func (s State) SelectedSettingIndex() int {
 // IsLanguageSelected 返回当前是否选中语言设置项
 func (s State) IsLanguageSelected() bool {
 	return s.selectedSetting == LanguageSettingIndex()
+}
+
+// IsThemeSelected 返回当前是否选中主题设置项
+func (s State) IsThemeSelected() bool {
+	return s.selectedSetting == ThemeSettingIndex()
 }
 
 // FetchMihomoVersion 返回一个拉取 Mihomo 版本信息的 Cmd
@@ -151,6 +157,21 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 				return s, cfg, ""
 			}
 		}
+		if s.selectedSetting == ThemeSettingIndex() {
+			if t, ok := resolveThemeMouseTarget(pageX); ok {
+				if err := configSvc.SetConfigValue("theme", t); err == nil {
+					newCfg, _ := configSvc.LoadConfig()
+					theme.SetTheme(t)
+					s.editMode = false
+					s.editValue = ""
+					s.editCursor = 0
+					s.showToast(i18n.T("settings.toast.save_success_theme"), common.ToastSuccess)
+					return s, newCfg, newCfg.ProxyAddress
+				}
+				s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
+				return s, cfg, ""
+			}
+		}
 
 		// 编辑模式下点击空白处退出编辑
 		if settingIdx < 0 || settingIdx >= len(SettingKeys) {
@@ -171,6 +192,17 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 			if err := configSvc.SetConfigValue(SettingKeys[settingIdx], lang); err == nil {
 				newCfg, _ := configSvc.LoadConfig()
 				s.showToast(i18n.T("settings.toast.save_success_lang"), common.ToastSuccess)
+				return s, newCfg, newCfg.ProxyAddress
+			}
+			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
+		}
+	}
+	if settingIdx == ThemeSettingIndex() {
+		if t, ok := resolveThemeMouseTarget(pageX); ok {
+			if err := configSvc.SetConfigValue("theme", t); err == nil {
+				newCfg, _ := configSvc.LoadConfig()
+				theme.SetTheme(t)
+				s.showToast(i18n.T("settings.toast.save_success_theme"), common.ToastSuccess)
 				return s, newCfg, newCfg.ProxyAddress
 			}
 			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
@@ -210,6 +242,31 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 			s.editValue = prevLanguage(s.editValue)
 		case msg.String() == "right", msg.String() == "tab":
 			s.editValue = nextLanguage(s.editValue)
+		}
+		return s, cfg, "", nil
+	}
+
+	if s.selectedSetting == ThemeSettingIndex() { // 主题设置采用 tab 切换，切换后热生效
+		switch {
+		case key.Matches(msg, common.Keys.Escape):
+			s.editMode = false
+			s.editValue = ""
+		case key.Matches(msg, common.Keys.Enter):
+			newTheme := s.editValue
+			if err := configSvc.SetConfigValue("theme", newTheme); err != nil {
+				s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
+				return s, cfg, "", nil
+			}
+			newCfg, _ := configSvc.LoadConfig()
+			theme.SetTheme(newTheme)
+			s.editMode = false
+			s.editValue = ""
+			s.showToast(i18n.T("settings.toast.save_success_theme"), common.ToastSuccess)
+			return s, newCfg, "", func() tea.Msg { return messages.ThemeChangedMsg{} }
+		case msg.String() == "left":
+			s.editValue = prevTheme(s.editValue)
+		case msg.String() == "right", msg.String() == "tab":
+			s.editValue = nextTheme(s.editValue)
 		}
 		return s, cfg, "", nil
 	}
@@ -326,6 +383,60 @@ func LanguageSettingIndex() int {
 		}
 	}
 	return -1
+}
+
+// ThemeSettingIndex 返回主题设置项索引
+func ThemeSettingIndex() int {
+	for i, key := range SettingKeys {
+		if key == "theme" {
+			return i
+		}
+	}
+	return -1
+}
+
+func nextTheme(t string) string {
+	themes := theme.Names()
+	for i, n := range themes {
+		if n == t {
+			return themes[(i+1)%len(themes)]
+		}
+	}
+	return themes[0]
+}
+
+func prevTheme(t string) string {
+	themes := theme.Names()
+	for i, n := range themes {
+		if n == t {
+			return themes[(i+len(themes)-1)%len(themes)]
+		}
+	}
+	return themes[0]
+}
+
+// resolveThemeMouseTarget 解析主题 Tab 区域的鼠标点击目标
+func resolveThemeMouseTarget(pageX int) (string, bool) {
+	if pageX < 0 {
+		return "", false
+	}
+
+	valueStartX := settingsContainerLeft + settingsRowPaddingLeft + settingsLabelWidth
+	themes := theme.Names()
+	cursor := valueStartX
+
+	for i, m := range themes {
+		tabWidth := len(m) + 2
+		if pageX >= cursor && pageX < cursor+tabWidth {
+			return m, true
+		}
+		cursor += tabWidth
+		if i < len(themes)-1 {
+			cursor++
+		}
+	}
+
+	return "", false
 }
 
 func resolveLanguageMouseTarget(pageX int) (string, bool) {

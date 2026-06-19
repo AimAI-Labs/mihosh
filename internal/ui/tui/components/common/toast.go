@@ -49,32 +49,32 @@ func RenderToast(toast Toast) string {
 	case ToastSuccess:
 		icon = "✓"
 		style = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Background(lipgloss.Color("#2ECC71")).
+			Foreground(Bright()).
+			Background(Success()).
 			Padding(0, 1)
 	case ToastError:
 		icon = "✗"
 		style = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Background(lipgloss.Color("#E74C3C")).
+			Foreground(Bright()).
+			Background(Danger()).
 			Padding(0, 1)
 	case ToastWarning:
 		icon = "⚠"
 		style = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#000000")).
-			Background(lipgloss.Color("#FFD700")).
+			Background(Warning()).
 			Padding(0, 1)
 	case ToastInfo:
 		icon = "ℹ"
 		style = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Background(lipgloss.Color("#3498DB")).
+			Foreground(Bright()).
+			Background(Info()).
 			Padding(0, 1)
 	default:
 		icon = "•"
 		style = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Background(lipgloss.Color("#95A5A6")).
+			Foreground(Bright()).
+			Background(Gray()).
 			Padding(0, 1)
 	}
 

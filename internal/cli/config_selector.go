@@ -70,19 +70,19 @@ func (m selectorModel) View() string {
 	}
 
 	var s strings.Builder
-	s.WriteString(lipgloss.NewStyle().Bold(true).Foreground(common.CActive).Render("请选择要编辑的配置文件：") + "\n\n")
+	s.WriteString(lipgloss.NewStyle().Bold(true).Foreground(common.Active()).Render("请选择要编辑的配置文件：") + "\n\n")
 
 	for i, choice := range m.choices {
 		checkbox := "[ ]"
 		if m.selected == i {
-			checkbox = lipgloss.NewStyle().Foreground(common.CActive).Render("[x]")
-			s.WriteString(fmt.Sprintf("%s %s\n", checkbox, lipgloss.NewStyle().Foreground(common.CActive).Bold(true).Render(choice)))
+			checkbox = lipgloss.NewStyle().Foreground(common.Active()).Render("[x]")
+			s.WriteString(fmt.Sprintf("%s %s\n", checkbox, lipgloss.NewStyle().Foreground(common.Active()).Bold(true).Render(choice)))
 		} else {
 			s.WriteString(fmt.Sprintf("%s %s\n", checkbox, choice))
 		}
 	}
 
-	s.WriteString("\n" + lipgloss.NewStyle().Foreground(common.CMuted).Render("(使用方向键选择，回车确认，Esc/q 退出)") + "\n")
+	s.WriteString("\n" + lipgloss.NewStyle().Foreground(common.Muted()).Render("(使用方向键选择，回车确认，Esc/q 退出)") + "\n")
 
 	return s.String()
 }

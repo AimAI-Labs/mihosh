@@ -385,6 +385,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case messages.MihomoVersionMsg:
 		m.settingsState = m.settingsState.ApplyMihomoVersion(msg.Version)
+
+	case messages.ThemeChangedMsg:
+		// 主题已切换，触发重绘（View 会读取新主题色）
+		return m, tea.ClearScreen
 	}
 
 	return m, nil

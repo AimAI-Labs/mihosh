@@ -126,3 +126,6 @@ type AutoRefreshTickMsg time.Time
 type MihomoVersionMsg struct {
 	Version string
 }
+
+// ThemeChangedMsg 主题已切换，触发全屏重绘
+type ThemeChangedMsg struct{}

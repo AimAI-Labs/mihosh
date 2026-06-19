@@ -20,9 +20,9 @@ func RenderTopNSection(items []TopNItem, width int) string {
 		return ""
 	}
 
-	nameStyle := lipgloss.NewStyle().Foreground(common.TokyoForeground)
-	bytesStyle := lipgloss.NewStyle().Foreground(common.TokyoCyan)
-	barColor := common.TokyoPurple // 紫色进度条
+	nameStyle := lipgloss.NewStyle().Foreground(common.TokyoForeground())
+	bytesStyle := lipgloss.NewStyle().Foreground(common.TokyoCyan())
+	barColor := common.TokyoPurple() // 紫色进度条
 
 	// 总面板宽度与导航栏对齐
 	panelWidth := width
@@ -93,7 +93,7 @@ func RenderTopNSection(items []TopNItem, width int) string {
 		}
 
 		bar := lipgloss.NewStyle().Foreground(barColor).Render(strings.Repeat("█", barLen))
-		emptyBar := lipgloss.NewStyle().Foreground(common.TokyoMuted).Render(strings.Repeat("░", barsWidth-barLen))
+		emptyBar := lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render(strings.Repeat("░", barsWidth-barLen))
 
 		sep := common.TokyoMutedStyle().Render(" │ ")
 		line := nameStr + sep + bar + emptyBar + " " + bytesStrRendered

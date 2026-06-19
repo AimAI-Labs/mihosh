@@ -15,14 +15,16 @@ import (
 // 调用 OverlayHelpAtBottomRight 将其叠加到页面右下角即可。
 // 与页面无关的纯渲染逻辑集中于此，避免重复造轮子。
 
-var (
-	// InlineHelpKeyStyle 按键文本样式（醒目黄）
-	InlineHelpKeyStyle = lipgloss.NewStyle().Foreground(TokyoYellow)
-	// InlineHelpDimStyle 分隔符等次要文本样式（灰）
-	InlineHelpDimStyle = lipgloss.NewStyle().Foreground(TokyoMuted)
-	// InlineHelpDescStyle 描述文本样式（柔和蓝）
-	InlineHelpDescStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#A9B1D6"))
-)
+// InlineHelp 样式函数（支持主题热切换）
+
+// InlineHelpKeyStyle 按键文本样式（醒目黄）
+func InlineHelpKeyStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(TokyoYellow()) }
+
+// InlineHelpDimStyle 分隔符等次要文本样式（灰）
+func InlineHelpDimStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(TokyoMuted()) }
+
+// InlineHelpDescStyle 描述文本样式（柔和蓝）
+func InlineHelpDescStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(Dim()) }
 
 // InlineHelpHint 内联帮助条目（按键 + 描述）
 type InlineHelpHint struct {
@@ -32,10 +34,10 @@ type InlineHelpHint struct {
 
 // FormatInlineHintRow 将一组帮助条目格式化为 "key desc · key desc" 单行
 func FormatInlineHintRow(hints []InlineHelpHint) string {
-	sep := InlineHelpDimStyle.Render(" · ")
+	sep := InlineHelpDimStyle().Render(" · ")
 	parts := make([]string, 0, len(hints))
 	for _, h := range hints {
-		parts = append(parts, InlineHelpKeyStyle.Render(h.Key)+" "+InlineHelpDescStyle.Render(h.Desc))
+		parts = append(parts, InlineHelpKeyStyle().Render(h.Key)+" "+InlineHelpDescStyle().Render(h.Desc))
 	}
 	return strings.Join(parts, sep)
 }

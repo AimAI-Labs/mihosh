@@ -6,6 +6,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
@@ -18,7 +19,7 @@ const (
 	settingsDescWidth   = 30
 )
 
-var SettingKeys = []string{"api-address", "secret", "test-url", "timeout", "proxy-address", "language", "auto-refresh-interval"}
+var SettingKeys = []string{"api-address", "secret", "test-url", "timeout", "proxy-address", "language", "auto-refresh-interval", "theme"}
 
 func GetSettingLabel(index int) string {
 	switch index {
@@ -36,6 +37,8 @@ func GetSettingLabel(index int) string {
 		return i18n.T("settings.label.language")
 	case 6:
 		return i18n.T("settings.label.auto_refresh_interval")
+	case 7:
+		return i18n.T("settings.label.theme")
 	}
 	return ""
 }
@@ -56,6 +59,8 @@ func GetSettingDesc(index int) string {
 		return i18n.T("settings.desc.language")
 	case 6:
 		return i18n.T("settings.desc.auto_refresh_interval")
+	case 7:
+		return i18n.T("settings.desc.theme")
 	}
 	return ""
 }
@@ -97,6 +102,11 @@ func GetSettingValue(cfg *config.Config, index int) string {
 		return cfg.Language
 	case 6:
 		return fmt.Sprintf("%d", cfg.AutoRefreshInterval)
+	case 7:
+		if cfg.Theme == "" {
+			return "tokyo-night"
+		}
+		return cfg.Theme
 	}
 	return ""
 }
@@ -129,7 +139,7 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	var descPart string
 	if state.SelectedSetting >= 0 && state.SelectedSetting < len(SettingKeys) {
 		descPart = lipgloss.NewStyle().
-			Foreground(common.TokyoMuted).
+			Foreground(common.TokyoMuted()).
 			Italic(true).
 			Render("💡 " + GetSettingDesc(state.SelectedSetting))
 	}
@@ -154,7 +164,7 @@ func RenderSettingsPage(state PageState, width, height int) string {
 		versionText = common.TruncateDisplay(versionText, versionSlot)
 	}
 	versionPart := lipgloss.NewStyle().
-		Foreground(common.TokyoMuted).
+		Foreground(common.TokyoMuted()).
 		Align(lipgloss.Right).
 		Width(versionSlot).
 		Render(versionText)
@@ -208,6 +218,14 @@ func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
 				{Key: "Esc", Desc: i18n.T("help.settings_edit_lang.cancel")},
 			}
 		}
+		if state.SelectedSetting == ThemeSettingIndex() {
+			// 主题项：Tab/方向键切换 + 应用 + 取消
+			return []common.InlineHelpHint{
+				{Key: "←→/Tab", Desc: i18n.T("help.settings_edit_theme.switch")},
+				{Key: "Enter", Desc: i18n.T("help.settings_edit_theme.confirm")},
+				{Key: "Esc", Desc: i18n.T("help.settings_edit_theme.cancel")},
+			}
+		}
 		// 普通编辑项：移动光标 + 保存 + 取消
 		return []common.InlineHelpHint{
 			{Key: "←→", Desc: i18n.T("help.settings_edit_config.move")},
@@ -247,33 +265,33 @@ func renderSettingItem(state PageState, index int, label string, width int) stri
 	labelStyle := lipgloss.NewStyle().
 		Width(settingsLabelWidth).
 		Align(lipgloss.Right).
-		Foreground(common.TokyoMuted).
+		Foreground(common.TokyoMuted()).
 		PaddingRight(1)
 
 	selectedLabelStyle := labelStyle.Copy().
-		Foreground(common.TokyoCyan).
+		Foreground(common.TokyoCyan()).
 		Bold(true)
 
 	// 值样式
 	valueStyle := lipgloss.NewStyle().
-		Foreground(common.TokyoForeground)
+		Foreground(common.TokyoForeground())
 
 	// 选中状态样式
 	selectedBg := lipgloss.NewStyle().
-		Background(common.TokyoSelected)
+		Background(common.TokyoSelected())
 
 	// 编辑模式样式
 	editBoxStyle := lipgloss.NewStyle().
-		Foreground(common.TokyoYellow).
-		Background(lipgloss.Color("#1A1B26")).
+		Foreground(common.TokyoYellow()).
+		Background(common.Background()).
 		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(common.TokyoBlue).
+		BorderForeground(common.TokyoBlue()).
 		Padding(0, 1)
 
 	// 光标样式
 	cursorStyle := lipgloss.NewStyle().
-		Background(common.TokyoForeground).
-		Foreground(lipgloss.Color("#1A1B26"))
+		Background(common.TokyoForeground()).
+		Foreground(common.Background())
 
 	// 渲染标签
 	var renderedLabel string
@@ -292,6 +310,13 @@ func renderSettingItem(state PageState, index int, label string, width int) stri
 			valToRender = state.EditValue
 		}
 		renderedValue = renderLanguageTabs(valToRender, state.EditMode && index == state.SelectedSetting)
+	} else if index == ThemeSettingIndex() {
+		// 主题选项使用 Tab 组件渲染
+		valToRender := value
+		if state.EditMode && index == state.SelectedSetting {
+			valToRender = state.EditValue
+		}
+		renderedValue = renderThemeTabs(valToRender, state.EditMode && index == state.SelectedSetting)
 	} else if state.EditMode && index == state.SelectedSetting {
 		// 在光标位置渲染真实光标指示符
 		cursorPos := state.EditCursor
@@ -342,21 +367,21 @@ func renderLanguageTabs(currentLang string, editMode bool) string {
 	var parts []string
 
 	activeStyle := lipgloss.NewStyle().
-		Background(common.TokyoBlue).
-		Foreground(lipgloss.Color("#FFFFFF")).
+		Background(common.TokyoBlue()).
+		Foreground(common.Bright()).
 		Bold(true).
 		Padding(0, 1)
 
 	if editMode {
-		activeStyle = activeStyle.Background(common.TokyoGreen)
+		activeStyle = activeStyle.Background(common.TokyoGreen())
 	}
 
 	inactiveStyle := lipgloss.NewStyle().
-		Foreground(common.TokyoMuted).
-		Background(lipgloss.Color("#1A1B26")).
+		Foreground(common.TokyoMuted()).
+		Background(common.Background()).
 		Padding(0, 1)
 
-	separatorStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted)
+	separatorStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted())
 
 	for i, m := range modes {
 		if currentLang == m {
@@ -365,6 +390,41 @@ func renderLanguageTabs(currentLang string, editMode bool) string {
 			parts = append(parts, inactiveStyle.Render(" "+m+" "))
 		}
 		if i < len(modes)-1 {
+			parts = append(parts, separatorStyle.Render("│"))
+		}
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Left, parts...)
+}
+
+// renderThemeTabs 渲染主题切换 Tab（仿 renderLanguageTabs）
+func renderThemeTabs(currentTheme string, editMode bool) string {
+	themes := theme.Names()
+	var parts []string
+
+	activeStyle := lipgloss.NewStyle().
+		Background(common.TokyoBlue()).
+		Foreground(common.Bright()).
+		Bold(true).
+		Padding(0, 1)
+
+	if editMode {
+		activeStyle = activeStyle.Background(common.TokyoGreen())
+	}
+
+	inactiveStyle := lipgloss.NewStyle().
+		Foreground(common.TokyoMuted()).
+		Background(common.Background()).
+		Padding(0, 1)
+
+	separatorStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted())
+
+	for i, m := range themes {
+		if currentTheme == m {
+			parts = append(parts, activeStyle.Render(" "+m+" "))
+		} else {
+			parts = append(parts, inactiveStyle.Render(" "+m+" "))
+		}
+		if i < len(themes)-1 {
 			parts = append(parts, separatorStyle.Render("│"))
 		}
 	}

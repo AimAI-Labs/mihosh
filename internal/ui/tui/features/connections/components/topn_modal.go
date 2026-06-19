@@ -54,9 +54,9 @@ func RenderTopNModal(items []TopNItem, width, height, scroll int) string {
 }
 
 func buildTopNModal(items []TopNItem, width, height, scroll int) string {
-	rankStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted)
-	nameStyle := lipgloss.NewStyle().Foreground(common.TokyoForeground)
-	bytesStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue)
+	rankStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted())
+	nameStyle := lipgloss.NewStyle().Foreground(common.TokyoForeground())
+	bytesStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
 
 	innerW := width - 20
 	maxInnerW := width - 8
@@ -133,7 +133,7 @@ func buildTopNModal(items []TopNItem, width, height, scroll int) string {
 		}
 	}
 
-	barColor := common.TokyoPurple // Tokyo Night 紫色进度条
+	barColor := common.TokyoPurple() // Tokyo Night 紫色进度条
 
 	var maxBytes int64
 	if len(items) > 0 {
@@ -142,7 +142,7 @@ func buildTopNModal(items []TopNItem, width, height, scroll int) string {
 
 	var rows []string
 	if len(items) == 0 {
-		rows = append(rows, common.DimStyle.Render(i18n.T("conns.topn_modal_empty")))
+		rows = append(rows, common.DimStyle().Render(i18n.T("conns.topn_modal_empty")))
 	} else {
 		for i, item := range items {
 			name := item.Name
@@ -165,7 +165,7 @@ func buildTopNModal(items []TopNItem, width, height, scroll int) string {
 				barLen = 1
 			}
 			bar := lipgloss.NewStyle().Foreground(barColor).Render(strings.Repeat("█", barLen))
-			emptyBar := lipgloss.NewStyle().Foreground(common.CMuted).Render(strings.Repeat("░", barWidth-barLen))
+			emptyBar := lipgloss.NewStyle().Foreground(common.Muted()).Render(strings.Repeat("░", barWidth-barLen))
 
 			bytesStr := FormatMemory(item.TotalBytes)
 			if len([]rune(bytesStr)) < bytesColWidth {
@@ -196,11 +196,11 @@ func buildTopNModal(items []TopNItem, width, height, scroll int) string {
 
 	var content []string
 	if scroll > 0 {
-		content = append(content, common.DimStyle.Render(i18n.Tf("conns.topn_modal_more_up", scroll)))
+		content = append(content, common.DimStyle().Render(i18n.Tf("conns.topn_modal_more_up", scroll)))
 	}
 	content = append(content, rows[scroll:end]...)
 	if end < totalRows {
-		content = append(content, common.DimStyle.Render(i18n.Tf("conns.topn_modal_more_down", totalRows-end)))
+		content = append(content, common.DimStyle().Render(i18n.Tf("conns.topn_modal_more_down", totalRows-end)))
 	}
 
 	// 加上下空行使其有类似 Padding(1, 0) 的效果

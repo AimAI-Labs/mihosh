@@ -225,6 +225,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("proxy_address", DefaultConfig.ProxyAddress)
 	viper.SetDefault("language", DefaultConfig.Language)
 	viper.SetDefault("auto_refresh_interval", DefaultConfig.AutoRefreshInterval)
+	viper.SetDefault("theme", DefaultConfig.Theme)
 
 	if err := viper.ReadInConfig(); err != nil {
 		return nil, err

@@ -67,7 +67,7 @@ func RenderDetailModalRight(conn *model.Connection, width, height, scrollTop int
 	visibleLines := jsonLines[scrollTop:endIdx]
 
 	// 样式 — Tokyo Night JSON 高亮
-	jsonStyle := lipgloss.NewStyle().Foreground(common.TokyoGreen)
+	jsonStyle := lipgloss.NewStyle().Foreground(common.TokyoGreen())
 
 	var contentLines []string
 	for _, line := range visibleLines {
@@ -93,11 +93,11 @@ func RenderDetailModalRight(conn *model.Connection, width, height, scrollTop int
 
 // wrapDetailJSONPanel 用带标题的圆角边框包裹 JSON 正文
 func wrapDetailJSONPanel(body string, width int, isFocused bool) string {
-	borderColor := common.TokyoMuted
-	titleColor := common.TokyoBlue
+	borderColor := common.TokyoMuted()
+	titleColor := common.TokyoBlue()
 	if isFocused {
-		borderColor = common.TokyoPurple
-		titleColor = common.TokyoCyan
+		borderColor = common.TokyoPurple()
+		titleColor = common.TokyoCyan()
 	}
 	return common.RenderBorderedPanel(i18n.T("conns.detail.title_json"), body, width, borderColor, titleColor)
 }

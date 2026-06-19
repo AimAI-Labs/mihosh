@@ -20,7 +20,7 @@ func RenderFooter(width, height, currentContentHeight int, helpText string) stri
 	// 计算需要填充的空行数，以确保 footer 固定在底部
 	// footer 占用 1 行，但如果 width 太窄导致 wrap 可能会占用多行
 	// 使用 lipgloss 计算渲染后的高度
-	styledFooter := styles.FooterStyle.Width(width).Render(helpText)
+	styledFooter := styles.FooterStyle().Width(width).Render(helpText)
 	footerHeight := lipgloss.Height(styledFooter)
 
 	paddingLines := height - currentContentHeight - footerHeight

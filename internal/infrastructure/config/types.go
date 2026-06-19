@@ -9,6 +9,7 @@ type Config struct {
 	ProxyAddress        string `mapstructure:"proxy_address"`
 	Language            string `mapstructure:"language"`
 	AutoRefreshInterval int    `mapstructure:"auto_refresh_interval"`
+	Theme               string `mapstructure:"theme"`
 }
 
 // DefaultConfig 默认配置
@@ -20,4 +21,5 @@ var DefaultConfig = Config{
 	ProxyAddress:        "http://127.0.0.1:7890",
 	Language:            "auto",
 	AutoRefreshInterval: 5,
+	Theme:               "tokyo-night",
 }

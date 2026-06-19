@@ -5,6 +5,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/styles"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -22,17 +23,17 @@ func newDetailStyles() detailStyles {
 	return detailStyles{
 		Header: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(styles.ColorPrimary),
+			Foreground(styles.Primary()),
 		SectionTitle: lipgloss.NewStyle().
-			Foreground(styles.ColorSecondary),
+			Foreground(styles.Secondary()),
 		Label: lipgloss.NewStyle().
-			Foreground(styles.ColorPrimary),
+			Foreground(styles.Primary()),
 		Value: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#E5E7EB")),
+			Foreground(common.Bright()),
 		JSON: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#00FF00")),
+			Foreground(common.Success()),
 		Dim: lipgloss.NewStyle().
-			Foreground(styles.ColorSecondary),
+			Foreground(styles.Secondary()),
 	}
 }
 

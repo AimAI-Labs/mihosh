@@ -139,10 +139,10 @@ func RenderSymmetricBarChart(uploadData, downloadData []int64, formatFunc func(i
 	sampledDown := sampleChartData(downloadData, chartWidth)
 
 	// 颜色样式
-	purpleStyle := lipgloss.NewStyle().Foreground(common.TokyoPurple)
-	blueStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue)
-	labelStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted)
-	axisStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted)
+	purpleStyle := lipgloss.NewStyle().Foreground(common.TokyoPurple())
+	blueStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
+	labelStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted())
+	axisStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted())
 
 	halfHF := float64(halfH)
 

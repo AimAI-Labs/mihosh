@@ -1,41 +1,39 @@
 package common
 
-import "github.com/charmbracelet/lipgloss"
-
-// 基础调色板 (主要从现有代码中提取)
-const (
-	ColorPrimary   = "#1E90FF" // 蓝色 (DodgerBlue)
-	ColorSecondary = "#00BFFF" // 深天蓝 (DeepSkyBlue)
-	ColorSuccess   = "#2ECC71" // 绿色 (Emerald)
-	ColorWarning   = "#FFD700" // 黄色 (Gold)
-	ColorDanger    = "#E74C3C" // 红色 (Alizarin)
-	ColorInfo      = "#00CED1" // 青色 (DarkTurquoise)
-	ColorMuted     = "#888888" // 灰色 (中灰)
-	ColorDim       = "#555555" // 灰色 (深灰)
-	ColorHighlight = "#333333" // 背景高亮色
-	ColorWhite     = "#FFFFFF"
-	ColorActive    = "#00FF00" // 激活态 (绿色)
-	ColorOrange    = "#E67E22" // 橙色
-	ColorPurple    = "#9B59B6" // 紫色
-	ColorGray      = "#95A5A6" // 石棉灰
-	ColorBorder    = "#666666" // 边框灰
+import (
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
+	"github.com/charmbracelet/lipgloss"
 )
 
-// LipGloss 颜色对象
-var (
-	CPrimary   = lipgloss.Color(ColorPrimary)
-	CSecondary = lipgloss.Color(ColorSecondary)
-	CSuccess   = lipgloss.Color(ColorSuccess)
-	CWarning   = lipgloss.Color(ColorWarning)
-	CDanger    = lipgloss.Color(ColorDanger)
-	CInfo      = lipgloss.Color(ColorInfo)
-	CMuted     = lipgloss.Color(ColorMuted)
-	CDim       = lipgloss.Color(ColorDim)
-	CHighlight = lipgloss.Color(ColorHighlight)
-	CWhite     = lipgloss.Color(ColorWhite)
-	CActive    = lipgloss.Color(ColorActive)
-	COrange    = lipgloss.Color(ColorOrange)
-	CPurple    = lipgloss.Color(ColorPurple)
-	CGray      = lipgloss.Color(ColorGray)
-	CBorder    = lipgloss.Color(ColorBorder)
-)
+// 颜色访问函数——每次调用读取当前主题，支持热切换
+func Background() lipgloss.Color { return theme.Current().Background }
+func Surface() lipgloss.Color    { return theme.Current().Surface }
+func Overlay() lipgloss.Color    { return theme.Current().Overlay }
+func Primary() lipgloss.Color   { return theme.Current().Primary }
+func Secondary() lipgloss.Color { return theme.Current().Secondary }
+func Success() lipgloss.Color   { return theme.Current().Success }
+func Warning() lipgloss.Color   { return theme.Current().Warning }
+func Danger() lipgloss.Color    { return theme.Current().Danger }
+func Info() lipgloss.Color      { return theme.Current().Info }
+func Muted() lipgloss.Color     { return theme.Current().Muted }
+func Dim() lipgloss.Color       { return theme.Current().Dim }
+func Highlight() lipgloss.Color { return theme.Current().Selected }
+func Selected() lipgloss.Color  { return theme.Current().Selected }
+func Bright() lipgloss.Color    { return theme.Current().Bright }
+func Active() lipgloss.Color    { return theme.Current().Active }
+func Orange() lipgloss.Color    { return theme.Current().Orange }
+func Purple() lipgloss.Color    { return theme.Current().Purple }
+func Gray() lipgloss.Color      { return theme.Current().Muted } // 别名
+func Border() lipgloss.Color    { return theme.Current().Border }
+
+// Tokyo 系列别名（减少调用点改动量）
+func TokyoForeground() lipgloss.Color { return theme.Current().Foreground }
+func TokyoMuted() lipgloss.Color      { return theme.Current().Muted }
+func TokyoBlue() lipgloss.Color       { return theme.Current().Primary }
+func TokyoCyan() lipgloss.Color       { return theme.Current().Info }
+func TokyoGreen() lipgloss.Color      { return theme.Current().Success }
+func TokyoRed() lipgloss.Color        { return theme.Current().Danger }
+func TokyoYellow() lipgloss.Color     { return theme.Current().Warning }
+func TokyoPurple() lipgloss.Color     { return theme.Current().Secondary }
+func TokyoPanel() lipgloss.Color      { return theme.Current().Background }
+func TokyoSelected() lipgloss.Color   { return theme.Current().Selected }

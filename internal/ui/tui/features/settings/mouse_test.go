@@ -97,11 +97,14 @@ func TestSettingsIncludesAutoRefreshInterval(t *testing.T) {
 		AutoRefreshInterval: 7,
 	}
 
-	if len(SettingKeys) != 7 {
-		t.Fatalf("expected 7 setting keys, got %d", len(SettingKeys))
+	if len(SettingKeys) != 8 {
+		t.Fatalf("expected 8 setting keys, got %d", len(SettingKeys))
 	}
 	if SettingKeys[6] != "auto-refresh-interval" {
 		t.Fatalf("expected auto-refresh-interval setting key, got %q", SettingKeys[6])
+	}
+	if SettingKeys[7] != "theme" {
+		t.Fatalf("expected theme setting key, got %q", SettingKeys[7])
 	}
 	if got := GetSettingValue(cfg, 6); got != "7" {
 		t.Fatalf("expected auto refresh interval value 7, got %q", got)

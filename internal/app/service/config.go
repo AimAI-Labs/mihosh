@@ -2,8 +2,10 @@ package service
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 )
 
 // ConfigService 配置管理服务
@@ -96,8 +98,13 @@ func (s *ConfigService) SetConfigValue(key, value string) error {
 			return fmt.Errorf("auto_refresh_interval 不能小于 0")
 		}
 		cfg.AutoRefreshInterval = interval
+	case "theme":
+		if !theme.IsValid(value) {
+			return fmt.Errorf("theme 必须是: %s", strings.Join(theme.Names(), ", "))
+		}
+		cfg.Theme = value
 	default:
-		return fmt.Errorf("未知的配置项: %s (可用: api_address, secret, test_url, timeout, proxy_address, language, auto_refresh_interval)", key)
+		return fmt.Errorf("未知的配置项: %s (可用: api_address, secret, test_url, timeout, proxy_address, language, auto_refresh_interval, theme)", key)
 	}
 
 	return config.Save(cfg)

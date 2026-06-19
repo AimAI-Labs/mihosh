@@ -22,13 +22,15 @@ const (
 // 日志级别列表
 var logLevels = []string{"debug", "info", "warning", "error", "silent"}
 
-// 日志级别颜色
-var logLevelColors = map[string]lipgloss.Color{
-	"debug":   common.TokyoMuted,
-	"info":    common.TokyoBlue,
-	"warning": common.TokyoYellow,
-	"error":   common.TokyoRed,
-	"silent":  common.TokyoPurple,
+// logLevelColors 返回日志级别颜色映射（动态构建，支持主题热切换）
+func logLevelColors() map[string]lipgloss.Color {
+	return map[string]lipgloss.Color{
+		"debug":   common.TokyoMuted(),
+		"info":    common.TokyoBlue(),
+		"warning": common.TokyoYellow(),
+		"error":   common.TokyoRed(),
+		"silent":  common.TokyoPurple(),
+	}
 }
 
 type logLevelTabStyle struct {
@@ -83,7 +85,7 @@ func RenderLogsPage(state PageState) string {
 
 	// 渲染统计信息
 	stats := i18n.Tf("logs.stats", len(filteredLogs), logLevels[state.LogLevel])
-	sections = append(sections, common.MutedStyle.Render(stats))
+	sections = append(sections, common.MutedStyle().Render(stats))
 	sections = append(sections, "")
 
 	// 计算可显示的日志行数 (级别栏 + 搜索框 + 统计 + 间隔)
@@ -188,7 +190,7 @@ func renderLevelBar(selectedLevel int, width int) string {
 	}
 
 	// 渲染带边框的级别栏
-	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue)
+	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
 	topLine := borderStyle.Render("╭" + strings.Repeat("─", innerWidth) + "╮")
 	middleLine := borderStyle.Render("│") + content + borderStyle.Render("│")
 	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
@@ -220,16 +222,16 @@ func renderLogLevelTab(level string, active bool) string {
 
 func resolveLogLevelTabStyle(level string, active bool) logLevelTabStyle {
 	style := logLevelTabStyle{
-		Background: common.TokyoSelected,
-		Foreground: common.TokyoMuted,
-		Indicator:  logLevelColors[level],
+		Background: common.TokyoSelected(),
+		Foreground: common.TokyoMuted(),
+		Indicator:  logLevelColors()[level],
 	}
 	if active {
-		style.Background = common.TokyoSelected
-		style.Foreground = common.TokyoCyan
+		style.Background = common.TokyoSelected()
+		style.Foreground = common.TokyoCyan()
 		style.Bold = true
 		if style.Indicator == style.Background {
-			style.Indicator = common.TokyoCyan
+			style.Indicator = common.TokyoCyan()
 		}
 	}
 	return style
@@ -243,8 +245,8 @@ func LevelBarPositions(pageWidth int) []int {
 	// 使用实际渲染宽度计算（考虑 lipgloss 样式）
 	activeStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("#FFFFFF")).
-		Background(common.TokyoBlue)
+		Foreground(common.Bright()).
+		Background(common.TokyoBlue())
 
 	for i, level := range logLevels {
 		positions[i] = currentPos
@@ -280,14 +282,14 @@ func ClickedLevel(pageX int, pageWidth int, selectedLevel int) int {
 // renderLogSearchBox 渲染搜索框
 func renderLogSearchBox(filterText string, filterMode bool) string {
 	if filterMode {
-		inputStyle := lipgloss.NewStyle().Foreground(common.TokyoPanel).Background(common.TokyoCyan)
+		inputStyle := lipgloss.NewStyle().Foreground(common.TokyoPanel()).Background(common.TokyoCyan())
 		label := common.TokyoMutedStyle().Render(i18n.T("logs.search"))
 		input := inputStyle.Render(filterText + "█")
 		return label + input
 	}
 
 	label := common.TokyoMutedStyle().Render(i18n.T("logs.search"))
-	input := lipgloss.NewStyle().Foreground(common.TokyoForeground).Render(filterText)
+	input := lipgloss.NewStyle().Foreground(common.TokyoForeground()).Render(filterText)
 	return label + input
 }
 
@@ -304,7 +306,7 @@ func getLevelIndex(level string) int {
 // renderLogList 渲染日志列表
 func renderLogList(logs []model.LogEntry, selectedIdx, scrollTop, maxLines, width, hOffset int) string {
 	if len(logs) == 0 {
-		return common.MutedStyle.Render(i18n.T("logs.empty"))
+		return common.MutedStyle().Render(i18n.T("logs.empty"))
 	}
 
 	var lines []string
@@ -334,9 +336,9 @@ func renderLogList(logs []model.LogEntry, selectedIdx, scrollTop, maxLines, widt
 
 // renderLogEntry 渲染单条日志
 func renderLogEntry(log model.LogEntry, selected bool, maxWidth int, hOffset int) string {
-	color := logLevelColors[log.Type]
+	color := logLevelColors()[log.Type]
 	if color == "" {
-		color = common.TokyoMuted
+		color = common.TokyoMuted()
 	}
 
 	levelStyle := lipgloss.NewStyle().
@@ -344,9 +346,9 @@ func renderLogEntry(log model.LogEntry, selected bool, maxWidth int, hOffset int
 		Width(logsLevelWidth)
 
 	timeStr := log.Timestamp.Format("15:04:05")
-	timePart := common.DimStyle.Render(timeStr)
+	timePart := common.DimStyle().Render(timeStr)
 
-	contentStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted)
+	contentStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted())
 
 	content := log.Payload
 	if decoded, err := url.QueryUnescape(content); err == nil {
@@ -389,7 +391,7 @@ func renderLogEntry(log model.LogEntry, selected bool, maxWidth int, hOffset int
 
 	if selected {
 		line = lipgloss.NewStyle().
-			Background(common.TokyoSelected).
+			Background(common.TokyoSelected()).
 			Render(common.SymbolSelectActive + line)
 	} else {
 		line = common.SymbolSelectInactive + line

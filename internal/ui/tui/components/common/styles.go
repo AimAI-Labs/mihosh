@@ -2,41 +2,34 @@ package common
 
 import "github.com/charmbracelet/lipgloss"
 
-// 基础 UI 样式定义
-var (
-	// Tab 渲染
-	TabActiveStyle = lipgloss.NewStyle().
-			Bold(true).
-			Background(CSecondary).
-			Foreground(CWhite).
-			Padding(0, 1)
+func TabActiveStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Bold(true).
+		Background(Secondary()).Foreground(Bright()).
+		Padding(0, 1)
+}
 
-	TabInactiveStyle = lipgloss.NewStyle().
-				Background(CHighlight).
-				Foreground(CMuted).
-				Padding(0, 1)
+func TabInactiveStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Background(Highlight()).Foreground(Muted()).
+		Padding(0, 1)
+}
 
-	// 文本样式
-	BoldStyle      = lipgloss.NewStyle().Bold(true)
-	ActiveStyle    = lipgloss.NewStyle().Foreground(CActive).Bold(true)
-	InactiveStyle  = lipgloss.NewStyle().Foreground(CPrimary)
-	DimStyle       = lipgloss.NewStyle().Foreground(CDim)
-	MutedStyle     = lipgloss.NewStyle().Foreground(CMuted)
-	HighlightStyle = lipgloss.NewStyle().Background(CHighlight).Foreground(CWhite)
-	ErrorStyle     = lipgloss.NewStyle().Foreground(CDanger)
-	SuccessStyle   = lipgloss.NewStyle().Foreground(CSuccess)
-	WarningStyle   = lipgloss.NewStyle().Foreground(CWarning)
-
-	// 表格/列表样式
-	TableHeaderStyle = lipgloss.NewStyle().Foreground(CMuted).Bold(true)
-	TableBorderStyle = lipgloss.NewStyle().Foreground(CBorder)
-	SelectedStyle    = lipgloss.NewStyle().Foreground(CActive).Bold(true)
-
-	// 页面标题
-	PageHeaderStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(CWarning).
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderBottom(true).
-			BorderForeground(CBorder)
-)
+func BoldStyle() lipgloss.Style      { return lipgloss.NewStyle().Bold(true) }
+func ActiveStyle() lipgloss.Style    { return lipgloss.NewStyle().Foreground(Active()).Bold(true) }
+func InactiveStyle() lipgloss.Style  { return lipgloss.NewStyle().Foreground(Primary()) }
+func DimStyle() lipgloss.Style       { return lipgloss.NewStyle().Foreground(Dim()) }
+func MutedStyle() lipgloss.Style     { return lipgloss.NewStyle().Foreground(Muted()) }
+func HighlightStyle() lipgloss.Style { return lipgloss.NewStyle().Background(Highlight()).Foreground(Bright()) }
+func ErrorStyle() lipgloss.Style     { return lipgloss.NewStyle().Foreground(Danger()) }
+func SuccessStyle() lipgloss.Style   { return lipgloss.NewStyle().Foreground(Success()) }
+func WarningStyle() lipgloss.Style   { return lipgloss.NewStyle().Foreground(Warning()) }
+func TableHeaderStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(Muted()).Bold(true) }
+func TableBorderStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(Border()) }
+func SelectedStyle() lipgloss.Style    { return lipgloss.NewStyle().Foreground(Active()).Bold(true) }
+func PageHeaderStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Bold(true).
+		Foreground(Warning()).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderBottom(true).
+		BorderForeground(Border())
+}

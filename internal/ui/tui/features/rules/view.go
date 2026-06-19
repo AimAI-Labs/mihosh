@@ -25,29 +25,31 @@ var (
 	domainSuffixColorKey = "DomainSuffix"
 )
 
-// 规则类型颜色
-var ruleTypeColors = map[string]lipgloss.Color{
-	// 标准格式
-	"DOMAIN":         common.CSecondary,
-	"DOMAIN-SUFFIX":  common.CSecondary,
-	"DOMAIN-KEYWORD": common.CInfo,
-	"IP-CIDR":        common.CPurple,
-	"IP-CIDR6":       common.CPurple,
-	"GEOIP":          common.CDanger,
-	"GEOSITE":        common.COrange,
-	"RULE-SET":       common.CSuccess,
-	"MATCH":          common.CWarning,
-	"DIRECT":         common.CGray,
-	// Clash Meta 驼峰格式
-	"Domain":        common.CSecondary,
-	"DomainSuffix":  common.CSecondary,
-	"DomainKeyword": common.CInfo,
-	"IPCIDR":        common.CPurple,
-	"IPCIDR6":       common.CPurple,
-	"GeoIP":         common.CDanger,
-	"GeoSite":       common.COrange,
-	"RuleSet":       common.CSuccess,
-	"Match":         common.CWarning,
+// ruleTypeColors 返回规则类型颜色映射（每次调用动态构建，支持主题热切换）
+func ruleTypeColors() map[string]lipgloss.Color {
+	return map[string]lipgloss.Color{
+		// 标准格式
+		"DOMAIN":         common.Secondary(),
+		"DOMAIN-SUFFIX":  common.Secondary(),
+		"DOMAIN-KEYWORD": common.Info(),
+		"IP-CIDR":        common.Purple(),
+		"IP-CIDR6":       common.Purple(),
+		"GEOIP":          common.Danger(),
+		"GEOSITE":        common.Orange(),
+		"RULE-SET":       common.Success(),
+		"MATCH":          common.Warning(),
+		"DIRECT":         common.Gray(),
+		// Clash Meta 驼峰格式
+		"Domain":        common.Secondary(),
+		"DomainSuffix":  common.Secondary(),
+		"DomainKeyword": common.Info(),
+		"IPCIDR":        common.Purple(),
+		"IPCIDR6":       common.Purple(),
+		"GeoIP":         common.Danger(),
+		"GeoSite":       common.Orange(),
+		"RuleSet":       common.Success(),
+		"Match":         common.Warning(),
+	}
 }
 
 // filteredRule 带原始索引的规则
@@ -229,8 +231,8 @@ func renderRulesInlineHelp(page string, state PageState) string {
 // RenderRulesHeaderComponent 渲染规则页面头部组件（带边框，包含统计和搜索框）
 // 统计信息右对齐显示在搜索行右侧
 func RenderRulesHeaderComponent(stats string, searchBox string, width int) string {
-	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue)
-	statsStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue)
+	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
+	statsStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
 
 	// 计算内边框宽度
 	innerWidth := width - 2
@@ -267,13 +269,13 @@ func RenderRulesHeaderComponent(stats string, searchBox string, width int) strin
 
 // renderRuleSearchBox 渲染搜索框
 func renderRuleSearchBox(filterText string, filterMode bool, engine FilterEngine, selectedTypes []string) string {
-	inputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF"))
+	inputStyle := lipgloss.NewStyle().Foreground(common.Bright())
 
 	if filterMode {
-		inputStyle = inputStyle.Background(common.CHighlight)
+		inputStyle = inputStyle.Background(common.Highlight())
 	}
 
-	label := common.MutedStyle.Render(i18n.T("rules.search"))
+	label := common.MutedStyle().Render(i18n.T("rules.search"))
 	input := inputStyle.Render(filterText)
 
 	if filterMode {
@@ -293,17 +295,17 @@ func renderRuleSearchBox(filterText string, filterMode bool, engine FilterEngine
 	if filterText == "" {
 		switch engine {
 		case FilterEngineRegex:
-			hint = common.MutedStyle.Render(i18n.T("rules.search_hint_regex"))
+			hint = common.MutedStyle().Render(i18n.T("rules.search_hint_regex"))
 		case FilterEngineFuzzy:
-			hint = common.MutedStyle.Render(i18n.T("rules.search_hint_fuzzy"))
+			hint = common.MutedStyle().Render(i18n.T("rules.search_hint_fuzzy"))
 		default:
-			hint = common.MutedStyle.Render(i18n.T("rules.search_hint"))
+			hint = common.MutedStyle().Render(i18n.T("rules.search_hint"))
 		}
 	}
 	if len(selectedTypes) > 0 {
 		typeNames := strings.Join(selectedTypes, ", ")
 		typeIndicator := lipgloss.NewStyle().
-			Foreground(common.CSuccess).
+			Foreground(common.Success()).
 			Render(fmt.Sprintf(" [%s]", typeNames))
 		return label + input + hint + engineIndicator + typeIndicator
 	}
@@ -313,7 +315,7 @@ func renderRuleSearchBox(filterText string, filterMode bool, engine FilterEngine
 // renderRuleList 渲染规则列表（含整体垂直滚动条）
 func renderRuleList(rules []filteredRule, selectedIdx, scrollTop, maxLines, width int, colorAdjustLight, colorAdjustDark float64) string {
 	if len(rules) == 0 {
-		return common.MutedStyle.Render(i18n.T("rules.empty"))
+		return common.MutedStyle().Render(i18n.T("rules.empty"))
 	}
 
 	// 检测 Domain 和 DomainSuffix 是否共享相同颜色，如果是则应用颜色区分
@@ -351,9 +353,9 @@ func renderRuleList(rules []filteredRule, selectedIdx, scrollTop, maxLines, widt
 	var barLines []string
 	for i, ch := range strings.Split(scrollbarStr, "\n") {
 		if i >= thumbStart && i < thumbEnd {
-			barLines = append(barLines, common.MutedStyle.Foreground(lipgloss.Color("#AAAAAA")).Render(ch))
+			barLines = append(barLines, common.MutedStyle().Foreground(common.Gray()).Render(ch))
 		} else {
-			barLines = append(barLines, common.DimStyle.Render(ch))
+			barLines = append(barLines, common.DimStyle().Render(ch))
 		}
 	}
 	barStr := strings.Join(barLines, "\n")
@@ -390,7 +392,7 @@ func renderRuleEntry(rule model.Rule, index int, selected bool, width int, adjus
 	color := getAdjustedRuleTypeColor(rule.Type, adjustedColors)
 
 	// 序号
-	indexStyle := lipgloss.NewStyle().Foreground(common.CSuccess).Width(6)
+	indexStyle := lipgloss.NewStyle().Foreground(common.Success()).Width(6)
 	indexStr := indexStyle.Render(fmt.Sprintf("%d.", index+1))
 
 	// 类型标签
@@ -402,7 +404,7 @@ func renderRuleEntry(rule model.Rule, index int, selected bool, width int, adjus
 	noResolveStyle := lipgloss.NewStyle().Width(noResolveColWidth)
 	var noResolveStr string
 	if rule.NoResolve {
-		noResolveStr = noResolveStyle.Foreground(common.CWarning).Render("no-resolve")
+		noResolveStr = noResolveStyle.Foreground(common.Warning()).Render("no-resolve")
 	} else {
 		noResolveStr = noResolveStyle.Render("")
 	}
@@ -412,7 +414,7 @@ func renderRuleEntry(rule model.Rule, index int, selected bool, width int, adjus
 	if payloadWidth < 20 {
 		payloadWidth = 20
 	}
-	payloadStyle := lipgloss.NewStyle().Foreground(common.CSecondary)
+	payloadStyle := lipgloss.NewStyle().Foreground(common.Secondary())
 	payload := rule.Payload
 	if len(payload) > payloadWidth {
 		payload = payload[:payloadWidth-3] + "..."
@@ -420,7 +422,7 @@ func renderRuleEntry(rule model.Rule, index int, selected bool, width int, adjus
 	payloadStr := payloadStyle.Width(payloadWidth).Render(payload)
 
 	// 代理
-	proxyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF"))
+	proxyStyle := lipgloss.NewStyle().Foreground(common.Bright())
 	proxyStr := proxyStyle.Render(rule.Proxy)
 
 	// 构建行 (顺序: 序号 类型 Payload no-resolve 代理)
@@ -429,7 +431,7 @@ func renderRuleEntry(rule model.Rule, index int, selected bool, width int, adjus
 	// 选中样式
 	if selected {
 		line = lipgloss.NewStyle().
-			Background(common.CHighlight).
+			Background(common.Highlight()).
 			Render(common.SymbolSelectActive + line)
 	} else {
 		line = common.SymbolSelectInactive + line
@@ -438,16 +440,8 @@ func renderRuleEntry(rule model.Rule, index int, selected bool, width int, adjus
 	return line
 }
 
-// adjustedRuleColors 存储调整后的规则类型颜色缓存
-var adjustedRuleColors = make(map[string]lipgloss.Color)
-
-// prevColorAdjustLight 上次的轻度调整值（用于检测变化）
-var prevColorAdjustLight float64 = -1
-
-// prevColorAdjustDark 上次的深度调整值（用于检测变化）
-var prevColorAdjustDark float64 = -1
-
-// detectAndAdjustDomainColors 检测 Domain 和 DomainSuffix 是否颜色相同，如果是则调整它们
+// detectAndAdjustDomainColors 检测 Domain 和 DomainSuffix 是否颜色相同，如果是则调整它们。
+// 每次调用动态构建（无缓存），以支持主题热切换。
 func detectAndAdjustDomainColors(colorAdjustLight, colorAdjustDark float64) map[string]lipgloss.Color {
 	// 如果调整参数未设置，使用默认值
 	if colorAdjustLight <= 0 {
@@ -457,20 +451,15 @@ func detectAndAdjustDomainColors(colorAdjustLight, colorAdjustDark float64) map[
 		colorAdjustDark = 0.20
 	}
 
-	// 如果参数未变化且已有缓存，直接返回缓存
-	if colorAdjustLight == prevColorAdjustLight && colorAdjustDark == prevColorAdjustDark && len(adjustedRuleColors) > 0 {
-		return adjustedRuleColors
-	}
-
-	// 重置缓存
-	adjustedRuleColors = make(map[string]lipgloss.Color)
+	adjusted := make(map[string]lipgloss.Color)
 
 	// 检查 Domain 和 DomainSuffix 的基础颜色是否相同
-	domainBaseColor := ruleTypeColors[domainColorKey]
-	domainSuffixBaseColor := ruleTypeColors[domainSuffixColorKey]
+	colors := ruleTypeColors()
+	domainBaseColor := colors[domainColorKey]
+	domainSuffixBaseColor := colors[domainSuffixColorKey]
 
 	if domainBaseColor == "" || domainSuffixBaseColor == "" {
-		return adjustedRuleColors
+		return adjusted
 	}
 
 	baseColorHex := string(domainBaseColor)
@@ -481,23 +470,20 @@ func detectAndAdjustDomainColors(colorAdjustLight, colorAdjustDark float64) map[
 		// 生成较浅和较深的变体
 		lighterHex, err := utils.LighterColor(baseColorHex, colorAdjustLight)
 		if err == nil {
-			adjustedRuleColors[domainColorKey] = lipgloss.Color(lighterHex)
+			adjusted[domainColorKey] = lipgloss.Color(lighterHex)
 		}
 
 		darkerHex, err := utils.DarkerColor(baseColorSuffixHex, colorAdjustDark)
 		if err == nil {
-			adjustedRuleColors[domainSuffixColorKey] = lipgloss.Color(darkerHex)
+			adjusted[domainSuffixColorKey] = lipgloss.Color(darkerHex)
 		}
 
 		// 同时处理大写格式
-		adjustedRuleColors["DOMAIN"] = adjustedRuleColors[domainColorKey]
-		adjustedRuleColors["DOMAIN-SUFFIX"] = adjustedRuleColors[domainSuffixColorKey]
+		adjusted["DOMAIN"] = adjusted[domainColorKey]
+		adjusted["DOMAIN-SUFFIX"] = adjusted[domainSuffixColorKey]
 	}
 
-	prevColorAdjustLight = colorAdjustLight
-	prevColorAdjustDark = colorAdjustDark
-
-	return adjustedRuleColors
+	return adjusted
 }
 
 // getAdjustedRuleTypeColor 获取调整后的规则类型颜色
@@ -505,10 +491,10 @@ func getAdjustedRuleTypeColor(ruleType string, adjustedColors map[string]lipglos
 	if adjustedColor, ok := adjustedColors[ruleType]; ok {
 		return adjustedColor
 	}
-	if baseColor, ok := ruleTypeColors[ruleType]; ok {
+	if baseColor, ok := ruleTypeColors()[ruleType]; ok {
 		return baseColor
 	}
-	return lipgloss.Color("#CCCCCC")
+	return common.Gray()
 }
 
 // animateColor 计算平滑过渡动画后的颜色
@@ -792,11 +778,11 @@ func buildTypeFilterModal(state PageState, width, height int) string {
 		if i == state.TypeFilterCursor {
 			// 当前光标行 — Tokyo Night 选中态
 			cursorStyle := lipgloss.NewStyle().
-				Background(common.TokyoSelected).
-				Foreground(common.TokyoCyan)
+				Background(common.TokyoSelected()).
+				Foreground(common.TokyoCyan())
 			var checkMark string
 			if isSelected {
-				checkMark = lipgloss.NewStyle().Foreground(common.TokyoGreen).Render("✓ ")
+				checkMark = lipgloss.NewStyle().Foreground(common.TokyoGreen()).Render("✓ ")
 			} else {
 				checkMark = "  "
 			}
@@ -805,7 +791,7 @@ func buildTypeFilterModal(state PageState, width, height int) string {
 		} else {
 			var checkMark string
 			if isSelected {
-				checkMark = lipgloss.NewStyle().Foreground(common.TokyoGreen).Render("✓ ")
+				checkMark = lipgloss.NewStyle().Foreground(common.TokyoGreen()).Render("✓ ")
 			} else {
 				checkMark = "  "
 			}
@@ -839,8 +825,8 @@ func buildTypeFilterModal(state PageState, width, height int) string {
 		i18n.T("rules.filter_title"),
 		modalContent,
 		modalWidth,
-		common.TokyoBlue,
-		common.TokyoForeground,
+		common.TokyoBlue(),
+		common.TokyoForeground(),
 	)
 }
 
@@ -951,7 +937,7 @@ func buildAddRuleModal(state PageState, width, height int) string {
 	typeRow := renderAddFormTypeRow(form, innerWidth)
 
 	// ── 分隔行 ──
-	divider := lipgloss.NewStyle().Foreground(common.TokyoBlue).Render(strings.Repeat("─", innerWidth))
+	divider := lipgloss.NewStyle().Foreground(common.TokyoBlue()).Render(strings.Repeat("─", innerWidth))
 
 	// ── 字段渲染 ──
 	// MATCH 无 payload，省略匹配值字段
@@ -971,7 +957,7 @@ func buildAddRuleModal(state PageState, width, height int) string {
 	// ── 说明/错误行 ──
 	var footer string
 	if form.errMsg != "" {
-		footer = lipgloss.NewStyle().Foreground(common.CDanger).Render("✗ " + form.errMsg)
+		footer = lipgloss.NewStyle().Foreground(common.Danger()).Render("✗ " + form.errMsg)
 	} else if form.isTypeField() {
 		footer = common.TokyoMutedStyle().Render(i18n.T("rules.add_type_hint"))
 	} else if form.isProxyField() {
@@ -1000,8 +986,8 @@ func buildAddRuleModal(state PageState, width, height int) string {
 		i18n.T("rules.add_title"),
 		modalContent,
 		layout.modalWidth,
-		common.TokyoBlue,
-		common.TokyoForeground,
+		common.TokyoBlue(),
+		common.TokyoForeground(),
 	)
 }
 
@@ -1017,7 +1003,7 @@ func renderAddFormFieldRow(form addForm, fieldIdx int, label string, innerWidth 
 	// 标签：聚焦时用青色（参考导航栏选中态前景），否则弱化色
 	labelStyle := common.TokyoMutedStyle()
 	if focused {
-		labelStyle = lipgloss.NewStyle().Foreground(common.TokyoCyan)
+		labelStyle = lipgloss.NewStyle().Foreground(common.TokyoCyan())
 	}
 	labelText := labelStyle.Render(label)
 
@@ -1025,9 +1011,9 @@ func renderAddFormFieldRow(form addForm, fieldIdx int, label string, innerWidth 
 	field := form.fields[fieldIdx]
 	inputView := field.View()
 	if focused {
-		inputView = lipgloss.NewStyle().Foreground(common.TokyoCyan).Render(inputView)
+		inputView = lipgloss.NewStyle().Foreground(common.TokyoCyan()).Render(inputView)
 	} else {
-		inputView = lipgloss.NewStyle().Foreground(common.TokyoForeground).Render(inputView)
+		inputView = lipgloss.NewStyle().Foreground(common.TokyoForeground()).Render(inputView)
 	}
 
 	return applyFieldRowBackground(labelText+" "+inputView, focused, innerWidth)
@@ -1041,14 +1027,14 @@ func renderAddFormTypeRow(form addForm, innerWidth int) string {
 
 	labelStyle := common.TokyoMutedStyle()
 	if focused {
-		labelStyle = lipgloss.NewStyle().Foreground(common.TokyoCyan)
+		labelStyle = lipgloss.NewStyle().Foreground(common.TokyoCyan())
 	}
 	labelText := labelStyle.Render(i18n.T("rules.add_field_type"))
 
 	// 类型值颜色：聚焦时用青色强调（盖过类型配色），否则用类型自身配色
 	var typeVal string
 	if focused {
-		typeVal = lipgloss.NewStyle().Foreground(common.TokyoCyan).Bold(true).
+		typeVal = lipgloss.NewStyle().Foreground(common.TokyoCyan()).Bold(true).
 			Render(fmt.Sprintf("◀ %s ▶", form.currentType()))
 	} else {
 		typeColor := getAdjustedRuleTypeColor(form.currentType(), nil)
@@ -1066,14 +1052,14 @@ func renderAddFormProxyRow(form addForm, innerWidth int) string {
 
 	labelStyle := common.TokyoMutedStyle()
 	if focused {
-		labelStyle = lipgloss.NewStyle().Foreground(common.TokyoCyan)
+		labelStyle = lipgloss.NewStyle().Foreground(common.TokyoCyan())
 	}
 	labelText := labelStyle.Render(i18n.T("rules.add_field_proxy"))
 
 	// 策略值颜色：策略组用蓝，节点用绿
-	valColor := common.TokyoBlue
+	valColor := common.TokyoBlue()
 	if !form.isProxyGroupSelected() {
-		valColor = common.TokyoGreen
+		valColor = common.TokyoGreen()
 	}
 	val := form.currentProxy()
 	var valView string
@@ -1081,7 +1067,7 @@ func renderAddFormProxyRow(form addForm, innerWidth int) string {
 		valView = lipgloss.NewStyle().Foreground(valColor).Bold(true).Render(val)
 		valView += " " + common.TokyoMutedStyle().Render(i18n.T("rules.add_proxy_change"))
 	} else {
-		valView = lipgloss.NewStyle().Foreground(common.TokyoForeground).Render(val)
+		valView = lipgloss.NewStyle().Foreground(common.TokyoForeground()).Render(val)
 	}
 	return applyFieldRowBackground(labelText+" "+valView, focused, innerWidth)
 }
@@ -1094,7 +1080,7 @@ func renderAddFormNoResolveRow(form addForm, innerWidth int) string {
 
 	labelStyle := common.TokyoMutedStyle()
 	if focused {
-		labelStyle = lipgloss.NewStyle().Foreground(common.TokyoCyan)
+		labelStyle = lipgloss.NewStyle().Foreground(common.TokyoCyan())
 	}
 	labelText := labelStyle.Render(i18n.T("rules.add_field_noresolve"))
 
@@ -1105,9 +1091,9 @@ func renderAddFormNoResolveRow(form addForm, innerWidth int) string {
 
 	var valView string
 	if focused {
-		valView = lipgloss.NewStyle().Foreground(common.TokyoCyan).Bold(true).Render(checkbox)
+		valView = lipgloss.NewStyle().Foreground(common.TokyoCyan()).Bold(true).Render(checkbox)
 	} else {
-		valView = lipgloss.NewStyle().Foreground(common.TokyoForeground).Render(checkbox)
+		valView = lipgloss.NewStyle().Foreground(common.TokyoForeground()).Render(checkbox)
 	}
 	return applyFieldRowBackground(labelText+" "+valView, focused, innerWidth)
 }
@@ -1126,7 +1112,7 @@ func applyFieldRowBackground(row string, focused bool, innerWidth int) string {
 	if pad < 0 {
 		pad = 0
 	}
-	return lipgloss.NewStyle().Background(common.TokyoSelected).Render(styled + strings.Repeat(" ", pad))
+	return lipgloss.NewStyle().Background(common.TokyoSelected()).Render(styled + strings.Repeat(" ", pad))
 }
 
 // ResolveAddFormBounds 返回添加规则弹窗在页面坐标系中的边界（右下为开区间）。
@@ -1288,7 +1274,7 @@ func buildProxyPickerModal(state PageState, width, height int) string {
 	// ── Tab 行 ──
 	tabGroup := i18n.T("rules.picker_tab_group")
 	tabNode := i18n.T("rules.picker_tab_node")
-	activeStyle := lipgloss.NewStyle().Foreground(common.TokyoCyan).Bold(true).Underline(true)
+	activeStyle := lipgloss.NewStyle().Foreground(common.TokyoCyan()).Bold(true).Underline(true)
 	inactiveStyle := common.TokyoMutedStyle()
 	var tabRow string
 	if form.pickerTab == addPickerTabGroup {
@@ -1299,7 +1285,7 @@ func buildProxyPickerModal(state PageState, width, height int) string {
 
 	// ── 搜索行 ──
 	searchLabel := common.TokyoMutedStyle().Render(i18n.T("rules.picker_search"))
-	searchVal := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Render(form.pickerSearch + "█")
+	searchVal := lipgloss.NewStyle().Foreground(common.Bright()).Render(form.pickerSearch + "█")
 	searchRow := searchLabel + searchVal
 
 	// ── 列表 ──
@@ -1322,16 +1308,16 @@ func buildProxyPickerModal(state PageState, width, height int) string {
 				break
 			}
 		}
-		nameColor := common.TokyoBlue
+		nameColor := common.TokyoBlue()
 		if !isGroup {
-			nameColor = common.TokyoGreen
+			nameColor = common.TokyoGreen()
 		}
 
 		if i == form.pickerCursor {
-			cursorStyle := lipgloss.NewStyle().Background(common.TokyoSelected).Foreground(common.TokyoCyan)
+			cursorStyle := lipgloss.NewStyle().Background(common.TokyoSelected()).Foreground(common.TokyoCyan())
 			var mark string
 			if isCurrentSelected {
-				mark = lipgloss.NewStyle().Foreground(common.TokyoGreen).Render("✓ ")
+				mark = lipgloss.NewStyle().Foreground(common.TokyoGreen()).Render("✓ ")
 			} else {
 				mark = "  "
 			}
@@ -1340,7 +1326,7 @@ func buildProxyPickerModal(state PageState, width, height int) string {
 		} else {
 			var mark string
 			if isCurrentSelected {
-				mark = lipgloss.NewStyle().Foreground(common.TokyoGreen).Render("✓ ")
+				mark = lipgloss.NewStyle().Foreground(common.TokyoGreen()).Render("✓ ")
 			} else {
 				mark = "  "
 			}
@@ -1377,8 +1363,8 @@ func buildProxyPickerModal(state PageState, width, height int) string {
 		i18n.T("rules.picker_title"),
 		modalContent,
 		layout.modalWidth,
-		common.TokyoBlue,
-		common.TokyoForeground,
+		common.TokyoBlue(),
+		common.TokyoForeground(),
 	)
 }
 
@@ -1513,7 +1499,7 @@ func buildDeleteConfirmModal(state PageState, width, height int) string {
 	indexStr := fmt.Sprintf("%d.", state.DeleteTargetIndex+1)
 
 	// 序号行
-	indexStyle := lipgloss.NewStyle().Foreground(common.CSuccess)
+	indexStyle := lipgloss.NewStyle().Foreground(common.Success())
 	indexLine := indexStyle.Render(indexStr)
 
 	// 类型标签（带规则类型颜色）
@@ -1524,11 +1510,11 @@ func buildDeleteConfirmModal(state PageState, width, height int) string {
 	// no-resolve 标签
 	var noResolveLine string
 	if target.NoResolve {
-		noResolveLine = lipgloss.NewStyle().Foreground(common.CWarning).Render(" [no-resolve]")
+		noResolveLine = lipgloss.NewStyle().Foreground(common.Warning()).Render(" [no-resolve]")
 	}
 
 	// Payload
-	payloadStyle := lipgloss.NewStyle().Foreground(common.CSecondary)
+	payloadStyle := lipgloss.NewStyle().Foreground(common.Secondary())
 	payload := target.Payload
 	maxPayload := innerWidth - 2
 	if len(payload) > maxPayload {
@@ -1537,7 +1523,7 @@ func buildDeleteConfirmModal(state PageState, width, height int) string {
 	payloadLine := payloadStyle.Render(payload)
 
 	// 代理
-	proxyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF"))
+	proxyStyle := lipgloss.NewStyle().Foreground(common.Bright())
 	proxyLine := proxyStyle.Render("→ " + target.Proxy)
 
 	// 摘要行（单行截断）
@@ -1547,7 +1533,7 @@ func buildDeleteConfirmModal(state PageState, width, height int) string {
 	}
 
 	// 分隔
-	divider := lipgloss.NewStyle().Foreground(common.TokyoBlue).Render(strings.Repeat("─", innerWidth))
+	divider := lipgloss.NewStyle().Foreground(common.TokyoBlue()).Render(strings.Repeat("─", innerWidth))
 
 	// 确认提示
 	prompt := common.TokyoMutedStyle().Render(i18n.T("rules.delete_confirm_hint"))
@@ -1564,8 +1550,8 @@ func buildDeleteConfirmModal(state PageState, width, height int) string {
 		i18n.T("rules.delete_title"),
 		modalContent,
 		modalWidth,
-		common.CDanger,
-		common.TokyoForeground,
+		common.Danger(),
+		common.TokyoForeground(),
 	)
 }
 

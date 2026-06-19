@@ -29,8 +29,8 @@ func DefaultSparklineConfig() SparklineConfig {
 	return SparklineConfig{
 		Width:    40,
 		Height:   4,
-		Color1:   styles.ColorPrimary,
-		Color2:   lipgloss.Color("#9370DB"),
+		Color1:   styles.Primary(),
+		Color2:   Purple(),
 		MinValue: 0,
 		FormatFunc: func(v int64) string {
 			return utils.FormatBytes(v)
@@ -95,12 +95,12 @@ func RenderDualSparkline(data1, data2 []int64, config SparklineConfig) string {
 	}
 
 	// 样式
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.ColorPrimary)
-	labelStyle := lipgloss.NewStyle().Foreground(styles.ColorSecondary)
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary())
+	labelStyle := lipgloss.NewStyle().Foreground(styles.Secondary())
 	color1Style := lipgloss.NewStyle().Foreground(config.Color1)
 	color2Style := lipgloss.NewStyle().Foreground(config.Color2)
-	pauseStyle := lipgloss.NewStyle().Foreground(styles.ColorSecondary)
-	axisStyle := lipgloss.NewStyle().Foreground(styles.ColorGray)
+	pauseStyle := lipgloss.NewStyle().Foreground(styles.Secondary())
+	axisStyle := lipgloss.NewStyle().Foreground(styles.Gray())
 
 	var lines []string
 

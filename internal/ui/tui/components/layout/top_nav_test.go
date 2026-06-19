@@ -57,7 +57,7 @@ func TestRenderTopNavUsesNeutralBorderWhenIdle(t *testing.T) {
 
 	style := topNavBorderStyle()
 
-	if got := style.GetForeground(); got != styles.ColorBorder {
+	if got := style.GetForeground(); got != styles.Border() {
 		t.Fatalf("expected idle top nav border to use neutral border color, got %q", got)
 	}
 }
@@ -68,7 +68,7 @@ func TestRenderTopNavKeepsNeutralBorderWhenActiveStatusIsProvided(t *testing.T) 
 
 	style := topNavBorderStyle()
 
-	if got := style.GetForeground(); got != styles.ColorBorder {
+	if got := style.GetForeground(); got != styles.Border() {
 		t.Fatalf("expected active top nav border to remain neutral, got %q", got)
 	}
 }

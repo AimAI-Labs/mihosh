@@ -1,111 +1,53 @@
 package styles
 
-import "github.com/charmbracelet/lipgloss"
-
-// ============================================================
-//  Tokyo Night Deep — 全局调色板
-// ============================================================
-
-// 表面 / 背景色
-var (
-	ColorBackground = lipgloss.Color("#1A1B26") // 深蓝灰背景
-	ColorSurface    = lipgloss.Color("#24283b") // 稍亮的面板背景
-	ColorOverlay    = lipgloss.Color("#414868") // 弹出层 / 悬浮层
-)
-
-// 主强调色
-var (
-	ColorPrimary   = lipgloss.Color("#7AA2F7") // 现代蓝
-	ColorSecondary = lipgloss.Color("#BB9AF7") // 紫色 — 选中态
-)
-
-// 语义状态色
-var (
-	ColorSuccess = lipgloss.Color("#9ECE6A") // 延迟 <100ms
-	ColorWarning = lipgloss.Color("#E0AF68") // 延迟 100-300ms
-	ColorDanger  = lipgloss.Color("#F7768E") // 超时 / 离线
-)
-
-// 中性色
-var (
-	ColorBorder = lipgloss.Color("#414868") // 边框
-	ColorGray   = lipgloss.Color("#565f89") // 次要文字
-	ColorDim    = lipgloss.Color("#3b4261") // 最暗文字 / 禁用
-	ColorText   = lipgloss.Color("#c0caf5") // 正文
-	ColorBright = lipgloss.Color("#ffffff") // 高亮文字
+import (
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // ============================================================
-//  公共样式预设
+//  语义色访问函数——动态读取当前主题，支持热切换
 // ============================================================
 
-// 状态栏样式
-var (
-	StatusStyle = lipgloss.NewStyle().
-			Foreground(ColorGray)
+func Background() lipgloss.Color { return theme.Current().Background }
+func Surface() lipgloss.Color    { return theme.Current().Surface }
+func Overlay() lipgloss.Color    { return theme.Current().Overlay }
+func Primary() lipgloss.Color    { return theme.Current().Primary }
+func Secondary() lipgloss.Color  { return theme.Current().Secondary }
+func Success() lipgloss.Color    { return theme.Current().Success }
+func Warning() lipgloss.Color    { return theme.Current().Warning }
+func Danger() lipgloss.Color     { return theme.Current().Danger }
+func Border() lipgloss.Color     { return theme.Current().Border }
+func Gray() lipgloss.Color       { return theme.Current().Muted }
+func Dim() lipgloss.Color        { return theme.Current().Dim }
+func Text() lipgloss.Color       { return theme.Current().Foreground }
+func Bright() lipgloss.Color     { return theme.Current().Bright }
 
-	ErrorStyle = lipgloss.NewStyle().
-			Foreground(ColorDanger)
+// ============================================================
+//  公共样式预设（函数化，支持主题热切换）
+// ============================================================
 
-	TestingStyle = lipgloss.NewStyle().
-			Foreground(ColorWarning)
-)
+func StatusStyle() lipgloss.Style  { return lipgloss.NewStyle().Foreground(Gray()) }
+func ErrorStyle() lipgloss.Style   { return lipgloss.NewStyle().Foreground(Danger()) }
+func TestingStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(Warning()) }
+func DividerStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(Border()) }
 
-// 分隔线
-var DividerStyle = lipgloss.NewStyle().
-	Foreground(ColorBorder)
+func TitleStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Bold(true).Foreground(Primary()).Padding(0, 1)
+}
+func SubtitleStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(Gray()) }
 
-// 标题
-var (
-	TitleStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(ColorPrimary).
-			Padding(0, 1)
+func SelectedItemStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(Secondary()).Bold(true) }
+func NormalItemStyle() lipgloss.Style   { return lipgloss.NewStyle().Foreground(Text()) }
+func DisabledItemStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(Gray()) }
 
-	SubtitleStyle = lipgloss.NewStyle().
-			Foreground(ColorGray)
-)
+func TableHeaderStyle() lipgloss.Style { return lipgloss.NewStyle().Bold(true).Foreground(Primary()) }
+func TableRowStyle() lipgloss.Style    { return lipgloss.NewStyle().Foreground(Text()) }
+func TableAltRowStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(Dim()) }
 
-// 列表
-var (
-	SelectedItemStyle = lipgloss.NewStyle().
-				Foreground(ColorSecondary).
-				Bold(true)
-
-	NormalItemStyle = lipgloss.NewStyle().
-			Foreground(ColorText)
-
-	DisabledItemStyle = lipgloss.NewStyle().
-				Foreground(ColorGray)
-)
-
-// 表格
-var (
-	TableHeaderStyle = lipgloss.NewStyle().
-				Bold(true).
-				Foreground(ColorPrimary)
-
-	TableRowStyle = lipgloss.NewStyle().
-			Foreground(ColorText)
-
-	TableAltRowStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#a9b1d6"))
-)
-
-// 输入框
-var (
-	InputStyle = lipgloss.NewStyle().
-			Foreground(ColorPrimary).
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(ColorPrimary).
-			Padding(0, 1)
-
-	InputLabelStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(ColorGray)
-
-	// 底部页脚样式
-	FooterStyle = lipgloss.NewStyle().
-			Foreground(ColorGray).
-			Padding(0, 1)
-)
+func InputStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(Primary()).
+		Border(lipgloss.RoundedBorder()).BorderForeground(Primary()).Padding(0, 1)
+}
+func InputLabelStyle() lipgloss.Style { return lipgloss.NewStyle().Bold(true).Foreground(Gray()) }
+func FooterStyle() lipgloss.Style     { return lipgloss.NewStyle().Foreground(Gray()).Padding(0, 1) }

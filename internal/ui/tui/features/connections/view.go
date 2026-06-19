@@ -125,16 +125,16 @@ func renderTrafficTab(state PageState, content []string) string {
 // renderConnectionListTab 渲染活跃/历史连接 tab（表格独占）
 func renderConnectionListTab(state PageState, content []string) string {
 	// 样式定义 — Tokyo Night
-	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(common.TokyoBlue)
+	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(common.TokyoBlue())
 	isHistory := state.ViewMode == ConnViewHistory
 	var normalStyle lipgloss.Style
 	if isHistory {
-		normalStyle = lipgloss.NewStyle().Foreground(common.TokyoMuted)
+		normalStyle = lipgloss.NewStyle().Foreground(common.TokyoMuted())
 	} else {
-		normalStyle = lipgloss.NewStyle().Foreground(common.TokyoForeground)
+		normalStyle = lipgloss.NewStyle().Foreground(common.TokyoForeground())
 	}
-	selectedStyle := lipgloss.NewStyle().Background(common.TokyoSelected).Foreground(common.TokyoCyan).Bold(true)
-	dimStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted)
+	selectedStyle := lipgloss.NewStyle().Background(common.TokyoSelected()).Foreground(common.TokyoCyan()).Bold(true)
+	dimStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted())
 
 	// 根据视图模式选择数据源
 	var connList []model.Connection
@@ -232,7 +232,7 @@ func renderConnectionListTab(state PageState, content []string) string {
 		content = append(content, filterLine)
 	}
 	content = append(content, tableHeader)
-	content = append(content, common.TableBorderStyle.Render(strings.Repeat("─", max(state.Width-2, 1))))
+	content = append(content, common.TableBorderStyle().Render(strings.Repeat("─", max(state.Width-2, 1))))
 	content = append(content, strings.Join(rows, "\n"))
 
 	return strings.Join(content, "\n")

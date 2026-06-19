@@ -17,15 +17,15 @@ import (
 func renderNodeInfo(mode, groupName, nodeName string, delay, width int) string {
 	// 无数据时显示占位符
 	if mode == "" && groupName == "" && nodeName == "" {
-		return lipgloss.NewStyle().Foreground(styles.ColorGray).Render("● -- · --")
+		return lipgloss.NewStyle().Foreground(styles.Gray()).Render("● -- · --")
 	}
 
 	// 样式
-	modeStyle := lipgloss.NewStyle().Foreground(styles.ColorGray)
-	groupStyle := lipgloss.NewStyle().Foreground(styles.ColorGray)
-	nodeStyle := lipgloss.NewStyle().Foreground(styles.ColorText)
-	dotStyle := lipgloss.NewStyle().Foreground(common.TokyoCyan)
-	sepStyle := lipgloss.NewStyle().Foreground(styles.ColorGray)
+	modeStyle := lipgloss.NewStyle().Foreground(styles.Gray())
+	groupStyle := lipgloss.NewStyle().Foreground(styles.Gray())
+	nodeStyle := lipgloss.NewStyle().Foreground(styles.Text())
+	dotStyle := lipgloss.NewStyle().Foreground(common.TokyoCyan())
+	sepStyle := lipgloss.NewStyle().Foreground(styles.Gray())
 
 	// 构建各部分
 	modeDisplay := mode
@@ -46,14 +46,14 @@ func renderNodeInfo(mode, groupName, nodeName string, delay, width int) string {
 	// 延迟
 	var delayStr string
 	if delay > 0 {
-		delayColor := styles.ColorGray
+		delayColor := styles.Gray()
 		switch {
 		case delay < 100:
-			delayColor = styles.ColorSuccess
+			delayColor = styles.Success()
 		case delay < 300:
-			delayColor = styles.ColorWarning
+			delayColor = styles.Warning()
 		default:
-			delayColor = styles.ColorDanger
+			delayColor = styles.Danger()
 		}
 		delayStr = lipgloss.NewStyle().Foreground(delayColor).Render(fmt.Sprintf("%dms", delay))
 	} else {
@@ -92,9 +92,9 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, n
 		} else if strings.Contains(errText, "timeout") {
 			friendlyErr = i18n.T("status.err.timeout")
 		}
-		status = styles.ErrorStyle.Render(fmt.Sprintf("✗ %s", friendlyErr))
+		status = styles.ErrorStyle().Render(fmt.Sprintf("✗ %s", friendlyErr))
 	} else if strings.TrimSpace(notice) != "" {
-		status = styles.StatusStyle.Render("✔ " + truncateRunes(notice, width/2))
+		status = styles.StatusStyle().Render("✔ " + truncateRunes(notice, width/2))
 	} else if testing {
 		statusText := i18n.T("status.testing")
 		if target := strings.TrimSpace(testingTarget); target != "" {
@@ -105,7 +105,7 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, n
 			target = truncateRunes(target, maxTargetLen)
 			statusText = fmt.Sprintf("%s: %s", i18n.T("status.testing"), target)
 		}
-		status = styles.TestingStyle.Render(statusText)
+		status = styles.TestingStyle().Render(statusText)
 	} else {
 		status = ""
 	}
@@ -118,9 +118,9 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, n
 
 	// ── 右侧：实时指标 ──
 	var metricsStr string
-	dimStyle := lipgloss.NewStyle().Foreground(styles.ColorGray)
-	upStyle := lipgloss.NewStyle().Foreground(styles.ColorSuccess)
-	downStyle := lipgloss.NewStyle().Foreground(styles.ColorPrimary)
+	dimStyle := lipgloss.NewStyle().Foreground(styles.Gray())
+	upStyle := lipgloss.NewStyle().Foreground(styles.Success())
+	downStyle := lipgloss.NewStyle().Foreground(styles.Primary())
 	sep := dimStyle.Render(" │ ")
 
 	// 当前实时流量
@@ -155,7 +155,7 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, n
 	}
 
 	// ── 分隔线 ──
-	divider := styles.DividerStyle.
+	divider := styles.DividerStyle().
 		Render(strings.Repeat("─", width))
 
 	// ── 组装状态行 ──

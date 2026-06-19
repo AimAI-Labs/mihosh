@@ -139,14 +139,14 @@ func TestRenderLogEntry_URLEncoded(t *testing.T) {
 
 func TestResolveLogLevelTabStyle_ActiveKeepsContinuousBackgroundAroundIndicator(t *testing.T) {
 	style := resolveLogLevelTabStyle("info", true)
-	if style.Background != common.TokyoSelected {
-		t.Fatalf("expected active background %q, got %q", common.TokyoSelected, style.Background)
+	if style.Background != common.TokyoSelected() {
+		t.Fatalf("expected active background %q, got %q", common.TokyoSelected(), style.Background)
 	}
-	if style.Foreground != common.TokyoCyan {
-		t.Fatalf("expected active foreground %q, got %q", common.TokyoCyan, style.Foreground)
+	if style.Foreground != common.TokyoCyan() {
+		t.Fatalf("expected active foreground %q, got %q", common.TokyoCyan(), style.Foreground)
 	}
-	if style.Indicator != common.TokyoBlue {
-		t.Fatalf("expected active info indicator %q, got %q", common.TokyoBlue, style.Indicator)
+	if style.Indicator != common.TokyoBlue() {
+		t.Fatalf("expected active info indicator %q, got %q", common.TokyoBlue(), style.Indicator)
 	}
 	if !style.Bold {
 		t.Fatal("expected active tab to be bold")
@@ -155,14 +155,14 @@ func TestResolveLogLevelTabStyle_ActiveKeepsContinuousBackgroundAroundIndicator(
 
 func TestResolveLogLevelTabStyle_InactiveUsesCommonInactiveColors(t *testing.T) {
 	style := resolveLogLevelTabStyle("debug", false)
-	if style.Background != common.TokyoSelected {
-		t.Fatalf("expected inactive background %q, got %q", common.TokyoSelected, style.Background)
+	if style.Background != common.TokyoSelected() {
+		t.Fatalf("expected inactive background %q, got %q", common.TokyoSelected(), style.Background)
 	}
-	if style.Foreground != common.TokyoMuted {
-		t.Fatalf("expected inactive foreground %q, got %q", common.TokyoMuted, style.Foreground)
+	if style.Foreground != common.TokyoMuted() {
+		t.Fatalf("expected inactive foreground %q, got %q", common.TokyoMuted(), style.Foreground)
 	}
-	if style.Indicator != logLevelColors["debug"] {
-		t.Fatalf("expected indicator foreground %q, got %q", logLevelColors["debug"], style.Indicator)
+	if style.Indicator != logLevelColors()["debug"] {
+		t.Fatalf("expected indicator foreground %q, got %q", logLevelColors()["debug"], style.Indicator)
 	}
 	if style.Bold {
 		t.Fatal("expected inactive tab not to be bold")

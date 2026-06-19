@@ -9,6 +9,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
@@ -80,6 +81,11 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 	cfg, err := config.Load()
 	if err != nil || cfg == nil {
 		cfg = &config.DefaultConfig
+	}
+
+	// 启动时根据配置初始化主题
+	if cfg.Theme != "" {
+		theme.SetTheme(cfg.Theme)
 	}
 
 	proxySvc := service.NewProxyService(client, testURL, timeout)

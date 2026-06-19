@@ -71,9 +71,9 @@ func RenderNodesPage(state PageState) string {
 	}
 
 	if state.FilterMode {
-		searchLine = common.TableHeaderStyle.Render(i18n.Tf("nodes.search_active", state.FilterText)) + engineIndicator
+		searchLine = common.TableHeaderStyle().Render(i18n.Tf("nodes.search_active", state.FilterText)) + engineIndicator
 	} else if state.FilterText != "" {
-		searchLine = common.MutedStyle.Render(i18n.Tf("nodes.search_inactive", state.FilterText)) + engineIndicator
+		searchLine = common.MutedStyle().Render(i18n.Tf("nodes.search_inactive", state.FilterText)) + engineIndicator
 	} else {
 		searchLine = "" // 占位空行由 clampPanelArea 负责填充
 	}
@@ -88,10 +88,10 @@ func RenderNodesPage(state PageState) string {
 		}
 		badgeText := i18n.Tf("nodes.result_badge", len(state.TestResults))
 		if failCount > 0 {
-			badgeText += " " + common.ErrorStyle.Render(i18n.Tf("nodes.result_fail_count", failCount))
+			badgeText += " " + common.ErrorStyle().Render(i18n.Tf("nodes.result_fail_count", failCount))
 		}
-		resultBadge = common.MutedStyle.Render(badgeText) +
-			" " + common.MutedStyle.Render(i18n.T("nodes.view_detail"))
+		resultBadge = common.MutedStyle().Render(badgeText) +
+			" " + common.MutedStyle().Render(i18n.T("nodes.view_detail"))
 	}
 
 	// 底部固定区域占用的行数：搜索行(1) + 结果徽标(0或1)
@@ -227,16 +227,16 @@ func buildTestResultModal(state PageState) string {
 	// 构建内容行
 	var bodyLines []string
 	if scrollTop > 0 {
-		bodyLines = append(bodyLines, common.DimStyle.Render(i18n.Tf("nodes.result_scroll_up", scrollTop)))
+		bodyLines = append(bodyLines, common.DimStyle().Render(i18n.Tf("nodes.result_scroll_up", scrollTop)))
 	}
 	for _, line := range allLines[scrollTop:endIdx] {
 		bodyLines = append(bodyLines, line)
 	}
 	if endIdx < totalLines {
-		bodyLines = append(bodyLines, common.DimStyle.Render(i18n.Tf("nodes.result_scroll_down", totalLines-endIdx)))
+		bodyLines = append(bodyLines, common.DimStyle().Render(i18n.Tf("nodes.result_scroll_down", totalLines-endIdx)))
 	}
 	bodyLines = append(bodyLines, "")
-	bodyLines = append(bodyLines, common.MutedStyle.Render(i18n.T("nodes.result_modal_help")))
+	bodyLines = append(bodyLines, common.MutedStyle().Render(i18n.T("nodes.result_modal_help")))
 
 	body := strings.Join(bodyLines, "\n")
 
@@ -247,17 +247,17 @@ func buildTestResultModal(state PageState) string {
 			failCount++
 		}
 	}
-	title := common.TableHeaderStyle.Render(i18n.Tf("nodes.result_modal_title", len(results)))
+	title := common.TableHeaderStyle().Render(i18n.Tf("nodes.result_modal_title", len(results)))
 	if failCount > 0 {
-		title += " " + common.ErrorStyle.Render(i18n.Tf("nodes.result_fail_count", failCount))
+		title += " " + common.ErrorStyle().Render(i18n.Tf("nodes.result_fail_count", failCount))
 	}
-	subtitle := common.DimStyle.Render(i18n.T("nodes.result_modal_subtitle"))
-	separator := common.DimStyle.Render(strings.Repeat("─", innerWidth))
+	subtitle := common.DimStyle().Render(i18n.T("nodes.result_modal_subtitle"))
+	separator := common.DimStyle().Render(strings.Repeat("─", innerWidth))
 	content := lipgloss.JoinVertical(lipgloss.Left, title, subtitle, separator, body)
 
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#7aa2f7")).
+		BorderForeground(common.TokyoBlue()).
 		Padding(0, 1).
 		Width(modalWidth).
 		Render(content)
@@ -272,7 +272,7 @@ func buildTestResultDetailLines(results []TestResultEntry, width int) []string {
 	for i, entry := range results {
 		if entry.Error != "" {
 			// 失败条目
-			lines = append(lines, common.ErrorStyle.Render(fmt.Sprintf("[%02d] %s", i+1, entry.Name)))
+			lines = append(lines, common.ErrorStyle().Render(fmt.Sprintf("[%02d] %s", i+1, entry.Name)))
 			summary := summarizeFailure(entry.Error)
 			lines = append(lines, wrapWithPrefix(i18n.T("nodes.reason_prefix"), summary, width)...)
 			rawMsg := entry.Error

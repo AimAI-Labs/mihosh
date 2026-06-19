@@ -3,6 +3,7 @@ package help
 import (
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
@@ -50,6 +51,7 @@ type HelpContext struct {
 	// 设置页子状态
 	SettingsEdit     bool // 编辑模式
 	SettingsLanguage bool // 当前选中项是语言
+	SettingsTheme    bool // 当前选中项是主题
 }
 
 // keybinding 单条快捷键条目
@@ -329,6 +331,16 @@ func buildSettingsSections(ctx HelpContext) []section {
 				},
 			}}
 		}
+		if ctx.SettingsTheme {
+			return []section{{
+				title: i18n.T("settings.label.theme"),
+				bindings: []keybinding{
+					{"←/→ / Tab", i18n.T("help.settings_edit_theme.switch")},
+					{"Enter", i18n.T("help.settings_edit_theme.confirm")},
+					{"Esc", i18n.T("help.settings_edit_theme.cancel")},
+				},
+			}}
+		}
 		return []section{{
 			title: i18n.T("help.section.settings_edit_config"),
 			bindings: []keybinding{
@@ -351,18 +363,7 @@ func buildSettingsSections(ctx HelpContext) []section {
 	}}
 }
 
-// ── 颜色常量 — Tokyo Night ──
-var (
-	colorBorder  = lipgloss.Color("#7aa2f7") // blue
-	colorTitle   = lipgloss.Color("#c0caf5") // foreground
-	colorSection = lipgloss.Color("#7dcfff") // cyan
-	colorKey     = lipgloss.Color("#e0af68") // yellow
-	colorDesc    = lipgloss.Color("#a9b1d6") // comment
-	colorDim     = lipgloss.Color("#565f89") // dark5
-	colorGreen   = lipgloss.Color("#9ece6a")
-	colorYellow  = lipgloss.Color("#e0af68")
-	colorRed     = lipgloss.Color("#f7768e")
-)
+// ── 颜色访问——使用 common 包函数，支持主题热切换 ──
 
 // OverlayHelpPopup 将帮助弹窗居中叠加在 base 页面之上。
 //
@@ -475,15 +476,15 @@ func renderPopup(termWidth, termHeight int, ctx HelpContext) string {
 	}
 
 	// ── 标题行 ──
-	title := lipgloss.NewStyle().Bold(true).Foreground(colorTitle).Render(i18n.T("help.popup_title"))
-	closeHint := lipgloss.NewStyle().Foreground(colorDim).Render(i18n.T("help.close_hint"))
+	title := lipgloss.NewStyle().Bold(true).Foreground(common.TokyoForeground()).Render(i18n.T("help.popup_title"))
+	closeHint := lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render(i18n.T("help.close_hint"))
 	gap := innerWidth - lipgloss.Width(title) - lipgloss.Width(closeHint)
 	if gap < 1 {
 		gap = 1
 	}
 	titleLine := title + strings.Repeat(" ", gap) + closeHint
 
-	divider := lipgloss.NewStyle().Foreground(colorDim).Render(strings.Repeat("─", innerWidth))
+	divider := lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render(strings.Repeat("─", innerWidth))
 
 	// ── 各分区卡片 ──
 	colW := innerWidth/cols - 1
@@ -513,7 +514,7 @@ func renderPopup(termWidth, termHeight int, ctx HelpContext) string {
 	if len(contentLines) > maxLines {
 		contentLines = contentLines[:maxLines]
 		contentLines = append(contentLines,
-			lipgloss.NewStyle().Foreground(colorDim).Render(i18n.T("help.more_hint")),
+			lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render(i18n.T("help.more_hint")),
 		)
 	}
 	for len(contentLines) < maxLines {
@@ -524,7 +525,7 @@ func renderPopup(termWidth, termHeight int, ctx HelpContext) string {
 	// ── 弹窗外壳：圆角边框，无背景色 ──
 	popupStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(colorBorder).
+		BorderForeground(common.TokyoBlue()).
 		Padding(1, 2).
 		Width(popupWidth)
 
@@ -575,14 +576,14 @@ func distributeCardsToColumns(cards []string, heights []int, cols int, colWidth 
 
 // renderSection 渲染单个快捷键分区（无背景色）
 func renderSection(sec section, width int) string {
-	sectionStyle := lipgloss.NewStyle().Bold(true).Foreground(colorSection)
+	sectionStyle := lipgloss.NewStyle().Bold(true).Foreground(common.TokyoCyan())
 
 	keyWidth := 16
 	if width < 38 {
 		keyWidth = 12
 	}
-	keyStyle := lipgloss.NewStyle().Foreground(colorKey).Width(keyWidth)
-	descStyle := lipgloss.NewStyle().Foreground(colorDesc)
+	keyStyle := lipgloss.NewStyle().Foreground(common.TokyoYellow()).Width(keyWidth)
+	descStyle := lipgloss.NewStyle().Foreground(common.Dim())
 
 	var lines []string
 	lines = append(lines, sectionStyle.Render(sec.title))
@@ -595,11 +596,11 @@ func renderSection(sec section, width int) string {
 			var dot string
 			switch {
 			case strings.Contains(k, "绿") || strings.Contains(strings.ToLower(k), "green"):
-				dot = lipgloss.NewStyle().Foreground(colorGreen).Render("●")
+				dot = lipgloss.NewStyle().Foreground(common.TokyoGreen()).Render("●")
 			case strings.Contains(k, "黄") || strings.Contains(strings.ToLower(k), "yellow"):
-				dot = lipgloss.NewStyle().Foreground(colorYellow).Render("●")
+				dot = lipgloss.NewStyle().Foreground(common.TokyoYellow()).Render("●")
 			case strings.Contains(k, "红") || strings.Contains(strings.ToLower(k), "red"):
-				dot = lipgloss.NewStyle().Foreground(colorRed).Render("●")
+				dot = lipgloss.NewStyle().Foreground(common.TokyoRed()).Render("●")
 			default:
 				dot = "●"
 			}

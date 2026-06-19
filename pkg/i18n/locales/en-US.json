@@ -184,6 +184,7 @@
   "settings.label.proxy_address": "Proxy Address",
   "settings.label.language": "Language",
   "settings.label.auto_refresh_interval": "Auto Refresh(s)",
+  "settings.label.theme": "Theme",
 
   "settings.desc.api_address": "Clash API service address",
   "settings.desc.secret": "API authentication secret",
@@ -192,9 +193,11 @@
   "settings.desc.proxy_address": "HTTP/SOCKS5 proxy address",
   "settings.desc.language": "UI display language",
   "settings.desc.auto_refresh_interval": "Data auto-refresh interval in seconds",
+  "settings.desc.theme": "UI color theme",
 
   "settings.toast.save_success": "Settings saved",
   "settings.toast.save_success_lang": "Language settings saved",
+  "settings.toast.save_success_theme": "Theme switched",
   "settings.toast.save_failed": "Failed to save",
   "settings.toast.save_failed_with_err": "Failed to save: %s",
 
@@ -366,6 +369,9 @@
   "help.section.settings_edit_lang": "Edit Language",
   "help.settings_edit_lang.switch": "Switch",
   "help.settings_edit_lang.confirm": "Save",
+  "help.settings_edit_theme.switch": "Switch theme",
+  "help.settings_edit_theme.confirm": "Apply",
+  "help.settings_edit_theme.cancel": "Cancel",
   "help.settings_edit_lang.cancel": "Cancel",
 
   "help.section.settings_edit_config": "Edit Config",
