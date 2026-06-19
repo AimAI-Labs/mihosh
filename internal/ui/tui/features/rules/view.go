@@ -940,7 +940,7 @@ func buildAddRuleModal(state PageState, width, height int) string {
 	// ── 字段渲染 ──
 	// MATCH 无 payload，省略匹配值字段
 	payloadRow := renderAddFormFieldRow(form, addFieldPayload, i18n.T("rules.add_field_payload"), innerWidth, form.isMatchType())
-	proxyRow := renderAddFormProxyRow(form)
+	proxyRow := renderAddFormProxyRow(form, innerWidth)
 	indexRow := renderAddFormFieldRow(form, addFieldIndex, i18n.T("rules.add_field_index"), innerWidth, false)
 
 	// ── 第二分隔行 ──
@@ -949,7 +949,7 @@ func buildAddRuleModal(state PageState, width, height int) string {
 	// ── no-resolve 复选框行（仅 IP 类规则显示）──
 	var noResolveRow string
 	if form.isIPType() {
-		noResolveRow = renderAddFormNoResolveRow(form)
+		noResolveRow = renderAddFormNoResolveRow(form, innerWidth)
 	}
 
 	// ── 说明/错误行 ──
@@ -989,30 +989,42 @@ func buildAddRuleModal(state PageState, width, height int) string {
 
 // renderAddFormFieldRow 渲染单个表单字段行（label + textinput.View）。
 // skip=true 时返回空字符串（用于 MATCH 类型省略 payload 字段）。
+// 聚焦行整体填充 TokyoSelected 背景（同顶部导航栏选中态），跨整行宽度，便于上下切换时辨识。
 func renderAddFormFieldRow(form addForm, fieldIdx int, label string, innerWidth int, skip bool) string {
 	if skip {
 		return ""
 	}
+	focused := form.fieldCursor == fieldIdx
+
+	// 标签：聚焦时用青色（参考导航栏选中态前景），否则弱化色
 	labelStyle := common.TokyoMutedStyle()
+	if focused {
+		labelStyle = lipgloss.NewStyle().Foreground(common.TokyoCyan)
+	}
 	labelText := labelStyle.Render(label)
 
-	// textinput 的 View() 自带光标；为聚焦字段添加高亮背景
+	// textinput 的 View() 自带光标
 	field := form.fields[fieldIdx]
 	inputView := field.View()
-	if form.fieldCursor == fieldIdx {
-		// 聚焦态：青色高亮
+	if focused {
 		inputView = lipgloss.NewStyle().Foreground(common.TokyoCyan).Render(inputView)
 	} else {
 		inputView = lipgloss.NewStyle().Foreground(common.TokyoForeground).Render(inputView)
 	}
 
-	return labelText + " " + inputView
+	return applyFieldRowBackground(labelText+" "+inputView, focused, innerWidth)
 }
 
 // renderAddFormProxyRow 渲染策略选择器行：策略: NAME (Enter 改)。
 // 策略来源颜色区分：策略组（TokyoBlue）/ 具体节点（TokyoGreen）。
-func renderAddFormProxyRow(form addForm) string {
+// 聚焦行整体填充 TokyoSelected 背景，跨整行宽度。
+func renderAddFormProxyRow(form addForm, innerWidth int) string {
+	focused := form.isProxyField()
+
 	labelStyle := common.TokyoMutedStyle()
+	if focused {
+		labelStyle = lipgloss.NewStyle().Foreground(common.TokyoCyan)
+	}
 	labelText := labelStyle.Render(i18n.T("rules.add_field_proxy"))
 
 	// 策略值颜色：策略组用蓝，节点用绿
@@ -1022,19 +1034,25 @@ func renderAddFormProxyRow(form addForm) string {
 	}
 	val := form.currentProxy()
 	var valView string
-	if form.isProxyField() {
+	if focused {
 		valView = lipgloss.NewStyle().Foreground(valColor).Bold(true).Render(val)
 		valView += " " + common.TokyoMutedStyle().Render(i18n.T("rules.add_proxy_change"))
 	} else {
 		valView = lipgloss.NewStyle().Foreground(common.TokyoForeground).Render(val)
 	}
-	return labelText + " " + valView
+	return applyFieldRowBackground(labelText+" "+valView, focused, innerWidth)
 }
 
 // renderAddFormNoResolveRow 渲染 no-resolve 复选框行。
 // 仅当规则类型为 IP-CIDR/IP-CIDR6/SRC-IP-CIDR 时显示。
-func renderAddFormNoResolveRow(form addForm) string {
+// 聚焦行整体填充 TokyoSelected 背景，跨整行宽度。
+func renderAddFormNoResolveRow(form addForm, innerWidth int) string {
+	focused := form.isNoResolveField()
+
 	labelStyle := common.TokyoMutedStyle()
+	if focused {
+		labelStyle = lipgloss.NewStyle().Foreground(common.TokyoCyan)
+	}
 	labelText := labelStyle.Render(i18n.T("rules.add_field_noresolve"))
 
 	checkbox := "[ ]"
@@ -1043,12 +1061,29 @@ func renderAddFormNoResolveRow(form addForm) string {
 	}
 
 	var valView string
-	if form.isNoResolveField() {
+	if focused {
 		valView = lipgloss.NewStyle().Foreground(common.TokyoCyan).Bold(true).Render(checkbox)
 	} else {
 		valView = lipgloss.NewStyle().Foreground(common.TokyoForeground).Render(checkbox)
 	}
-	return labelText + " " + valView
+	return applyFieldRowBackground(labelText+" "+valView, focused, innerWidth)
+}
+
+// applyFieldRowBackground 为聚焦的表单字段行铺满整行 TokyoSelected 背景，
+// 并在左侧加 1 个空格前导与右侧用空格补齐至 innerWidth，使高亮条对齐稳定。
+// 非聚焦行原样返回。背景色与顶部导航栏选中项保持一致（#292E42）。
+func applyFieldRowBackground(row string, focused bool, innerWidth int) string {
+	if !focused {
+		return row
+	}
+	// 左侧加一个空格作为光标条视觉间隔，便于辨识当前编辑项
+	styled := " " + row
+	// 补齐至 innerWidth：内容显示宽度 + 1（前导空格）
+	pad := innerWidth - 1 - common.DisplayWidth(row)
+	if pad < 0 {
+		pad = 0
+	}
+	return lipgloss.NewStyle().Background(common.TokyoSelected).Render(styled + strings.Repeat(" ", pad))
 }
 
 // ResolveAddFormBounds 返回添加规则弹窗在页面坐标系中的边界（右下为开区间）。
