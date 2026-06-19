@@ -43,8 +43,9 @@ type HelpContext struct {
 	LogsFilter bool // 过滤输入
 
 	// 规则页子状态
-	RulesTypeFilter bool // 类型筛选弹窗
-	RulesFilter     bool // 过滤输入
+	RulesTypeFilter     bool // 类型筛选弹窗
+	RulesFilter         bool // 过滤输入
+	RulesDeleteConfirm  bool // 删除确认弹窗
 
 	// 设置页子状态
 	SettingsEdit     bool // 编辑模式
@@ -265,6 +266,16 @@ func buildLogsSections(ctx HelpContext) []section {
 
 // buildRulesSections 规则页帮助分区
 func buildRulesSections(ctx HelpContext) []section {
+	if ctx.RulesDeleteConfirm {
+		return []section{{
+			title: i18n.T("help.section.rules_delete"),
+			bindings: []keybinding{
+				{"Enter / y", i18n.T("help.rules_delete.confirm")},
+				{"Esc / n", i18n.T("help.rules_delete.cancel")},
+			},
+		}}
+	}
+
 	if ctx.RulesTypeFilter {
 		return []section{{
 			title: i18n.T("help.section.rules_type_filter"),
@@ -297,6 +308,8 @@ func buildRulesSections(ctx HelpContext) []section {
 			{"↑/↓  k/j", i18n.T("help.rules.select")},
 			{"/", i18n.T("help.rules.search")},
 			{"t", i18n.T("help.rules.type")},
+			{"n", i18n.T("help.rules.add")},
+			{"d", i18n.T("help.rules.delete")},
 			{"Esc", i18n.T("help.rules.clear")},
 		},
 	}}

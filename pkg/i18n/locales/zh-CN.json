@@ -171,6 +171,9 @@
   "rules.add_err_geosite": "GEOSITE 需为站点标识符，如 google、netflix",
   "rules.add_err_process": "进程名/路径不能包含空格",
   "rules.added_toast": "已添加规则并重载核心",
+  "rules.delete_title": "删除规则",
+  "rules.delete_confirm_hint": "确定要删除此规则吗？（不可恢复）",
+  "rules.deleted_toast": "已删除规则并重载核心",
 
   "settings.panel_title": "配置项",
   "settings.label.api_address": "API 地址",
@@ -339,7 +342,14 @@
   "help.rules.hint_search": "搜索",
   "help.rules.hint_type": "类型",
   "help.rules.hint_add": "新增",
+  "help.rules.hint_delete": "删除",
   "help.rules.hint_refresh": "刷新",
+  "help.rules.add": "新增",
+  "help.rules.delete": "删除",
+
+  "help.section.rules_delete": "删除规则确认",
+  "help.rules_delete.confirm": "确认删除",
+  "help.rules_delete.cancel": "取消",
 
   "help.section.rules_add": "添加规则",
   "help.rules_add.type": "切换类型",

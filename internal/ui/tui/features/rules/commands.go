@@ -75,6 +75,21 @@ func AddRuleCmd(configPath, ruleType, payload, proxy string, index int, noResolv
 	}
 }
 
+// DeleteRuleCmd 从 Mihomo 配置文件的 rules 列表中删除指定规则。
+//
+// 匹配基于内容（type + payload + proxy + no-resolve），见 config.DeleteRule。
+// ruleType 必须为配置文件格式（大写横杠分隔），调用方负责把 API 返回的
+// CamelCase 类型经 normalizeRuleType 转换后传入。
+// 成功返回 RuleDeletedMsg，未匹配或写盘失败返回 RuleDeleteErrorMsg。
+func DeleteRuleCmd(configPath, ruleType, payload, proxy string, noResolve bool) tea.Cmd {
+	return func() tea.Msg {
+		if err := config.DeleteRule(configPath, ruleType, payload, proxy, noResolve); err != nil {
+			return messages.RuleDeleteErrorMsg{Err: err}
+		}
+		return messages.RuleDeletedMsg{}
+	}
+}
+
 // buildRuleLine 按 Mihomo 源格式 `TYPE,PAYLOAD,PROXY` 组装规则字符串。
 // MATCH 类型无需 payload，输出 `MATCH,PROXY`。
 // noResolve 为 true 时在规则末尾追加 `,no-resolve`。

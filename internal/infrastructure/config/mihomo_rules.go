@@ -74,6 +74,89 @@ func InsertRule(configPath, rule string, index int) error {
 	return atomicWriteFile(configPath, out, 0644)
 }
 
+// DeleteRule 从 configPath 的 rules 列表中删除第一条匹配的规则。
+//
+// ruleType 必须为配置文件格式（如 "DOMAIN-SUFFIX"、"MATCH"），调用方负责把
+// API 返回的 CamelCase（如 "DomainSuffix"）经 normalizeRuleType 转换后再传入。
+//
+// 匹配语义：基于内容（type + payload + proxy + no-resolve），与 ParseRulesNoResolve
+// 使用相同的 parseRuleLine 规范化键比较，避免依赖 API 列表与配置文件的索引顺序。
+//
+// 注释安全：与 InsertRule 一致，使用 yaml.Node 操作并原子写回。
+// 未匹配到（如规则来自 rule-provider，不在文件中）返回 errRuleNotFound。
+func DeleteRule(configPath, ruleType, payload, proxy string, noResolve bool) error {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("读取配置文件失败: %w", err)
+	}
+	if len(bytesTrimSpace(data)) == 0 {
+		return errRuleNotFound
+	}
+
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return fmt.Errorf("解析配置文件失败: %w", err)
+	}
+	root := mappingRoot(&doc)
+	if root == nil {
+		return errRuleNotFound
+	}
+	seq := findRulesSequence(root)
+	if seq == nil {
+		return errRuleNotFound
+	}
+
+	// 目标键与配置行都走 parseRuleLine，保证两侧规范化一致
+	targetKey, targetNR := parseRuleLine(canonicalRuleLine(ruleType, payload, proxy, noResolve))
+	if targetKey == "" {
+		return errRuleNotFound
+	}
+
+	// 原地删除首个匹配项（仅删一条，避免误删同名规则）
+	removed := false
+	n := 0
+	for _, item := range seq.Content {
+		if !removed && item.Kind == yaml.ScalarNode {
+			if k, nr := parseRuleLine(item.Value); k == targetKey && nr == targetNR {
+				removed = true
+				continue
+			}
+		}
+		seq.Content[n] = item
+		n++
+	}
+	seq.Content = seq.Content[:n]
+	if !removed {
+		return errRuleNotFound
+	}
+
+	out, err := yaml.Marshal(&doc)
+	if err != nil {
+		return fmt.Errorf("序列化配置文件失败: %w", err)
+	}
+	return atomicWriteFile(configPath, out, 0644)
+}
+
+// errRuleNotFound 表示目标规则未出现在配置文件的 rules 列表中。
+// 常见原因：规则由 rule-provider 注入，无法通过编辑配置文件删除。
+var errRuleNotFound = fmt.Errorf("规则未在配置文件中找到（可能来自 rule-provider）")
+
+// canonicalRuleLine 按 parseRuleLine 期望的形状构造规则行，使目标行与配置行
+// 走同一规范化路径。MATCH 无 payload，输出 "MATCH,PROXY"。
+func canonicalRuleLine(ruleType, payload, proxy string, noResolve bool) string {
+	ruleType = strings.ToUpper(strings.TrimSpace(ruleType))
+	payload = strings.TrimSpace(payload)
+	proxy = strings.TrimSpace(proxy)
+	if ruleType == "MATCH" {
+		return "MATCH," + proxy
+	}
+	line := ruleType + "," + payload + "," + proxy
+	if noResolve {
+		line += ",no-resolve"
+	}
+	return line
+}
+
 // CountRules 返回配置文件中 rules 列表的条目数；rules 键不存在时返回 0。
 func CountRules(configPath string) (int, error) {
 	data, err := os.ReadFile(configPath)

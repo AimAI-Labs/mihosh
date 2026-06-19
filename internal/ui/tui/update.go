@@ -273,6 +273,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.notice = ""
 		m.noticeTicks = 0
 
+	case messages.RuleDeletedMsg:
+		// 规则已从配置文件删除：热重载核心 + 刷新规则列表 + 显示成功提示
+		m.notice = i18n.T("rules.deleted_toast")
+		m.noticeTicks = autoRefreshNoticeTicks
+		return m, reloadConfigCmd(m.client)
+
+	case messages.RuleDeleteErrorMsg:
+		// 删除失败：沿用全局错误显示
+		m.err = msg
+		m.notice = ""
+		m.noticeTicks = 0
+
 	case messages.SiteTestMsg:
 		m.connsState = m.connsState.ApplySiteTestResult(msg.Name, msg.Delay, msg.Err)
 
@@ -573,7 +585,7 @@ func (m Model) isInputCapturing() bool {
 	case layout.PageLogs:
 		return m.logsState.FilterMode()
 	case layout.PageRules:
-		return m.rulesState.FilterMode() || m.rulesState.ShowTypeFilter() || m.rulesState.ShowAddForm()
+		return m.rulesState.FilterMode() || m.rulesState.ShowTypeFilter() || m.rulesState.ShowAddForm() || m.rulesState.ShowDeleteConfirm()
 	case layout.PageSettings:
 		return m.settingsState.IsEditing()
 	}

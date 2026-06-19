@@ -74,6 +74,14 @@ type RuleAddErrorMsg struct{ Err error }
 
 func (m RuleAddErrorMsg) Error() string { return m.Err.Error() }
 
+// RuleDeletedMsg 规则已从配置文件删除（调用方负责热重载与刷新）。
+type RuleDeletedMsg struct{}
+
+// RuleDeleteErrorMsg 删除规则失败（未找到 / 写盘失败）。
+type RuleDeleteErrorMsg struct{ Err error }
+
+func (m RuleDeleteErrorMsg) Error() string { return m.Err.Error() }
+
 // ConfigReloadedMsg 调用 mihomo 核心 ReloadConfig 的结果。
 type ConfigReloadedMsg struct{ Err error }
 

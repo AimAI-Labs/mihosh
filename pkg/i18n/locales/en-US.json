@@ -171,6 +171,9 @@
   "rules.add_err_geosite": "GEOSITE requires a site identifier, e.g. google, netflix",
   "rules.add_err_process": "Process name/path must not contain spaces",
   "rules.added_toast": "Rule added and core reloaded",
+  "rules.delete_title": "Delete Rule",
+  "rules.delete_confirm_hint": "Are you sure you want to delete this rule? (irreversible)",
+  "rules.deleted_toast": "Rule deleted and core reloaded",
 
   "settings.panel_title": "Settings",
   "settings.label.api_address": "API Address",
@@ -339,7 +342,10 @@
   "help.rules.hint_search": "Search",
   "help.rules.hint_type": "Type",
   "help.rules.hint_add": "Add",
+  "help.rules.hint_delete": "Delete",
   "help.rules.hint_refresh": "Refresh",
+  "help.rules.add": "Add",
+  "help.rules.delete": "Delete",
 
   "help.section.rules_add": "Add Rule",
   "help.rules_add.type": "Cycle type",
@@ -349,6 +355,10 @@
   "help.rules_add.picker_tab": "Switch tab",
   "help.rules_add.picker_pick": "Move",
   "help.rules_add.picker_back": "Back",
+
+  "help.section.rules_delete": "Delete Rule Confirm",
+  "help.rules_delete.confirm": "Confirm delete",
+  "help.rules_delete.cancel": "Cancel",
 
   "help.section.settings_edit_lang": "Edit Language",
   "help.settings_edit_lang.switch": "Switch",

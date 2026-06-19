@@ -106,8 +106,9 @@ func (m Model) buildHelpContext() help.HelpContext {
 		NodesFilterMode:    m.nodesState.NodeFilterMode,
 		LogsDetail:         m.logsState.DetailMode(),
 		LogsFilter:         m.logsState.FilterMode(),
-		RulesTypeFilter:    m.rulesState.ShowTypeFilter(),
-		RulesFilter:        m.rulesState.FilterMode(),
+		RulesTypeFilter:     m.rulesState.ShowTypeFilter(),
+		RulesFilter:         m.rulesState.FilterMode(),
+		RulesDeleteConfirm:  m.rulesState.ShowDeleteConfirm(),
 		SettingsEdit:       m.settingsState.IsEditing(),
 		SettingsLanguage:   m.settingsState.IsLanguageSelected(),
 	}

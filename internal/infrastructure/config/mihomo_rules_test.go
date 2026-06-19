@@ -149,6 +149,79 @@ func TestCountRules(t *testing.T) {
 	})
 }
 
+func TestDeleteRule_RemovesFirstMatchByContent(t *testing.T) {
+	path := writeTempConfig(t, `rules:
+  - DOMAIN-SUFFIX,example.com,DIRECT
+  - DOMAIN-SUFFIX,example.com,DIRECT
+  - MATCH,REJECT
+`)
+	require.NoError(t, DeleteRule(path, "DOMAIN-SUFFIX", "example.com", "DIRECT", false))
+	// 仅删除第一条匹配，第二条同名规则保留
+	assertRulesEquals(t, path, []string{
+		"DOMAIN-SUFFIX,example.com,DIRECT",
+		"MATCH,REJECT",
+	})
+}
+
+func TestDeleteRule_MatchIncludesNoResolve(t *testing.T) {
+	path := writeTempConfig(t, `rules:
+  - IP-CIDR,10.0.0.0/24,DIRECT,no-resolve
+  - IP-CIDR,10.0.0.0/24,DIRECT
+`)
+	// 仅删除带 no-resolve 的那条，不带 no-resolve 的同名规则保留
+	require.NoError(t, DeleteRule(path, "IP-CIDR", "10.0.0.0/24", "DIRECT", true))
+	assertRulesEquals(t, path, []string{
+		"IP-CIDR,10.0.0.0/24,DIRECT",
+	})
+}
+
+func TestDeleteRule_MatchMatchType(t *testing.T) {
+	path := writeTempConfig(t, `rules:
+  - MATCH,REJECT
+  - DOMAIN,a.com,DIRECT
+`)
+	require.NoError(t, DeleteRule(path, "MATCH", "", "REJECT", false))
+	assertRulesEquals(t, path, []string{"DOMAIN,a.com,DIRECT"})
+}
+
+func TestDeleteRule_NotFoundReturnsError(t *testing.T) {
+	path := writeTempConfig(t, "rules:\n  - DOMAIN,a.com,DIRECT\n")
+	err := DeleteRule(path, "DOMAIN-SUFFIX", "missing.com", "DIRECT", false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "未在配置文件中找到")
+	// 配置文件应保持不变
+	assertRulesEquals(t, path, []string{"DOMAIN,a.com,DIRECT"})
+}
+
+func TestDeleteRule_NoRulesKeyReturnsError(t *testing.T) {
+	path := writeTempConfig(t, "mode: rule\n")
+	err := DeleteRule(path, "DOMAIN", "a.com", "DIRECT", false)
+	require.Error(t, err)
+}
+
+func TestDeleteRule_PreservesCommentsAndKeyOrder(t *testing.T) {
+	src := `# mihomo 配置
+mixed-port: 7890
+
+# 规则
+rules:
+  # keep me
+  - DOMAIN,a.com,DIRECT
+  - DOMAIN,b.com,PROXY
+`
+	path := writeTempConfig(t, src)
+	require.NoError(t, DeleteRule(path, "DOMAIN", "a.com", "DIRECT", false))
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	content := string(data)
+	assert.Contains(t, content, "# mihomo 配置")
+	assert.Contains(t, content, "# 规则")
+	assert.Contains(t, content, "mixed-port: 7890")
+	assert.Contains(t, content, "DOMAIN,b.com,PROXY")
+	assert.NotContains(t, content, "DOMAIN,a.com,DIRECT")
+}
+
 func TestNormalizeInsertIndex(t *testing.T) {
 	assert.Equal(t, 0, normalizeInsertIndex(0, 5))
 	assert.Equal(t, 0, normalizeInsertIndex(-3, 5))

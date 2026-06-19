@@ -53,6 +53,11 @@ type State struct {
 	addForm     addForm // 表单状态（仅 showAddForm 为 true 时有意义）
 	configPath  string  // 当前 Mihomo 配置文件路径（由主 Model 注入）
 
+	// 删除规则确认弹窗状态
+	showDeleteConfirm bool        // 是否显示删除确认弹窗
+	deleteTarget      model.Rule  // 待删除规则快照（仅 showDeleteConfirm 为 true 时有意义）
+	deleteTargetIndex int         // 待删除规则在 rules 列表中的原始索引（用于展示序号）
+
 	ColorAdjustLight float64 // 0.2-0.4 建议明度增加比例
 	ColorAdjustDark  float64 // 0.15-0.25 建议明度降低比例
 }
@@ -79,6 +84,10 @@ func (s State) ToPageState(width, height int) PageState {
 		// 添加规则弹窗状态
 		ShowAddForm: s.showAddForm,
 		AddForm:     s.addForm,
+		// 删除确认弹窗状态
+		ShowDeleteConfirm: s.showDeleteConfirm,
+		DeleteTarget:      s.deleteTarget,
+		DeleteTargetIndex: s.deleteTargetIndex,
 	}
 }
 
@@ -93,6 +102,11 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client) (State, tea.Cmd) {
 	// 添加规则弹窗优先拦截（吞掉所有按键）
 	if s.showAddForm {
 		return s.handleAddFormMode(msg)
+	}
+
+	// 删除确认弹窗拦截（吞掉所有按键）
+	if s.showDeleteConfirm {
+		return s.handleDeleteConfirmMode(msg)
 	}
 
 	// 类型筛选弹窗模式优先处理
@@ -131,6 +145,10 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client) (State, tea.Cmd) {
 		// 打开添加自定义规则弹窗（每次打开重置为干净表单）
 		s.showAddForm = true
 		s.addForm = newAddForm(s.configPath)
+
+	case msg.String() == "d":
+		// 打开删除确认弹窗（针对当前选中规则）
+		return s.openDeleteConfirm()
 
 	case key.Matches(msg, common.Keys.Refresh):
 		return s, FetchRules(client)
@@ -182,6 +200,9 @@ func (s State) ShowTypeFilter() bool { return s.showTypeFilter }
 
 // ShowAddForm 返回是否显示添加规则弹窗
 func (s State) ShowAddForm() bool { return s.showAddForm }
+
+// ShowDeleteConfirm 返回是否显示删除规则确认弹窗
+func (s State) ShowDeleteConfirm() bool { return s.showDeleteConfirm }
 
 // FilterMode 返回是否处于规则过滤模式
 func (s State) FilterMode() bool { return s.ruleFilterMode }
@@ -235,6 +256,48 @@ func (s State) handleRuleFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 			s.selectedRule = 0
 			s.ruleScrollTop = 0
 		}
+	}
+	return s, nil
+}
+
+// openDeleteConfirm 针对当前选中规则打开删除确认弹窗。
+// 列表为空时直接忽略（无可删项）。快照目标规则及其原始索引供渲染与提交复用。
+func (s State) openDeleteConfirm() (State, tea.Cmd) {
+	if len(s.filteredRuleIndices) == 0 || s.selectedRule < 0 || s.selectedRule >= len(s.filteredRuleIndices) {
+		return s, nil
+	}
+	origIdx := s.filteredRuleIndices[s.selectedRule]
+	if origIdx < 0 || origIdx >= len(s.rules) {
+		return s, nil
+	}
+	s.showDeleteConfirm = true
+	s.deleteTarget = s.rules[origIdx]
+	s.deleteTargetIndex = origIdx
+	return s, nil
+}
+
+// handleDeleteConfirmMode 处理删除确认弹窗按键（吞掉所有按键）。
+//   - Enter / y：确认，发起 DeleteRuleCmd 并关闭弹窗；
+//   - Esc / n / 其它：取消关闭，不修改配置。
+func (s State) handleDeleteConfirmMode(msg tea.KeyMsg) (State, tea.Cmd) {
+	switch {
+	case key.Matches(msg, common.Keys.Enter), msg.String() == "y":
+		target := s.deleteTarget
+		s.showDeleteConfirm = false
+		s.deleteTarget = model.Rule{}
+		s.deleteTargetIndex = 0
+		return s, DeleteRuleCmd(
+			s.configPath,
+			normalizeRuleType(target.Type),
+			target.Payload,
+			target.Proxy,
+			target.NoResolve,
+		)
+
+	case key.Matches(msg, common.Keys.Escape), msg.String() == "n":
+		s.showDeleteConfirm = false
+		s.deleteTarget = model.Rule{}
+		s.deleteTargetIndex = 0
 	}
 	return s, nil
 }
@@ -613,6 +676,24 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 			// 点击边框外：取消关闭
 			s.showAddForm = false
 			s.addForm = newAddForm(s.configPath)
+		}
+		return s, nil
+	}
+
+	// 删除确认弹窗打开时：点击弹窗外取消（破坏性操作的安全默认）
+	if s.showDeleteConfirm {
+		pageState := PageState{
+			ShowDeleteConfirm: s.showDeleteConfirm,
+			DeleteTarget:      s.deleteTarget,
+			DeleteTargetIndex: s.deleteTargetIndex,
+			Width:             pageWidth,
+			Height:            pageHeight,
+		}
+		left, top, right, bottom := ResolveDeleteConfirmBounds(pageState, pageWidth, pageHeight)
+		if !(pageX >= left && pageX < right && pageY >= top && pageY < bottom) {
+			s.showDeleteConfirm = false
+			s.deleteTarget = model.Rule{}
+			s.deleteTargetIndex = 0
 		}
 		return s, nil
 	}
