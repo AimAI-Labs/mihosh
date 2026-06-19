@@ -285,6 +285,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.notice = ""
 		m.noticeTicks = 0
 
+	case messages.ConfigEditFinishedMsg:
+		// 外部编辑器结束：失败沿用全局错误显示；成功热重载核心（随后刷新规则列表）
+		if msg.Err != nil {
+			m.err = messages.ErrMsg{Err: msg.Err}
+			m.notice = ""
+			m.noticeTicks = 0
+			return m, nil
+		}
+		m.notice = i18n.T("rules.edited_toast")
+		m.noticeTicks = autoRefreshNoticeTicks
+		return m, reloadConfigCmd(m.client)
+
 	case messages.SiteTestMsg:
 		m.connsState = m.connsState.ApplySiteTestResult(msg.Name, msg.Delay, msg.Err)
 

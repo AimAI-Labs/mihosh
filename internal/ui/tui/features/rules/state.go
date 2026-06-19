@@ -150,6 +150,10 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client) (State, tea.Cmd) {
 		// 打开删除确认弹窗（针对当前选中规则）
 		return s.openDeleteConfirm()
 
+	case msg.String() == "e":
+		// 在外部编辑器中打开配置文件
+		return s.openConfigEditor()
+
 	case key.Matches(msg, common.Keys.Refresh):
 		return s, FetchRules(client)
 

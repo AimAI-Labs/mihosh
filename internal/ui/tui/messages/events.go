@@ -85,6 +85,10 @@ func (m RuleDeleteErrorMsg) Error() string { return m.Err.Error() }
 // ConfigReloadedMsg 调用 mihomo 核心 ReloadConfig 的结果。
 type ConfigReloadedMsg struct{ Err error }
 
+// ConfigEditFinishedMsg 外部编辑器编辑配置文件结束。
+// Err 为 nil 表示编辑器正常退出（调用方负责热重载核心与刷新）；非 nil 表示启动或退出失败。
+type ConfigEditFinishedMsg struct{ Err error }
+
 // ========= WebSocket Streaming Messages =========
 
 type MemoryWSMsg struct {

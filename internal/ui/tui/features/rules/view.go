@@ -210,6 +210,7 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 		{Key: "t", Desc: i18n.T("help.rules.hint_type")},
 		{Key: "n", Desc: i18n.T("help.rules.hint_add")},
 		{Key: "d", Desc: i18n.T("help.rules.hint_delete")},
+		{Key: "e", Desc: i18n.T("help.rules.hint_edit")},
 		{Key: "r", Desc: i18n.T("help.rules.hint_refresh")},
 	}
 }

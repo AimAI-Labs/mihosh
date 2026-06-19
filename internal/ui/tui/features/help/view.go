@@ -310,6 +310,7 @@ func buildRulesSections(ctx HelpContext) []section {
 			{"t", i18n.T("help.rules.type")},
 			{"n", i18n.T("help.rules.add")},
 			{"d", i18n.T("help.rules.delete")},
+			{"e", i18n.T("help.rules.edit")},
 			{"Esc", i18n.T("help.rules.clear")},
 		},
 	}}
