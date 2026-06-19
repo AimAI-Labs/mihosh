@@ -138,6 +138,38 @@ func TestRulesState_UpdateFilteredRules_Engines(t *testing.T) {
 	})
 }
 
+// TestRulesState_UpdateFilteredRules_NoResolve 验证 no-resolve 作为可搜索标签：
+// 输入 no-resolve / resolve 均可筛出带该标记的规则，三种引擎一致。
+func TestRulesState_UpdateFilteredRules_NoResolve(t *testing.T) {
+	nrRules := []model.Rule{
+		{Type: "IP-CIDR", Payload: "10.0.0.0/8", Proxy: "DIRECT", NoResolve: true},
+		{Type: "IP-CIDR", Payload: "192.168.0.0/16", Proxy: "REJECT", NoResolve: true},
+		{Type: "DOMAIN", Payload: "example.com", Proxy: "DIRECT"},
+	}
+
+	cases := []struct {
+		engine FilterEngine
+		query  string
+		want   int
+	}{
+		{FilterEngineSubstring, "no-resolve", 2},
+		{FilterEngineSubstring, "resolve", 2},
+		{FilterEngineRegex, `no-resolve`, 2},
+		{FilterEngineRegex, `resolve`, 2},
+		{FilterEngineFuzzy, "no-resolve", 2},
+	}
+
+	for _, c := range cases {
+		s := State{rules: nrRules, ruleFilter: c.query}
+		s.FilterEngine = c.engine
+		s.updateFilteredRules()
+		if len(s.filteredRuleIndices) != c.want {
+			t.Fatalf("engine=%d query=%q: expected %d matches, got %d",
+				c.engine, c.query, c.want, len(s.filteredRuleIndices))
+		}
+	}
+}
+
 // TestRulesState_FilterInputAcceptsMultibyte 验证过滤输入接受多字节字符（如中文）。
 func TestRulesState_FilterInputAcceptsMultibyte(t *testing.T) {
 	s := State{}

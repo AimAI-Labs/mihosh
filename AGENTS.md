@@ -13,6 +13,7 @@
 - **环境**：执行命令前必须判断系统类型（Windows或Linux），使用兼容的命令执行。（win优先执行pwsh.exe）
 - **构建**：项目使用了mise工具。
 - **命令**: 
+  > win下禁止使用类似`2>nul`命令，以防生成nul等保留设备名的文件
   - `mise exec go -- go test ./...` (涉及渲染及逻辑时必须跑测试，不依赖真实服务端环境)
   - `mise exec go -- go build -o mihosh .`（强制，构建后会自动杀死进程并重新运行）
 - **构建后（本地为Win环境时执行）**：执行`.\deploy.ps1`

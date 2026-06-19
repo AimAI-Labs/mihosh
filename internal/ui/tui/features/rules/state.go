@@ -437,6 +437,10 @@ func (s *State) updateFilteredRules() {
 		// 文本过滤检查（按引擎分派）
 		if hasTextFilter {
 			searchText := rule.Type + " " + rule.Payload + " " + rule.Proxy
+			// no-resolve 作为可搜索标签加入文本（输入 no-resolve / resolve / nr-... 即可筛选）
+			if rule.NoResolve {
+				searchText += " no-resolve"
+			}
 			switch s.FilterEngine {
 			case FilterEngineRegex:
 				if re == nil || !re.MatchString(searchText) {
