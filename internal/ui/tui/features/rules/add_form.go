@@ -28,7 +28,13 @@ var ruleTypePresets = []string{
 	"MATCH",
 }
 
-// defaultProxyPolicy 是策略提取失败或列表为空时的兜底值。
+// geoipCodeRe 匹配 ISO 3166-1 alpha-2 国家代码（两位大写字母）。
+var geoipCodeRe = regexp.MustCompile(`^[A-Z]{2}$`)
+
+// geositeNameRe 匹配 GEOSITE 站点标识符（字母数字、连字符、点、下划线，且以字母数字开头）。
+var geositeNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]*$`)
+
+// defaultProxyPolicy 是策略提取失败或列表为空时的兆底值。
 const defaultProxyPolicy = "DIRECT"
 
 // addPickerTab 是策略选择二级弹窗的分类索引。
@@ -43,10 +49,11 @@ const addPickerListMax = 14
 
 // 表单字段索引（同时也是 Tab 循环顺序）。
 const (
-	addFieldPayload = 0 // 匹配值
-	addFieldProxy   = 1 // 策略
-	addFieldIndex   = 2 // 插入位置
-	addFieldCount   = 3 // 字段数
+	addFieldPayload   = 0 // 匹配值
+	addFieldProxy     = 1 // 策略
+	addFieldIndex     = 2 // 插入位置
+	addFieldNoResolve = 3 // no-resolve 复选框（仅 IP 类可见）
+	addFieldCount     = 4 // 字段数
 )
 
 // addForm 维护「添加自定义规则」弹窗的表单状态。
@@ -59,7 +66,7 @@ const (
 // addFieldProxy 槽位仍保留一个 textinput.Model 仅作占位以维持字段索引与
 // 布局高度一致，其值不参与提交。
 type addForm struct {
-	fields      []textinput.Model // length == addFieldCount；proxy 槽为占位
+	fields      []textinput.Model // length == addFieldCount；proxy/noResolve 槽为占位
 	fieldCursor int               // 当前聚焦字段
 	typeCursor  int               // 类型选择器光标（ruleTypePresets 索引）
 
@@ -74,6 +81,9 @@ type addForm struct {
 	pickerSearch    string // 模糊搜索文本
 	pickerCursor    int    // 在「过滤后」列表中的索引
 	pickerScrollTop int
+
+	// no-resolve：仅 IP-CIDR/IP-CIDR6/SRC-IP-CIDR 类型可见
+	noResolve bool
 
 	errMsg string // 行内校验/写入错误
 }
@@ -100,6 +110,11 @@ func newAddForm(configPath string) addForm {
 	idx.CharLimit = 6
 	idx.Prompt = ""
 	fields[addFieldIndex] = idx
+
+	// noResolve 槽位保留 textinput.Model 仅作占位，避免 Focus() 空指针。
+	noRes := textinput.New()
+	noRes.Prompt = ""
+	fields[addFieldNoResolve] = noRes
 
 	groups, nodes, _ := config.ExtractProxyPolicies(configPath)
 	if len(groups) == 0 {
@@ -156,16 +171,26 @@ func (f *addForm) focusCurrent() {
 }
 
 // cycleField 切换聚焦字段（dir=1 向下，dir=-1 向上），循环。
+// 非 IP 类型时自动跳过 addFieldNoResolve 字段。
 func (f *addForm) cycleField(dir int) {
 	n := addFieldCount
-	f.fieldCursor = ((f.fieldCursor+dir)%n + n) % n
+	next := ((f.fieldCursor+dir)%n + n) % n
+	// 非 IP 类型跳过 noResolve 字段
+	if next == addFieldNoResolve && !f.isIPType() {
+		next = ((next+dir)%n + n) % n
+	}
+	f.fieldCursor = next
 	f.focusCurrent()
 }
 
 // cycleType 循环切换类型（dir=1 下一项，dir=-1 上一项）。
+// 切换后若新类型非 IP 类，自动重置 noResolve 状态。
 func (f *addForm) cycleType(dir int) {
 	n := len(ruleTypePresets)
 	f.typeCursor = ((f.typeCursor+dir)%n + n) % n
+	if !f.isIPType() {
+		f.noResolve = false
+	}
 }
 
 // currentProxy 返回当前选中的策略字符串（始终非空：至少含 DIRECT 兜底）。
@@ -285,6 +310,22 @@ func (f addForm) isProxyField() bool {
 	return f.fieldCursor == addFieldProxy
 }
 
+// isIPType 当前类型是否为 IP 类（IP-CIDR / IP-CIDR6 / SRC-IP-CIDR）。
+func (f addForm) isIPType() bool {
+	t := strings.ToUpper(f.currentType())
+	return t == "IP-CIDR" || t == "IP-CIDR6" || t == "SRC-IP-CIDR"
+}
+
+// isNoResolveField 当前聚焦字段是否为 no-resolve 复选框。
+func (f addForm) isNoResolveField() bool {
+	return f.fieldCursor == addFieldNoResolve
+}
+
+// toggleNoResolve 切换 no-resolve 复选框状态。
+func (f *addForm) toggleNoResolve() {
+	f.noResolve = !f.noResolve
+}
+
 // resolveIndex 解析位置字段：空或非法视为 1（顶部，最高优先级）。
 func (f addForm) resolveIndex() int {
 	raw := strings.TrimSpace(f.fields[addFieldIndex].Value())
@@ -352,6 +393,27 @@ func (f addForm) validate() (bool, string) {
 	if strings.HasPrefix(ruleType, "DOMAIN") {
 		if strings.ContainsAny(payload, " \t") {
 			return false, "rules.add_err_domain"
+		}
+	}
+
+	// 5. GEOIP 国家代码校验（两位大写字母）
+	if ruleType == "GEOIP" {
+		if !geoipCodeRe.MatchString(strings.ToUpper(payload)) {
+			return false, "rules.add_err_geoip"
+		}
+	}
+
+	// 6. GEOSITE 站点标识符校验
+	if ruleType == "GEOSITE" {
+		if !geositeNameRe.MatchString(payload) {
+			return false, "rules.add_err_geosite"
+		}
+	}
+
+	// 7. 进程名/路径校验（不允许空格）
+	if ruleType == "PROCESS-NAME" || ruleType == "PROCESS-PATH" {
+		if strings.ContainsAny(payload, " \t") {
+			return false, "rules.add_err_process"
 		}
 	}
 

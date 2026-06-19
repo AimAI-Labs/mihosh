@@ -263,6 +263,12 @@ func (s State) handleAddFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 			s.addForm = form
 			return s, nil
 		}
+		// no-resolve 行聚焦时 Enter 切换复选框，不提交
+		if form.isNoResolveField() {
+			form.toggleNoResolve()
+			s.addForm = form
+			return s, nil
+		}
 		ok, errKey := form.validate()
 		if !ok {
 			form.errMsg = i18n.T(errKey)
@@ -279,6 +285,7 @@ func (s State) handleAddFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 			submit.fields[addFieldPayload].Value(),
 			submit.currentProxy(),
 			submit.resolveIndex(),
+			submit.noResolve,
 		)
 		return s, cmd
 
@@ -298,19 +305,25 @@ func (s State) handleAddFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 
 	case key.Matches(msg, common.Keys.Left):
 		// 策略行不再用 ←/→ 切换（改由二级弹窗），仅类型行横向翻页
-		if !form.isProxyField() {
+		if !form.isProxyField() && !form.isNoResolveField() {
 			form.cycleType(-1)
 		}
 
 	case key.Matches(msg, common.Keys.Right):
-		if !form.isProxyField() {
+		if !form.isProxyField() && !form.isNoResolveField() {
 			form.cycleType(1)
+		}
+
+	case msg.String() == " ":
+		// Space 切换 no-resolve 复选框
+		if form.isNoResolveField() {
+			form.toggleNoResolve()
 		}
 
 	default:
 		// 透传给当前 textinput（Backspace / 可打印字符等）
-		// 策略行为只读选择器，不接收文本输入
-		if form.isProxyField() || !isTextInputKey(msg) {
+		// 策略和 no-resolve 行为只读，不接收文本输入
+		if form.isProxyField() || form.isNoResolveField() || !isTextInputKey(msg) {
 			break
 		}
 		cur := form.fields[form.fieldCursor]

@@ -212,22 +212,155 @@ func TestAddForm_IndexValidationRejectsNonNumeric(t *testing.T) {
 // TestBuildRuleLine 验证规则字符串组装格式。
 func TestBuildRuleLine(t *testing.T) {
 	cases := []struct {
-		name     string
-		ruleType string
-		payload  string
-		proxy    string
-		expected string
+		name      string
+		ruleType  string
+		payload   string
+		proxy     string
+		noResolve bool
+		expected  string
 	}{
-		{"standard", "DOMAIN-SUFFIX", "example.com", "DIRECT", "DOMAIN-SUFFIX,example.com,DIRECT"},
-		{"match_no_payload", "MATCH", "ignored", "REJECT", "MATCH,REJECT"},
-		{"trim_spaces", "DOMAIN", "  a.com  ", "  PROXY  ", "DOMAIN,a.com,PROXY"},
-		{"lowercase_match", "match", "", "DIRECT", "MATCH,DIRECT"},
+		{"standard", "DOMAIN-SUFFIX", "example.com", "DIRECT", false, "DOMAIN-SUFFIX,example.com,DIRECT"},
+		{"match_no_payload", "MATCH", "ignored", "REJECT", false, "MATCH,REJECT"},
+		{"trim_spaces", "DOMAIN", "  a.com  ", "  PROXY  ", false, "DOMAIN,a.com,PROXY"},
+		{"lowercase_match", "match", "", "DIRECT", false, "MATCH,DIRECT"},
+		{"ip_cidr_no_resolve", "IP-CIDR", "10.0.0.0/8", "DIRECT", true, "IP-CIDR,10.0.0.0/8,DIRECT,no-resolve"},
+		{"ip_cidr6_no_resolve", "IP-CIDR6", "fd00::/8", "REJECT", true, "IP-CIDR6,fd00::/8,REJECT,no-resolve"},
+		{"src_ip_cidr_no_resolve", "SRC-IP-CIDR", "192.168.0.0/16", "DIRECT", true, "SRC-IP-CIDR,192.168.0.0/16,DIRECT,no-resolve"},
+		{"ip_cidr_no_resolve_false", "IP-CIDR", "10.0.0.0/8", "DIRECT", false, "IP-CIDR,10.0.0.0/8,DIRECT"},
+		{"non_ip_no_resolve_ignored", "DOMAIN-SUFFIX", "example.com", "DIRECT", true, "DOMAIN-SUFFIX,example.com,DIRECT"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := buildRuleLine(c.ruleType, c.payload, c.proxy)
+			got := buildRuleLine(c.ruleType, c.payload, c.proxy, c.noResolve)
 			if got != c.expected {
 				t.Fatalf("expected %q, got %q", c.expected, got)
+			}
+		})
+	}
+}
+
+// ============================================================
+//  payload 前置校验（各类型规则）
+// ============================================================
+
+// TestValidate_GeoipRejected 验证 GEOIP 非法国家代码被拦截。
+func TestValidate_GeoipRejected(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload string
+	}{
+		{"single_letter", "C"},
+		{"three_letters", "USA"},
+		{"numeric", "12"},
+		{"with_space", "C N"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			form := newAddForm("")
+			form.typeCursor = indexOfPreset("GEOIP")
+			form.fields[addFieldPayload].SetValue(c.payload)
+			ok, errKey := form.validate()
+			if ok {
+				t.Fatalf("expected validation to fail for GEOIP payload %q", c.payload)
+			}
+			if errKey != "rules.add_err_geoip" {
+				t.Fatalf("expected errKey=rules.add_err_geoip, got %q", errKey)
+			}
+		})
+	}
+}
+
+// TestValidate_GeoipAccepted 验证合法 GEOIP 国家代码通过。
+func TestValidate_GeoipAccepted(t *testing.T) {
+	form := newAddForm("")
+	form.typeCursor = indexOfPreset("GEOIP")
+	form.fields[addFieldPayload].SetValue("CN")
+	ok, errKey := form.validate()
+	if !ok {
+		t.Fatalf("expected validation to pass for GEOIP=CN, got errKey=%q", errKey)
+	}
+}
+
+// TestValidate_GeositeRejected 验证 GEOSITE 非法标识符被拦截。
+func TestValidate_GeositeRejected(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload string
+	}{
+		{"leading_dot", ".google"},
+		{"with_space", "my site"},
+		{"with_comma", "a,b"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			form := newAddForm("")
+			form.typeCursor = indexOfPreset("GEOSITE")
+			form.fields[addFieldPayload].SetValue(c.payload)
+			ok, _ := form.validate()
+			if ok {
+				t.Fatalf("expected validation to fail for GEOSITE payload %q", c.payload)
+			}
+		})
+	}
+}
+
+// TestValidate_GeositeAccepted 验证合法 GEOSITE 标识符通过。
+func TestValidate_GeositeAccepted(t *testing.T) {
+	for _, name := range []string{"google", "google.cn", "my-site", "netflix"} {
+		t.Run(name, func(t *testing.T) {
+			form := newAddForm("")
+			form.typeCursor = indexOfPreset("GEOSITE")
+			form.fields[addFieldPayload].SetValue(name)
+			ok, errKey := form.validate()
+			if !ok {
+				t.Fatalf("expected validation to pass for GEOSITE=%q, got errKey=%q", name, errKey)
+			}
+		})
+	}
+}
+
+// TestValidate_ProcessRejected 验证进程名/路径含空格时被拦截。
+func TestValidate_ProcessRejected(t *testing.T) {
+	cases := []struct {
+		typeName string
+		payload  string
+	}{
+		{"PROCESS-NAME", "my process"},
+		{"PROCESS-PATH", "/path with/space"},
+	}
+	for _, c := range cases {
+		t.Run(c.typeName, func(t *testing.T) {
+			form := newAddForm("")
+			form.typeCursor = indexOfPreset(c.typeName)
+			form.fields[addFieldPayload].SetValue(c.payload)
+			ok, errKey := form.validate()
+			if ok {
+				t.Fatalf("expected validation to fail for %s payload %q", c.typeName, c.payload)
+			}
+			if errKey != "rules.add_err_process" {
+				t.Fatalf("expected errKey=rules.add_err_process, got %q", errKey)
+			}
+		})
+	}
+}
+
+// TestValidate_ProcessAccepted 验证合法进程名/路径通过。
+func TestValidate_ProcessAccepted(t *testing.T) {
+	cases := []struct {
+		typeName string
+		payload  string
+	}{
+		{"PROCESS-NAME", "chrome.exe"},
+		{"PROCESS-PATH", "/usr/bin/chrome"},
+	}
+	for _, c := range cases {
+		t.Run(c.typeName, func(t *testing.T) {
+			form := newAddForm("")
+			form.typeCursor = indexOfPreset(c.typeName)
+			form.fields[addFieldPayload].SetValue(c.payload)
+			ok, errKey := form.validate()
+			if !ok {
+				t.Fatalf("expected validation to pass for %s=%q, got errKey=%q", c.typeName, c.payload, errKey)
 			}
 		})
 	}

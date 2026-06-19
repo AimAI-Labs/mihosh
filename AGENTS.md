@@ -10,6 +10,7 @@
 
 ## 1. 技术栈与常用命令
 - **栈**: Go 1.24.0, Bubble Tea v1.3, cobra, viper, gorilla/websocket.
+- **环境**：执行命令前必须判断系统类型（Windows或Linux），使用兼容的命令。（win使用pwsh.exe执行）
 - **构建**：项目使用了mise工具，可在项目目录里**直接使用go命令**。
 - **命令**: 
   - `go test ./...` (涉及渲染及逻辑时必须跑测试，不依赖真实服务端环境)

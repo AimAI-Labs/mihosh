@@ -839,8 +839,12 @@ func computeAddFormLayout(state PageState, width, height int) addFormLayout {
 	if modalWidth < 24 {
 		modalWidth = 24
 	}
-	// 固定高度：上边框1 + 类型行1 + 分隔1 + 三字段3 + 分隔1 + 说明/错误1 + 下边框1 = 9
+	// 基础高度：上边框1 + 类型行1 + 分隔1 + 三字段3 + 分隔1 + 说明/错误1 + 下边框1 = 9
+	// IP 类规则额外显示 no-resolve 复选框行 +1
 	modalHeight := 9
+	if state.AddForm.isIPType() {
+		modalHeight = 10
+	}
 	if modalHeight > height-2 {
 		modalHeight = height - 2
 	}
@@ -932,6 +936,12 @@ func buildAddRuleModal(state PageState, width, height int) string {
 	// ── 第二分隔行 ──
 	divider2 := divider
 
+	// ── no-resolve 复选框行（仅 IP 类规则显示）──
+	var noResolveRow string
+	if form.isIPType() {
+		noResolveRow = renderAddFormNoResolveRow(form)
+	}
+
 	// ── 说明/错误行 ──
 	var footer string
 	if form.errMsg != "" {
@@ -939,6 +949,8 @@ func buildAddRuleModal(state PageState, width, height int) string {
 	} else if form.isProxyField() {
 		// 策略行聚焦时提示 ←/→ 切换、来源为源配置文件
 		footer = common.TokyoMutedStyle().Render(i18n.T("rules.add_proxy_hint"))
+	} else if form.isNoResolveField() {
+		footer = common.TokyoMutedStyle().Render(i18n.T("rules.add_noresolve_hint"))
 	} else {
 		footer = common.TokyoMutedStyle().Render(i18n.T("rules.add_index_hint"))
 	}
@@ -948,7 +960,11 @@ func buildAddRuleModal(state PageState, width, height int) string {
 	if payloadRow != "" {
 		contentRows = append(contentRows, payloadRow)
 	}
-	contentRows = append(contentRows, proxyRow, indexRow, divider2, footer)
+	contentRows = append(contentRows, proxyRow, indexRow)
+	if noResolveRow != "" {
+		contentRows = append(contentRows, noResolveRow)
+	}
+	contentRows = append(contentRows, divider2, footer)
 
 	modalContent := strings.Join(contentRows, "\n")
 
@@ -1001,6 +1017,26 @@ func renderAddFormProxyRow(form addForm) string {
 		valView += " " + common.TokyoMutedStyle().Render(i18n.T("rules.add_proxy_change"))
 	} else {
 		valView = lipgloss.NewStyle().Foreground(common.TokyoForeground).Render(val)
+	}
+	return labelText + " " + valView
+}
+
+// renderAddFormNoResolveRow 渲染 no-resolve 复选框行。
+// 仅当规则类型为 IP-CIDR/IP-CIDR6/SRC-IP-CIDR 时显示。
+func renderAddFormNoResolveRow(form addForm) string {
+	labelStyle := common.TokyoMutedStyle()
+	labelText := labelStyle.Render(i18n.T("rules.add_field_noresolve"))
+
+	checkbox := "[ ]"
+	if form.noResolve {
+		checkbox = "[✓]"
+	}
+
+	var valView string
+	if form.isNoResolveField() {
+		valView = lipgloss.NewStyle().Foreground(common.TokyoCyan).Bold(true).Render(checkbox)
+	} else {
+		valView = lipgloss.NewStyle().Foreground(common.TokyoForeground).Render(checkbox)
 	}
 	return labelText + " " + valView
 }
