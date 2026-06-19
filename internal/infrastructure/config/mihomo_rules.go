@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -66,7 +67,7 @@ func InsertRule(configPath, rule string, index int) error {
 	copy(seq.Content[insertAt+1:], seq.Content[insertAt:])
 	seq.Content[insertAt] = newItem
 
-	out, err := yaml.Marshal(&doc)
+	out, err := marshalYAML(&doc)
 	if err != nil {
 		return fmt.Errorf("序列化配置文件失败: %w", err)
 	}
@@ -130,7 +131,7 @@ func DeleteRule(configPath, ruleType, payload, proxy string, noResolve bool) err
 		return errRuleNotFound
 	}
 
-	out, err := yaml.Marshal(&doc)
+	out, err := marshalYAML(&doc)
 	if err != nil {
 		return fmt.Errorf("序列化配置文件失败: %w", err)
 	}
@@ -358,6 +359,21 @@ func normalizeInsertIndex(index, length int) int {
 		return length
 	}
 	return index - 1
+}
+
+// marshalYAML 以 2 空格缩进序列化 yaml.Node，保持与 yaml.Marshal 一致的输出格式，
+// 仅将默认的 4 空格缩进改为 2 空格（符合 Mihomo 配置惯例）。
+func marshalYAML(doc *yaml.Node) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(doc); err != nil {
+		return nil, err
+	}
+	if err := enc.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 // atomicWriteFile 先写入同目录临时文件再 Rename 覆盖目标，降低半写损坏风险。
