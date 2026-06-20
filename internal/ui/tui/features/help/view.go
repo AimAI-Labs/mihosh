@@ -15,7 +15,8 @@ const (
 	PageConnections = 1
 	PageLogs        = 2
 	PageRules       = 3
-	PageSettings    = 4
+	PageSub         = 4
+	PageSettings    = 5
 )
 
 // ── 连接页视图模式常量（与 connections 包保持一致）──
@@ -49,6 +50,9 @@ type HelpContext struct {
 	RulesDeleteConfirm  bool // 删除确认弹窗
 	RulesEditForm      bool // 编辑规则弹窗
 
+	// 订阅页子状态
+	SubMode int // sub 页交互模式（见 features/sub SubMode* 常量）
+
 	// 设置页子状态
 	SettingsEdit     bool // 编辑模式
 	SettingsLanguage bool // 当前选中项是语言
@@ -77,7 +81,7 @@ func buildHelpSections(ctx HelpContext) []section {
 		bindings: []keybinding{
 			{"?", i18n.T("help.global.toggle")},
 			{"Tab / Shift+Tab", i18n.T("help.global.switch")},
-			{"1-5", i18n.T("help.global.go")},
+			{"1-6", i18n.T("help.global.go")},
 			{"r", i18n.T("help.global.refresh")},
 			{"q / Ctrl+C", i18n.T("help.global.quit")},
 		},
@@ -102,6 +106,8 @@ func buildHelpSections(ctx HelpContext) []section {
 		sections = append(sections, buildLogsSections(ctx)...)
 	case PageRules:
 		sections = append(sections, buildRulesSections(ctx)...)
+	case PageSub:
+		sections = append(sections, buildSubSections(ctx)...)
 	case PageSettings:
 		sections = append(sections, buildSettingsSections(ctx)...)
 	}
@@ -376,6 +382,70 @@ func buildSettingsSections(ctx HelpContext) []section {
 			{"Enter / 双击", i18n.T("help.settings.edit")},
 		},
 	}}
+}
+
+// ── 订阅页交互模式常量（与 features/sub SubMode* 保持一致，避免循环依赖）──
+const (
+	subModeNormal      = 0 // 普通（列表浏览）
+	subModeSearch      = 1 // 搜索输入
+	subModeAddForm     = 2 // 添加订阅表单
+	subModeMergeEditor = 3 // merge 编辑器
+	subModeDeleteConf  = 4 // 删除确认
+)
+
+// buildSubSections 订阅页帮助分区。
+func buildSubSections(ctx HelpContext) []section {
+	switch ctx.SubMode {
+	case subModeSearch:
+		return []section{{
+			title: i18n.T("help.section.sub_search"),
+			bindings: []keybinding{
+				{"输入字符", i18n.T("help.sub_search.append")},
+				{"Backspace", i18n.T("help.sub_search.backspace")},
+				{"Enter", i18n.T("help.sub_search.confirm")},
+				{"Esc", i18n.T("help.sub_search.cancel")},
+			},
+		}}
+	case subModeAddForm:
+		return []section{{
+			title: i18n.T("help.section.sub_add"),
+			bindings: []keybinding{
+				{"↑/↓", i18n.T("help.sub_add.field")},
+				{"Enter", i18n.T("help.sub_add.confirm")},
+				{"Esc", i18n.T("help.sub_add.cancel")},
+			},
+		}}
+	case subModeMergeEditor:
+		return []section{{
+			title: i18n.T("help.section.sub_merge"),
+			bindings: []keybinding{
+				{"Ctrl+S", i18n.T("help.sub_merge.save")},
+				{"Esc", i18n.T("help.sub_merge.cancel")},
+			},
+		}}
+	case subModeDeleteConf:
+		return []section{{
+			title: i18n.T("help.section.sub_delete"),
+			bindings: []keybinding{
+				{"Enter / y", i18n.T("help.sub_delete.confirm")},
+				{"Esc / n", i18n.T("help.sub_delete.cancel")},
+			},
+		}}
+	default:
+		return []section{{
+			title: i18n.T("help.section.sub"),
+			bindings: []keybinding{
+				{"↑/↓", i18n.T("help.sub.select")},
+				{"Enter / 双击", i18n.T("help.sub.activate")},
+				{"u", i18n.T("help.sub.update")},
+				{"e", i18n.T("help.sub.edit_merge")},
+				{"n", i18n.T("help.sub.add")},
+				{"d", i18n.T("help.sub.delete")},
+				{"r", i18n.T("help.sub.refresh")},
+				{"/", i18n.T("help.sub.search")},
+			},
+		}}
+	}
 }
 
 // ── 颜色访问——使用 common 包函数，支持主题热切换 ──

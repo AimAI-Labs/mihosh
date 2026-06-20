@@ -29,6 +29,13 @@ func Save(cfg *Config) error {
 	viper.Set("language", cfg.Language)
 	viper.Set("auto_refresh_interval", cfg.AutoRefreshInterval)
 	viper.Set("theme", cfg.Theme)
+	// 订阅管理字段：subs 为订阅元数据列表，active_sub 为当前激活 UID
+	if cfg.Subs == nil {
+		viper.Set("subs", []interface{}{})
+	} else {
+		viper.Set("subs", cfg.Subs)
+	}
+	viper.Set("active_sub", cfg.ActiveSub)
 
 	return viper.WriteConfigAs(configFile)
 }

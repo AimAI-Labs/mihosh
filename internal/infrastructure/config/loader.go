@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/spf13/viper"
 )
 
@@ -226,6 +227,9 @@ func Load() (*Config, error) {
 	viper.SetDefault("language", DefaultConfig.Language)
 	viper.SetDefault("auto_refresh_interval", DefaultConfig.AutoRefreshInterval)
 	viper.SetDefault("theme", DefaultConfig.Theme)
+	// 订阅：subs 默认空列表（旧配置文件无此键时保持空），active_sub 默认空（未启用）
+	viper.SetDefault("subs", []profile.Profile{})
+	viper.SetDefault("active_sub", "")
 
 	if err := viper.ReadInConfig(); err != nil {
 		return nil, err

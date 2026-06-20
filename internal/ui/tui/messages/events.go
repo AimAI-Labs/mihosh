@@ -5,6 +5,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 )
 
 // ========= Global Lifecycle & API Messages =========
@@ -137,3 +138,62 @@ type MihomoVersionMsg struct {
 
 // ThemeChangedMsg 主题已切换，触发全屏重绘
 type ThemeChangedMsg struct{}
+
+// ========= Sub (订阅管理) Messages =========
+
+// SubsLoadedMsg 订阅列表已从配置加载。
+type SubsLoadedMsg struct {
+	Subs   []profile.Profile // 当前订阅元数据列表
+	Active string            // 当前激活订阅 UID（空=未激活）
+}
+
+// SubFetchDoneMsg 订阅原始配置已成功拉取/读取。
+type SubFetchDoneMsg struct{ UID string }
+
+// SubFetchErrorMsg 拉取订阅失败。
+type SubFetchErrorMsg struct {
+	UID string
+	Err error
+}
+
+func (m SubFetchErrorMsg) Error() string { return m.Err.Error() }
+
+// SubActivatedMsg 激活订阅流程结束。
+// Err != nil 表示生成/备份/写入/重载中某步失败（配置可能已写入，见 ProfileService.Activate）。
+// MergeErr != nil 表示 merge.yaml 语法错误（已降级忽略覆写，非致命）。
+type SubActivatedMsg struct {
+	UID        string
+	BackupName string // 产生的备份文件名（首次生成时为空）
+	Err        error
+	MergeErr   error
+}
+
+// SubAddDoneMsg 订阅已新增（调用方负责刷新列表）。
+type SubAddDoneMsg struct{ UID string }
+
+// SubAddErrorMsg 新增订阅失败。
+type SubAddErrorMsg struct{ Err error }
+
+func (m SubAddErrorMsg) Error() string { return m.Err.Error() }
+
+// SubDeletedMsg 订阅已删除（调用方负责刷新列表）。
+type SubDeletedMsg struct{ UID string }
+
+// SubDeleteErrorMsg 删除订阅失败。
+type SubDeleteErrorMsg struct{ Err error }
+
+func (m SubDeleteErrorMsg) Error() string { return m.Err.Error() }
+
+// SubMergeSavedMsg 订阅覆写已保存。
+type SubMergeSavedMsg struct{ UID string }
+
+// SubMergeSaveErrorMsg 保存覆写失败。
+type SubMergeSaveErrorMsg struct {
+	UID string
+	Err error
+}
+
+func (m SubMergeSaveErrorMsg) Error() string { return m.Err.Error() }
+
+// SubRenameDoneMsg 订阅已重命名。
+type SubRenameDoneMsg struct{ UID string }

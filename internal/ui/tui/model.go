@@ -7,6 +7,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/sub"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
@@ -36,6 +37,7 @@ type Model struct {
 	proxySvc  *service.ProxyService
 	configSvc *service.ConfigService
 	connSvc   *service.ConnectionService
+	profileSvc *service.ProfileService
 
 	// 路由与布局
 	currentPage          layout.PageType
@@ -67,11 +69,12 @@ type Model struct {
 	// IP 解析器
 	ipResolver *service.IPResolver
 
-	// 五个页面子状态
+	// 六个页面子状态
 	nodesState    nodes.State
 	connsState    connections.State
 	logsState     logs.State
 	rulesState    rules.State
+	subState      sub.State
 	settingsState settings.State
 }
 
@@ -91,6 +94,7 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 	proxySvc := service.NewProxyService(client, testURL, timeout)
 	configSvc := service.NewConfigService()
 	connSvc := service.NewConnectionService(client)
+	profileSvc := service.NewProfileService(client)
 
 	wsClient := api.NewWSClient(cfg.APIAddress, cfg.Secret)
 	wsCtx, wsCancel := context.WithCancel(context.Background())
@@ -102,6 +106,7 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 		proxySvc:             proxySvc,
 		configSvc:            configSvc,
 		connSvc:              connSvc,
+		profileSvc:           profileSvc,
 		testURL:              testURL,
 		timeout:              timeout,
 		currentPage:          layout.PageNodes,
@@ -115,6 +120,7 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 		connsState:           connections.NewState(cfg.ProxyAddress, model.DefaultSiteTests()),
 		logsState:            logs.NewState(),
 		rulesState:           newRulesState(),
+		subState:             sub.State{},
 		settingsState:        settings.State{},
 		autoRefreshRemaining: cfg.AutoRefreshInterval,
 	}

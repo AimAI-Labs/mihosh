@@ -47,6 +47,8 @@ func (m Model) View() string {
 		pageContent = m.renderLogsPage()
 	case layout.PageRules:
 		pageContent = m.renderRulesPage()
+	case layout.PageSub:
+		pageContent = m.renderSubPage()
 	}
 	// 将页面内容约束在精确的 contentHeight 行内：
 	// 内容不足时补空行，内容溢出时截断，确保状态栏始终固定在底部
@@ -109,10 +111,11 @@ func (m Model) buildHelpContext() help.HelpContext {
 		RulesTypeFilter:     m.rulesState.ShowTypeFilter(),
 		RulesFilter:         m.rulesState.FilterMode(),
 		RulesDeleteConfirm:  m.rulesState.ShowDeleteConfirm(),
-			RulesEditForm:      m.rulesState.ShowEditForm(),
-		SettingsEdit:       m.settingsState.IsEditing(),
-		SettingsLanguage:   m.settingsState.IsLanguageSelected(),
-		SettingsTheme:      m.settingsState.IsThemeSelected(),
+		RulesEditForm:       m.rulesState.ShowEditForm(),
+		SubMode:             m.subState.Mode(),
+		SettingsEdit:        m.settingsState.IsEditing(),
+		SettingsLanguage:    m.settingsState.IsLanguageSelected(),
+		SettingsTheme:       m.settingsState.IsThemeSelected(),
 	}
 }
 

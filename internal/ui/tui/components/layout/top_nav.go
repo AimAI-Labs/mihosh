@@ -18,6 +18,7 @@ const (
 	PageConnections
 	PageLogs
 	PageRules
+	PageSub
 	PageSettings
 	PageCount // 页面总数，必须放在最后
 )
@@ -29,6 +30,7 @@ func getTopNavItems() []struct{ Label string } {
 		{i18n.T("menu.connections")},
 		{i18n.T("menu.logs")},
 		{i18n.T("menu.rules")},
+		{i18n.T("menu.sub")},
 		{i18n.T("menu.settings")},
 	}
 }
@@ -245,6 +247,7 @@ func GetPageTitle(page PageType) string {
 		i18n.T("title.connections"),
 		i18n.T("title.logs"),
 		i18n.T("title.rules"),
+		i18n.T("title.sub"),
 		i18n.T("title.settings"),
 	}
 	if int(page) < len(titles) {

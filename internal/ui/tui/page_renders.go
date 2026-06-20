@@ -8,6 +8,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/sub"
 )
 
 // getPageSize 计算页面内容的可用宽度和高度
@@ -59,4 +60,11 @@ func (m Model) renderRulesPage() string {
 	pageWidth, pageHeight := m.getPageSize()
 	state := m.rulesState.ToPageState(pageWidth, pageHeight)
 	return rules.RenderRulesPage(state)
+}
+
+// renderSubPage 渲染订阅管理页面
+func (m Model) renderSubPage() string {
+	pageWidth, pageHeight := m.getPageSize()
+	state := m.subState.ToPageState(pageWidth, pageHeight)
+	return sub.RenderSubPage(state)
 }

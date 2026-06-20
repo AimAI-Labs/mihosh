@@ -5,6 +5,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/sub"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
@@ -134,6 +135,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if m.currentPage == layout.PageRules {
 				return m.handleRulesMouseLeft(msg.X, msg.Y)
+			}
+			if m.currentPage == layout.PageSub {
+				return m.handleSubMouseLeft(msg.X, msg.Y)
 			}
 			if m.currentPage == layout.PageSettings {
 				return m.handleSettingsMouseLeft(msg.X, msg.Y)
@@ -401,6 +405,76 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.ThemeChangedMsg:
 		// 主题已切换，触发重绘（View 会读取新主题色）
 		return m, tea.ClearScreen
+
+	// ── 订阅管理 (Sub) 消息 ──
+	case messages.SubsLoadedMsg:
+		m.subState = m.subState.ApplySubs(msg.Subs, msg.Active)
+		m.notice = ""
+		m.noticeTicks = 0
+
+	case messages.SubAddDoneMsg:
+		// 新增成功：刷新列表 + 提示
+		m.notice = i18n.T("sub.added_toast")
+		m.noticeTicks = autoRefreshNoticeTicks
+		return m, sub.FetchSubs(m.profileSvc)
+
+	case messages.SubAddErrorMsg:
+		m.err = msg
+		m.notice = ""
+		m.noticeTicks = 0
+
+	case messages.SubDeletedMsg:
+		m.notice = i18n.T("sub.deleted_toast")
+		m.noticeTicks = autoRefreshNoticeTicks
+		return m, sub.FetchSubs(m.profileSvc)
+
+	case messages.SubDeleteErrorMsg:
+		m.err = msg
+		m.notice = ""
+		m.noticeTicks = 0
+
+	case messages.SubFetchDoneMsg:
+		m.notice = i18n.T("sub.updated_toast")
+		m.noticeTicks = autoRefreshNoticeTicks
+		return m, sub.FetchSubs(m.profileSvc)
+
+	case messages.SubFetchErrorMsg:
+		m.err = msg
+		m.notice = ""
+		m.noticeTicks = 0
+
+	case messages.SubActivatedMsg:
+		if msg.Err != nil {
+			m.err = messages.ErrMsg{Err: msg.Err}
+			m.notice = ""
+			m.noticeTicks = 0
+			return m, nil
+		}
+		notice := i18n.T("sub.activated_toast")
+		if msg.MergeErr != nil {
+			notice = i18n.T("sub.activated_merge_warn_toast")
+		}
+		m.notice = notice
+		m.noticeTicks = autoRefreshNoticeTicks
+		// 刷新订阅列表（更新激活态）+ 刷新节点信息（配置已重载）
+		return m, tea.Batch(
+			sub.FetchSubs(m.profileSvc),
+			nodes.FetchGroups(m.client),
+			nodes.FetchProxies(m.client),
+		)
+
+	case messages.SubMergeSavedMsg:
+		m.notice = i18n.T("sub.merge_saved_toast")
+		m.noticeTicks = autoRefreshNoticeTicks
+
+	case messages.SubMergeSaveErrorMsg:
+		m.err = msg
+		m.notice = ""
+		m.noticeTicks = 0
+
+	case sub.MergeLoadedMsg:
+		// merge 编辑器内容已异步加载，回填到编辑器状态
+		m.subState = m.subState.HandleMergeLoaded(msg.UID, msg.Data, msg.Err)
 	}
 
 	return m, nil
@@ -421,6 +495,9 @@ func (m Model) dispatchKeyToPage(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case layout.PageRules:
 		m.rulesState, cmd = m.rulesState.Update(msg, m.client)
+
+	case layout.PageSub:
+		m.subState, cmd = m.subState.Update(msg, m.profileSvc)
 
 	case layout.PageSettings:
 		var newCfg, proxyAddr = m.config, ""
@@ -460,6 +537,8 @@ func (m *Model) onPageChange() tea.Cmd {
 		return logsTick()
 	case layout.PageRules:
 		return rules.FetchRules(m.client)
+	case layout.PageSub:
+		return sub.FetchSubs(m.profileSvc)
 	case layout.PageSettings:
 		return settings.FetchMihomoVersion(m.client)
 	}
@@ -473,6 +552,8 @@ func (m *Model) refreshCurrentPage() tea.Cmd {
 		return tea.Batch(nodes.FetchGroups(m.client), nodes.FetchProxies(m.client))
 	case layout.PageRules:
 		return rules.FetchRules(m.client)
+	case layout.PageSub:
+		return sub.FetchSubs(m.profileSvc)
 	case layout.PageSettings:
 		cfg, _ := m.configSvc.LoadConfig()
 		m.config = cfg
@@ -514,6 +595,8 @@ func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
 		m.logsState = m.logsState.HandleMouseScroll(up)
 	case layout.PageRules:
 		m.rulesState = m.rulesState.HandleMouseScroll(up)
+	case layout.PageSub:
+		m.subState = m.subState.HandleMouseScroll(up)
 	case layout.PageSettings:
 		m.settingsState = m.settingsState.HandleMouseScroll(up)
 	}
@@ -551,6 +634,17 @@ func (m Model) handleRulesMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	m.rulesState, cmd = m.rulesState.HandleMouseLeft(pageX, pageY, pageWidth, pageHeight, m.client)
+	return m, cmd
+}
+
+func (m Model) handleSubMouseLeft(x, y int) (tea.Model, tea.Cmd) {
+	pageX, pageY, pageWidth, pageHeight, ok := m.resolveMainPageMouseHit(x, y)
+	if !ok {
+		return m, nil
+	}
+
+	var cmd tea.Cmd
+	m.subState, cmd = m.subState.HandleMouseLeft(pageX, pageY, pageWidth, pageHeight, m.profileSvc)
 	return m, cmd
 }
 
@@ -622,6 +716,8 @@ func (m Model) isInputCapturing() bool {
 		return m.logsState.FilterMode()
 	case layout.PageRules:
 		return m.rulesState.FilterMode() || m.rulesState.ShowTypeFilter() || m.rulesState.ShowAddForm() || m.rulesState.ShowDeleteConfirm()
+	case layout.PageSub:
+		return m.subState.Querying()
 	case layout.PageSettings:
 		return m.settingsState.IsEditing()
 	}
