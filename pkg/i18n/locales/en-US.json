@@ -435,6 +435,7 @@
   "sub.stats_filtered": " (filtered from %d)",
   "sub.stats_remote": "%d remote",
   "sub.badge_active": "active",
+  "sub.updating": "updating",
   "sub.never_updated": "never updated",
   "sub.time_just_now": "just now",
   "sub.time_minutes_ago": "%d min ago",

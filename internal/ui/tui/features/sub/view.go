@@ -47,6 +47,7 @@ type PageState struct {
 	MergeEditor    mergeEditor
 	ShowDeleteConf bool
 	DeleteUID      string
+	UpdatingUID    string
 }
 
 // RenderSubPage 渲染订阅页。
@@ -183,7 +184,7 @@ func renderList(state PageState, maxLines int) string {
 			continue
 		}
 		p := state.Subs[subIdx]
-		lines = append(lines, renderSubEntry(p, i+1, subIdx==0, p.UID == state.ActiveUID, i == state.Selected, listWidth))
+		lines = append(lines, renderSubEntry(p, i+1, subIdx==0, p.UID == state.ActiveUID, p.UID == state.UpdatingUID, i == state.Selected, listWidth))
 	}
 	listStr := strings.Join(lines, "\n")
 
@@ -215,7 +216,7 @@ func renderList(state PageState, maxLines int) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, fixedList, styledBar)
 }
 
-func renderSubEntry(p profile.Profile, seq int, _, isActive, selected bool, width int) string {
+func renderSubEntry(p profile.Profile, seq int, _, isActive, isUpdating, selected bool, width int) string {
 	// 激活标记
 	var mark string
 	if isActive {
@@ -234,6 +235,11 @@ func renderSubEntry(p profile.Profile, seq int, _, isActive, selected bool, widt
 	var badge string
 	if isActive {
 		badge = " " + lipgloss.NewStyle().Foreground(common.TokyoGreen()).Render("["+i18n.T("sub.badge_active")+"]")
+	}
+
+	var updatingBadge string
+	if isUpdating {
+		updatingBadge = " " + lipgloss.NewStyle().Foreground(common.TokyoCyan()).Render("["+i18n.T("sub.updating")+"]")
 	}
 
 	// 类型
@@ -257,7 +263,7 @@ func renderSubEntry(p profile.Profile, seq int, _, isActive, selected bool, widt
 	// 更新时间
 	timeStr := lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render(relativeTime(p.UpdatedAt))
 
-	line := fmt.Sprintf("%s%s %s%s %s %s %s", mark, indexStr, nameStr, badge, kindStr, srcStr, timeStr)
+	line := fmt.Sprintf("%s%s %s%s %s %s %s%s", mark, indexStr, nameStr, badge, kindStr, srcStr, timeStr, updatingBadge)
 	if selected {
 		line = lipgloss.NewStyle().Background(common.Highlight()).Render(common.SymbolSelectActive + line)
 	} else {

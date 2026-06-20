@@ -442,6 +442,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg
 		m.notice = ""
 		m.noticeTicks = 0
+		m.subState = m.subState.ClearUpdating()
 
 	case messages.SubActivatedMsg:
 		if msg.Err != nil {

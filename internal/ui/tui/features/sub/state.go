@@ -54,6 +54,8 @@ type State struct {
 	// 鼠标双击检测
 	lastMouseIdx int
 	lastMouseAt  time.Time
+
+	updatingUID string // 当前正在更新的订阅 UID
 }
 
 // FilterEngine 订阅搜索匹配引擎（与 rules 页一致语义）。
@@ -84,6 +86,7 @@ func (s State) ToPageState(width, height int) PageState {
 		MergeEditor:    s.mergeEditor,
 		ShowDeleteConf: s.showDeleteConf,
 		DeleteUID:      s.deleteUID,
+		UpdatingUID:    s.updatingUID,
 	}
 }
 
@@ -112,6 +115,7 @@ func (s State) Querying() bool {
 func (s State) ApplySubs(subs []profile.Profile, active string) State {
 	s.subs = subs
 	s.activeUID = active
+	s.updatingUID = "" // 清理更新状态
 	if cap(s.filteredIdx) < len(subs) {
 		s.filteredIdx = make([]int, 0, len(subs))
 	}
@@ -262,7 +266,14 @@ func (s State) updateSelected(svc *service.ProfileService) (State, tea.Cmd) {
 		return s, nil
 	}
 	uid := s.subs[s.filteredIdx[s.selected]].UID
+	s.updatingUID = uid
 	return s, UpdateSubCmd(svc, uid)
+}
+
+// ClearUpdating 清除正在更新的订阅标记。
+func (s State) ClearUpdating() State {
+	s.updatingUID = ""
+	return s
 }
 
 // openMergeEditor 打开当前选中订阅的 merge 编辑器（先异步载入内容）。
