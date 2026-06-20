@@ -284,6 +284,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg
 		m.notice = ""
 		m.noticeTicks = 0
+	
+	case messages.RuleEditedMsg:
+		// 规则已修改：热重载核心 + 刷新规则列表 + 显示成功提示
+		m.notice = i18n.T("rules.edit_toast")
+		m.noticeTicks = autoRefreshNoticeTicks
+		return m, reloadConfigCmd(m.client)
+	
+	case messages.RuleEditErrorMsg:
+		// 修改失败：沿用全局错误显示
+		m.err = msg
+		m.notice = ""
+		m.noticeTicks = 0
 
 	case messages.ConfigEditFinishedMsg:
 		// 外部编辑器结束：失败沿用全局错误显示；成功热重载核心（随后刷新规则列表）

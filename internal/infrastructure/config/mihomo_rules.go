@@ -138,6 +138,91 @@ func DeleteRule(configPath, ruleType, payload, proxy string, noResolve bool) err
 	return atomicWriteFile(configPath, out, 0644)
 }
 
+// ReplaceRule 替换配置文件中的一条规则：先删除匹配的旧规则，再插入新规则。
+//
+// oldType/oldPayload/oldProxy/oldNoResolve 为旧规则的匹配键（与 DeleteRule 语义一致），
+// newRule 为新规则字符串（如 "DOMAIN-SUFFIX,new.com,PROXY"），
+// newIndex 为 1-based 插入位置（删除旧规则后插入新规则的位置），
+// newIndex <= 0 表示插入到顶部。
+//
+// 若旧规则未找到则返回 errRuleNotFound；删除成功但写入失败时返回写入错误。
+// 注释安全：使用 yaml.Node 操作并原子写回。
+func ReplaceRule(configPath, oldType, oldPayload, oldProxy string, oldNoResolve bool, newRule string, newIndex int) error {
+	if newRule == "" {
+		return fmt.Errorf("规则内容不能为空")
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("读取配置文件失败: %w", err)
+	}
+	if len(bytesTrimSpace(data)) == 0 {
+		return errRuleNotFound
+	}
+
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return fmt.Errorf("解析配置文件失败: %w", err)
+	}
+	root := mappingRoot(&doc)
+	if root == nil {
+		return errRuleNotFound
+	}
+	seq := findRulesSequence(root)
+	if seq == nil {
+		return errRuleNotFound
+	}
+
+	// 1. 删除旧规则
+	targetKey, targetNR := parseRuleLine(canonicalRuleLine(oldType, oldPayload, oldProxy, oldNoResolve))
+	if targetKey == "" {
+		return errRuleNotFound
+	}
+
+	removed := false
+	removedIdx := 0 // 0-based 累计位置（用于确定删除后在何处插入）
+	n := 0
+	for i, item := range seq.Content {
+		if !removed && item.Kind == yaml.ScalarNode {
+			if k, nr := parseRuleLine(item.Value); k == targetKey && nr == targetNR {
+				removed = true
+				removedIdx = i
+				continue
+			}
+			}
+		seq.Content[n] = item
+		n++
+	}
+	seq.Content = seq.Content[:n]
+	if !removed {
+		return errRuleNotFound
+	}
+
+	// 2. 插入新规则
+	insertAt := normalizeInsertIndex(newIndex, len(seq.Content))
+	// 若 newIndex 未指定（<=0），且旧规则有有效位置，保持原位
+	if newIndex <= 0 && removedIdx > 0 {
+		// 删除后原位可能需要调整（删除元素后的位置偏移）
+		if insertAt == 0 {
+			if removedIdx <= len(seq.Content) {
+				insertAt = removedIdx
+			} else {
+				insertAt = len(seq.Content)
+			}
+		}
+	}
+	newItem := &yaml.Node{Kind: yaml.ScalarNode, Tag: strTagPlain, Value: newRule}
+	seq.Content = append(seq.Content, nil)
+	copy(seq.Content[insertAt+1:], seq.Content[insertAt:])
+	seq.Content[insertAt] = newItem
+
+	out, err := marshalYAML(&doc)
+	if err != nil {
+		return fmt.Errorf("序列化配置文件失败: %w", err)
+	}
+	return atomicWriteFile(configPath, out, 0644)
+}
+
 // errRuleNotFound 表示目标规则未出现在配置文件的 rules 列表中。
 // 常见原因：规则由 rule-provider 注入，无法通过编辑配置文件删除。
 var errRuleNotFound = fmt.Errorf("规则未在配置文件中找到（可能来自 rule-provider）")

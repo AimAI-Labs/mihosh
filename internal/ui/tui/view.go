@@ -109,6 +109,7 @@ func (m Model) buildHelpContext() help.HelpContext {
 		RulesTypeFilter:     m.rulesState.ShowTypeFilter(),
 		RulesFilter:         m.rulesState.FilterMode(),
 		RulesDeleteConfirm:  m.rulesState.ShowDeleteConfirm(),
+			RulesEditForm:      m.rulesState.ShowEditForm(),
 		SettingsEdit:       m.settingsState.IsEditing(),
 		SettingsLanguage:   m.settingsState.IsLanguageSelected(),
 		SettingsTheme:      m.settingsState.IsThemeSelected(),

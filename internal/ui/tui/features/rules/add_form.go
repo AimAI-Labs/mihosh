@@ -1,11 +1,13 @@
 package rules
 
 import (
+	"fmt"
 	"net/netip"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -57,7 +59,18 @@ const (
 	addFieldCount     = 5 // 字段数
 )
 
-// addForm 维护「添加自定义规则」弹窗的表单状态。
+// editOrigin 保存编辑模式下原始规则的所有信息。
+// 提交时需要先删除旧规则再插入新规则（ReplaceRule），
+// 因此需要完整的原始键用于匹配删除。
+type editOrigin struct {
+	ruleType  string // 原始规则类型（配置文件格式，如 DOMAIN-SUFFIX）
+	payload   string // 原始 payload
+	proxy     string // 原始策略
+	noResolve bool   // 原始 no-resolve 标记
+	origIndex int    // 原始规则在 rules 列表中的 0-based 索引（用于位置回填）
+}
+
+// addForm 维护「添加/编辑自定义规则」弹窗的表单状态。
 //
 // textinput.Model 为值类型，State 在 Bubble Tea 中按值传递，每次更新都会
 // 复制整个 form；因此本结构的方法均以值接收者返回新值。
@@ -68,6 +81,10 @@ const (
 // 布局高度一致，其值不参与提交。
 // addFieldType / addFieldNoResolve 同样为只读选择器/复选框，槽位保留占位
 // textinput.Model 以避免 Focus() 空指针。
+//
+// isEdit 为 true 时表示当前处于编辑模式（修改已有规则而非新增）。
+// editOrigin 保存原始规则的完整信息，提交时走 ReplaceRule（删旧+插新）。
+// 位置字段在编辑模式下预填充为原始索引+1，但用户可修改插入位置。
 type addForm struct {
 	fields      []textinput.Model // length == addFieldCount；type/proxy/noResolve 槽为占位
 	fieldCursor int               // 当前聚焦字段
@@ -88,6 +105,10 @@ type addForm struct {
 	// no-resolve：仅 IP-CIDR/IP-CIDR6/SRC-IP-CIDR 类型可见
 	noResolve bool
 
+	// 编辑模式：isEdit=true 时表示修改已有规则
+	isEdit      bool       // 是否为编辑模式
+	editOrigin  editOrigin // 原始规则信息（仅编辑模式有意义）
+
 	errMsg string // 行内校验/写入错误
 }
 
@@ -96,6 +117,20 @@ type addForm struct {
 // 内置 DIRECT/REJECT）。proxySelected 默认 DIRECT。默认焦点在 payload（最常用
 // 操作为输入匹配值）。
 func newAddForm(configPath string) addForm {
+	return newFormWithRule(configPath, model.Rule{}, -1, false)
+}
+
+// newEditForm 构造编辑模式表单：预填充已有规则的值。
+// rule 为原始规则数据，origIndex 为其在 rules 列表中的 0-based 索引。
+// 类型选择器定位到原始类型，payload/proxy/noResolve 回填原始值。
+// 位置字段预填充为 origIndex+1（保持原位），用户可修改。
+func newEditForm(configPath string, rule model.Rule, origIndex int) addForm {
+	return newFormWithRule(configPath, rule, origIndex, true)
+}
+
+// newFormWithRule 构造表单的通用入口：add 模式传空 rule + origIndex=-1，
+// edit 模式传原始规则 + origIndex。
+func newFormWithRule(configPath string, rule model.Rule, origIndex int, isEdit bool) addForm {
 	fields := make([]textinput.Model, addFieldCount)
 
 	// type 槽位保留 textinput.Model 仅作占位，实际值由 typeCursor + cycleType 切换。
@@ -136,9 +171,32 @@ func newAddForm(configPath string) addForm {
 		proxyGroups:   groups,
 		proxyNodes:    nodes,
 		proxySelected: defaultProxyPolicy,
+		isEdit:        isEdit,
 	}
-	// 默认类型选择 DOMAIN-SUFFIX
-	form.typeCursor = indexOfPreset("DOMAIN-SUFFIX")
+
+	if isEdit && rule.Type != "" {
+		// 预填充原始规则值
+		normalizedType := normalizeRuleType(rule.Type)
+		form.typeCursor = indexOfPreset(normalizedType)
+		form.proxySelected = rule.Proxy
+		form.noResolve = rule.NoResolve
+		form.fields[addFieldPayload].SetValue(rule.Payload)
+		// 编辑模式：位置预填充为原索引+1（保持原位），不填则默认原位
+		if origIndex >= 0 {
+			form.fields[addFieldIndex].SetValue(fmt.Sprintf("%d", origIndex+1))
+		}
+		form.editOrigin = editOrigin{
+			ruleType:  normalizedType,
+			payload:   rule.Payload,
+			proxy:     rule.Proxy,
+			noResolve: rule.NoResolve,
+			origIndex: origIndex,
+		}
+	} else {
+		// 添加模式：默认类型 DOMAIN-SUFFIX
+		form.typeCursor = indexOfPreset("DOMAIN-SUFFIX")
+	}
+
 	form.focusCurrent()
 	return form
 }

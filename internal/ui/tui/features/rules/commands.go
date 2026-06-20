@@ -90,6 +90,24 @@ func DeleteRuleCmd(configPath, ruleType, payload, proxy string, noResolve bool) 
 	}
 }
 
+// EditRuleCmd 修改一条自定义规则：先删除旧规则再插入新规则（ReplaceRule）。
+//
+// oldType/oldPayload/oldProxy/oldNoResolve 为旧规则的匹配键。
+// newType/newPayload/newProxy 为新规则值。
+// newIndex 为 1-based 插入位置。
+// newNoResolve 为新规则是否带 no-resolve。
+// 成功返回 RuleEditedMsg，未匹配或写盘失败返回 RuleEditErrorMsg。
+func EditRuleCmd(configPath, oldType, oldPayload, oldProxy string, oldNoResolve bool,
+	newType, newPayload, newProxy string, newIndex int, newNoResolve bool) tea.Cmd {
+	newRule := buildRuleLine(newType, newPayload, newProxy, newNoResolve)
+	return func() tea.Msg {
+		if err := config.ReplaceRule(configPath, oldType, oldPayload, oldProxy, oldNoResolve, newRule, newIndex); err != nil {
+			return messages.RuleEditErrorMsg{Err: err}
+		}
+		return messages.RuleEditedMsg{}
+	}
+}
+
 // buildRuleLine 按 Mihomo 源格式 `TYPE,PAYLOAD,PROXY` 组装规则字符串。
 // MATCH 类型无需 payload，输出 `MATCH,PROXY`。
 // noResolve 为 true 时在规则末尾追加 `,no-resolve`。

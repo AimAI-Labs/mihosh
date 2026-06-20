@@ -53,10 +53,14 @@ type State struct {
 	addForm     addForm // 表单状态（仅 showAddForm 为 true 时有意义）
 	configPath  string  // 当前 Mihomo 配置文件路径（由主 Model 注入）
 
-	// 删除规则确认弹窗状态
+ // 删除规则确认弹窗状态
 	showDeleteConfirm bool        // 是否显示删除确认弹窗
 	deleteTarget      model.Rule  // 待删除规则快照（仅 showDeleteConfirm 为 true 时有意义）
 	deleteTargetIndex int         // 待删除规则在 rules 列表中的原始索引（用于展示序号）
+
+	// 编辑规则弹窗状态
+	showEditForm        bool       // 是否显示编辑规则弹窗
+	editOriginIndex     int        // 原始规则在 rules 列表中的 0-based 索引
 
 	ColorAdjustLight float64 // 0.2-0.4 建议明度增加比例
 	ColorAdjustDark  float64 // 0.15-0.25 建议明度降低比例
@@ -88,6 +92,9 @@ func (s State) ToPageState(width, height int) PageState {
 		ShowDeleteConfirm: s.showDeleteConfirm,
 		DeleteTarget:      s.deleteTarget,
 		DeleteTargetIndex: s.deleteTargetIndex,
+		// 编辑规则弹窗状态
+		ShowEditForm:    s.showEditForm,
+		EditOriginIndex: s.editOriginIndex,
 	}
 }
 
@@ -99,6 +106,11 @@ func (s State) SetConfigPath(path string) State {
 
 // Update 处理规则页面按键
 func (s State) Update(msg tea.KeyMsg, client *api.Client) (State, tea.Cmd) {
+	// 编辑规则弹窗优先拦截（吞掉所有按键）
+	if s.showEditForm {
+		return s.handleEditFormMode(msg)
+	}
+
 	// 添加规则弹窗优先拦截（吞掉所有按键）
 	if s.showAddForm {
 		return s.handleAddFormMode(msg)
@@ -150,6 +162,10 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client) (State, tea.Cmd) {
 		// 打开删除确认弹窗（针对当前选中规则）
 		return s.openDeleteConfirm()
 
+	case key.Matches(msg, common.Keys.Enter):
+		// Enter 打开编辑规则弹窗（针对当前选中规则）
+		return s.openEditForm()
+	
 	case msg.String() == "e":
 		// 在外部编辑器中打开配置文件
 		return s.openConfigEditor()
@@ -207,6 +223,9 @@ func (s State) ShowAddForm() bool { return s.showAddForm }
 
 // ShowDeleteConfirm 返回是否显示删除规则确认弹窗
 func (s State) ShowDeleteConfirm() bool { return s.showDeleteConfirm }
+
+// ShowEditForm 返回是否显示编辑规则弹窗
+func (s State) ShowEditForm() bool { return s.showEditForm }
 
 // FilterMode 返回是否处于规则过滤模式
 func (s State) FilterMode() bool { return s.ruleFilterMode }
@@ -274,10 +293,37 @@ func (s State) openDeleteConfirm() (State, tea.Cmd) {
 	if origIdx < 0 || origIdx >= len(s.rules) {
 		return s, nil
 	}
-	s.showDeleteConfirm = true
-	s.deleteTarget = s.rules[origIdx]
-	s.deleteTargetIndex = origIdx
-	return s, nil
+	return s.openDeleteConfirmForIndex(origIdx)
+}
+
+// openDeleteConfirmForIndex 针对指定原始索引打开删除确认弹窗（鼠标双击复用）。
+func (s State) openDeleteConfirmForIndex(origIdx int) (State, tea.Cmd) {
+	if origIdx < 0 || origIdx >= len(s.rules) {
+		return s, nil
+	}
+	return State{
+		rules:               s.rules,
+		filteredRuleIndices: s.filteredRuleIndices,
+		ruleFilter:          s.ruleFilter,
+		ruleFilterMode:      s.ruleFilterMode,
+		FilterEngine:        s.FilterEngine,
+		selectedRule:        s.selectedRule,
+		ruleScrollTop:       s.ruleScrollTop,
+		showTypeFilter:      s.showTypeFilter,
+		selectedTypes:       s.selectedTypes,
+		availableTypes:      s.availableTypes,
+		typeFilterCursor:    s.typeFilterCursor,
+		showAddForm:         s.showAddForm,
+		addForm:             s.addForm,
+		configPath:          s.configPath,
+		showDeleteConfirm:   true,
+		deleteTarget:        s.rules[origIdx],
+		deleteTargetIndex:   origIdx,
+		showEditForm:        s.showEditForm,
+		editOriginIndex:     s.editOriginIndex,
+		ColorAdjustLight:    s.ColorAdjustLight,
+		ColorAdjustDark:     s.ColorAdjustDark,
+	}, nil
 }
 
 // handleDeleteConfirmMode 处理删除确认弹窗按键（吞掉所有按键）。
@@ -702,6 +748,50 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		return s, nil
 	}
 
+	// 编辑规则弹窗打开时
+	if s.showEditForm {
+		// 策略选择二级弹窗优先处理
+		if s.addForm.isProxyPickerOpen() {
+			pageState := s.ToPageState(pageWidth, pageHeight)
+			pLeft, pTop, pRight, pBottom := ResolveProxyPickerBounds(pageState, pageWidth, pageHeight)
+			if !(pageX >= pLeft && pageX < pRight && pageY >= pTop && pageY < pBottom) {
+				form := s.addForm
+				form.pickerClose()
+				return s.applyEditFormUpdate(form)
+			}
+			idx := ResolveProxyPickerListItemAt(pageState, pageX, pageY, pageWidth, pageHeight)
+			if idx < 0 {
+				return s, nil
+			}
+			form := s.addForm
+			now := time.Now()
+			isDouble := s.isProxyPickerDoubleClick(idx, now)
+			form.pickerCursor = idx
+			if isDouble {
+				filtered := form.pickerFiltered()
+				if idx < len(filtered) {
+					form.pickerChoose(filtered[idx])
+				}
+			}
+			return s.applyEditFormUpdate(form)
+		}
+
+		pageState := PageState{
+			ShowEditForm: s.showEditForm,
+			AddForm:      s.addForm,
+			Width:        pageWidth,
+			Height:       pageHeight,
+		}
+		left, top, right, bottom := ResolveEditFormBounds(pageState, pageWidth, pageHeight)
+		if !(pageX >= left && pageX < right && pageY >= top && pageY < bottom) {
+			// 点击边框外：取消关闭
+			s.showEditForm = false
+			s.addForm = addForm{}
+			s.editOriginIndex = 0
+		}
+		return s, nil
+	}
+
 	// 仅在类型筛选弹窗打开时处理鼠标点击
 	if !s.showTypeFilter {
 		return s, nil
@@ -768,9 +858,36 @@ func (s *State) isProxyPickerDoubleClick(idx int, now time.Time) bool {
 	isDouble := idx == s.lastProxyPickerClickIdx &&
 		!s.lastProxyPickerClickAt.IsZero() &&
 		now.Sub(s.lastProxyPickerClickAt) <= rulesDoubleClickThreshold
-	s.lastProxyPickerClickIdx = idx
+ s.lastProxyPickerClickIdx = idx
 	s.lastProxyPickerClickAt = now
 	return isDouble
+}
+
+// applyEditFormUpdate 将更新后的 addForm 应用到 State，保留其他字段不变。
+func (s State) applyEditFormUpdate(form addForm) (State, tea.Cmd) {
+	return State{
+		rules:               s.rules,
+		filteredRuleIndices: s.filteredRuleIndices,
+		ruleFilter:          s.ruleFilter,
+		ruleFilterMode:      s.ruleFilterMode,
+		FilterEngine:        s.FilterEngine,
+		selectedRule:        s.selectedRule,
+		ruleScrollTop:       s.ruleScrollTop,
+		showTypeFilter:      s.showTypeFilter,
+		selectedTypes:       s.selectedTypes,
+		availableTypes:      s.availableTypes,
+		typeFilterCursor:    s.typeFilterCursor,
+		showAddForm:         s.showAddForm,
+		addForm:             form,
+		configPath:          s.configPath,
+		showDeleteConfirm:   s.showDeleteConfirm,
+		deleteTarget:        s.deleteTarget,
+		deleteTargetIndex:   s.deleteTargetIndex,
+		showEditForm:        s.showEditForm,
+		editOriginIndex:     s.editOriginIndex,
+		ColorAdjustLight:    s.ColorAdjustLight,
+		ColorAdjustDark:     s.ColorAdjustDark,
+	}, nil
 }
 
 // extractAvailableTypes 从规则中提取所有可用的规则类型
@@ -806,4 +923,160 @@ func removeString(slice []string, target string) []string {
 		}
 	}
 	return result
+}
+
+// openEditForm 针对当前选中规则打开编辑弹窗。
+// 列表为空时直接忽略。编辑弹窗使用 newEditForm 预填充原始规则值。
+func (s State) openEditForm() (State, tea.Cmd) {
+	if len(s.filteredRuleIndices) == 0 || s.selectedRule < 0 || s.selectedRule >= len(s.filteredRuleIndices) {
+		return s, nil
+	}
+	origIdx := s.filteredRuleIndices[s.selectedRule]
+	if origIdx < 0 || origIdx >= len(s.rules) {
+		return s, nil
+	}
+	return s.openEditFormForIndex(origIdx)
+}
+
+// openEditFormForIndex 针对指定原始索引打开编辑弹窗（鼠标双击复用）。
+func (s State) openEditFormForIndex(origIdx int) (State, tea.Cmd) {
+	if origIdx < 0 || origIdx >= len(s.rules) {
+		return s, nil
+	}
+	form := newEditForm(s.configPath, s.rules[origIdx], origIdx)
+	return State{
+		rules:               s.rules,
+		filteredRuleIndices: s.filteredRuleIndices,
+		ruleFilter:          s.ruleFilter,
+		ruleFilterMode:      s.ruleFilterMode,
+		FilterEngine:        s.FilterEngine,
+		selectedRule:        s.selectedRule,
+		ruleScrollTop:       s.ruleScrollTop,
+		showTypeFilter:      s.showTypeFilter,
+		selectedTypes:       s.selectedTypes,
+		availableTypes:      s.availableTypes,
+		typeFilterCursor:    s.typeFilterCursor,
+		showAddForm:         false,
+		addForm:             form,
+		configPath:          s.configPath,
+		showDeleteConfirm:   false,
+		deleteTarget:        model.Rule{},
+		deleteTargetIndex:   0,
+		showEditForm:        true,
+		editOriginIndex:     origIdx,
+		ColorAdjustLight:    s.ColorAdjustLight,
+		ColorAdjustDark:     s.ColorAdjustDark,
+	}, nil
+}
+
+// handleEditFormMode 处理编辑规则弹窗按键（吞掉所有按键）。
+// 逻辑与 handleAddFormMode 完全相同（复用 addForm），仅在提交时：
+//   - 调用 EditRuleCmd（ReplaceRule：删旧+插新）而非 AddRuleCmd。
+func (s State) handleEditFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
+	form := s.addForm
+
+	// 策略选择二级弹窗优先拦截（吞掉所有键）
+	if form.isProxyPickerOpen() {
+		return s.handleProxyPickerMode(msg)
+	}
+
+	switch {
+	case key.Matches(msg, common.Keys.Escape):
+		// 取消编辑，关闭弹窗
+		s.showEditForm = false
+		s.addForm = addForm{}
+		s.editOriginIndex = 0
+		return s, nil
+
+	case key.Matches(msg, common.Keys.Enter):
+		// 策略行聚焦时 Enter 打开二级弹窗，不提交
+		if form.isProxyField() {
+			form.openProxyPicker()
+			s.addForm = form
+			return s, nil
+		}
+		ok, errKey := form.validate()
+		if !ok {
+			form.errMsg = i18n.T(errKey)
+			s.addForm = form
+			return s, nil
+		}
+		// 校验通过：发起编辑命令（ReplaceRule：删旧+插新），重置弹窗
+		submit := form
+		s.showEditForm = false
+		s.addForm = addForm{}
+		s.editOriginIndex = 0
+		cmd := EditRuleCmd(
+			s.configPath,
+			submit.editOrigin.ruleType,
+			submit.editOrigin.payload,
+			submit.editOrigin.proxy,
+			submit.editOrigin.noResolve,
+			submit.currentType(),
+			submit.fields[addFieldPayload].Value(),
+			submit.currentProxy(),
+			submit.resolveIndex(),
+			submit.noResolve,
+		)
+		return s, cmd
+
+	case msg.String() == "tab":
+		form.cycleField(1)
+
+	case msg.String() == "shift+tab":
+		form.cycleField(-1)
+
+	case key.Matches(msg, common.Keys.Up):
+		form.cycleField(-1)
+
+	case key.Matches(msg, common.Keys.Down):
+		form.cycleField(1)
+
+	case key.Matches(msg, common.Keys.Left):
+		switch {
+		case form.isTypeField():
+			form.cycleType(-1)
+		case form.isProxyField(), form.isNoResolveField():
+			// 只读字段，忽略
+		default:
+			updated, cmd := form.fields[form.fieldCursor].Update(msg)
+			form.fields[form.fieldCursor] = updated
+			form.errMsg = ""
+			s.addForm = form
+			return s, cmd
+		}
+
+	case key.Matches(msg, common.Keys.Right):
+		switch {
+		case form.isTypeField():
+			form.cycleType(1)
+		case form.isProxyField(), form.isNoResolveField():
+			// 只读字段，忽略
+		default:
+			updated, cmd := form.fields[form.fieldCursor].Update(msg)
+			form.fields[form.fieldCursor] = updated
+			form.errMsg = ""
+			s.addForm = form
+			return s, cmd
+		}
+
+	case msg.String() == " ":
+		if form.isNoResolveField() {
+			form.toggleNoResolve()
+		}
+
+	default:
+		if form.isProxyField() || form.isNoResolveField() || !isTextInputKey(msg) {
+			break
+		}
+		cur := form.fields[form.fieldCursor]
+		updated, cmd := cur.Update(msg)
+		form.fields[form.fieldCursor] = updated
+		form.errMsg = ""
+		s.addForm = form
+		return s, cmd
+	}
+
+	s.addForm = form
+	return s, nil
 }

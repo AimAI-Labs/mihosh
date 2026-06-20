@@ -82,10 +82,14 @@ type PageState struct {
 	ShowAddForm bool    // 是否显示添加规则弹窗
 	AddForm     addForm // 表单状态快照
 
-	// 删除确认弹窗状态
+ // 删除确认弹窗状态
 	ShowDeleteConfirm bool       // 是否显示删除确认弹窗
 	DeleteTarget      model.Rule // 待删除规则快照
 	DeleteTargetIndex int        // 待删除规则原始索引（用于显示序号）
+
+	// 编辑规则弹窗状态
+	ShowEditForm    bool // 是否显示编辑规则弹窗
+	EditOriginIndex int  // 原始规则在 rules 列表中的原始索引
 }
 
 // RenderRulesPage 渲染规则页面
@@ -144,6 +148,16 @@ func RenderRulesPage(state PageState) string {
 	if state.ShowDeleteConfirm {
 		result = renderDeleteConfirmOverlay(result, state, state.Width, state.Height)
 	}
+	
+	// 如果显示编辑规则弹窗，叠加在所有弹窗之上
+	if state.ShowEditForm {
+		result = renderEditRuleOverlay(result, state, state.Width, state.Height)
+	}
+	
+	// 如果策略选择二级弹窗已打开（编辑模式），叠加在编辑弹窗之上
+	if state.ShowEditForm && state.AddForm.isProxyPickerOpen() {
+		result = renderProxyPickerOverlay(result, state, state.Width, state.Height)
+	}
 
 	return renderRulesInlineHelp(result, state)
 }
@@ -166,6 +180,16 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 			{Key: "Esc", Desc: i18n.T("help.rules_add.picker_back")},
 		}
 	}
+	
+	// 策略选择二级弹窗（编辑模式）：与添加模式共用相同的提示
+	if state.ShowEditForm && state.AddForm.isProxyPickerOpen() {
+		return []common.InlineHelpHint{
+			{Key: "Tab", Desc: i18n.T("help.rules_add.picker_tab")},
+			{Key: "↑/↓", Desc: i18n.T("help.rules_add.picker_pick")},
+			{Key: "Enter", Desc: i18n.T("help.rules_add.confirm")},
+			{Key: "Esc", Desc: i18n.T("help.rules_add.picker_back")},
+		}
+	}
 
 	// 删除确认弹窗：确认删除 + 取消
 	if state.ShowDeleteConfirm {
@@ -177,6 +201,16 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 
 	// 添加规则弹窗：类型切换（横向 ◀▶）+ 字段切换（纵向）+ 确认 + 取消
 	if state.ShowAddForm {
+		return []common.InlineHelpHint{
+			{Key: "←/→", Desc: i18n.T("help.rules_add.type")},
+			{Key: "↑/↓", Desc: i18n.T("help.rules_add.field")},
+			{Key: "Enter", Desc: i18n.T("help.rules_add.confirm")},
+			{Key: "Esc", Desc: i18n.T("help.rules_add.cancel")},
+		}
+	}
+	
+	// 编辑规则弹窗：类型切换（横向 ◀▶）+ 字段切换（纵向）+ 确认 + 取消
+	if state.ShowEditForm {
 		return []common.InlineHelpHint{
 			{Key: "←/→", Desc: i18n.T("help.rules_add.type")},
 			{Key: "↑/↓", Desc: i18n.T("help.rules_add.field")},
@@ -208,6 +242,7 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 	// 普通模式：核心操作
 	return []common.InlineHelpHint{
 		{Key: "↑↓", Desc: i18n.T("help.rules.hint_select")},
+		{Key: "Enter", Desc: i18n.T("help.rules.hint_modify")},
 		{Key: "/", Desc: i18n.T("help.rules.hint_search")},
 		{Key: "t", Desc: i18n.T("help.rules.hint_type")},
 		{Key: "n", Desc: i18n.T("help.rules.hint_add")},

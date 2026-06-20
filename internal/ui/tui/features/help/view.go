@@ -47,6 +47,7 @@ type HelpContext struct {
 	RulesTypeFilter     bool // 类型筛选弹窗
 	RulesFilter         bool // 过滤输入
 	RulesDeleteConfirm  bool // 删除确认弹窗
+	RulesEditForm      bool // 编辑规则弹窗
 
 	// 设置页子状态
 	SettingsEdit     bool // 编辑模式
@@ -276,6 +277,20 @@ func buildRulesSections(ctx HelpContext) []section {
 				{"Esc / n", i18n.T("help.rules_delete.cancel")},
 			},
 		}}
+	}
+	
+	if ctx.RulesEditForm {
+		return []section{
+			{
+				title: i18n.T("rules.edit_title"),
+				bindings: []keybinding{
+					{"← / →", i18n.T("help.rules_add.type")},
+					{"↑ / ↓", i18n.T("help.rules_add.field")},
+					{"Enter", i18n.T("help.rules_add.confirm")},
+					{"Esc", i18n.T("help.rules_add.cancel")},
+				},
+			},
+		}
 	}
 
 	if ctx.RulesTypeFilter {

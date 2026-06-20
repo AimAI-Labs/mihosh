@@ -82,6 +82,14 @@ type RuleDeleteErrorMsg struct{ Err error }
 
 func (m RuleDeleteErrorMsg) Error() string { return m.Err.Error() }
 
+// RuleEditedMsg 规则已成功修改（调用方负责热重载与刷新）。
+type RuleEditedMsg struct{}
+
+// RuleEditErrorMsg 修改规则失败（未找到旧规则 / 写盘失败）。
+type RuleEditErrorMsg struct{ Err error }
+
+func (m RuleEditErrorMsg) Error() string { return m.Err.Error() }
+
 // ConfigReloadedMsg 调用 mihomo 核心 ReloadConfig 的结果。
 type ConfigReloadedMsg struct{ Err error }
 
