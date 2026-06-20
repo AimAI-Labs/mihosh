@@ -182,3 +182,37 @@ func TestRulesState_FilterInputAcceptsMultibyte(t *testing.T) {
 		t.Fatalf("expected filter text '搜', got %q", s.ruleFilter)
 	}
 }
+
+// TestRulesState_UpdateFilteredRules_IndexSearch 验证可以按序号搜索功能。
+func TestRulesState_UpdateFilteredRules_IndexSearch(t *testing.T) {
+	// 不包含数字的规则，这样序号搜索就不会和内容混淆
+	rules := []model.Rule{
+		{Type: "DOMAIN", Payload: "a.com", Proxy: "DIRECT"},
+		{Type: "DOMAIN-SUFFIX", Payload: "b.com", Proxy: "PROXY"},
+		{Type: "DOMAIN-KEYWORD", Payload: "c", Proxy: "REJECT"},
+		{Type: "DOMAIN", Payload: "d.net", Proxy: "PROXY"},
+	}
+
+	cases := []struct {
+		engine FilterEngine
+		query  string
+		want   int
+	}{
+		{FilterEngineSubstring, "1", 1},
+		{FilterEngineSubstring, "2", 1},
+		{FilterEngineSubstring, "4", 1},
+		{FilterEngineRegex, `3`, 1},
+		{FilterEngineRegex, `^2`, 0}, // ^2 不会匹配，因为序号不是在开头
+		{FilterEngineFuzzy, "4", 1},
+	}
+
+	for _, c := range cases {
+		s := State{rules: rules, ruleFilter: c.query}
+		s.FilterEngine = c.engine
+		s.updateFilteredRules()
+		if len(s.filteredRuleIndices) != c.want {
+			t.Fatalf("engine=%d query=%q: expected %d matches, got %d (indices: %v)",
+				c.engine, c.query, c.want, len(s.filteredRuleIndices), s.filteredRuleIndices)
+		}
+	}
+}

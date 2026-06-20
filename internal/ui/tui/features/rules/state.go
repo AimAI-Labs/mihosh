@@ -4,6 +4,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -603,6 +604,8 @@ func (s *State) updateFilteredRules() {
 			if rule.NoResolve {
 				searchText += " no-resolve"
 			}
+			// 序号也加入搜索文本（1-based）
+			searchText += " " + strconv.Itoa(i+1)
 			switch s.FilterEngine {
 			case FilterEngineRegex:
 				if re == nil || !re.MatchString(searchText) {
