@@ -192,6 +192,30 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client) (State, tea.Cmd) {
 
 // HandleMouseScroll 鼠标滚轮处理
 func (s State) HandleMouseScroll(up bool) State {
+	// 如果显示添加表单或编辑表单，滚动切换字段焦点
+	if s.showAddForm || s.showEditForm {
+		// 如果策略选择器打开，则滚动策略选择器的列表
+		if s.addForm.isProxyPickerOpen() {
+			form := s.addForm
+			if up {
+				form.movePickerCursor(-1)
+			} else {
+				form.movePickerCursor(1)
+			}
+			s.addForm = form
+			return s
+		}
+		// 否则滚动表单字段
+		form := s.addForm
+		if up {
+			form.cycleField(-1)
+		} else {
+			form.cycleField(1)
+		}
+		s.addForm = form
+		return s
+	}
+	// 否则滚动规则列表
 	count := len(s.filteredRuleIndices)
 	if up {
 		if s.selectedRule > 0 {
@@ -719,7 +743,30 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *
 			return s, nil
 		}
 
-		pageState := PageState{
+		// 检查是否点击了表单字段
+		pageState := s.ToPageState(pageWidth, pageHeight)
+		fieldIdx := ResolveFormFieldAt(pageState, pageX, pageY, pageWidth, pageHeight)
+		if fieldIdx >= 0 {
+			// 点击了表单字段，切换焦点
+			form := s.addForm
+			// 检查字段是否应该可见
+			shouldFocus := true
+			if fieldIdx == addFieldNoResolve && !form.isIPType() {
+				shouldFocus = false
+			}
+			if fieldIdx == addFieldPayload && form.isMatchType() {
+				shouldFocus = false
+			}
+			if shouldFocus {
+				form.fieldCursor = fieldIdx
+				form.focusCurrent()
+				s.addForm = form
+			}
+			return s, nil
+		}
+
+		// 点击在弹窗外：取消关闭
+		pageState = PageState{
 			ShowAddForm: s.showAddForm,
 			AddForm:     s.addForm,
 			Width:       pageWidth,
@@ -727,7 +774,6 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *
 		}
 		left, top, right, bottom := ResolveAddFormBounds(pageState, pageWidth, pageHeight)
 		if !(pageX >= left && pageX < right && pageY >= top && pageY < bottom) {
-			// 点击边框外：取消关闭
 			s.showAddForm = false
 			s.addForm = newAddForm(s.configPath)
 		}
@@ -780,7 +826,30 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *
 			return s.applyEditFormUpdate(form)
 		}
 
-		pageState := PageState{
+		// 检查是否点击了表单字段
+		pageState := s.ToPageState(pageWidth, pageHeight)
+		fieldIdx := ResolveFormFieldAt(pageState, pageX, pageY, pageWidth, pageHeight)
+		if fieldIdx >= 0 {
+			// 点击了表单字段，切换焦点
+			form := s.addForm
+			// 检查字段是否应该可见
+			shouldFocus := true
+			if fieldIdx == addFieldNoResolve && !form.isIPType() {
+				shouldFocus = false
+			}
+			if fieldIdx == addFieldPayload && form.isMatchType() {
+				shouldFocus = false
+			}
+			if shouldFocus {
+				form.fieldCursor = fieldIdx
+				form.focusCurrent()
+				s.addForm = form
+			}
+			return s, nil
+		}
+
+		// 点击在弹窗外：取消关闭
+		pageState = PageState{
 			ShowEditForm: s.showEditForm,
 			AddForm:      s.addForm,
 			Width:        pageWidth,
@@ -788,7 +857,6 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *
 		}
 		left, top, right, bottom := ResolveEditFormBounds(pageState, pageWidth, pageHeight)
 		if !(pageX >= left && pageX < right && pageY >= top && pageY < bottom) {
-			// 点击边框外：取消关闭
 			s.showEditForm = false
 			s.addForm = addForm{}
 			s.editOriginIndex = 0

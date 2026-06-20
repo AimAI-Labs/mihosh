@@ -160,3 +160,78 @@ func ResolveEditFormBounds(state PageState, width, height int) (left, top, right
 	bottom = top + modalHeight
 	return left, top, right, bottom
 }
+
+// ResolveFormFieldAt 判断页面坐标 (pageX, pageY) 命中的表单字段索引。
+// 返回 addFieldType/addFieldPayload/addFieldProxy/addFieldIndex/addFieldNoResolve 之一，
+// 或 -1 表示未命中任何字段。
+func ResolveFormFieldAt(state PageState, pageX, pageY, width, height int) int {
+	form := state.AddForm
+
+	// 确定弹窗边界
+	var left, top, right, bottom int
+	if state.ShowEditForm {
+		left, top, right, bottom = ResolveEditFormBounds(state, width, height)
+	} else if state.ShowAddForm {
+		left, top, right, bottom = ResolveAddFormBounds(state, width, height)
+	} else {
+		return -1
+	}
+
+	// 点击在弹窗外
+	if pageX < left || pageX >= right || pageY < top || pageY >= bottom {
+		return -1
+	}
+
+	// 弹窗内相对坐标
+	relY := pageY - top
+
+	// 构建字段行的 Y 偏移映射（与 buildAddRuleModal/buildEditRuleModal 布局一致）
+	// 行 0: 上边框
+	// 行 1: 类型行 (addFieldType)
+	// 行 2: 分隔行
+	// 行 3: payload (addFieldPayload, 仅非 MATCH)
+	// 行 4: proxy (addFieldProxy)
+	// 行 5: index (addFieldIndex)
+	// 行 6: 分隔行 2
+	// 行 7: no-resolve (addFieldNoResolve, 仅 IP 类型)
+	// 行 8: 说明/错误
+	// 行 9: 下边框
+
+	// 构建可见字段的行号映射
+	rowToField := make(map[int]int)
+	currentRow := 1 // 类型行从第 1 行开始（0 是边框）
+
+	// 类型行始终可见
+	rowToField[currentRow] = addFieldType
+	currentRow += 2 // +1 类型行, +1 分隔行
+
+	// payload 行（仅非 MATCH 类型）
+	if !form.isMatchType() {
+		rowToField[currentRow] = addFieldPayload
+		currentRow++
+	}
+
+	// proxy 行
+	rowToField[currentRow] = addFieldProxy
+	currentRow++
+
+	// index 行
+	rowToField[currentRow] = addFieldIndex
+	currentRow++
+
+	// 分隔行 2
+	currentRow++
+
+	// no-resolve 行（仅 IP 类型）
+	if form.isIPType() {
+		rowToField[currentRow] = addFieldNoResolve
+		currentRow++
+	}
+
+	// 检查点击落在哪个字段行
+	if fieldIdx, ok := rowToField[relY]; ok {
+		return fieldIdx
+	}
+
+	return -1
+}
