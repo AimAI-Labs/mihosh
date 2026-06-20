@@ -46,7 +46,7 @@ func TestFetch_Remote(t *testing.T) {
 	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "mihosh/1.0", r.Header.Get("User-Agent"))
+		assert.Equal(t, "clash-verge/v2.4.5", r.Header.Get("User-Agent"))
 		w.Header().Set("Content-Type", "text/yaml")
 		_, _ = w.Write([]byte("mode: rule\nproxies: []\n"))
 	}))

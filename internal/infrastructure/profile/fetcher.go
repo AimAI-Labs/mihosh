@@ -23,8 +23,8 @@ import (
 // fetchTimeout 远程拉取超时。
 const fetchTimeout = 30 * time.Second
 
-// fetchUserAgent 远程拉取使用的 User-Agent，便于订阅端识别。
-const fetchUserAgent = "mihosh/1.0"
+// fetchUserAgent 远程拉取使用的 User-Agent，伪装成 clash-verge 以获取订阅后端的完整 Clash 规则。
+const fetchUserAgent = "clash-verge/v2.4.5"
 
 // Fetch 拉取订阅原始配置，写回 raw.yaml。
 //   - remote: HTTP GET，状态码非 2xx 视为失败；
