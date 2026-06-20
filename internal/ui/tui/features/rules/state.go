@@ -48,6 +48,10 @@ type State struct {
 	lastProxyPickerClickIdx int
 	lastProxyPickerClickAt  time.Time
 
+	// 鼠标双击检测（用于规则列表项双击打开编辑）
+	lastMouseIndex int
+	lastMouseAt    time.Time
+
 	// 添加自定义规则弹窗状态
 	showAddForm bool    // 是否显示添加规则弹窗
 	addForm     addForm // 表单状态（仅 showAddForm 为 true 时有意义）
@@ -682,7 +686,7 @@ func (s *State) cancelAndClose() {
 
 // HandleMouseLeft 处理规则页面鼠标左键事件。
 // 弹窗打开时：点击弹窗外则确认并关闭；点击列表项则移动光标，双击切换选中。
-func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, tea.Cmd) {
+func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *api.Client) (State, tea.Cmd) {
 	// 添加规则弹窗打开时
 	if s.showAddForm {
 		// 策略选择二级弹窗优先处理
@@ -792,54 +796,86 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		return s, nil
 	}
 
-	// 仅在类型筛选弹窗打开时处理鼠标点击
-	if !s.showTypeFilter {
+	// 类型筛选弹窗打开时处理鼠标点击
+	if s.showTypeFilter {
+		pageState := PageState{
+			ShowTypeFilter:   s.showTypeFilter,
+			SelectedTypes:    s.selectedTypes,
+			AvailableTypes:   s.availableTypes,
+			TypeFilterCursor: s.typeFilterCursor,
+			Width:            pageWidth,
+			Height:           pageHeight,
+		}
+
+		// 点击在弹窗内？
+		left, top, right, bottom := ResolveTypeFilterModalBounds(pageState, pageWidth, pageHeight)
+		insideModal := pageX >= left && pageX < right && pageY >= top && pageY < bottom
+		if !insideModal {
+			// 点击边框外：确认并关闭（保留已勾选的过滤）
+			s.confirmAndClose()
+			// 重置双击状态，避免下次打开误触发
+			s.lastTypeFilterClickIdx = 0
+			s.lastTypeFilterClickAt = time.Time{}
+			return s, nil
+		}
+
+		// 点击在弹窗内：尝试映射到类型列表项
+		idx := ResolveTypeFilterListItemAt(pageState, pageX, pageY, pageWidth, pageHeight)
+		if idx < 0 {
+			return s, nil
+		}
+
+		now := time.Now()
+		isDouble := s.isTypeFilterDoubleClick(idx, now)
+
+		// 单击：移动光标到该项
+		s.typeFilterCursor = idx
+
+		// 双击：切换该项选中状态
+		if isDouble {
+			typeName := s.availableTypes[idx]
+			if s.isTypeSelected(typeName) {
+				s.selectedTypes = removeString(s.selectedTypes, typeName)
+			} else {
+				s.selectedTypes = append(s.selectedTypes, typeName)
+			}
+			s.updateFilteredRules()
+		}
 		return s, nil
 	}
 
-	pageState := PageState{
-		ShowTypeFilter:   s.showTypeFilter,
-		SelectedTypes:    s.selectedTypes,
-		AvailableTypes:   s.availableTypes,
-		TypeFilterCursor: s.typeFilterCursor,
-		Width:            pageWidth,
-		Height:           pageHeight,
-	}
-
-	// 点击在弹窗内？
-	left, top, right, bottom := ResolveTypeFilterModalBounds(pageState, pageWidth, pageHeight)
-	insideModal := pageX >= left && pageX < right && pageY >= top && pageY < bottom
-	if !insideModal {
-		// 点击边框外：确认并关闭（保留已勾选的过滤）
-		s.confirmAndClose()
-		// 重置双击状态，避免下次打开误触发
-		s.lastTypeFilterClickIdx = 0
-		s.lastTypeFilterClickAt = time.Time{}
-		return s, nil
-	}
-
-	// 点击在弹窗内：尝试映射到类型列表项
-	idx := ResolveTypeFilterListItemAt(pageState, pageX, pageY, pageWidth, pageHeight)
+	// 处理规则列表的单击和双击
+	pageState := s.ToPageState(pageWidth, pageHeight)
+	idx := ResolveMouseHit(pageState, pageY)
 	if idx < 0 {
 		return s, nil
 	}
 
 	now := time.Now()
-	isDouble := s.isTypeFilterDoubleClick(idx, now)
+	isDouble := s.isMouseDoubleClick(idx, now)
 
-	// 单击：移动光标到该项
-	s.typeFilterCursor = idx
-
-	// 双击：切换该项选中状态
-	if isDouble {
-		typeName := s.availableTypes[idx]
-		if s.isTypeSelected(typeName) {
-			s.selectedTypes = removeString(s.selectedTypes, typeName)
-		} else {
-			s.selectedTypes = append(s.selectedTypes, typeName)
-		}
-		s.updateFilteredRules()
+	// 单击：选中规则
+	s.selectedRule = idx
+	// 确保选中项可见
+	if s.selectedRule < s.ruleScrollTop {
+		s.ruleScrollTop = s.selectedRule
 	}
+	availableHeight := pageHeight - rulesFixedLines
+	if availableHeight < rulesMinHeight {
+		availableHeight = rulesMinHeight
+	}
+	if s.selectedRule >= s.ruleScrollTop+availableHeight {
+		s.ruleScrollTop = s.selectedRule - availableHeight + 1
+	}
+
+	// 双击：打开编辑
+	if isDouble {
+		origIdx := s.filteredRuleIndices[idx]
+		if origIdx >= 0 && origIdx < len(s.rules) {
+			return s.openEditFormForIndex(origIdx)
+		}
+	}
+
 	return s, nil
 }
 
@@ -858,8 +894,18 @@ func (s *State) isProxyPickerDoubleClick(idx int, now time.Time) bool {
 	isDouble := idx == s.lastProxyPickerClickIdx &&
 		!s.lastProxyPickerClickAt.IsZero() &&
 		now.Sub(s.lastProxyPickerClickAt) <= rulesDoubleClickThreshold
- s.lastProxyPickerClickIdx = idx
+	s.lastProxyPickerClickIdx = idx
 	s.lastProxyPickerClickAt = now
+	return isDouble
+}
+
+// isMouseDoubleClick 检测规则列表项的双击。
+func (s *State) isMouseDoubleClick(idx int, now time.Time) bool {
+	isDouble := idx == s.lastMouseIndex &&
+		!s.lastMouseAt.IsZero() &&
+		now.Sub(s.lastMouseAt) <= rulesDoubleClickThreshold
+	s.lastMouseIndex = idx
+	s.lastMouseAt = now
 	return isDouble
 }
 

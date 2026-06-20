@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -209,8 +210,9 @@ func TestTypeFilterMouseDoubleClickToggles(t *testing.T) {
 		t.Fatalf("expected first list item index 0, got %d", firstItemY)
 	}
 
+	var nilClient *api.Client
 	// First click — should move cursor but NOT select
-	s, _ = s.HandleMouseLeft(left+3, top+2, pageW, pageH)
+	s, _ = s.HandleMouseLeft(left+3, top+2, pageW, pageH, nilClient)
 	if s.typeFilterCursor != 0 {
 		t.Fatalf("cursor should be 0 after first click, got %d", s.typeFilterCursor)
 	}
@@ -219,7 +221,7 @@ func TestTypeFilterMouseDoubleClickToggles(t *testing.T) {
 	}
 
 	// Second click (immediately, within threshold) — should toggle selection ON
-	s, _ = s.HandleMouseLeft(left+3, top+2, pageW, pageH)
+	s, _ = s.HandleMouseLeft(left+3, top+2, pageW, pageH, nilClient)
 	if len(s.selectedTypes) != 1 {
 		t.Fatalf("double click should select the type, got %v", s.selectedTypes)
 	}
@@ -229,13 +231,13 @@ func TestTypeFilterMouseDoubleClickToggles(t *testing.T) {
 	s.lastTypeFilterClickAt = time.Time{}
 
 	// Third click — starts a new double-click window, only moves cursor (still selected)
-	s, _ = s.HandleMouseLeft(left+3, top+2, pageW, pageH)
+	s, _ = s.HandleMouseLeft(left+3, top+2, pageW, pageH, nilClient)
 	if len(s.selectedTypes) != 1 {
 		t.Fatalf("single click should NOT toggle selection, got %v", s.selectedTypes)
 	}
 
 	// Fourth click — completes the new double-click, toggles selection OFF
-	s, _ = s.HandleMouseLeft(left+3, top+2, pageW, pageH)
+	s, _ = s.HandleMouseLeft(left+3, top+2, pageW, pageH, nilClient)
 	if len(s.selectedTypes) != 0 {
 		t.Fatalf("second double-click should deselect, got %v", s.selectedTypes)
 	}
@@ -277,7 +279,8 @@ func TestTypeFilterMouseOutsideClosesAndKeepsFilter(t *testing.T) {
 		outsideY = top - 1
 	}
 
-	s, _ = s.HandleMouseLeft(outsideX, outsideY, pageW, pageH)
+	var nilClient *api.Client
+	s, _ = s.HandleMouseLeft(outsideX, outsideY, pageW, pageH, nilClient)
 
 	if s.showTypeFilter {
 		t.Fatal("overlay should be closed after clicking outside")

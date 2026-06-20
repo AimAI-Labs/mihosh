@@ -1613,3 +1613,37 @@ func ResolveDeleteConfirmBounds(state PageState, width, height int) (left, top, 
 	bottom = top + modalHeight
 	return left, top, right, bottom
 }
+
+// ResolveMouseHit 根据 pageContent 内的 Y 坐标定位命中的规则行。
+func ResolveMouseHit(state PageState, pageY int) int {
+	// 计算规则列表起始行：
+	// - 头部组件占 rulesHeaderHeight (3) 行（包括边框）
+	// - 然后有一个空行
+	listStartY := rulesHeaderHeight + 1
+
+	if pageY < listStartY {
+		return -1
+	}
+
+	// 计算规则在列表中的相对偏移
+	ruleOffset := pageY - listStartY
+	if ruleOffset < 0 {
+		return -1
+	}
+
+	// 计算可用的规则行数
+	availableHeight := state.Height - rulesFixedLines
+	if availableHeight < rulesMinHeight {
+		availableHeight = rulesMinHeight
+	}
+
+	// 检查是否在规则可见范围内
+	numFiltered := len(state.FilteredRuleIndices)
+	visibleRuleIdx := state.ScrollTop + ruleOffset
+
+	if visibleRuleIdx < 0 || visibleRuleIdx >= numFiltered || ruleOffset >= availableHeight {
+		return -1
+	}
+
+	return visibleRuleIdx
+}

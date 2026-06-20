@@ -550,7 +550,7 @@ func (m Model) handleRulesMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	m.rulesState, cmd = m.rulesState.HandleMouseLeft(pageX, pageY, pageWidth, pageHeight)
+	m.rulesState, cmd = m.rulesState.HandleMouseLeft(pageX, pageY, pageWidth, pageHeight, m.client)
 	return m, cmd
 }
 
