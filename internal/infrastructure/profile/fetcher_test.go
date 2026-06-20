@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -154,6 +155,102 @@ func TestFetch_PreservesOldRawOnError(t *testing.T) {
 	require.Error(t, err)
 
 	// 旧 raw 应仍存在
+	raw, err := ReadRaw(uid)
+	require.NoError(t, err)
+	require.NotNil(t, raw)
+}
+
+// TestFetch_RemoteV2RayBase64 远程 v2ray base64 订阅自动转换。
+func TestFetch_RemoteV2RayBase64(t *testing.T) {
+	uid := "fetch-v2ray-remote"
+	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
+
+	// 构造 base64 编码的 vmess 订阅
+	vmessData := `{"v":"2","ps":"TestNode","add":"v2.example.com","port":443,"id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","aid":0,"net":"ws","path":"/ws","host":"cdn.example.com","tls":"tls","sni":"v2.example.com"}`
+	vmessURI := prefixVmess + base64.StdEncoding.EncodeToString([]byte(vmessData))
+	subContent := base64.StdEncoding.EncodeToString([]byte(vmessURI))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(subContent))
+	}))
+	defer srv.Close()
+
+	p := Profile{UID: uid, Source: SubSource{Kind: SourceRemote, URL: srv.URL}}
+	require.NoError(t, Fetch(p))
+
+	// raw.yaml 应为合法 Mihomo YAML
+	raw, err := ReadRaw(uid)
+	require.NoError(t, err)
+	require.NotNil(t, raw)
+
+	// 应包含 proxies mapping key
+	mapping := topLevelMapping(raw)
+	require.NotNil(t, mapping, "raw.yaml 应为合法 YAML mapping")
+
+	// 遍历 mapping 查找 proxies 键
+	foundProxies := false
+	for i := 0; i < len(mapping.Content)-1; i += 2 {
+		if mapping.Content[i].Value == "proxies" {
+			foundProxies = true
+			break
+		}
+	}
+	assert.True(t, foundProxies, "raw.yaml 应包含 proxies 键")
+}
+
+// TestFetch_LocalV2RayBase64 本地 v2ray base64 文件自动转换。
+func TestFetch_LocalV2RayBase64(t *testing.T) {
+	uid := "fetch-v2ray-local"
+	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
+
+	vmessData := `{"v":"2","ps":"LocalNode","add":"local.example.com","port":8080,"id":"bbbbbbbb-cccc-dddd-eeee-ffffffffffff","aid":0,"net":"tcp"}`
+	vmessURI := prefixVmess + base64.StdEncoding.EncodeToString([]byte(vmessData))
+	subContent := base64.StdEncoding.EncodeToString([]byte(vmessURI))
+
+	srcDir := t.TempDir()
+	srcPath := filepath.Join(srcDir, "v2ray_sub.txt")
+	require.NoError(t, os.WriteFile(srcPath, []byte(subContent), 0644))
+
+	p := Profile{UID: uid, Source: SubSource{Kind: SourceLocal, Path: srcPath}}
+	require.NoError(t, Fetch(p))
+
+	raw, err := ReadRaw(uid)
+	require.NoError(t, err)
+	require.NotNil(t, raw)
+}
+
+// TestFetch_RemoteV2RayInvalidContent 远程返回的 base64 解码后全部解析失败。
+func TestFetch_RemoteV2RayInvalidContent(t *testing.T) {
+	uid := "fetch-v2ray-invalid"
+	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
+
+	// base64 编码的 vmess 前缀但内容无效
+	subContent := base64.StdEncoding.EncodeToString([]byte("vmess://not-valid-base64!"))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(subContent))
+	}))
+	defer srv.Close()
+
+	p := Profile{UID: uid, Source: SubSource{Kind: SourceRemote, URL: srv.URL}}
+	err := Fetch(p)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "v2ray")
+}
+
+// TestFetch_YAMLStillWorks 确保原有 YAML 订阅不受影响（回归测试）。
+func TestFetch_YAMLStillWorks(t *testing.T) {
+	uid := "fetch-yaml-regression"
+	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("mode: rule\nproxies:\n  - name: test\n    type: ss\n    server: 1.2.3.4\n    port: 443\n"))
+	}))
+	defer srv.Close()
+
+	p := Profile{UID: uid, Source: SubSource{Kind: SourceRemote, URL: srv.URL}}
+	require.NoError(t, Fetch(p), "YAML 订阅应正常工作")
+
 	raw, err := ReadRaw(uid)
 	require.NoError(t, err)
 	require.NotNil(t, raw)

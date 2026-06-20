@@ -38,13 +38,26 @@ func Fetch(p Profile) error {
 	}
 	// 校验 YAML 合法性 + 顶层必须为 mapping。
 	var probe yaml.Node
-	if err := yaml.Unmarshal(data, &probe); err != nil {
-		return fmt.Errorf("订阅内容非合法 YAML: %w", err)
+	yamlErr := yaml.Unmarshal(data, &probe)
+	if yamlErr == nil && topLevelMapping(&probe) != nil {
+		// 合法 Mihomo YAML，直接写入
+		return WriteRaw(p.UID, data)
 	}
-	if topLevelMapping(&probe) == nil {
-		return fmt.Errorf("订阅内容顶层不是配置映射（可能是错误页或纯文本），已拒绝")
+
+	// 非合法 Mihomo YAML，尝试作为 v2ray base64 订阅解析
+	converted, isV2Ray, convErr := TryConvertV2Ray(data)
+	if isV2Ray && convErr == nil {
+		return WriteRaw(p.UID, converted)
 	}
-	return WriteRaw(p.UID, data)
+	if isV2Ray {
+		return fmt.Errorf("v2ray 订阅解析失败: %w", convErr)
+	}
+
+	// 两者皆非，返回原始 YAML 错误
+	if yamlErr != nil {
+		return fmt.Errorf("订阅内容非合法 YAML: %w", yamlErr)
+	}
+	return fmt.Errorf("订阅内容顶层不是配置映射（可能是错误页或纯文本），已拒绝")
 }
 
 // fetchBytes 按 Source 类型获取原始字节。
