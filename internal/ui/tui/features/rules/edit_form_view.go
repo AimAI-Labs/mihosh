@@ -33,7 +33,7 @@ func renderEditRuleOverlay(background string, state PageState, width, height int
 		dimmed[i] = faint.Render(l)
 	}
 
-	// ── 2. 弹窗居中计算 ──
+	// ── 2. 弹窗从顶部开始计算 ──
 	modal := buildEditRuleModal(state, width, height)
 	modalLines := strings.Split(modal, "\n")
 	modalHeight := len(modalLines)
@@ -46,9 +46,16 @@ func renderEditRuleOverlay(background string, state PageState, width, height int
 	if leftOffset < 0 {
 		leftOffset = 0
 	}
-	topOffset := (height - modalHeight) / 2
+	topOffset := rulesHeaderHeight + 1 // 从规则头部下方开始，避免视觉疲劳
 	if topOffset < 0 {
 		topOffset = 0
+	}
+	// 确保弹窗底部不会超出屏幕
+	if topOffset+modalHeight > height {
+		topOffset = height - modalHeight
+		if topOffset < 0 {
+			topOffset = 0
+		}
 	}
 
 	// ── 3. 弹窗行嵌入暗化底层 ──
@@ -150,12 +157,18 @@ func ResolveEditFormBounds(state PageState, width, height int) (left, top, right
 	if leftGap < 0 {
 		leftGap = 0
 	}
-	topGap := height - modalHeight
-	if topGap < 0 {
-		topGap = 0
-	}
 	left = leftGap / 2
-	top = topGap / 2
+	top = rulesHeaderHeight + 1
+	if top < 0 {
+		top = 0
+	}
+	// 确保弹窗底部不会超出屏幕
+	if top+modalHeight > height {
+		top = height - modalHeight
+		if top < 0 {
+			top = 0
+		}
+	}
 	right = left + modalWidth
 	bottom = top + modalHeight
 	return left, top, right, bottom

@@ -626,7 +626,7 @@ func renderTypeFilterOverlay(background string, state PageState, width, height i
 		dimmed[i] = faint.Render(l)
 	}
 
-	// ── 2. 弹窗居中计算 ──
+	// ── 2. 弹窗从顶部开始计算 ──
 	modal := buildTypeFilterModal(state, width, height)
 	modalLines := strings.Split(modal, "\n")
 	modalHeight := len(modalLines)
@@ -639,9 +639,16 @@ func renderTypeFilterOverlay(background string, state PageState, width, height i
 	if leftOffset < 0 {
 		leftOffset = 0
 	}
-	topOffset := (height - modalHeight) / 2
+	topOffset := rulesHeaderHeight + 1 // 从规则头部下方开始，避免视觉疲劳
 	if topOffset < 0 {
 		topOffset = 0
+	}
+	// 确保弹窗底部不会超出屏幕
+	if topOffset+modalHeight > height {
+		topOffset = height - modalHeight
+		if topOffset < 0 {
+			topOffset = 0
+		}
 	}
 
 	// ── 3. 弹窗行嵌入暗化底层 ──
@@ -731,7 +738,7 @@ func computeTypeFilterModalLayout(state PageState, width, height int) typeFilter
 }
 
 // ResolveTypeFilterModalBounds 返回类型筛选弹窗在页面坐标系中的边界（右下为开区间）。
-// 通过渲染真实弹窗取尺寸，确保与 renderTypeFilterOverlay 的居中位置完全一致。
+// 通过渲染真实弹窗取尺寸，确保与 renderTypeFilterOverlay 的位置完全一致。
 func ResolveTypeFilterModalBounds(state PageState, width, height int) (left, top, right, bottom int) {
 	if width <= 0 || height <= 0 {
 		return 0, 0, 0, 0
@@ -744,12 +751,18 @@ func ResolveTypeFilterModalBounds(state PageState, width, height int) (left, top
 	if leftGap < 0 {
 		leftGap = 0
 	}
-	topGap := height - modalHeight
-	if topGap < 0 {
-		topGap = 0
-	}
 	left = leftGap / 2
-	top = topGap / 2
+	top = rulesHeaderHeight + 1
+	if top < 0 {
+		top = 0
+	}
+	// 确保弹窗底部不会超出屏幕
+	if top+modalHeight > height {
+		top = height - modalHeight
+		if top < 0 {
+			top = 0
+		}
+	}
 	right = left + modalWidth
 	bottom = top + modalHeight
 	return left, top, right, bottom
@@ -919,7 +932,7 @@ func renderAddRuleOverlay(background string, state PageState, width, height int)
 		dimmed[i] = faint.Render(l)
 	}
 
-	// ── 2. 弹窗居中计算 ──
+	// ── 2. 弹窗从顶部开始计算 ──
 	modal := buildAddRuleModal(state, width, height)
 	modalLines := strings.Split(modal, "\n")
 	modalHeight := len(modalLines)
@@ -932,9 +945,16 @@ func renderAddRuleOverlay(background string, state PageState, width, height int)
 	if leftOffset < 0 {
 		leftOffset = 0
 	}
-	topOffset := (height - modalHeight) / 2
+	topOffset := rulesHeaderHeight + 1 // 从规则头部下方开始，避免视觉疲劳
 	if topOffset < 0 {
 		topOffset = 0
+	}
+	// 确保弹窗底部不会超出屏幕
+	if topOffset+modalHeight > height {
+		topOffset = height - modalHeight
+		if topOffset < 0 {
+			topOffset = 0
+		}
 	}
 
 	// ── 3. 弹窗行嵌入暗化底层 ──
@@ -1151,7 +1171,7 @@ func applyFieldRowBackground(row string, focused bool, innerWidth int) string {
 }
 
 // ResolveAddFormBounds 返回添加规则弹窗在页面坐标系中的边界（右下为开区间）。
-// 通过渲染真实弹窗取尺寸，确保与 renderAddRuleOverlay 居中位置完全一致。
+// 通过渲染真实弹窗取尺寸，确保与 renderAddRuleOverlay 位置完全一致。
 func ResolveAddFormBounds(state PageState, width, height int) (left, top, right, bottom int) {
 	if width <= 0 || height <= 0 {
 		return 0, 0, 0, 0
@@ -1164,12 +1184,18 @@ func ResolveAddFormBounds(state PageState, width, height int) (left, top, right,
 	if leftGap < 0 {
 		leftGap = 0
 	}
-	topGap := height - modalHeight
-	if topGap < 0 {
-		topGap = 0
-	}
 	left = leftGap / 2
-	top = topGap / 2
+	top = rulesHeaderHeight + 1
+	if top < 0 {
+		top = 0
+	}
+	// 确保弹窗底部不会超出屏幕
+	if top+modalHeight > height {
+		top = height - modalHeight
+		if top < 0 {
+			top = 0
+		}
+	}
 	right = left + modalWidth
 	bottom = top + modalHeight
 	return left, top, right, bottom
@@ -1251,7 +1277,7 @@ func computeProxyPickerLayout(state PageState, width, height int) proxyPickerLay
 	}
 }
 
-// renderProxyPickerOverlay 渲染策略选择弹窗叠加层（复用暗化+居中+嵌入三步）。
+// renderProxyPickerOverlay 渲染策略选择弹窗叠加层（复用暗化+从顶部开始+嵌入三步）。
 func renderProxyPickerOverlay(background string, state PageState, width, height int) string {
 	baseLines := strings.Split(background, "\n")
 	for len(baseLines) < height {
@@ -1279,9 +1305,16 @@ func renderProxyPickerOverlay(background string, state PageState, width, height 
 	if leftOffset < 0 {
 		leftOffset = 0
 	}
-	topOffset := (height - modalHeight) / 2
+	topOffset := rulesHeaderHeight + 1 // 从规则头部下方开始，避免视觉疲劳
 	if topOffset < 0 {
 		topOffset = 0
+	}
+	// 确保弹窗底部不会超出屏幕
+	if topOffset+modalHeight > height {
+		topOffset = height - modalHeight
+		if topOffset < 0 {
+			topOffset = 0
+		}
 	}
 
 	for i, pl := range modalLines {
@@ -1416,12 +1449,18 @@ func ResolveProxyPickerBounds(state PageState, width, height int) (left, top, ri
 	if leftGap < 0 {
 		leftGap = 0
 	}
-	topGap := height - modalHeight
-	if topGap < 0 {
-		topGap = 0
-	}
 	left = leftGap / 2
-	top = topGap / 2
+	top = rulesHeaderHeight + 1
+	if top < 0 {
+		top = 0
+	}
+	// 确保弹窗底部不会超出屏幕
+	if top+modalHeight > height {
+		top = height - modalHeight
+		if top < 0 {
+			top = 0
+		}
+	}
 	right = left + modalWidth
 	bottom = top + modalHeight
 	return left, top, right, bottom
@@ -1491,9 +1530,16 @@ func renderDeleteConfirmOverlay(background string, state PageState, width, heigh
 	if leftOffset < 0 {
 		leftOffset = 0
 	}
-	topOffset := (height - modalHeight) / 2
+	topOffset := rulesHeaderHeight + 1 // 从规则头部下方开始，避免视觉疲劳
 	if topOffset < 0 {
 		topOffset = 0
+	}
+	// 确保弹窗底部不会超出屏幕
+	if topOffset+modalHeight > height {
+		topOffset = height - modalHeight
+		if topOffset < 0 {
+			topOffset = 0
+		}
 	}
 
 	for i, pl := range modalLines {
@@ -1603,12 +1649,18 @@ func ResolveDeleteConfirmBounds(state PageState, width, height int) (left, top, 
 	if leftGap < 0 {
 		leftGap = 0
 	}
-	topGap := height - modalHeight
-	if topGap < 0 {
-		topGap = 0
-	}
 	left = leftGap / 2
-	top = topGap / 2
+	top = rulesHeaderHeight + 1
+	if top < 0 {
+		top = 0
+	}
+	// 确保弹窗底部不会超出屏幕
+	if top+modalHeight > height {
+		top = height - modalHeight
+		if top < 0 {
+			top = 0
+		}
+	}
 	right = left + modalWidth
 	bottom = top + modalHeight
 	return left, top, right, bottom
