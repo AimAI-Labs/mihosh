@@ -476,6 +476,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.notice = ""
 		m.noticeTicks = 0
 
+	case messages.SubEditDoneMsg:
+		m.notice = i18n.T("sub.edited_toast")
+		m.noticeTicks = autoRefreshNoticeTicks
+		return m, sub.FetchSubs(m.profileSvc)
+
+	case messages.SubEditErrorMsg:
+		m.err = msg
+		m.notice = ""
+		m.noticeTicks = 0
+
 	case sub.MergeLoadedMsg:
 		// merge 编辑器内容已异步加载，回填到编辑器状态
 		m.subState = m.subState.HandleMergeLoaded(msg.UID, msg.Data, msg.Err)

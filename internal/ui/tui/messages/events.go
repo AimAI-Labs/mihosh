@@ -197,3 +197,14 @@ func (m SubMergeSaveErrorMsg) Error() string { return m.Err.Error() }
 
 // SubRenameDoneMsg 订阅已重命名。
 type SubRenameDoneMsg struct{ UID string }
+
+// SubEditDoneMsg 订阅元数据已编辑（调用方负责刷新列表）。
+type SubEditDoneMsg struct{ UID string }
+
+// SubEditErrorMsg 编辑订阅失败。
+type SubEditErrorMsg struct {
+	UID string
+	Err error
+}
+
+func (m SubEditErrorMsg) Error() string { return m.Err.Error() }

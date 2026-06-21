@@ -455,6 +455,9 @@
   "sub.add_err_name": "name must not be empty",
   "sub.add_err_src": "source must not be empty",
 
+  "sub.edit_title": "Edit Subscription",
+  "sub.edited_toast": "Subscription updated",
+
   "sub.merge_title": "Global Merge Override",
   "sub.merge_placeholder": "# supports prepend-rules / append-rules / prepend-proxies / append-proxies / prepend-proxy-groups / append-proxy-groups and any top-level key override",
   "sub.merge_keys_hint": "valid keys: prepend/append-rules, prepend/append-proxies, prepend/append-proxy-groups, dns, mode, tun...",
@@ -482,6 +485,7 @@
   "help.sub.activate": "activate/switch",
   "help.sub.update": "update (fetch/reread)",
   "help.sub.edit_merge": "edit override",
+  "help.sub.edit_profile": "edit subscription",
   "help.sub.add": "add",
   "help.sub.delete": "delete",
   "help.sub.refresh": "refresh list",

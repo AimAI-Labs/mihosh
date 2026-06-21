@@ -43,6 +43,9 @@ type State struct {
 	// 弹窗/输入模式
 	showAddForm     bool
 	addForm         addForm
+	showEditForm    bool // 编辑当前选中订阅（名称 + 来源）
+	editUID         string
+	editForm        addForm
 	showMergeEditor bool
 	mergeEditor     mergeEditor
 	showDeleteConf  bool
@@ -82,6 +85,8 @@ func (s State) ToPageState(width, height int) PageState {
 		Height:         height,
 		ShowAddForm:    s.showAddForm,
 		AddForm:        s.addForm,
+		ShowEditForm:   s.showEditForm,
+		EditForm:       s.editForm,
 		ShowMergeEdit:  s.showMergeEditor,
 		MergeEditor:    s.mergeEditor,
 		ShowDeleteConf: s.showDeleteConf,
@@ -95,7 +100,7 @@ func (s State) Mode() int {
 	switch {
 	case s.filterMode:
 		return ModeSearch
-	case s.showAddForm:
+	case s.showAddForm, s.showEditForm:
 		return ModeAddForm
 	case s.showMergeEditor:
 		return ModeMergeEditor
@@ -108,7 +113,7 @@ func (s State) Mode() int {
 
 // Querying 是否处于输入捕获模式（供主 Model 的 isInputCapturing 判断）。
 func (s State) Querying() bool {
-	return s.filterMode || s.showAddForm || s.showMergeEditor || s.showDeleteConf
+	return s.filterMode || s.showAddForm || s.showEditForm || s.showMergeEditor || s.showDeleteConf
 }
 
 // ApplySubs 应用加载的订阅列表与激活 UID，并重建过滤缓存。
@@ -134,6 +139,9 @@ func (s State) Update(msg tea.KeyMsg, svc *service.ProfileService) (State, tea.C
 	if s.showAddForm {
 		return s.handleAddFormUpdate(msg, svc)
 	}
+	if s.showEditForm {
+		return s.handleEditFormUpdate(msg, svc)
+	}
 	if s.filterMode {
 		return s.handleFilterMode(msg, svc)
 	}
@@ -153,8 +161,10 @@ func (s State) Update(msg tea.KeyMsg, svc *service.ProfileService) (State, tea.C
 		return s.activateSelected(svc)
 	case msg.String() == "u":
 		return s.updateSelected(svc)
-	case msg.String() == "e":
+	case msg.String() == "m":
 		return s.openMergeEditor(svc)
+	case msg.String() == "e":
+		return s.openEditForm(svc)
 	case msg.String() == "n":
 		s.showAddForm = true
 		s.addForm = newAddForm()
@@ -293,6 +303,48 @@ func (s State) openMergeEditor(svc *service.ProfileService) (State, tea.Cmd) {
 	return s, LoadMergeCmd(svc, uid)
 }
 
+// openEditForm 打开当前选中订阅的编辑表单（预填名称 + 来源）。
+func (s State) openEditForm(svc *service.ProfileService) (State, tea.Cmd) {
+	if len(s.filteredIdx) == 0 || s.selected < 0 || s.selected >= len(s.filteredIdx) {
+		return s, nil
+	}
+	p := s.subs[s.filteredIdx[s.selected]]
+	form := newAddForm()
+	form.fields[addFieldName].SetValue(p.Name)
+	form.fields[addFieldSrc].SetValue(p.Source.Display())
+	form.kindRemote = p.Source.Kind == profile.SourceRemote
+	// 焦点重新落到名称字段（SetValue 后 textinput 仍处于 Focus 状态）
+	form.focusCurrent()
+	s.showEditForm = true
+	s.editUID = p.UID
+	s.editForm = form
+	return s, nil
+}
+
+// handleEditFormUpdate 处理编辑表单按键（与添加表单逻辑共用）。
+func (s State) handleEditFormUpdate(msg tea.KeyMsg, svc *service.ProfileService) (State, tea.Cmd) {
+	form := s.editForm
+	next, submit, cmd, closed := updateFormFields(msg, form)
+	if closed {
+		// Esc：关闭并清空
+		s.showEditForm = false
+		s.editUID = ""
+		s.editForm = newAddForm()
+		return s, nil
+	}
+	if submit {
+		name := next.fields[addFieldName].Value()
+		src := next.buildSource()
+		uid := s.editUID
+		s.showEditForm = false
+		s.editUID = ""
+		s.editForm = newAddForm()
+		return s, EditSubCmd(svc, uid, name, src)
+	}
+	s.editForm = next
+	return s, cmd
+}
+
 // HandleMergeLoaded 处理 merge 内容加载结果（由主 Model 收到 MergeLoadedMsg 后回调）。
 func (s State) HandleMergeLoaded(uid string, data []byte, err error) State {
 	// 仅当当前正在加载该 UID 且编辑器确实为其打开时才回填，
@@ -337,15 +389,18 @@ func (s State) HandleMouseScroll(up bool) State {
 // HandleMouseLeft 处理列表单击/双击。
 func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, svc *service.ProfileService) (State, tea.Cmd) {
 	// 弹窗激活时点击弹窗外 → 取消关闭（删除确认/merge 编辑器/添加表单）
-	if s.showDeleteConf || s.showMergeEditor || s.showAddForm {
+	if s.showDeleteConf || s.showMergeEditor || s.showAddForm || s.showEditForm {
 		// 简化处理：点击任意位置不自动关闭破坏性弹窗（需 Esc/Enter），
-		// 避免误触。仅非破坏性的添加表单点击外部关闭。
-		if s.showAddForm && !s.showDeleteConf && !s.showMergeEditor {
+		// 避免误触。仅非破坏性的添加/编辑表单点击外部关闭。
+		if (s.showAddForm || s.showEditForm) && !s.showDeleteConf && !s.showMergeEditor {
 			ps := s.ToPageState(pageWidth, pageHeight)
-			left, top, right, bottom := resolveAddFormBounds(ps, pageWidth, pageHeight)
+			left, top, right, bottom := resolveFormBounds(ps, pageWidth, pageHeight)
 			if !(pageX >= left && pageX < right && pageY >= top && pageY < bottom) {
 				s.showAddForm = false
 				s.addForm = newAddForm()
+				s.showEditForm = false
+				s.editUID = ""
+				s.editForm = newAddForm()
 			}
 		}
 		return s, nil

@@ -121,6 +121,41 @@ func TestProfileService_Rename(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestProfileService_EditProfile(t *testing.T) {
+	s := newIsolatedService(t)
+
+	p, err := s.AddProfile("原订阅", profile.SubSource{Kind: profile.SourceLocal, Path: "/old/path.yaml"})
+	require.NoError(t, err)
+
+	// 编辑名称 + 来源（local → remote）
+	require.NoError(t, s.EditProfile(p.UID, "新订阅", profile.SubSource{Kind: profile.SourceRemote, URL: "https://new.io/sub"}))
+
+	got, err := s.findProfile(p.UID)
+	require.NoError(t, err)
+	assert.Equal(t, "新订阅", got.Name)
+	assert.Equal(t, profile.SourceRemote, got.Source.Kind)
+	assert.Equal(t, "https://new.io/sub", got.Source.URL)
+
+	// 来源 Kind 规范化：传入 remote URL（Kind 已正确）应原样保留
+	require.NoError(t, s.EditProfile(p.UID, "X", profile.SubSource{Kind: profile.SourceRemote, URL: "https://auto.io/sub"}))
+	got, err = s.findProfile(p.UID)
+	require.NoError(t, err)
+	assert.Equal(t, profile.SourceRemote, got.Source.Kind)
+	assert.Equal(t, "https://auto.io/sub", got.Source.URL)
+
+	// 空名拒绝
+	err = s.EditProfile(p.UID, "  ", profile.SubSource{Kind: profile.SourceRemote, URL: "https://x.io/s"})
+	require.Error(t, err)
+
+	// 空来源拒绝
+	err = s.EditProfile(p.UID, "ok", profile.SubSource{Kind: profile.SourceLocal, Path: "  "})
+	require.Error(t, err)
+
+	// 不存在的 UID 报错
+	err = s.EditProfile("ghost", "ok", profile.SubSource{Kind: profile.SourceLocal, Path: "/p/x.yaml"})
+	assert.ErrorIs(t, err, ErrSubNotFound)
+}
+
 func TestProfileService_FetchLocal(t *testing.T) {
 	s := newIsolatedService(t)
 

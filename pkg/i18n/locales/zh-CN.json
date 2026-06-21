@@ -455,6 +455,9 @@
   "sub.add_err_name": "名称不能为空",
   "sub.add_err_src": "来源不能为空",
 
+  "sub.edit_title": "编辑订阅",
+  "sub.edited_toast": "已更新订阅",
+
   "sub.merge_title": "全局扩展覆写 (merge)",
   "sub.merge_placeholder": "# 支持 prepend-rules / append-rules / prepend-proxies / append-proxies / prepend-proxy-groups / append-proxy-groups 及任意顶层键覆盖",
   "sub.merge_keys_hint": "合法键：prepend/append-rules、prepend/append-proxies、prepend/append-proxy-groups、dns、mode、tun…",
@@ -482,6 +485,7 @@
   "help.sub.activate": "激活/切换",
   "help.sub.update": "更新（拉取/重读）",
   "help.sub.edit_merge": "编辑覆写",
+  "help.sub.edit_profile": "编辑订阅",
   "help.sub.add": "添加",
   "help.sub.delete": "删除",
   "help.sub.refresh": "刷新列表",

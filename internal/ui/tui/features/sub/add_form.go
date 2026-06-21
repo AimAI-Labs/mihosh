@@ -125,25 +125,44 @@ func (f addForm) buildSource() profile.SubSource {
 // handleUpdate 处理表单内的按键（弹窗激活时由 state 分派到此）。
 func (s State) handleAddFormUpdate(msg tea.KeyMsg, svc *service.ProfileService) (State, tea.Cmd) {
 	form := s.addForm
-
-	switch {
-	case msg.String() == "esc":
+	next, submit, cmd, closed := updateFormFields(msg, form)
+	if closed {
+		// Esc：关闭并清空表单
 		s.showAddForm = false
 		s.addForm = newAddForm()
 		return s, nil
+	}
+	if submit {
+		// Enter 校验通过：调用方提交
+		name := next.fields[addFieldName].Value()
+		src := next.buildSource()
+		s.showAddForm = false
+		s.addForm = newAddForm()
+		return s, AddSubCmd(svc, name, src)
+	}
+	s.addForm = next
+	return s, cmd
+}
+
+// updateFormFields 表单按键的共用逻辑（添加/编辑表单共享）。
+//
+// 返回：
+//   - next：处理后的表单状态；
+//   - submit：是否触发了 Enter 且校验通过（调用方据此决定提交命令）；
+//   - cmd：文本输入产生的命令（无则 nil）；
+//   - closed：是否按 Esc 取消（调用方据此关闭弹窗）。
+func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, cmd tea.Cmd, closed bool) {
+	switch {
+	case msg.String() == "esc":
+		return form, false, nil, true
 
 	case msg.String() == "enter":
 		ok, errKey := form.validate()
 		if !ok {
 			form.errMsg = i18n.T(errKey)
-			s.addForm = form
-			return s, nil
+			return form, false, nil, false
 		}
-		name := form.fields[addFieldName].Value()
-		src := form.buildSource()
-		s.showAddForm = false
-		s.addForm = newAddForm()
-		return s, AddSubCmd(svc, name, src)
+		return form, true, nil, false
 
 	case msg.String() == "tab":
 		form.cycleField(1)
@@ -167,16 +186,13 @@ func (s State) handleAddFormUpdate(msg tea.KeyMsg, svc *service.ProfileService) 
 	default:
 		// 仅名称与来源值字段接收文本输入
 		if form.isKindField() {
-			break
+			return form, false, nil, false
 		}
 		cur := form.fields[form.fieldCursor]
-		updated, cmd := cur.Update(msg)
+		updated, c := cur.Update(msg)
 		form.fields[form.fieldCursor] = updated
 		form.errMsg = ""
-		s.addForm = form
-		return s, cmd
+		return form, false, c, false
 	}
-
-	s.addForm = form
-	return s, nil
+	return form, false, nil, false
 }

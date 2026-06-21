@@ -40,6 +40,19 @@ func AddSubCmd(svc *service.ProfileService, name string, src profile.SubSource) 
 	}
 }
 
+// EditSubCmd 编辑订阅元数据（名称 + 来源）。
+func EditSubCmd(svc *service.ProfileService, uid, name string, src profile.SubSource) tea.Cmd {
+	return func() tea.Msg {
+		if svc == nil {
+			return messages.SubEditErrorMsg{UID: uid, Err: errNoService}
+		}
+		if err := svc.EditProfile(uid, name, src); err != nil {
+			return messages.SubEditErrorMsg{UID: uid, Err: err}
+		}
+		return messages.SubEditDoneMsg{UID: uid}
+	}
+}
+
 // DeleteSubCmd 删除订阅。
 func DeleteSubCmd(svc *service.ProfileService, uid string) tea.Cmd {
 	return func() tea.Msg {

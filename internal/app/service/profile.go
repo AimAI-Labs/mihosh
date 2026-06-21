@@ -136,6 +136,33 @@ func (s *ProfileService) RenameProfile(uid, newName string) error {
 	})
 }
 
+// EditProfile 编辑订阅元数据（名称 + 来源），就地校验并持久化。
+// 校验逻辑与 AddProfile 对齐：名称非空、来源非空，并按内容规范化 Kind。
+func (s *ProfileService) EditProfile(uid, name string, src profile.SubSource) error {
+	exists, err := s.uidExists(uid)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return ErrSubNotFound
+	}
+	name = trimSpace(name)
+	if name == "" {
+		return errors.New("订阅名称不能为空")
+	}
+	if trimSpace(src.Display()) == "" {
+		return errors.New("订阅来源不能为空")
+	}
+	// 规范化来源字段：去除首尾空白，并按内容推断 Kind（与 AddProfile 一致）。
+	src.URL = trimSpace(src.URL)
+	src.Path = trimSpace(src.Path)
+	src.Kind = profile.ParseSourceKind(src.Display())
+	return s.mutateProfile(uid, func(p *profile.Profile) {
+		p.Name = name
+		p.Source = src
+	})
+}
+
 // SetActiveSub 设置激活订阅 UID（仅改元数据，不触发生成/重载）。
 // 传空字符串表示取消激活。
 func (s *ProfileService) SetActiveSub(uid string) error {

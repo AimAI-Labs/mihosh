@@ -43,6 +43,8 @@ type PageState struct {
 
 	ShowAddForm    bool
 	AddForm        addForm
+	ShowEditForm   bool
+	EditForm       addForm
 	ShowMergeEdit  bool
 	MergeEditor    mergeEditor
 	ShowDeleteConf bool
@@ -83,6 +85,9 @@ func RenderSubPage(state PageState) string {
 
 	if state.ShowAddForm {
 		result = renderAddFormOverlay(result, state, state.Width, state.Height)
+	}
+	if state.ShowEditForm {
+		result = renderEditFormOverlay(result, state, state.Width, state.Height)
 	}
 	if state.ShowMergeEdit {
 		result = renderMergeEditorOverlay(result, state, state.Width, state.Height)
@@ -337,7 +342,7 @@ func buildHints(state PageState) []common.InlineHelpHint {
 			{Key: "Esc/n", Desc: i18n.T("help.sub_delete.cancel")},
 		}
 	}
-	if state.ShowAddForm {
+	if state.ShowAddForm || state.ShowEditForm {
 		return []common.InlineHelpHint{
 			{Key: "↑↓/Tab", Desc: i18n.T("help.sub_add.field")},
 			{Key: "Enter", Desc: i18n.T("help.sub_add.confirm")},
@@ -356,7 +361,8 @@ func buildHints(state PageState) []common.InlineHelpHint {
 		{Key: "↑↓", Desc: i18n.T("help.sub.select")},
 		{Key: "Enter", Desc: i18n.T("help.sub.activate")},
 		{Key: "u", Desc: i18n.T("help.sub.update")},
-		{Key: "e", Desc: i18n.T("help.sub.edit_merge")},
+		{Key: "m", Desc: i18n.T("help.sub.edit_merge")},
+		{Key: "e", Desc: i18n.T("help.sub.edit_profile")},
 		{Key: "n", Desc: i18n.T("help.sub.add")},
 		{Key: "d", Desc: i18n.T("help.sub.delete")},
 		{Key: "/", Desc: i18n.T("help.sub.search")},
@@ -425,13 +431,26 @@ func overlayDim(background string, modal string, width, height int) string {
 	return strings.Join(dimmed, "\n")
 }
 
-// ===== 添加表单 =====
+// ===== 添加/编辑表单（共用渲染） =====
 
 func renderAddFormOverlay(background string, state PageState, width, height int) string {
 	return overlayDim(background, buildAddFormModal(state, width, height), width, height)
 }
 
+func renderEditFormOverlay(background string, state PageState, width, height int) string {
+	return overlayDim(background, buildEditFormModal(state, width, height), width, height)
+}
+
 func buildAddFormModal(state PageState, width, height int) string {
+	return buildFormModal(i18n.T("sub.add_title"), state.AddForm, width, height)
+}
+
+func buildEditFormModal(state PageState, width, height int) string {
+	return buildFormModal(i18n.T("sub.edit_title"), state.EditForm, width, height)
+}
+
+// buildFormModal 渲染订阅表单弹窗（添加/编辑共用，仅标题不同）。
+func buildFormModal(title string, form addForm, width, height int) string {
 	modalWidth := addFormModalWidth
 	if modalWidth > width-4 {
 		modalWidth = width - 4
@@ -443,7 +462,6 @@ func buildAddFormModal(state PageState, width, height int) string {
 	if innerWidth < 10 {
 		innerWidth = 10
 	}
-	form := state.AddForm
 
 	// 名称行
 	nameRow := renderFieldRow(i18n.T("sub.add_field_name"), form.fields[addFieldName].View(), form.isNameField(), innerWidth)
@@ -473,7 +491,7 @@ func buildAddFormModal(state PageState, width, height int) string {
 	content := strings.Join([]string{nameRow, kindRow, srcRow, divider, footer}, "\n")
 
 	return common.RenderBorderedPanel(
-		i18n.T("sub.add_title"),
+		title,
 		content,
 		modalWidth,
 		common.TokyoBlue(),
@@ -499,12 +517,18 @@ func renderFieldRow(label, value string, focused bool, innerWidth int) string {
 	return lipgloss.NewStyle().Background(common.TokyoSelected()).Render(styled + strings.Repeat(" ", pad))
 }
 
-// resolveAddFormBounds 返回添加表单弹窗边界（供鼠标点击外部关闭判断）。
-func resolveAddFormBounds(state PageState, width, height int) (left, top, right, bottom int) {
+// resolveFormBounds 返回表单弹窗边界（供鼠标点击外部关闭判断）。
+// 添加/编辑表单尺寸完全一致，共用一份实现。
+func resolveFormBounds(state PageState, width, height int) (left, top, right, bottom int) {
 	if width <= 0 || height <= 0 {
 		return 0, 0, 0, 0
 	}
-	modal := buildAddFormModal(state, width, height)
+	var modal string
+	if state.ShowEditForm {
+		modal = buildEditFormModal(state, width, height)
+	} else {
+		modal = buildAddFormModal(state, width, height)
+	}
 	modalWidth := lipgloss.Width(modal)
 	modalHeight := lipgloss.Height(modal)
 	leftGap := width - modalWidth

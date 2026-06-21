@@ -4,9 +4,15 @@ import (
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
+	"github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// newRuneKey 构造单字符按键消息（测试辅助）。
+func newRuneKey(s string) tea.KeyMsg {
+	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
+}
 
 // sampleSubs 构造一组测试用订阅。
 func sampleSubs() []profile.Profile {
@@ -160,4 +166,72 @@ func TestHandleMergeLoaded_EditorNotOpened(t *testing.T) {
 	s := State{mergeLoadingUID: "a1"}
 	s = s.HandleMergeLoaded("a1", []byte("mode: rule"), nil)
 	assert.False(t, s.mergeEditor.ready, "编辑器未打开时应忽略加载结果")
+}
+
+func TestOpenEditForm_PrefillsCurrentSub(t *testing.T) {
+	s := State{}.ApplySubs(sampleSubs(), "")
+	s.selected = 1 // 选中 b2（local）
+
+	s, _ = s.openEditForm(nil)
+	require.True(t, s.showEditForm)
+	assert.Equal(t, "b2", s.editUID)
+	// 名称与来源应预填
+	assert.Equal(t, "订阅B", s.editForm.fields[addFieldName].Value())
+	assert.Equal(t, "/etc/mihomo/b.yaml", s.editForm.fields[addFieldSrc].Value())
+	assert.False(t, s.editForm.kindRemote, "local 订阅应标记为非 remote")
+}
+
+func TestOpenEditForm_EmptyList(t *testing.T) {
+	s := State{}.ApplySubs(nil, "")
+	s, _ = s.openEditForm(nil)
+	assert.False(t, s.showEditForm, "空列表不应打开编辑表单")
+}
+
+func TestUpdate_MKeyOpensMergeEditor(t *testing.T) {
+	// 按 m 应打开 merge 编辑器（而非 e）
+	s := State{}.ApplySubs(sampleSubs(), "")
+	s.selected = 0
+	s, cmd := s.Update(newRuneKey("m"), nil)
+	assert.True(t, s.showMergeEditor, "m 应触发 merge 编辑器")
+	assert.Equal(t, "a1", s.mergeEditor.uid)
+	// 同时发出了 LoadMerge 命令
+	require.NotNil(t, cmd)
+}
+
+func TestUpdate_EKeyOpensEditForm(t *testing.T) {
+	// 按 e 应打开编辑表单（而非 merge）
+	s := State{}.ApplySubs(sampleSubs(), "")
+	s.selected = 0
+	s, _ = s.Update(newRuneKey("e"), nil)
+	assert.True(t, s.showEditForm, "e 应触发编辑表单")
+	assert.False(t, s.showMergeEditor, "e 不应触发 merge 编辑器")
+	assert.Equal(t, "a1", s.editUID)
+}
+
+func TestHandleEditFormSubmit_DispatchesEditCmd(t *testing.T) {
+	s := State{}.ApplySubs(sampleSubs(), "")
+	s.selected = 1
+	s, _ = s.openEditForm(nil)
+
+	// 修改名称后按 Enter 提交
+	form := s.editForm
+	form.fields[addFieldName].SetValue("新名称")
+	form.fields[addFieldSrc].SetValue("https://new.io/sub")
+	s.editForm = form
+
+	s, cmd := s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeyEnter}, nil)
+	require.NotNil(t, cmd)
+	assert.False(t, s.showEditForm, "提交后表单应关闭")
+	assert.Empty(t, s.editUID)
+}
+
+func TestHandleEditFormCancel_ClosesForm(t *testing.T) {
+	s := State{}.ApplySubs(sampleSubs(), "")
+	s.selected = 0
+	s, _ = s.openEditForm(nil)
+
+	s, cmd := s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeyEsc}, nil)
+	assert.Nil(t, cmd)
+	assert.False(t, s.showEditForm, "Esc 应关闭编辑表单")
+	assert.Empty(t, s.editUID)
 }
