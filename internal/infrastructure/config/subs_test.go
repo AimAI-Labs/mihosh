@@ -73,6 +73,51 @@ func TestConfig_SubsRoundTrip(t *testing.T) {
 	assert.Equal(t, "/etc/mihomo/local.yaml", out.Subs[1].Source.Path)
 }
 
+// TestConfig_SubsRoundTripFromDisk 用全新 viper 实例从磁盘读取配置，
+// 真正模拟「进程重启」场景，捕获 struct tag 与磁盘序列化不一致的回归。
+// （TestConfig_SubsRoundTrip 依赖 viper 全局内存状态，旧实现会因内存往返假性通过。）
+func TestConfig_SubsRoundTripFromDisk(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+	t.Setenv("USERPROFILE", tmpHome)
+	t.Setenv("HOMEDRIVE", "")
+	t.Setenv("HOMEPATH", "")
+
+	in := &Config{
+		APIAddress: "http://127.0.0.1:9090",
+		Language:   "zh-CN",
+		Subs: []profile.Profile{{
+			UID:       "uid-x",
+			Name:      "磁盘往返订阅",
+			UpdatedAt: 1700000000,
+			Source:    profile.SubSource{Kind: profile.SourceRemote, URL: "https://example.com/x.yaml"},
+		}},
+		ActiveSub: "uid-x",
+	}
+	require.NoError(t, Save(in))
+
+	// 用全新的 viper 实例从磁盘读取，不依赖任何全局内存状态。
+	dir, _ := GetConfigDir()
+	configFile := filepath.Join(dir, "config.yaml")
+	reader := viper.New()
+	reader.SetConfigFile(configFile)
+	reader.SetConfigType("yaml")
+	require.NoError(t, reader.ReadInConfig())
+
+	var out Config
+	require.NoError(t, reader.Unmarshal(&out))
+
+	require.Len(t, out.Subs, 1, "磁盘往返后应保留订阅")
+	assert.Equal(t, "uid-x", out.Subs[0].UID)
+	assert.Equal(t, "磁盘往返订阅", out.Subs[0].Name)
+	assert.Equal(t, "https://example.com/x.yaml", out.Subs[0].Source.URL)
+	// 核心断言：UpdatedAt 必须真正从磁盘 yaml 中读回（旧实现因 yaml tag 缺失会读到 0）。
+	assert.Equal(t, int64(1700000000), out.Subs[0].UpdatedAt, "UpdatedAt 须持久化到磁盘并读回，否则重启后显示「未更新」")
+}
+
 // TestConfig_NoSubsLegacyConfig 旧配置（无 subs 键）加载时不报错且字段为零值。
 func TestConfig_NoSubsLegacyConfig(t *testing.T) {
 	// viper 使用全局状态，需 Reset 隔离本测试，避免被前置用例的 Set 污染。

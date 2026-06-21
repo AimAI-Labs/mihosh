@@ -50,9 +50,9 @@ func ParseSourceKind(s string) SourceKind {
 // SubSource 描述订阅的原始配置来源。
 // Kind 决定使用 URL 还是 Path 字段。
 type SubSource struct {
-	Kind SourceKind `mapstructure:"kind"`
-	URL  string     `mapstructure:"url"`  // Kind==SourceRemote 时使用
-	Path string     `mapstructure:"path"` // Kind==SourceLocal 时使用
+	Kind SourceKind `mapstructure:"kind" yaml:"kind"`
+	URL  string     `mapstructure:"url"  yaml:"url"`  // Kind==SourceRemote 时使用
+	Path string     `mapstructure:"path" yaml:"path"` // Kind==SourceLocal 时使用
 }
 
 // Display 返回来源的可显示字符串（remote 显示 URL，local 显示 Path）。
@@ -70,10 +70,10 @@ func (s SubSource) Display() string {
 // raw.yaml（订阅原始配置快照）与 merge.yaml（用户覆写）按 UID 存为独立文件，
 // 不进入本结构（避免 config.yaml 膨胀）。
 type Profile struct {
-	UID       string    `mapstructure:"uid"`        // 短 ID，用作 profiles/<uid>/ 目录名
-	Name      string    `mapstructure:"name"`       // 显示名
-	Source    SubSource `mapstructure:"source"`     // 原始配置来源
-	UpdatedAt int64     `mapstructure:"updated_at"` // 最近成功拉取的 unix 时间戳（秒），0=从未更新
+	UID       string    `mapstructure:"uid"        yaml:"uid"`        // 短 ID，用作 profiles/<uid>/ 目录名
+	Name      string    `mapstructure:"name"       yaml:"name"`       // 显示名
+	Source    SubSource `mapstructure:"source"     yaml:"source"`     // 原始配置来源
+	UpdatedAt int64     `mapstructure:"updated_at" yaml:"updated_at"` // 最近成功拉取的 unix 时间戳（秒），0=从未更新
 }
 
 // 错误哨兵。集中定义，便于调用方用 errors.Is 判别。
