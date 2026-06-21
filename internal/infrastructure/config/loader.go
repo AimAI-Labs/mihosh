@@ -8,10 +8,13 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/spf13/viper"
 )
+
+var mu sync.Mutex
 
 // ErrConfigNotFound 配置文件不存在
 var ErrConfigNotFound = errors.New("配置文件不存在")
@@ -203,6 +206,9 @@ func buildMihomoConfigPathNotFoundError() error {
 
 // Load 加载配置文件
 func Load() (*Config, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
 	configDir, err := GetConfigDir()
 	if err != nil {
 		return nil, err

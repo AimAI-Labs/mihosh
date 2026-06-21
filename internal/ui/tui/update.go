@@ -409,14 +409,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// ── 订阅管理 (Sub) 消息 ──
 	case messages.SubsLoadedMsg:
 		m.subState = m.subState.ApplySubs(msg.Subs, msg.Active)
-		m.notice = ""
-		m.noticeTicks = 0
 
 	case messages.SubAddDoneMsg:
-		// 新增成功：刷新列表 + 提示
+		// 新增成功：刷新列表 + 提示，并自动触发首次更新
 		m.notice = i18n.T("sub.added_toast")
 		m.noticeTicks = autoRefreshNoticeTicks
-		return m, sub.FetchSubs(m.profileSvc)
+		m.subState = m.subState.SetUpdating(msg.UID)
+		return m, tea.Sequence(
+			sub.FetchSubs(m.profileSvc),
+			sub.UpdateSubCmd(m.profileSvc, msg.UID),
+		)
 
 	case messages.SubAddErrorMsg:
 		m.err = msg
@@ -434,6 +436,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.noticeTicks = 0
 
 	case messages.SubFetchDoneMsg:
+		m.subState = m.subState.ClearUpdating()
 		m.notice = i18n.T("sub.updated_toast")
 		m.noticeTicks = autoRefreshNoticeTicks
 		return m, sub.FetchSubs(m.profileSvc)

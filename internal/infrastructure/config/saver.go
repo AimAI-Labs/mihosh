@@ -9,6 +9,9 @@ import (
 
 // Save 保存配置文件
 func Save(cfg *Config) error {
+	mu.Lock()
+	defer mu.Unlock()
+
 	configDir, err := GetConfigDir()
 	if err != nil {
 		return err

@@ -115,7 +115,6 @@ func (s State) Querying() bool {
 func (s State) ApplySubs(subs []profile.Profile, active string) State {
 	s.subs = subs
 	s.activeUID = active
-	s.updatingUID = "" // 清理更新状态
 	if cap(s.filteredIdx) < len(subs) {
 		s.filteredIdx = make([]int, 0, len(subs))
 	}
@@ -268,6 +267,12 @@ func (s State) updateSelected(svc *service.ProfileService) (State, tea.Cmd) {
 	uid := s.subs[s.filteredIdx[s.selected]].UID
 	s.updatingUID = uid
 	return s, UpdateSubCmd(svc, uid)
+}
+
+// SetUpdating 标记指定的订阅为正在更新。
+func (s State) SetUpdating(uid string) State {
+	s.updatingUID = uid
+	return s
 }
 
 // ClearUpdating 清除正在更新的订阅标记。
