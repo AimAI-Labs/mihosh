@@ -458,13 +458,6 @@
   "sub.edit_title": "Edit Subscription",
   "sub.edited_toast": "Subscription updated",
 
-  "sub.merge_title": "Global Merge Override",
-  "sub.merge_placeholder": "# supports prepend-rules / append-rules / prepend-proxies / append-proxies / prepend-proxy-groups / append-proxy-groups and any top-level key override",
-  "sub.merge_keys_hint": "valid keys: prepend/append-rules, prepend/append-proxies, prepend/append-proxy-groups, dns, mode, tun...",
-  "sub.merge_loading": "loading current override...",
-  "sub.merge_ready": "Ctrl+S save · Esc cancel",
-  "sub.merge_load_err": "failed to load override: %s",
-
   "sub.delete_title": "Delete Subscription",
   "sub.delete_confirm_hint": "Delete this subscription? (raw cache and override will be removed, irreversible)",
   "sub.delete_warn_active": "⚠ This is the active subscription; deleting resets to no active sub (mihomo config unchanged)",
@@ -475,16 +468,17 @@
   "sub.activated_toast": "Switched subscription and reloaded core",
   "sub.activated_merge_warn_toast": "Switched subscription (override syntax error, override ignored)",
   "sub.merge_saved_toast": "Override saved",
+  "sub.merge_applied_toast": "Override saved and core reloaded",
+  "sub.merge_applied_warn_toast": "Override saved but had syntax error, ignored override and reloaded",
 
   "help.section.sub": "Subscriptions",
   "help.section.sub_search": "Sub Search",
   "help.section.sub_add": "Add Subscription",
-  "help.section.sub_merge": "Override Editor",
   "help.section.sub_delete": "Delete Subscription",
   "help.sub.select": "select",
   "help.sub.activate": "activate/switch",
   "help.sub.update": "update (fetch/reread)",
-  "help.sub.edit_merge": "edit override",
+  "help.sub.edit_merge": "edit override (external editor)",
   "help.sub.edit_profile": "edit subscription",
   "help.sub.add": "add",
   "help.sub.delete": "delete",
@@ -497,8 +491,6 @@
   "help.sub_add.field": "switch field",
   "help.sub_add.confirm": "confirm add",
   "help.sub_add.cancel": "cancel",
-  "help.sub_merge.save": "save",
-  "help.sub_merge.cancel": "cancel",
   "help.sub_delete.confirm": "confirm delete",
   "help.sub_delete.cancel": "cancel"
 }

@@ -386,11 +386,10 @@ func buildSettingsSections(ctx HelpContext) []section {
 
 // ── 订阅页交互模式常量（与 features/sub SubMode* 保持一致，避免循环依赖）──
 const (
-	subModeNormal      = 0 // 普通（列表浏览）
-	subModeSearch      = 1 // 搜索输入
-	subModeAddForm     = 2 // 添加订阅表单
-	subModeMergeEditor = 3 // merge 编辑器
-	subModeDeleteConf  = 4 // 删除确认
+	subModeNormal     = 0 // 普通（列表浏览）
+	subModeSearch     = 1 // 搜索输入
+	subModeAddForm    = 2 // 添加订阅表单
+	subModeDeleteConf = 4 // 删除确认
 )
 
 // buildSubSections 订阅页帮助分区。
@@ -413,14 +412,6 @@ func buildSubSections(ctx HelpContext) []section {
 				{"↑/↓", i18n.T("help.sub_add.field")},
 				{"Enter", i18n.T("help.sub_add.confirm")},
 				{"Esc", i18n.T("help.sub_add.cancel")},
-			},
-		}}
-	case subModeMergeEditor:
-		return []section{{
-			title: i18n.T("help.section.sub_merge"),
-			bindings: []keybinding{
-				{"Ctrl+S", i18n.T("help.sub_merge.save")},
-				{"Esc", i18n.T("help.sub_merge.cancel")},
 			},
 		}}
 	case subModeDeleteConf:

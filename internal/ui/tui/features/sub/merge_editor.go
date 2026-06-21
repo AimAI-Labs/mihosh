@@ -1,100 +1,53 @@
 package sub
 
-// merge_editor.go — merge.yaml 多行编辑器（基于 bubbles/textarea）。
+// merge_editor.go — 在外部编辑器（$EDITOR / notepad）中打开 merge.yaml。
 //
-// 打开时异步载入当前订阅的 merge.yaml 内容（LoadMergeCmd → MergeLoadedMsg）。
-//   - Esc：取消关闭，不保存；
-//   - Ctrl+S：保存并关闭（SaveMergeCmd）。
-//
-// 内容加载后先存入 pending（延迟赋值）。bubbles/textarea 的 SetValue 依赖
-// viewport 初始化（viewport 仅在 SetWidth/SetHeight/View 后可用），过早调用
-// 会触发 nil panic。因此在弹窗渲染（已知宽度）时通过 flushPending 把内容
-// 真正写入 textarea。
+// 与 rules 页编辑 mihomo 配置一致：通过 tea.ExecProcess 暂停 TUI，
+// 把终端交给编辑器，编辑器直接写盘 merge.yaml；退出后由主 Model 负责重载核心。
+// 删除了原 bubbles/textarea 弹窗与 Load/Save 来回，磁盘作为单一事实源。
 
 import (
+	"errors"
+	"os/exec"
+
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
-	"github.com/AimAI-Labs/mihosh/pkg/i18n"
-	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// mergeEditor merge 编辑器状态。
-type mergeEditor struct {
-	editor  textarea.Model
-	uid     string
-	ready   bool   // 内容是否已加载
-	errMsg  string // 保存/加载错误（行内显示）
-	pending string // 待写入 textarea 的内容（渲染时 flush，避免 viewport nil panic）
-	flushed bool   // pending 是否已写入
-}
-
-// newMergeEditor 构造编辑器（内容待 LoadMerge 回填）。
-func newMergeEditor(uid string) mergeEditor {
-	ta := textarea.New()
-	ta.Placeholder = i18n.T("sub.merge_placeholder")
-	ta.Prompt = ""
-	ta.ShowLineNumbers = false
-	ta.SetHeight(10)
-	ta.Focus()
-	return mergeEditor{uid: uid, editor: ta}
-}
-
-// applyLoaded 内容加载完成后暂存到 pending（渲染时才 flush 到 textarea）。
-func (m mergeEditor) applyLoaded(data []byte) mergeEditor {
-	m.pending = string(data)
-	m.ready = true
-	m.flushed = false
-	return m
-}
-
-// flushPending 在 textarea 已设置尺寸（渲染期）后，把 pending 内容写入。
-// 重复调用安全（flushed 标记避免重复赋值）。
-func (m mergeEditor) flushPending() mergeEditor {
-	if m.flushed || !m.ready {
-		return m
-	}
-	if m.pending != "" {
-		m.editor.SetValue(m.pending)
-	}
-	m.flushed = true
-	return m
-}
-
-// handleUpdate 处理编辑器按键（弹窗激活时由 state 分派到此）。
-func (s State) handleMergeEditorUpdate(msg tea.KeyMsg, svc *service.ProfileService) (State, tea.Cmd) {
-	editor := s.mergeEditor
-
-	switch {
-	case msg.String() == "esc":
-		// 取消关闭
-		s.showMergeEditor = false
-		s.mergeEditor = newMergeEditor("")
+// openMergeExternalEditor 在外部编辑器中打开当前选中订阅的 merge.yaml。
+//
+// 空列表/无有效选中项时返回 nil cmd；无可用编辑器或路径解析失败时
+// 返回携带 MergeEditFinishedMsg{Err} 的命令。
+func (s State) openMergeExternalEditor(svc *service.ProfileService) (State, tea.Cmd) {
+	if len(s.filteredIdx) == 0 || s.selected < 0 || s.selected >= len(s.filteredIdx) {
 		return s, nil
+	}
+	uid := s.subs[s.filteredIdx[s.selected]].UID
 
-	case msg.String() == "ctrl+s":
-		if !editor.ready {
-			// 内容未加载，忽略保存
-			return s, nil
-		}
-		// 优先用 pending（尚未 flush 的情况），否则用编辑器当前值
-		content := editor.pending
-		if editor.flushed {
-			content = editor.editor.Value()
-		}
-		uid := editor.uid
-		s.showMergeEditor = false
-		s.mergeEditor = newMergeEditor("")
-		return s, SaveMergeCmd(svc, uid, []byte(content))
+	mergePath, err := profile.MergePath(uid)
+	if err != nil {
+		return s, mergeEditError(uid, err)
+	}
+	editor := utils.ResolveEditor()
+	if editor == "" {
+		return s, mergeEditError(uid, errors.New("未找到可用的编辑器，请在 ~/.bashrc 或 ~/.zshrc 中设置 EDITOR 变量"))
+	}
+	fields := utils.SplitEditorCommand(editor)
+	args := make([]string, 0, len(fields))
+	args = append(args, fields[1:]...)
+	args = append(args, mergePath)
+	c := exec.Command(fields[0], args...)
+	return s, tea.ExecProcess(c, func(err error) tea.Msg {
+		return messages.MergeEditFinishedMsg{UID: uid, Err: err}
+	})
+}
 
-	default:
-		if !editor.ready {
-			// 未就绪：吞掉除 Esc 外的所有键
-			return s, nil
-		}
-		editor = editor.flushPending()
-		updated, cmd := editor.editor.Update(msg)
-		editor.editor = updated
-		s.mergeEditor = editor
-		return s, cmd
+// mergeEditError 构造一个返回 MergeEditFinishedMsg（携带错误）的命令。
+func mergeEditError(uid string, err error) tea.Cmd {
+	return func() tea.Msg {
+		return messages.MergeEditFinishedMsg{UID: uid, Err: err}
 	}
 }

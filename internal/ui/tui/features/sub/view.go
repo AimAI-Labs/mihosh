@@ -45,8 +45,6 @@ type PageState struct {
 	AddForm        addForm
 	ShowEditForm   bool
 	EditForm       addForm
-	ShowMergeEdit  bool
-	MergeEditor    mergeEditor
 	ShowDeleteConf bool
 	DeleteUID      string
 	UpdatingUID    string
@@ -88,9 +86,6 @@ func RenderSubPage(state PageState) string {
 	}
 	if state.ShowEditForm {
 		result = renderEditFormOverlay(result, state, state.Width, state.Height)
-	}
-	if state.ShowMergeEdit {
-		result = renderMergeEditorOverlay(result, state, state.Width, state.Height)
 	}
 	if state.ShowDeleteConf {
 		result = renderDeleteConfirmOverlay(result, state, state.Width, state.Height)
@@ -330,12 +325,6 @@ func renderInlineHelp(page string, state PageState) string {
 }
 
 func buildHints(state PageState) []common.InlineHelpHint {
-	if state.ShowMergeEdit {
-		return []common.InlineHelpHint{
-			{Key: "Ctrl+S", Desc: i18n.T("help.sub_merge.save")},
-			{Key: "Esc", Desc: i18n.T("help.sub_merge.cancel")},
-		}
-	}
 	if state.ShowDeleteConf {
 		return []common.InlineHelpHint{
 			{Key: "Enter/y", Desc: i18n.T("help.sub_delete.confirm")},
@@ -374,10 +363,8 @@ func buildHints(state PageState) []common.InlineHelpHint {
 // ============================================================
 
 const (
-	addFormModalWidth      = 54
-	mergeEditorModalWidth  = 70
-	mergeEditorModalHeight = 18
-	deleteModalWidth       = 54
+	addFormModalWidth = 54
+	deleteModalWidth  = 54
 )
 
 // overlayDim 底层暗化 + 弹窗居中嵌入的通用实现。
@@ -549,66 +536,6 @@ func resolveFormBounds(state PageState, width, height int) (left, top, right, bo
 	right = left + modalWidth
 	bottom = top + modalHeight
 	return
-}
-
-// ===== merge 编辑器 =====
-
-func renderMergeEditorOverlay(background string, state PageState, width, height int) string {
-	return overlayDim(background, buildMergeEditorModal(state, width, height), width, height)
-}
-
-func buildMergeEditorModal(state PageState, width, height int) string {
-	modalWidth := mergeEditorModalWidth
-	if modalWidth > width-4 {
-		modalWidth = width - 4
-	}
-	if modalWidth < 40 {
-		modalWidth = 40
-	}
-	modalHeight := mergeEditorModalHeight
-	if modalHeight > height-4 {
-		modalHeight = height - 4
-	}
-	if modalHeight < 8 {
-		modalHeight = 8
-	}
-	innerWidth := modalWidth - 4
-	if innerWidth < 10 {
-		innerWidth = 10
-	}
-
-	editor := state.MergeEditor
-	// 调整 textarea 高度适配弹窗，尺寸设置后再 flush pending 内容
-	// （textarea.SetValue 依赖 viewport 初始化，需在 SetWidth/SetHeight 之后调用）
-	editor.editor.SetWidth(innerWidth)
-	editor.editor.SetHeight(modalHeight - 6)
-	editor = editor.flushPending()
-
-	// 合法键提示
-	hint := common.TokyoMutedStyle().Render(i18n.T("sub.merge_keys_hint"))
-
-	var status string
-	if !editor.ready {
-		status = common.TokyoMutedStyle().Render(i18n.T("sub.merge_loading"))
-	} else if editor.errMsg != "" {
-		status = lipgloss.NewStyle().Foreground(common.Warning()).Render(editor.errMsg)
-	} else {
-		status = common.TokyoMutedStyle().Render(i18n.T("sub.merge_ready"))
-	}
-
-	content := lipgloss.JoinVertical(lipgloss.Left,
-		hint,
-		editor.editor.View(),
-		status,
-	)
-
-	return common.RenderBorderedPanel(
-		i18n.T("sub.merge_title"),
-		content,
-		modalWidth,
-		common.TokyoBlue(),
-		common.TokyoForeground(),
-	)
 }
 
 // ===== 删除确认 =====

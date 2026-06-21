@@ -458,13 +458,6 @@
   "sub.edit_title": "编辑订阅",
   "sub.edited_toast": "已更新订阅",
 
-  "sub.merge_title": "全局扩展覆写 (merge)",
-  "sub.merge_placeholder": "# 支持 prepend-rules / append-rules / prepend-proxies / append-proxies / prepend-proxy-groups / append-proxy-groups 及任意顶层键覆盖",
-  "sub.merge_keys_hint": "合法键：prepend/append-rules、prepend/append-proxies、prepend/append-proxy-groups、dns、mode、tun…",
-  "sub.merge_loading": "正在加载当前覆写…",
-  "sub.merge_ready": "Ctrl+S 保存 · Esc 取消",
-  "sub.merge_load_err": "读取覆写失败：%s",
-
   "sub.delete_title": "删除订阅",
   "sub.delete_confirm_hint": "确定要删除此订阅吗？（原始缓存与覆写将被清除，不可恢复）",
   "sub.delete_warn_active": "⚠ 此为当前激活订阅，删除后将恢复至无激活状态（mihomo 配置不变）",
@@ -475,16 +468,17 @@
   "sub.activated_toast": "已切换订阅并重载核心",
   "sub.activated_merge_warn_toast": "已切换订阅（覆写语法错误，已忽略覆写）",
   "sub.merge_saved_toast": "已保存覆写",
+  "sub.merge_applied_toast": "覆写已保存并重载核心",
+  "sub.merge_applied_warn_toast": "覆写已保存但语法错误，已忽略覆写并重载",
 
   "help.section.sub": "订阅管理",
   "help.section.sub_search": "订阅搜索",
   "help.section.sub_add": "添加订阅",
-  "help.section.sub_merge": "覆写编辑",
   "help.section.sub_delete": "删除订阅",
   "help.sub.select": "选择订阅",
   "help.sub.activate": "激活/切换",
   "help.sub.update": "更新（拉取/重读）",
-  "help.sub.edit_merge": "编辑覆写",
+  "help.sub.edit_merge": "外部编辑器编辑覆写",
   "help.sub.edit_profile": "编辑订阅",
   "help.sub.add": "添加",
   "help.sub.delete": "删除",
@@ -497,8 +491,6 @@
   "help.sub_add.field": "切换字段",
   "help.sub_add.confirm": "确认添加",
   "help.sub_add.cancel": "取消",
-  "help.sub_merge.save": "保存",
-  "help.sub_merge.cancel": "取消",
   "help.sub_delete.confirm": "确认删除",
   "help.sub_delete.cancel": "取消"
 }

@@ -2,8 +2,9 @@ package sub
 
 // state.go — 订阅页完整状态与按键/鼠标分发。
 //
-// 交互模式（互斥）：普通列表 / 搜索输入 / 添加表单 / merge 编辑器 / 删除确认。
+// 交互模式（互斥）：普通列表 / 搜索输入 / 添加表单 / 删除确认。
 // 弹窗激活时吞掉底层按键（与 rules 页一致）。
+// 「编辑覆写」改为外部编辑器（按 m），不在 TUI 内维护弹窗状态。
 
 import (
 	"regexp"
@@ -13,46 +14,39 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
-	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 // 交互模式常量（供 help 包镜像，见 help/view.go subMode*）。
 const (
-	ModeNormal      = 0
-	ModeSearch      = 1
-	ModeAddForm     = 2
-	ModeMergeEditor = 3
-	ModeDeleteConf  = 4
+	ModeNormal     = 0
+	ModeSearch     = 1
+	ModeAddForm    = 2
+	ModeDeleteConf = 4
 )
 
 const subDoubleClickThreshold = 350 * time.Millisecond
 
 // State 订阅页完整状态。
 type State struct {
-	subs          []profile.Profile
-	filteredIdx   []int // 过滤后的订阅在 subs 中的索引
-	activeUID     string
-	filter        string
-	filterMode    bool
-	filterEngine  FilterEngine
-	selected      int
-	scrollTop     int
+	subs         []profile.Profile
+	filteredIdx  []int // 过滤后的订阅在 subs 中的索引
+	activeUID    string
+	filter       string
+	filterMode   bool
+	filterEngine FilterEngine
+	selected     int
+	scrollTop    int
 
 	// 弹窗/输入模式
-	showAddForm     bool
-	addForm         addForm
-	showEditForm    bool // 编辑当前选中订阅（名称 + 来源）
-	editUID         string
-	editForm        addForm
-	showMergeEditor bool
-	mergeEditor     mergeEditor
-	showDeleteConf  bool
-	deleteUID       string // 待删除订阅 UID
-
-	// merge 编辑器打开时正在加载的目标 UID（LoadMerge 命令发出后等待回填）
-	mergeLoadingUID string
+	showAddForm    bool
+	addForm        addForm
+	showEditForm   bool // 编辑当前选中订阅（名称 + 来源）
+	editUID        string
+	editForm       addForm
+	showDeleteConf bool
+	deleteUID      string // 待删除订阅 UID
 
 	// 鼠标双击检测
 	lastMouseIdx int
@@ -87,13 +81,14 @@ func (s State) ToPageState(width, height int) PageState {
 		AddForm:        s.addForm,
 		ShowEditForm:   s.showEditForm,
 		EditForm:       s.editForm,
-		ShowMergeEdit:  s.showMergeEditor,
-		MergeEditor:    s.mergeEditor,
 		ShowDeleteConf: s.showDeleteConf,
 		DeleteUID:      s.deleteUID,
 		UpdatingUID:    s.updatingUID,
 	}
 }
+
+// ActiveUID 返回当前激活订阅的 UID（供 update.go 区分编辑的是否为激活订阅）。
+func (s State) ActiveUID() string { return s.activeUID }
 
 // Mode 返回当前交互模式（供 help 弹窗）。
 func (s State) Mode() int {
@@ -102,8 +97,6 @@ func (s State) Mode() int {
 		return ModeSearch
 	case s.showAddForm, s.showEditForm:
 		return ModeAddForm
-	case s.showMergeEditor:
-		return ModeMergeEditor
 	case s.showDeleteConf:
 		return ModeDeleteConf
 	default:
@@ -113,7 +106,7 @@ func (s State) Mode() int {
 
 // Querying 是否处于输入捕获模式（供主 Model 的 isInputCapturing 判断）。
 func (s State) Querying() bool {
-	return s.filterMode || s.showAddForm || s.showEditForm || s.showMergeEditor || s.showDeleteConf
+	return s.filterMode || s.showAddForm || s.showEditForm || s.showDeleteConf
 }
 
 // ApplySubs 应用加载的订阅列表与激活 UID，并重建过滤缓存。
@@ -132,9 +125,6 @@ func (s State) Update(msg tea.KeyMsg, svc *service.ProfileService) (State, tea.C
 	// 弹窗优先拦截
 	if s.showDeleteConf {
 		return s.handleDeleteConfirm(msg, svc)
-	}
-	if s.showMergeEditor {
-		return s.handleMergeEditorUpdate(msg, svc)
 	}
 	if s.showAddForm {
 		return s.handleAddFormUpdate(msg, svc)
@@ -162,7 +152,7 @@ func (s State) Update(msg tea.KeyMsg, svc *service.ProfileService) (State, tea.C
 	case msg.String() == "u":
 		return s.updateSelected(svc)
 	case msg.String() == "m":
-		return s.openMergeEditor(svc)
+		return s.openMergeExternalEditor(svc)
 	case msg.String() == "e":
 		return s.openEditForm(svc)
 	case msg.String() == "n":
@@ -291,18 +281,6 @@ func (s State) ClearUpdating() State {
 	return s
 }
 
-// openMergeEditor 打开当前选中订阅的 merge 编辑器（先异步载入内容）。
-func (s State) openMergeEditor(svc *service.ProfileService) (State, tea.Cmd) {
-	if len(s.filteredIdx) == 0 || s.selected < 0 || s.selected >= len(s.filteredIdx) {
-		return s, nil
-	}
-	uid := s.subs[s.filteredIdx[s.selected]].UID
-	s.showMergeEditor = true
-	s.mergeEditor = newMergeEditor(uid)
-	s.mergeLoadingUID = uid
-	return s, LoadMergeCmd(svc, uid)
-}
-
 // openEditForm 打开当前选中订阅的编辑表单（预填名称 + 来源）。
 func (s State) openEditForm(svc *service.ProfileService) (State, tea.Cmd) {
 	if len(s.filteredIdx) == 0 || s.selected < 0 || s.selected >= len(s.filteredIdx) {
@@ -345,33 +323,8 @@ func (s State) handleEditFormUpdate(msg tea.KeyMsg, svc *service.ProfileService)
 	return s, cmd
 }
 
-// HandleMergeLoaded 处理 merge 内容加载结果（由主 Model 收到 MergeLoadedMsg 后回调）。
-func (s State) HandleMergeLoaded(uid string, data []byte, err error) State {
-	// 仅当当前正在加载该 UID 且编辑器确实为其打开时才回填，
-	// 避免编辑器未初始化时操作 textarea（viewport nil panic）。
-	if s.mergeLoadingUID != uid || s.mergeEditor.uid != uid {
-		return s
-	}
-	editor := s.mergeEditor
-	if err != nil {
-		editor.errMsg = i18n.Tf("sub.merge_load_err", err.Error())
-		editor.ready = true // 允许编辑（从空开始）
-	} else {
-		editor = editor.applyLoaded(data)
-	}
-	s.mergeEditor = editor
-	return s
-}
-
 // HandleMouseScroll 鼠标滚轮。
 func (s State) HandleMouseScroll(up bool) State {
-	// merge 编辑器打开时滚轮滚文本
-	if s.showMergeEditor && s.mergeEditor.ready {
-		editor := s.mergeEditor
-		// bubbles/textarea 的滚轮通过 Viewport 渲染处理，此处不干预
-		s.mergeEditor = editor
-		return s
-	}
 	if up {
 		if s.selected > 0 {
 			s.selected--
@@ -388,11 +341,11 @@ func (s State) HandleMouseScroll(up bool) State {
 
 // HandleMouseLeft 处理列表单击/双击。
 func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, svc *service.ProfileService) (State, tea.Cmd) {
-	// 弹窗激活时点击弹窗外 → 取消关闭（删除确认/merge 编辑器/添加表单）
-	if s.showDeleteConf || s.showMergeEditor || s.showAddForm || s.showEditForm {
+	// 弹窗激活时点击弹窗外 → 取消关闭（删除确认/添加表单）
+	if s.showDeleteConf || s.showAddForm || s.showEditForm {
 		// 简化处理：点击任意位置不自动关闭破坏性弹窗（需 Esc/Enter），
 		// 避免误触。仅非破坏性的添加/编辑表单点击外部关闭。
-		if (s.showAddForm || s.showEditForm) && !s.showDeleteConf && !s.showMergeEditor {
+		if (s.showAddForm || s.showEditForm) && !s.showDeleteConf {
 			ps := s.ToPageState(pageWidth, pageHeight)
 			left, top, right, bottom := resolveFormBounds(ps, pageWidth, pageHeight)
 			if !(pageX >= left && pageX < right && pageY >= top && pageY < bottom) {

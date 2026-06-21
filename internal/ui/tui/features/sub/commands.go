@@ -97,36 +97,24 @@ func ActivateSubCmd(svc *service.ProfileService, uid string) tea.Cmd {
 	}
 }
 
-// LoadMergeCmd 读取某订阅的 merge.yaml 内容（用于编辑器载入）。
-func LoadMergeCmd(svc *service.ProfileService, uid string) tea.Cmd {
+// ApplyActiveMergeCmd 复用 Activate 流程做覆写编辑后的重载
+// （生成 → 备份 → 写入 → 热重载核心；配置未变更时跳过）。
+// 与 ActivateSubCmd 的唯一差别：返回 SubMergeAppliedMsg 以走专属 toast 文案。
+func ApplyActiveMergeCmd(svc *service.ProfileService, uid string) tea.Cmd {
 	return func() tea.Msg {
 		if svc == nil {
-			return MergeLoadedMsg{UID: uid, Err: errNoService}
+			return messages.SubMergeAppliedMsg{UID: uid, Err: errNoService}
 		}
-		data, err := svc.LoadMerge(uid)
-		return MergeLoadedMsg{UID: uid, Data: data, Err: err}
+		res, err := svc.Activate(uid)
+		if err != nil {
+			return messages.SubMergeAppliedMsg{UID: uid, Err: err}
+		}
+		return messages.SubMergeAppliedMsg{
+			UID:        uid,
+			BackupName: res.BackupName,
+			MergeErr:   res.MergeErr,
+		}
 	}
-}
-
-// SaveMergeCmd 保存 merge.yaml 内容。
-func SaveMergeCmd(svc *service.ProfileService, uid string, content []byte) tea.Cmd {
-	return func() tea.Msg {
-		if svc == nil {
-			return messages.SubMergeSaveErrorMsg{UID: uid, Err: errNoService}
-		}
-		if err := svc.SaveMerge(uid, content); err != nil {
-			return messages.SubMergeSaveErrorMsg{UID: uid, Err: err}
-		}
-		return messages.SubMergeSavedMsg{UID: uid}
-	}
-}
-
-// MergeLoadedMsg 内部消息：merge 内容已读取（由 sub 页与主 Model 消费，
-// 不进全局 events.go 以保持载荷内聚）。
-type MergeLoadedMsg struct {
-	UID  string
-	Data []byte
-	Err  error
 }
 
 var errNoService = errNoServiceErr{}

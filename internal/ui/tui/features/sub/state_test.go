@@ -53,10 +53,6 @@ func TestState_QueryingAndMode(t *testing.T) {
 	assert.Equal(t, ModeAddForm, s.Mode())
 
 	s.showAddForm = false
-	s.showMergeEditor = true
-	assert.Equal(t, ModeMergeEditor, s.Mode())
-
-	s.showMergeEditor = false
 	s.showDeleteConf = true
 	assert.Equal(t, ModeDeleteConf, s.Mode())
 }
@@ -146,26 +142,19 @@ func TestOpenDeleteConfirm_EmptyList(t *testing.T) {
 	assert.False(t, s.showDeleteConf)
 }
 
-func TestHandleMergeLoaded_OnlyMatchingUID(t *testing.T) {
-	editor := newMergeEditor("a1")
-	s := State{mergeLoadingUID: "a1", mergeEditor: editor}
-
-	// 不匹配的 UID 应被丢弃，不改变状态
-	s = s.HandleMergeLoaded("b2", []byte("x"), nil)
-	assert.False(t, s.mergeEditor.ready, "不匹配的 UID 不应回填")
-
-	// 匹配的 UID 应回填（内容存入 pending，渲染时才 flush 到 textarea）
-	s = s.HandleMergeLoaded("a1", []byte("mode: rule"), nil)
-	assert.True(t, s.mergeEditor.ready)
-	assert.Equal(t, "mode: rule", s.mergeEditor.pending)
-	assert.False(t, s.mergeEditor.flushed, "未渲染时 pending 尚未 flush")
+func TestUpdate_MKeyOpensMergeEditor(t *testing.T) {
+	// 按 m 应返回非 nil 命令（tea.ExecProcess 启动外部编辑器）。
+	s := State{}.ApplySubs(sampleSubs(), "")
+	s.selected = 0
+	_, cmd := s.Update(newRuneKey("m"), nil)
+	require.NotNil(t, cmd, "m 应发出打开外部编辑器的命令")
 }
 
-func TestHandleMergeLoaded_EditorNotOpened(t *testing.T) {
-	// 编辑器未初始化（零值 mergeEditor，uid=""）时不应 panic
-	s := State{mergeLoadingUID: "a1"}
-	s = s.HandleMergeLoaded("a1", []byte("mode: rule"), nil)
-	assert.False(t, s.mergeEditor.ready, "编辑器未打开时应忽略加载结果")
+func TestOpenMergeExternalEditor_NoSelection(t *testing.T) {
+	// 空列表时按 m 应返回 nil 命令。
+	s := State{}.ApplySubs(nil, "")
+	_, cmd := s.openMergeExternalEditor(nil)
+	assert.Nil(t, cmd, "空列表不应发出编辑器命令")
 }
 
 func TestOpenEditForm_PrefillsCurrentSub(t *testing.T) {
@@ -187,24 +176,12 @@ func TestOpenEditForm_EmptyList(t *testing.T) {
 	assert.False(t, s.showEditForm, "空列表不应打开编辑表单")
 }
 
-func TestUpdate_MKeyOpensMergeEditor(t *testing.T) {
-	// 按 m 应打开 merge 编辑器（而非 e）
-	s := State{}.ApplySubs(sampleSubs(), "")
-	s.selected = 0
-	s, cmd := s.Update(newRuneKey("m"), nil)
-	assert.True(t, s.showMergeEditor, "m 应触发 merge 编辑器")
-	assert.Equal(t, "a1", s.mergeEditor.uid)
-	// 同时发出了 LoadMerge 命令
-	require.NotNil(t, cmd)
-}
-
 func TestUpdate_EKeyOpensEditForm(t *testing.T) {
-	// 按 e 应打开编辑表单（而非 merge）
+	// 按 e 应打开编辑表单
 	s := State{}.ApplySubs(sampleSubs(), "")
 	s.selected = 0
 	s, _ = s.Update(newRuneKey("e"), nil)
 	assert.True(t, s.showEditForm, "e 应触发编辑表单")
-	assert.False(t, s.showMergeEditor, "e 不应触发 merge 编辑器")
 	assert.Equal(t, "a1", s.editUID)
 }
 

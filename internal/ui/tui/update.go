@@ -486,9 +486,47 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.notice = ""
 		m.noticeTicks = 0
 
-	case sub.MergeLoadedMsg:
-		// merge 编辑器内容已异步加载，回填到编辑器状态
-		m.subState = m.subState.HandleMergeLoaded(msg.UID, msg.Data, msg.Err)
+	case messages.MergeEditFinishedMsg:
+		// 外部编辑器结束：tea.ExecProcess 期间会 ReleaseTerminal（禁用鼠标），
+		// 但 RestoreTerminal 不恢复鼠标模式（Bubble Tea v1.3.10 缺陷），需显式重新启用。
+		reenableMouse := func() tea.Msg { return tea.EnableMouseCellMotion() }
+		if msg.Err != nil {
+			m.err = messages.ErrMsg{Err: msg.Err}
+			m.notice = ""
+			m.noticeTicks = 0
+			return m, reenableMouse
+		}
+		// 编辑的是当前激活订阅 → 重新生成最终配置并热重载核心（专属 toast）；
+		// 否则仅提示已保存（下次激活该订阅时自然合并生效）。
+		if msg.UID == m.subState.ActiveUID() {
+			m.notice = i18n.T("sub.merge_applied_toast")
+			m.noticeTicks = autoRefreshNoticeTicks
+			return m, tea.Batch(reenableMouse, sub.ApplyActiveMergeCmd(m.profileSvc, msg.UID))
+		}
+		m.notice = i18n.T("sub.merge_saved_toast")
+		m.noticeTicks = autoRefreshNoticeTicks
+		return m, reenableMouse
+
+	case messages.SubMergeAppliedMsg:
+		// 覆写编辑后触发的重载流程结束（仅激活订阅会走到此分支）。
+		if msg.Err != nil {
+			m.err = messages.ErrMsg{Err: msg.Err}
+			m.notice = ""
+			m.noticeTicks = 0
+			return m, nil
+		}
+		notice := i18n.T("sub.merge_applied_toast")
+		if msg.MergeErr != nil {
+			notice = i18n.T("sub.merge_applied_warn_toast")
+		}
+		m.notice = notice
+		m.noticeTicks = autoRefreshNoticeTicks
+		// 刷新订阅列表 + 刷新节点信息（核心已重载）
+		return m, tea.Batch(
+			sub.FetchSubs(m.profileSvc),
+			nodes.FetchGroups(m.client),
+			nodes.FetchProxies(m.client),
+		)
 	}
 
 	return m, nil

@@ -61,23 +61,6 @@ func TestRenderSubPage_DeleteConfirmOverlay(t *testing.T) {
 	assert.NotEmpty(t, out)
 }
 
-func TestRenderSubPage_MergeEditorOverlay(t *testing.T) {
-	editor := newMergeEditor("a1")
-	editor = editor.applyLoaded([]byte("prepend-rules:\n  - DOMAIN,x,DIRECT"))
-	state := PageState{
-		Subs: []profile.Profile{
-			{UID: "a1", Name: "订阅A", Source: profile.SubSource{Kind: profile.SourceRemote, URL: "https://a.io"}},
-		},
-		FilteredIdx:   []int{0},
-		Width:         100,
-		Height:        30,
-		ShowMergeEdit: true,
-		MergeEditor:   editor,
-	}
-	out := RenderSubPage(state)
-	assert.NotEmpty(t, out)
-}
-
 func TestResolveListItemAt(t *testing.T) {
 	state := PageState{
 		FilteredIdx: []int{0, 1, 2},
