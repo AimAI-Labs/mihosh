@@ -188,6 +188,87 @@ func TestProfileService_ActivateMissingRaw(t *testing.T) {
 	assert.ErrorIs(t, err, profile.ErrRawNotFound)
 }
 
+// TestProfileService_ActivateSkipsUnchangedConfig 验证：当生成的最终配置与 mihomo
+// 当前配置文件字节相同时，Activate 跳过写盘+备份+重载（client==nil 也不会报错）。
+//
+// 这是"跳过相同配置重载"优化的核心保障——避免重复触发 mihomo ApplyConfig
+// 重建 proxies/rules/providers 导致的内存峰值。
+func TestProfileService_ActivateSkipsUnchangedConfig(t *testing.T) {
+	// 单一临时 HOME，同时容纳 mihosh 配置（.mihosh）与 mihomo 配置（.config/mihomo）。
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("APPDATA", "") // 防 Windows 下搜到真实系统的 mihomo 目录
+	t.Setenv("HOMEDRIVE", "")
+	t.Setenv("HOMEPATH", "")
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+
+	// 预置 mihosh 配置文件，使 config.Load 可用。
+	mihoshDir := filepath.Join(home, ".mihosh")
+	require.NoError(t, os.MkdirAll(mihoshDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(mihoshDir, "config.yaml"),
+		[]byte("api_address: http://127.0.0.1:9090\n"), 0644))
+
+	s := NewProfileService(nil)
+
+	// 添加订阅并写入一份本地 raw.yaml。
+	p, err := s.AddProfile("跳过测试", profile.SubSource{Kind: profile.SourceLocal, Path: "/p/a.yaml"})
+	require.NoError(t, err)
+	require.NoError(t, profile.WriteRaw(p.UID, []byte("mode: rule\nproxies: []\n")))
+
+	// 预先算出 Activate 将生成的字节，写入 mihomo 配置目录（模拟"上次已成功激活"）。
+	mihomoDir := filepath.Join(home, ".config", "mihomo")
+	require.NoError(t, os.MkdirAll(mihomoDir, 0755))
+	mihomoPath := filepath.Join(mihomoDir, "config.yaml")
+	expected, err := profile.GenerateAndWriteForUIDIgnoreMergeError(p.UID)
+	require.NoError(t, err)
+	require.NotEmpty(t, expected)
+	require.NoError(t, os.WriteFile(mihomoPath, expected, 0644))
+
+	// client==nil：若未跳过，会在重载阶段报"未配置 mihomo 客户端"。
+	// 跳过时应直接返回成功且 BackupName 为空。
+	res, err := s.Activate(p.UID)
+	require.NoError(t, err)
+	assert.Empty(t, res.BackupName, "配置未变更时应跳过备份，BackupName 为空")
+}
+
+// TestProfileService_ActivateRewritesWhenConfigChanged 验证：当生成的配置与
+// mihomo 当前配置不同时，Activate 走完整流程（此处因 client==nil 在重载阶段报错，
+// 但能证明未跳过——跳过分支不会报 client 错误）。
+func TestProfileService_ActivateRewritesWhenConfigChanged(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("APPDATA", "")
+	t.Setenv("HOMEDRIVE", "")
+	t.Setenv("HOMEPATH", "")
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+
+	mihoshDir := filepath.Join(home, ".mihosh")
+	require.NoError(t, os.MkdirAll(mihoshDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(mihoshDir, "config.yaml"),
+		[]byte("api_address: http://127.0.0.1:9090\n"), 0644))
+
+	s := NewProfileService(nil)
+
+	p, err := s.AddProfile("变更测试", profile.SubSource{Kind: profile.SourceLocal, Path: "/p/a.yaml"})
+	require.NoError(t, err)
+	require.NoError(t, profile.WriteRaw(p.UID, []byte("mode: rule\nproxies: []\n")))
+
+	// mihomoPath 放一份与生成内容不同的旧配置。
+	mihomoDir := filepath.Join(home, ".config", "mihomo")
+	require.NoError(t, os.MkdirAll(mihomoDir, 0755))
+	mihomoPath := filepath.Join(mihomoDir, "config.yaml")
+	require.NoError(t, os.WriteFile(mihomoPath, []byte("mode: direct\n"), 0644))
+
+	// 配置不同 → 不跳过 → 走到重载阶段 → client==nil 报错。
+	_, err = s.Activate(p.UID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "未配置 mihomo 客户端")
+}
+
 // TestNewUID verifies UID uniqueness and format.
 func TestNewUID(t *testing.T) {
 	seen := map[string]bool{}

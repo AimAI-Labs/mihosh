@@ -13,10 +13,12 @@ package service
 //   - 元数据持久化委托 config 包（subs/active_sub 字段）。
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -219,18 +221,30 @@ func (s *ProfileService) Activate(uid string) (ActivateResult, error) {
 		return ActivateResult{}, ErrMihomoPathMissing
 	}
 
-	// 3. 备份现有 config.yaml
+	// 3. 配置未变更时跳过写盘与重载。
+	// yaml.v3 序列化确定性保证：相同 raw+merge 生成字节一致。
+	// 跳过可避免重复触发 mihomo ApplyConfig 重建 proxies/rules/providers
+	// （其固有内存峰值是用户感知"切换订阅内存升高"的直接来源）。
+	if existing, rerr := os.ReadFile(mihomoPath); rerr == nil && bytes.Equal(existing, data) {
+		// 仅同步激活 UID 后返回（BackupName 为空表示未产生新备份）。
+		if err := s.SetActiveSub(uid); err != nil {
+			_ = err
+		}
+		return ActivateResult{MergeErr: mergeErr}, nil
+	}
+
+	// 4. 备份现有 config.yaml
 	backupName, err := profile.BackupConfig(mihomoPath)
 	if err != nil {
 		return ActivateResult{}, fmt.Errorf("备份配置失败: %w", err)
 	}
 
-	// 4. 原子写入最终配置
+	// 5. 原子写入最终配置
 	if err := profile.WriteFinal(mihomoPath, data); err != nil {
 		return ActivateResult{}, fmt.Errorf("写入最终配置失败: %w", err)
 	}
 
-	// 5. 热重载核心
+	// 6. 热重载核心
 	if s.client == nil {
 		return ActivateResult{}, errors.New("未配置 mihomo 客户端，无法重载核心")
 	}
@@ -239,7 +253,7 @@ func (s *ProfileService) Activate(uid string) (ActivateResult, error) {
 		return ActivateResult{}, fmt.Errorf("核心重载失败（配置已写入）: %w", err)
 	}
 
-	// 6. 更新激活 UID
+	// 7. 更新激活 UID
 	if err := s.SetActiveSub(uid); err != nil {
 		// 元数据更新失败不致命（核心已重载），仅返回结果。
 		_ = err
