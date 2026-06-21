@@ -131,6 +131,15 @@ func findConfigFileInDirectory(dir string) string {
 	return ""
 }
 
+// clashVergeIdentifiers 为常见的 Clash Verge（基于 Tauri）应用标识符。
+// Tauri 把运行期配置目录放在按 identifier 命名的子目录下，verge-mihomo 启动时
+// 即用该目录作为 -d（配置根），其下的 config.yaml 才是热重载真正读取的文件。
+// 包含现行 fork（clash-verge-rev）与历史上游（zzzgydi/clash-verge）两种 identifier。
+var clashVergeIdentifiers = []string{
+	"io.github.clash-verge-rev.clash-verge-rev",
+	"io.github.zzzgydi.clash-verge",
+}
+
 func searchKnownMihomoDirectories() string {
 	home, err := os.UserHomeDir()
 	if err == nil {
@@ -139,6 +148,16 @@ func searchKnownMihomoDirectories() string {
 			filepath.Join(home, ".config", "clash"),
 			filepath.Join(home, ".mihomo"),
 			filepath.Join(home, ".clash"),
+		}
+		// Clash Verge (Linux/类 Unix)：~/.config/<identifier>
+		for _, id := range clashVergeIdentifiers {
+			knownDirs = append(knownDirs, filepath.Join(home, ".config", id))
+		}
+		// Clash Verge (macOS)：~/Library/Application Support/<identifier>
+		if runtime.GOOS == "darwin" {
+			for _, id := range clashVergeIdentifiers {
+				knownDirs = append(knownDirs, filepath.Join(home, "Library", "Application Support", id))
+			}
 		}
 		for _, dir := range knownDirs {
 			if configFile := findConfigFileInDirectory(dir); configFile != "" {
@@ -153,6 +172,10 @@ func searchKnownMihomoDirectories() string {
 			knownDirs := []string{
 				filepath.Join(appData, "mihomo"),
 				filepath.Join(appData, "clash"),
+			}
+			// Clash Verge (Windows)：%APPDATA%\<identifier>
+			for _, id := range clashVergeIdentifiers {
+				knownDirs = append(knownDirs, filepath.Join(appData, id))
 			}
 			for _, dir := range knownDirs {
 				if configFile := findConfigFileInDirectory(dir); configFile != "" {

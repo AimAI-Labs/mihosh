@@ -81,6 +81,11 @@ func GenerateAndWriteForUID(uid string) ([]byte, error) {
 // GenerateAndWriteForUIDIgnoreMergeError 与 GenerateAndWriteForUID 类似，
 // 但当 merge 解析失败时忽略覆写（用空 merge），返回最终字节与一个 merge 错误（可空）。
 // 供 Activate 流程在 merge 损坏时降级使用。
+//
+// 返回约定（调用方 Activate 用 len(data)==0 判定致命失败）：
+//   - raw 不存在或序列化失败：返回 (nil, _)（视为致命，data 为空）；
+//   - 仅 merge 解析失败：返回 (data, mergeErr)（data 为用空 merge 生成的字节，mergeErr 用于警告）；
+//   - 全部成功：返回 (data, nil)。
 func GenerateAndWriteForUIDIgnoreMergeError(uid string) (data []byte, mergeErr error) {
 	raw, err := ReadRaw(uid)
 	if err != nil {

@@ -206,12 +206,10 @@ func (s *ProfileService) Activate(uid string) (ActivateResult, error) {
 	}
 	_ = p // UID 已通过 findProfile 校验存在
 
-	// 1. 生成（merge 损坏时降级）
+	// 1. 生成（merge 损坏时降级；data 为空表示 raw 缺失或序列化失败）
 	data, mergeErr := profile.GenerateAndWriteForUIDIgnoreMergeError(uid)
-	if err != nil {
-		return ActivateResult{}, fmt.Errorf("生成最终配置失败: %w", err)
-	}
 	if len(data) == 0 {
+		// raw.yaml 尚未拉取（最常见），给出可操作的提示。
 		return ActivateResult{}, profile.ErrRawNotFound
 	}
 
