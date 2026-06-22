@@ -554,8 +554,12 @@ func (m Model) dispatchKeyToPage(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case layout.PageSettings:
 		var newCfg, proxyAddr = m.config, ""
 		oldLanguage := ""
+		oldAPIAddress := ""
+		oldSecret := ""
 		if m.config != nil {
 			oldLanguage = m.config.Language
+			oldAPIAddress = m.config.APIAddress
+			oldSecret = m.config.Secret
 		}
 		m.settingsState, newCfg, proxyAddr, cmd = m.settingsState.Update(msg, m.config, m.configSvc)
 		m.config = newCfg
@@ -566,6 +570,12 @@ func (m Model) dispatchKeyToPage(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if proxyAddr != "" {
 			m.connsState = m.connsState.UpdateProxyAddr(proxyAddr)
+		}
+		// api_address / secret 变更 → 热刷新 client/wsClient，并清掉旧的"无法连接"错误
+		if newCfg != nil && (newCfg.APIAddress != oldAPIAddress || newCfg.Secret != oldSecret) {
+			m.reloadClients(newCfg.APIAddress, newCfg.Secret)
+			m.err = nil
+			cmd = tea.Batch(cmd, m.fetchNodes())
 		}
 		if newCfg != nil {
 			m.autoRefreshRemaining = newCfg.AutoRefreshInterval
@@ -708,9 +718,13 @@ func (m Model) handleSettingsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 
 	oldLanguage := ""
 	oldTheme := ""
+	oldAPIAddress := ""
+	oldSecret := ""
 	if m.config != nil {
 		oldLanguage = m.config.Language
 		oldTheme = m.config.Theme
+		oldAPIAddress = m.config.APIAddress
+		oldSecret = m.config.Secret
 	}
 
 	var proxyAddr string
@@ -725,6 +739,12 @@ func (m Model) handleSettingsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 	}
 	if proxyAddr != "" {
 		m.connsState = m.connsState.UpdateProxyAddr(proxyAddr)
+	}
+	// api_address / secret 变更 → 热刷新 client/wsClient，并清掉旧的"无法连接"错误
+	if m.config != nil && (m.config.APIAddress != oldAPIAddress || m.config.Secret != oldSecret) {
+		m.reloadClients(m.config.APIAddress, m.config.Secret)
+		m.err = nil
+		return m, m.fetchNodes()
 	}
 	if m.config != nil {
 		m.autoRefreshRemaining = m.config.AutoRefreshInterval
@@ -781,6 +801,28 @@ func (m Model) autoRefreshInterval() int {
 		return 0
 	}
 	return m.config.AutoRefreshInterval
+}
+
+// reloadClients 把 api.Client 与 WSClient 的端点更新为新值。
+// api.Client 立即生效（后续 DoRequest 读新值）；
+// WSClient 主动断开旧连接，由 connectStream 在下一轮用新端点重连。
+// 不重建对象：所有引用 m.client / m.wsClient 的页面状态自动获得新端点。
+func (m Model) reloadClients(apiAddress, secret string) {
+	if m.client != nil {
+		m.client.UpdateEndpoint(apiAddress, secret)
+	}
+	if m.wsClient != nil {
+		m.wsClient.UpdateEndpoint(apiAddress, secret)
+	}
+}
+
+// fetchNodes 批量拉取节点信息（用于端点切换后刷新）。
+func (m Model) fetchNodes() tea.Cmd {
+	return tea.Batch(
+		nodes.FetchGroups(m.client),
+		nodes.FetchProxies(m.client),
+		nodes.FetchConfigMode(m.client),
+	)
 }
 
 func (m Model) handleLogsMouseLeft(x, y int) (tea.Model, tea.Cmd) {

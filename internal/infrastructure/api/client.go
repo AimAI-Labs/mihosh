@@ -8,13 +8,18 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 )
 
 // Client mihomo API 客户端
+//
+// baseURL/secret 支持运行时热更新（UpdateEndpoint），用 mu 保护，
+// 使得用户在设置页改完 api_address/secret 后无需重启 mihosh 即可生效。
 type Client struct {
+	mu         sync.RWMutex
 	baseURL    string
 	secret     string
 	httpClient *http.Client
@@ -31,6 +36,15 @@ func NewClient(cfg *config.Config) *Client {
 	}
 }
 
+// UpdateEndpoint 原子更新 baseURL 与 secret。
+// 后续 DoRequest 会使用新值；httpClient 的 timeout 等保持不变。
+func (c *Client) UpdateEndpoint(baseURL, secret string) {
+	c.mu.Lock()
+	c.baseURL = baseURL
+	c.secret = secret
+	c.mu.Unlock()
+}
+
 // DoRequest 执行 HTTP 请求（导出供 endpoints 使用）
 func (c *Client) DoRequest(method, path string, body interface{}) ([]byte, error) {
 	resp, err := c.doRawRequest(method, path, body)
@@ -43,7 +57,13 @@ func (c *Client) DoRequest(method, path string, body interface{}) ([]byte, error
 }
 
 func (c *Client) doRawRequest(method, path string, body interface{}) (*http.Response, error) {
-	url := c.baseURL + path
+	// 快照当前 baseURL/secret：避免持锁执行 HTTP，且对单次请求保证地址一致。
+	c.mu.RLock()
+	baseURL := c.baseURL
+	secret := c.secret
+	c.mu.RUnlock()
+
+	reqURL := baseURL + path
 
 	var reqBody io.Reader
 	if body != nil {
@@ -54,13 +74,13 @@ func (c *Client) doRawRequest(method, path string, body interface{}) (*http.Resp
 		reqBody = bytes.NewBuffer(jsonData)
 	}
 
-	req, err := http.NewRequest(method, url, reqBody)
+	req, err := http.NewRequest(method, reqURL, reqBody)
 	if err != nil {
 		return nil, err
 	}
 
-	if c.secret != "" {
-		req.Header.Set("Authorization", "Bearer "+c.secret)
+	if secret != "" {
+		req.Header.Set("Authorization", "Bearer "+secret)
 	}
 	req.Header.Set("Content-Type", "application/json")
 

@@ -69,7 +69,11 @@ type LogData struct {
 }
 
 // WSClient WebSocket客户端
+//
+// baseURL/secret 支持运行时热更新（UpdateEndpoint）：调用后主动关闭所有
+// 现有连接，让 connectStream 在下一轮用新端点重连，无需重启 mihosh。
 type WSClient struct {
+	mu      sync.RWMutex
 	baseURL string
 	secret  string
 
@@ -95,6 +99,25 @@ func NewWSClient(baseURL, secret string) *WSClient {
 		conns:    make(map[string]*websocket.Conn),
 		stopChan: make(chan struct{}),
 	}
+}
+
+// UpdateEndpoint 原子更新 baseURL 与 secret，并主动断开所有现有连接，
+// 触发 connectStream 在下一轮用新端点重连。
+// 若 client 未启动（Start 未调用或已 Stop），仅更新字段，不重连。
+func (c *WSClient) UpdateEndpoint(baseURL, secret string) {
+	c.mu.Lock()
+	c.baseURL = baseURL
+	c.secret = secret
+	c.mu.Unlock()
+
+	// 关闭现有连接：connectStream 的 ReadMessage 会返回错误，
+	// 进入重连循环，下一轮 buildWSURL 读到新值。
+	c.connsMu.Lock()
+	for key, conn := range c.conns {
+		conn.Close()
+		delete(c.conns, key)
+	}
+	c.connsMu.Unlock()
 }
 
 // SetMemoryHandler 设置内存数据处理器
@@ -124,7 +147,12 @@ func (c *WSClient) SetLogLevel(level string) {
 
 // buildWSURL 构建WebSocket URL
 func (c *WSClient) buildWSURL(endpoint string) string {
-	wsURL := strings.Replace(c.baseURL, "https://", "wss://", 1)
+	c.mu.RLock()
+	baseURL := c.baseURL
+	secret := c.secret
+	c.mu.RUnlock()
+
+	wsURL := strings.Replace(baseURL, "https://", "wss://", 1)
 	wsURL = strings.Replace(wsURL, "http://", "ws://", 1)
 
 	u, err := url.Parse(wsURL + "/" + endpoint)
@@ -132,9 +160,9 @@ func (c *WSClient) buildWSURL(endpoint string) string {
 		return ""
 	}
 
-	if c.secret != "" {
+	if secret != "" {
 		q := u.Query()
-		q.Set("token", c.secret)
+		q.Set("token", secret)
 		u.RawQuery = q.Encode()
 	}
 
