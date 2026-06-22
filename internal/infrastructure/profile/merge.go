@@ -5,9 +5,11 @@ package profile
 // 输入：raw（订阅原始配置）+ merge（用户覆写 YAML），均为已解析的 yaml.Node。
 // 输出：基于 raw 深拷贝后叠加 merge 的最终 yaml.Node。
 //
-// 算法（对齐 merge.rs::use_merge）：
+// 算法（对齐 merge.rs::use_merge / deep_merge）：
 //   - 六个特殊键（prepend/append × rules/proxies/proxy-groups）做列表拼接；
-//   - 其余顶层键直接覆盖（shallow，不递归合并 mapping）；
+//   - 其余顶层键按值类型决定语义（对齐 deep_merge 的 match）：
+//       · 双方都是 mapping → 递归合并子键（保留 raw 已有子键，merge 覆盖同名子键）；
+//       · scalar / sequence / 类型不一致 → 直接覆盖；
 //   - key 经 strings.ToLower 归一比较（对齐 merge.rs 的 use_lowercase），
 //     避免 Prepend-Rules vs prepend-rules 漏匹配；
 //   - 目标键不存在时创建（raw 无 rules 时 prepend 等价于赋值）。
@@ -27,7 +29,7 @@ type mergeKind int
 const (
 	mergeKindPrepend mergeKind = iota // val 拼接到目标列表前面
 	mergeKindAppend                   // val 拼接到目标列表后面
-	mergeKindReplace                  // 顶层键直接覆盖
+	mergeKindReplace                  // mapping 递归合并；scalar/sequence 直接覆盖
 )
 
 // classifyMergeKey 根据归一化后的 key 判定合并类别，并返回目标键名。
@@ -88,8 +90,9 @@ func ApplyMerge(raw, merge *yaml.Node) (*yaml.Node, error) {
 			}
 			setMappingField(result, targetKey, merged)
 		case mergeKindReplace:
-			// 顶层键直接覆盖（shallow）：若已存在则替换值节点，否则追加键值对。
-			setMappingField(result, targetKey, valNode)
+			// 对齐 merge.rs::deep_merge：双方都为 mapping 则递归合并子键；
+			// 否则（scalar/sequence/缺失/类型不一致）直接覆盖。
+			mergeReplaceField(result, targetKey, valNode)
 		}
 	}
 
@@ -131,6 +134,69 @@ func mergeListField(result *yaml.Node, targetKey string, valNode *yaml.Node, pre
 		combined = append(combined, valItems...)
 	}
 	return &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Content: combined}, nil
+}
+
+// mergeReplaceField 按 deep_merge 语义把 valNode 叠加到 result[targetKey]：
+//   - valNode 非 mapping、或 result 无该键、或现有值非 mapping → 整体覆盖（深拷贝 valNode）；
+//   - 双方都为 mapping → 递归合并子键（对齐 merge.rs::deep_merge 的 Mapping 分支）。
+func mergeReplaceField(result *yaml.Node, targetKey string, valNode *yaml.Node) {
+	if valNode == nil {
+		return
+	}
+	existing := findMappingValue(result, targetKey)
+
+	// 仅当双方都是 mapping 时递归合并；scalar/sequence/缺失/类型不一致 → 整体覆盖。
+	if valNode.Kind == yaml.MappingNode && existing != nil && existing.Kind == yaml.MappingNode {
+		deepMergeMapping(existing, valNode)
+		return
+	}
+
+	setMappingField(result, targetKey, deepCopyNode(valNode))
+}
+
+// deepMergeMapping 把 src 的子键递归合并到 dst（dst 被原地修改）：
+//   - dst 无某 key → 追加 src 的深拷贝；
+//   - dst 有该 key 且双方值都为 mapping → 递归；
+//   - 其余（一方非 mapping）→ 用 src 的深拷贝替换 dst 中该 key 的值。
+//
+// 对齐 merge.rs::deep_merge 的 Mapping 分支。
+func deepMergeMapping(dst, src *yaml.Node) {
+	if dst == nil || src == nil {
+		return
+	}
+	if dst.Kind != yaml.MappingNode || src.Kind != yaml.MappingNode {
+		return
+	}
+	for i := 0; i+1 < len(src.Content); i += 2 {
+		srcKey := src.Content[i]
+		srcVal := src.Content[i+1]
+		if srcKey.Kind != yaml.ScalarNode {
+			// 非 scalar 键极少见，整体跳过避免破坏结构。
+			continue
+		}
+		// 在 dst 中查找同名键。
+		var dstVal *yaml.Node
+		dstIdx := -1
+		for j := 0; j+1 < len(dst.Content); j += 2 {
+			k := dst.Content[j]
+			if k.Kind == yaml.ScalarNode && k.Value == srcKey.Value {
+				dstVal = dst.Content[j+1]
+				dstIdx = j + 1
+				break
+			}
+		}
+		if dstVal == nil {
+			// dst 无此 key → 追加深拷贝（key + value）。
+			dst.Content = append(dst.Content, deepCopyNode(srcKey), deepCopyNode(srcVal))
+			continue
+		}
+		// 双方都为 mapping → 递归；否则用 src 的深拷贝替换。
+		if srcVal.Kind == yaml.MappingNode && dstVal.Kind == yaml.MappingNode {
+			deepMergeMapping(dstVal, srcVal)
+		} else {
+			dst.Content[dstIdx] = deepCopyNode(srcVal)
+		}
+	}
 }
 
 // setMappingField 把 value 写入 result mapping 的 targetKey：

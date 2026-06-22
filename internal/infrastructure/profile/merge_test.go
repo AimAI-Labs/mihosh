@@ -190,8 +190,9 @@ tun:
 	assert.Contains(t, m["dns"], "enable: false", "raw 原有顶层键应保留")
 }
 
-func TestApplyMerge_TopLevelReplaceMapping_Shallow(t *testing.T) {
-	// 覆盖语义：dns 整体替换，不递归合并子键。
+func TestApplyMerge_TopLevelReplaceMapping_Deep(t *testing.T) {
+	// 对齐 merge.rs::deep_merge：双方都为 mapping 时递归合并子键。
+	// raw 的 dns.nameserver 应保留，merge 的 dns.enable 覆盖 raw。
 	raw := parseDoc(t, `dns:
   enable: true
   nameserver:
@@ -204,9 +205,74 @@ func TestApplyMerge_TopLevelReplaceMapping_Shallow(t *testing.T) {
 	require.NoError(t, err)
 	dns := findMappingValue(topLevelMapping(final), "dns")
 	require.NotNil(t, dns)
-	// shallow：merge 的 dns 只有 enable，不应保留 raw 的 nameserver
-	assert.Nil(t, findMappingValue(dns, "nameserver"), "顶层覆盖为 shallow，不应保留 raw 的子键")
-	assert.Equal(t, "false", findMappingValue(dns, "enable").Value)
+	// deep：merge 的 enable 覆盖 raw，且 raw 的 nameserver 应保留
+	assert.Equal(t, "false", findMappingValue(dns, "enable").Value, "同名 scalar 子键应被 merge 覆盖")
+	ns := findMappingValue(dns, "nameserver")
+	require.NotNil(t, ns, "递归合并应保留 raw 的子键 nameserver")
+	require.Equal(t, yaml.SequenceNode, ns.Kind)
+	require.Len(t, ns.Content, 1)
+	assert.Equal(t, "8.8.8.8", ns.Content[0].Value)
+}
+
+func TestApplyMerge_DeepMergeNestedMapping(t *testing.T) {
+	// 多级嵌套 mapping 递归合并：raw 有 dns.nameserver-policy，merge 加 dns.enable
+	// 与 dns.nameserver-policy 的同名子键之外的键，两侧都应保留。
+	raw := parseDoc(t, `dns:
+  enable: true
+  nameserver-policy:
+    "geosite:cn":
+      - 223.5.5.5
+`)
+	merge := parseDoc(t, `dns:
+  enhanced-mode: fake-ip
+  nameserver-policy:
+    "geosite:geolocation-!cn":
+      - https://1.1.1.1/dns-query
+`)
+	final, err := ApplyMerge(raw, merge)
+	require.NoError(t, err)
+	dns := findMappingValue(topLevelMapping(final), "dns")
+	require.NotNil(t, dns)
+	assert.Equal(t, "true", findMappingValue(dns, "enable").Value, "raw 独有子键保留")
+	assert.Equal(t, "fake-ip", findMappingValue(dns, "enhanced-mode").Value, "merge 新增子键写入")
+	np := findMappingValue(dns, "nameserver-policy")
+	require.NotNil(t, np)
+	require.Len(t, np.Content, 4) // 两个子键，每个 key+value 各 2 节点
+	assert.NotNil(t, findMappingValue(np, "geosite:cn"))
+	assert.NotNil(t, findMappingValue(np, "geosite:geolocation-!cn"))
+}
+
+func TestApplyMerge_DeepMergeSequenceReplaced(t *testing.T) {
+	// 对齐 deep_merge 的 (a,b)=>*a=b：非 prepend/append 的同名 sequence 直接替换，不拼接。
+	raw := parseDoc(t, `rules:
+  - DOMAIN,old,DIRECT
+`)
+	merge := parseDoc(t, `rules:
+  - DOMAIN,new,DIRECT
+`)
+	final, err := ApplyMerge(raw, merge)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"DOMAIN,new,DIRECT"}, seqValues(t, final, "rules"))
+}
+
+func TestApplyMerge_DeepMergeDoesNotMutateInput(t *testing.T) {
+	// mapping 深合并不应修改 raw 入参。
+	raw := parseDoc(t, `dns:
+  enable: true
+  nameserver:
+    - 8.8.8.8
+`)
+	merge := parseDoc(t, `dns:
+  enable: false
+`)
+	_, err := ApplyMerge(raw, merge)
+	require.NoError(t, err)
+	rawDNS := findMappingValue(topLevelMapping(raw), "dns")
+	require.NotNil(t, rawDNS)
+	assert.Equal(t, "true", findMappingValue(rawDNS, "enable").Value, "raw 不应被修改")
+	ns := findMappingValue(rawDNS, "nameserver")
+	require.Len(t, ns.Content, 1)
+	assert.Equal(t, "8.8.8.8", ns.Content[0].Value)
 }
 
 func TestApplyMerge_PrependToMissingKey(t *testing.T) {
