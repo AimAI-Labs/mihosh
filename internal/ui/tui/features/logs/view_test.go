@@ -96,6 +96,7 @@ func TestRenderLogEntry_MaxWidthNarrow(t *testing.T) {
 }
 
 func TestRenderLogList_EmptyLogs(t *testing.T) {
+	i18n.SetLanguageOverride("zh-CN")
 	result := renderLogList(nil, 0, 0, 10, 80, 0)
 	if !strings.Contains(result, "暂无日志") {
 		t.Fatalf("expected placeholder for empty logs, got %q", result)
