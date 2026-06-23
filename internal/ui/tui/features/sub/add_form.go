@@ -12,7 +12,9 @@ package sub
 import (
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -174,14 +176,27 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 	case msg.String() == "down":
 		form.cycleField(1)
 
-	case msg.String() == "left":
+	case key.Matches(msg, common.Keys.Left):
 		if form.isKindField() {
 			form.toggleKind()
+			return form, false, nil, false
 		}
-	case msg.String() == "right":
+		cur := form.fields[form.fieldCursor]
+		updated, c := cur.Update(msg)
+		form.fields[form.fieldCursor] = updated
+		form.errMsg = ""
+		return form, false, c, false
+
+	case key.Matches(msg, common.Keys.Right):
 		if form.isKindField() {
 			form.toggleKind()
+			return form, false, nil, false
 		}
+		cur := form.fields[form.fieldCursor]
+		updated, c := cur.Update(msg)
+		form.fields[form.fieldCursor] = updated
+		form.errMsg = ""
+		return form, false, c, false
 
 	default:
 		// 仅名称与来源值字段接收文本输入
