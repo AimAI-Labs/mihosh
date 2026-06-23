@@ -165,8 +165,8 @@ func TestOpenEditForm_PrefillsCurrentSub(t *testing.T) {
 	require.True(t, s.showEditForm)
 	assert.Equal(t, "b2", s.editUID)
 	// 名称与来源应预填
-	assert.Equal(t, "订阅B", s.editForm.fields[addFieldName].Value())
-	assert.Equal(t, "/etc/mihomo/b.yaml", s.editForm.fields[addFieldSrc].Value())
+	assert.Equal(t, "订阅B", s.editForm.nameField.Value())
+	assert.Equal(t, "/etc/mihomo/b.yaml", s.editForm.srcField.Value())
 	assert.False(t, s.editForm.kindRemote, "local 订阅应标记为非 remote")
 }
 
@@ -192,8 +192,8 @@ func TestHandleEditFormSubmit_DispatchesEditCmd(t *testing.T) {
 
 	// 修改名称后按 Enter 提交
 	form := s.editForm
-	form.fields[addFieldName].SetValue("新名称")
-	form.fields[addFieldSrc].SetValue("https://new.io/sub")
+	form.nameField.SetValue("新名称")
+	form.srcField.SetValue("https://new.io/sub")
 	s.editForm = form
 
 	s, cmd := s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeyEnter}, nil)

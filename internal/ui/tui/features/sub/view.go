@@ -474,7 +474,7 @@ func buildFormModal(title string, form addForm, width, height int) string {
 	}
 
 	// 名称行
-	nameRow := renderFieldRow(i18n.T("sub.add_field_name"), form.fields[addFieldName].View(), form.isNameField(), innerWidth)
+	nameRow := renderFieldRow(i18n.T("sub.add_field_name"), form.nameField.View(), form.isNameField(), innerWidth)
 
 	// 类型行（◀ remote ▶）
 	kindLabel := "remote"
@@ -485,7 +485,14 @@ func buildFormModal(title string, form addForm, width, height int) string {
 	kindRow := renderFieldRow(i18n.T("sub.add_field_kind"), kindVal, form.isKindField(), innerWidth)
 
 	// 来源值行
-	srcRow := renderFieldRow(i18n.T("sub.add_field_src"), form.fields[addFieldSrc].View(), form.isSrcField(), innerWidth)
+	srcLabel := i18n.T("sub.add_field_src")
+	srcLabelWidth := common.DisplayWidth(srcLabel) + 1 // label + space
+	textareaWidth := innerWidth - srcLabelWidth
+	if textareaWidth < 10 {
+		textareaWidth = 10
+	}
+	form.srcField.SetWidth(textareaWidth)
+	srcRow := renderFieldRow(srcLabel, form.srcField.View(), form.isSrcField(), innerWidth)
 
 	// 说明/错误行
 	var footer string
@@ -515,16 +522,20 @@ func renderFieldRow(label, value string, focused bool, innerWidth int) string {
 	if focused {
 		labelStyle = lipgloss.NewStyle().Foreground(common.TokyoCyan())
 	}
-	row := labelStyle.Render(label) + " " + value
+	
+	// 使用 JoinHorizontal 确保多行 value（如 textarea）时，label 只在第一行对齐
+	row := lipgloss.JoinHorizontal(lipgloss.Top, labelStyle.Render(label), " ", value)
+
 	if !focused {
 		return row
 	}
-	styled := " " + row
-	pad := innerWidth - 1 - common.DisplayWidth(row)
-	if pad < 0 {
-		pad = 0
-	}
-	return lipgloss.NewStyle().Background(common.TokyoSelected()).Render(styled + strings.Repeat(" ", pad))
+	
+	// 聚焦时使用 Lipgloss 的 Width 属性和 Padding 自动处理多行背景铺满
+	return lipgloss.NewStyle().
+		Background(common.TokyoSelected()).
+		PaddingLeft(1).
+		Width(innerWidth).
+		Render(row)
 }
 
 // resolveFormBounds 返回表单弹窗边界（供鼠标点击外部关闭判断）。

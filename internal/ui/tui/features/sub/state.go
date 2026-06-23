@@ -288,8 +288,8 @@ func (s State) openEditForm(svc *service.ProfileService) (State, tea.Cmd) {
 	}
 	p := s.subs[s.filteredIdx[s.selected]]
 	form := newAddForm()
-	form.fields[addFieldName].SetValue(p.Name)
-	form.fields[addFieldSrc].SetValue(p.Source.Display())
+	form.nameField.SetValue(p.Name)
+	form.srcField.SetValue(p.Source.Display())
 	form.kindRemote = p.Source.Kind == profile.SourceRemote
 	// 焦点重新落到名称字段（SetValue 后 textinput 仍处于 Focus 状态）
 	form.focusCurrent()
@@ -311,7 +311,7 @@ func (s State) handleEditFormUpdate(msg tea.KeyMsg, svc *service.ProfileService)
 		return s, nil
 	}
 	if submit {
-		name := next.fields[addFieldName].Value()
+		name := next.nameField.Value()
 		src := next.buildSource()
 		uid := s.editUID
 		s.showEditForm = false

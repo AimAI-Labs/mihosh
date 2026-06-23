@@ -10,11 +10,14 @@ package sub
 // 提交时来源值自动判断类型（http(s):// → remote，其余 → local）。
 
 import (
+	"strings"
+
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -28,7 +31,8 @@ const (
 
 // addForm 添加订阅表单。
 type addForm struct {
-	fields      []textinput.Model
+	nameField   textinput.Model
+	srcField    textarea.Model
 	fieldCursor int
 	kindRemote  bool // true=remote, false=local
 	errMsg      string
@@ -41,16 +45,17 @@ func newAddForm() addForm {
 	name.Placeholder = i18n.T("sub.add_placeholder_name")
 	name.Focus()
 
-	src := textinput.New()
+	src := textarea.New()
 	src.Prompt = ""
 	src.Placeholder = i18n.T("sub.add_placeholder_src")
-
-	// kind 槽位保留占位 textinput（不参与输入，仅维持索引与布局高度）
-	kind := textinput.New()
-	kind.Prompt = ""
+	src.ShowLineNumbers = false
+	src.EndOfBufferCharacter = ' '
+	src.SetHeight(3)
+	src.SetWidth(42)
 
 	return addForm{
-		fields:      []textinput.Model{name, kind, src},
+		nameField:   name,
+		srcField:    src,
 		fieldCursor: addFieldName,
 		kindRemote:  true,
 	}
@@ -78,30 +83,31 @@ func (f *addForm) cycleField(dir int) {
 func (f *addForm) toggleKind() {
 	f.kindRemote = !f.kindRemote
 	// 切换类型时更新占位符提示
-	src := f.fields[addFieldSrc]
 	if f.kindRemote {
-		src.Placeholder = i18n.T("sub.add_placeholder_src_remote")
+		f.srcField.Placeholder = i18n.T("sub.add_placeholder_src_remote")
 	} else {
-		src.Placeholder = i18n.T("sub.add_placeholder_src_local")
+		f.srcField.Placeholder = i18n.T("sub.add_placeholder_src_local")
 	}
-	f.fields[addFieldSrc] = src
 }
 
 func (f *addForm) focusCurrent() {
-	for i := range f.fields {
-		if i == f.fieldCursor && (i == addFieldName || i == addFieldSrc) {
-			f.fields[i].Focus()
-		} else {
-			f.fields[i].Blur()
-		}
+	if f.fieldCursor == addFieldName {
+		f.nameField.Focus()
+		f.srcField.Blur()
+	} else if f.fieldCursor == addFieldSrc {
+		f.nameField.Blur()
+		f.srcField.Focus()
+	} else {
+		f.nameField.Blur()
+		f.srcField.Blur()
 	}
 }
 
 // validate 校验表单：名称非空、来源值非空。
 // 返回 (ok, errKey)；errKey 为 i18n 键。
 func (f addForm) validate() (bool, string) {
-	name := f.fields[addFieldName].Value()
-	src := f.fields[addFieldSrc].Value()
+	name := f.nameField.Value()
+	src := strings.TrimSpace(f.srcField.Value())
 	if name == "" {
 		return false, "sub.add_err_name"
 	}
@@ -113,7 +119,7 @@ func (f addForm) validate() (bool, string) {
 
 // buildSource 根据当前输入构造 SubSource（自动判断类型）。
 func (f addForm) buildSource() profile.SubSource {
-	val := f.fields[addFieldSrc].Value()
+	val := strings.TrimSpace(f.srcField.Value())
 	kind := profile.ParseSourceKind(val) // 自动判断，覆盖手动切换
 	src := profile.SubSource{Kind: kind}
 	if kind == profile.SourceRemote {
@@ -136,7 +142,7 @@ func (s State) handleAddFormUpdate(msg tea.KeyMsg, svc *service.ProfileService) 
 	}
 	if submit {
 		// Enter 校验通过：调用方提交
-		name := next.fields[addFieldName].Value()
+		name := next.nameField.Value()
 		src := next.buildSource()
 		s.showAddForm = false
 		s.addForm = newAddForm()
@@ -181,9 +187,12 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 			form.toggleKind()
 			return form, false, nil, false
 		}
-		cur := form.fields[form.fieldCursor]
-		updated, c := cur.Update(msg)
-		form.fields[form.fieldCursor] = updated
+		var c tea.Cmd
+		if form.isNameField() {
+			form.nameField, c = form.nameField.Update(msg)
+		} else if form.isSrcField() {
+			form.srcField, c = form.srcField.Update(msg)
+		}
 		form.errMsg = ""
 		return form, false, c, false
 
@@ -192,9 +201,12 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 			form.toggleKind()
 			return form, false, nil, false
 		}
-		cur := form.fields[form.fieldCursor]
-		updated, c := cur.Update(msg)
-		form.fields[form.fieldCursor] = updated
+		var c tea.Cmd
+		if form.isNameField() {
+			form.nameField, c = form.nameField.Update(msg)
+		} else if form.isSrcField() {
+			form.srcField, c = form.srcField.Update(msg)
+		}
 		form.errMsg = ""
 		return form, false, c, false
 
@@ -203,9 +215,12 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 		if form.isKindField() {
 			return form, false, nil, false
 		}
-		cur := form.fields[form.fieldCursor]
-		updated, c := cur.Update(msg)
-		form.fields[form.fieldCursor] = updated
+		var c tea.Cmd
+		if form.isNameField() {
+			form.nameField, c = form.nameField.Update(msg)
+		} else if form.isSrcField() {
+			form.srcField, c = form.srcField.Update(msg)
+		}
 		form.errMsg = ""
 		return form, false, c, false
 	}
