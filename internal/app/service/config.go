@@ -2,10 +2,15 @@ package service
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // ConfigService 配置管理服务
@@ -108,4 +113,84 @@ func (s *ConfigService) SetConfigValue(key, value string) error {
 	}
 
 	return config.Save(cfg)
+}
+
+// FetchMihomoConfig fetches the live config from Mihomo API and supplements with YAML if needed
+func (s *ConfigService) FetchMihomoConfig(client *api.Client) tea.Cmd {
+	return func() tea.Msg {
+		if client == nil {
+			return messages.MihomoConfigMsg{Err: fmt.Errorf("API client is nil")}
+		}
+		resp, err := client.GetConfigs()
+		if err != nil {
+			return messages.MihomoConfigMsg{Err: err}
+		}
+
+		mihomoCfg := &model.MihomoConfig{
+			ExternalController: resp.ExternalController,
+			Secret:             resp.Secret,
+			MixedPort:          resp.MixedPort,
+			AllowLan:           resp.AllowLan,
+			LogLevel:           resp.LogLevel,
+		}
+
+		// Fallback for secret if empty (API might omit it)
+		if mihomoCfg.Secret == "" {
+			if path, err := config.GetMihomoConfigPath(); err == nil {
+				if yamlData, err := config.ReadMihomoYAML(path); err == nil {
+					if secret, ok := yamlData["secret"].(string); ok {
+						mihomoCfg.Secret = secret
+					}
+				} else {
+					log.Printf("Fallback: failed to read mihomo yaml: %v", err)
+				}
+			} else {
+				log.Printf("Fallback: failed to get mihomo config path: %v", err)
+			}
+		}
+		return messages.MihomoConfigMsg{Config: mihomoCfg}
+	}
+}
+
+// SaveMihomoConfigField writes to YAML and reloads the API
+func (s *ConfigService) SaveMihomoConfigField(client *api.Client, key string, value interface{}) tea.Cmd {
+	return func() tea.Msg {
+		path, err := config.GetMihomoConfigPath()
+		if err != nil {
+			return messages.MihomoConfigSavedMsg{Err: err}
+		}
+
+		if err := config.WriteMihomoField(path, key, value); err != nil {
+			return messages.MihomoConfigSavedMsg{Err: fmt.Errorf("write yaml failed: %w", err)}
+		}
+
+		if client != nil {
+			if err := client.ReloadConfig(path); err != nil {
+				return messages.MihomoConfigSavedMsg{Err: fmt.Errorf("reload failed: %w", err)}
+			}
+		}
+		
+		// If external-controller or secret changed, we also need to update mihosh's own config.
+		// The update loop will handle this when it receives the saved msg if we sync here,
+		// or we can just update our local config directly since we are the config service.
+		if key == "external-controller" {
+			if strVal, ok := value.(string); ok {
+				if err := s.SetConfigValue("api_address", strVal); err != nil {
+					return messages.MihomoConfigSavedMsg{Err: fmt.Errorf("update local api_address failed: %w", err)}
+				}
+			} else {
+				return messages.MihomoConfigSavedMsg{Err: fmt.Errorf("external-controller must be a string")}
+			}
+		} else if key == "secret" {
+			if strVal, ok := value.(string); ok {
+				if err := s.SetConfigValue("secret", strVal); err != nil {
+					return messages.MihomoConfigSavedMsg{Err: fmt.Errorf("update local secret failed: %w", err)}
+				}
+			} else {
+				return messages.MihomoConfigSavedMsg{Err: fmt.Errorf("secret must be a string")}
+			}
+		}
+
+		return messages.MihomoConfigSavedMsg{}
+	}
 }

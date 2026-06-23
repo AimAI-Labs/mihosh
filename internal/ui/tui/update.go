@@ -402,6 +402,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.MihomoVersionMsg:
 		m.settingsState = m.settingsState.ApplyMihomoVersion(msg.Version)
 
+	case messages.MihomoConfigMsg:
+		// Mihomo 标签页配置加载完成（成功或失败）
+		m.settingsState = m.settingsState.ApplyMihomoConfig(&msg)
+
+	case messages.MihomoConfigSavedMsg:
+		// Mihomo 配置项已保存（写 YAML + 热重载）：toast 提示 + 重新拉取运行时配置
+		if msg.Err != nil {
+			m.err = messages.ErrMsg{Err: msg.Err}
+		} else {
+			m.notice = i18n.T("settings.toast.mihomo_save_success")
+			m.noticeTicks = autoRefreshNoticeTicks
+		}
+		// external-controller / secret 变更会影响本地 api_address / secret → 同步刷新 client 与节点信息
+		return m, tea.Batch(m.fetchNodes(), m.configSvc.FetchMihomoConfig(m.client))
+
 	case messages.ThemeChangedMsg:
 		// 主题已切换，触发重绘（View 会读取新主题色）
 		return m, tea.ClearScreen
@@ -561,7 +576,7 @@ func (m Model) dispatchKeyToPage(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			oldAPIAddress = m.config.APIAddress
 			oldSecret = m.config.Secret
 		}
-		m.settingsState, newCfg, proxyAddr, cmd = m.settingsState.Update(msg, m.config, m.configSvc)
+		m.settingsState, newCfg, proxyAddr, cmd = m.settingsState.Update(msg, m.config, m.configSvc, m.client)
 		m.config = newCfg
 		if newCfg != nil && newCfg.Language != oldLanguage {
 			i18n.SetLanguageOverride(newCfg.Language)
@@ -602,7 +617,7 @@ func (m *Model) onPageChange() tea.Cmd {
 	case layout.PageSub:
 		return sub.FetchSubs(m.profileSvc)
 	case layout.PageSettings:
-		return settings.FetchMihomoVersion(m.client)
+		return tea.Batch(settings.FetchMihomoVersion(m.client), m.configSvc.FetchMihomoConfig(m.client))
 	}
 	return nil
 }
@@ -728,7 +743,7 @@ func (m Model) handleSettingsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 	}
 
 	var proxyAddr string
-	m.settingsState, m.config, proxyAddr = m.settingsState.HandleMouseLeft(pageX, pageY, m.config, m.configSvc)
+	m.settingsState, m.config, proxyAddr = m.settingsState.HandleMouseLeft(pageX, pageY, m.config, m.configSvc, m.client)
 	if m.config != nil && m.config.Language != oldLanguage {
 		i18n.SetLanguageOverride(m.config.Language)
 		common.InitKeyBindings()

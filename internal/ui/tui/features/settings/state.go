@@ -1,9 +1,11 @@
 package settings
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
@@ -12,13 +14,16 @@ import (
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 const (
 	asciiMinPrintable = 32
 	asciiMaxPrintable = 127
 
-	settingsMouseRowsOffset      = 2
+	// settingsMouseRowsOffset：配置项第一行相对页面内容顶部的 Y 坐标。
+	// 布局：marginTop 空行(1) + 标签栏带边框(3 行: 上边框/内容行/下边框) + 配置面板上边框(1) = 5
+	settingsMouseRowsOffset      = 5
 	settingsDoubleClickThreshold = 350 * time.Millisecond
 	settingsContainerLeft        = 2
 	settingsRowPaddingLeft       = 1
@@ -42,6 +47,11 @@ type State struct {
 	// Mihomo 内核版本
 	mihomoVersion string
 	versionLoaded bool
+
+	activeTab     int // 0=Mihosh, 1=Mihomo
+	mihomoConfig  *model.MihomoConfig
+	mihomoLoaded  bool
+	mihomoLoadErr error
 }
 
 // IsEditing 返回是否处于编辑模式
@@ -98,14 +108,24 @@ func (s State) ToPageState(cfg *config.Config) PageState {
 		EditCursor:      s.editCursor,
 		Toast:           s.toastManager,
 		MihomoVersion:   s.mihomoVersion,
+		ActiveTab:       s.activeTab,
+		MihomoConfig:    s.mihomoConfig,
+		MihomoLoaded:    s.mihomoLoaded,
+		MihomoLoadErr:   s.mihomoLoadErr,
 	}
 }
 
 // Update 处理设置页面按键，返回：(新状态, 更新后的cfg, 更新后的proxyAddr, cmd)
 // proxyAddr 为空字符串时表示无变化
-func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService) (State, *config.Config, string, tea.Cmd) {
+func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, string, tea.Cmd) {
 	if s.editMode {
-		return s.handleEditMode(msg, cfg, configSvc)
+		return s.handleEditMode(msg, cfg, configSvc, client)
+	}
+
+	if msg.String() == "h" || msg.String() == "l" || msg.String() == "tab" {
+		s.activeTab = 1 - s.activeTab
+		s.selectedSetting = 0
+		return s, cfg, "", nil
 	}
 
 	switch {
@@ -114,12 +134,12 @@ func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.Con
 			s.selectedSetting--
 		}
 	case key.Matches(msg, common.Keys.Down):
-		if s.selectedSetting < len(SettingKeys)-1 {
+		if s.selectedSetting < len(s.activeKeys())-1 {
 			s.selectedSetting++
 		}
 	case key.Matches(msg, common.Keys.Enter):
 		s.editMode = true
-		s.editValue = GetSettingValue(cfg, s.selectedSetting)
+		s.editValue = s.getEditValue(cfg, s.activeKeys()[s.selectedSetting])
 		s.editCursor = len(s.editValue)
 	}
 
@@ -133,7 +153,7 @@ func (s State) HandleMouseScroll(up bool) State {
 			s.selectedSetting--
 		}
 	} else {
-		if s.selectedSetting < len(SettingKeys)-1 {
+		if s.selectedSetting < len(s.activeKeys())-1 {
 			s.selectedSetting++
 		}
 	}
@@ -141,13 +161,28 @@ func (s State) HandleMouseScroll(up bool) State {
 }
 
 // HandleMouseLeft 处理 settings 页面左键单击/双击
-func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *service.ConfigService) (State, *config.Config, string) {
-	settingIdx := resolveMouseSettingIndex(pageY)
+func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, string) {
+	// 优先处理标签栏点击（带边框的标签栏内容行位于 settingsTabBarContentY）
+	if pageY == settingsTabBarContentY {
+		if tab, ok := resolveSettingsTabMouseTarget(pageX); ok {
+			// 切换标签页时不主动退出编辑模式，避免误触；但需要重置选中项防止越界
+			if s.activeTab != tab {
+				s.activeTab = tab
+				s.selectedSetting = 0
+				s.editMode = false
+				s.editValue = ""
+				s.editCursor = 0
+			}
+			return s, cfg, ""
+		}
+	}
+
+	settingIdx := resolveMouseSettingIndex(s, pageY)
 
 	if s.editMode {
-		if s.selectedSetting == LanguageSettingIndex() {
+		if s.activeTab == 0 && s.selectedSetting == LanguageSettingIndex() {
 			if lang, ok := resolveLanguageMouseTarget(pageX); ok {
-				if err := configSvc.SetConfigValue(SettingKeys[s.selectedSetting], lang); err == nil {
+				if err := configSvc.SetConfigValue(s.activeKeys()[s.selectedSetting], lang); err == nil {
 					newCfg, _ := configSvc.LoadConfig()
 					s.editMode = false
 					s.editValue = ""
@@ -159,7 +194,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 				return s, cfg, ""
 			}
 		}
-		if s.selectedSetting == ThemeSettingIndex() {
+		if s.activeTab == 0 && s.selectedSetting == ThemeSettingIndex() {
 			if t, ok := resolveThemeMouseTarget(pageX); ok {
 				if err := configSvc.SetConfigValue("theme", t); err == nil {
 					newCfg, _ := configSvc.LoadConfig()
@@ -176,7 +211,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 		}
 
 		// 编辑模式下点击空白处退出编辑
-		if settingIdx < 0 || settingIdx >= len(SettingKeys) {
+		if settingIdx < 0 || settingIdx >= len(s.activeKeys()) {
 			s.editMode = false
 			s.editValue = ""
 			s.editCursor = 0
@@ -184,14 +219,14 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 		return s, cfg, ""
 	}
 
-	if settingIdx < 0 || settingIdx >= len(SettingKeys) {
+	if settingIdx < 0 || settingIdx >= len(s.activeKeys()) {
 		return s, cfg, ""
 	}
 
 	s.selectedSetting = settingIdx
-	if settingIdx == LanguageSettingIndex() {
+	if s.activeTab == 0 && settingIdx == LanguageSettingIndex() {
 		if lang, ok := resolveLanguageMouseTarget(pageX); ok {
-			if err := configSvc.SetConfigValue(SettingKeys[settingIdx], lang); err == nil {
+			if err := configSvc.SetConfigValue(s.activeKeys()[settingIdx], lang); err == nil {
 				newCfg, _ := configSvc.LoadConfig()
 				s.showToast(i18n.T("settings.toast.save_success_lang"), common.ToastSuccess)
 				return s, newCfg, newCfg.ProxyAddress
@@ -199,7 +234,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
 		}
 	}
-	if settingIdx == ThemeSettingIndex() {
+	if s.activeTab == 0 && settingIdx == ThemeSettingIndex() {
 		if t, ok := resolveThemeMouseTarget(pageX); ok {
 			if err := configSvc.SetConfigValue("theme", t); err == nil {
 				newCfg, _ := configSvc.LoadConfig()
@@ -214,7 +249,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 	now := time.Now()
 	if s.isMouseDoubleClick(settingIdx, now) {
 		s.editMode = true
-		s.editValue = GetSettingValue(cfg, settingIdx)
+		s.editValue = s.getEditValue(cfg, s.activeKeys()[settingIdx])
 		s.editCursor = len(s.editValue)
 	}
 
@@ -222,14 +257,77 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 }
 
 // handleEditMode 处理编辑模式按键，返回更新后的 cfg 和 proxyAddr（空表示无变化）
-func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService) (State, *config.Config, string, tea.Cmd) {
-	if s.selectedSetting == LanguageSettingIndex() { // 语言设置采用 tab 切换
+func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, string, tea.Cmd) {
+	if s.activeTab == 1 {
+		keys := s.activeKeys()
+		settingKey := keys[s.selectedSetting]
+
+		// allow-lan tab toggle
+		if settingKey == "allow-lan" {
+			switch {
+			case key.Matches(msg, common.Keys.Escape):
+				s.editMode = false
+			case key.Matches(msg, common.Keys.Enter):
+				val := s.editValue == "true"
+				s.editMode = false
+				s.editValue = ""
+				return s, cfg, "", configSvc.SaveMihomoConfigField(client, "allow-lan", val)
+			case msg.String() == "left", msg.String() == "right", msg.String() == "tab":
+				if s.editValue == "true" {
+					s.editValue = "false"
+				} else {
+					s.editValue = "true"
+				}
+			}
+			return s, cfg, "", nil
+		}
+		// log-level tab toggle
+		if settingKey == "log-level" {
+			levels := []string{"info", "warning", "error", "debug", "silent"}
+			switch {
+			case key.Matches(msg, common.Keys.Escape):
+				s.editMode = false
+			case key.Matches(msg, common.Keys.Enter):
+				val := s.editValue
+				s.editMode = false
+				s.editValue = ""
+				return s, cfg, "", configSvc.SaveMihomoConfigField(client, "log-level", val)
+			case msg.String() == "left":
+				matched := false
+				for i, l := range levels {
+					if l == s.editValue {
+						s.editValue = levels[(i+len(levels)-1)%len(levels)]
+						matched = true
+						break
+					}
+				}
+				if !matched && len(levels) > 0 {
+					s.editValue = levels[0]
+				}
+			case msg.String() == "right", msg.String() == "tab":
+				matched := false
+				for i, l := range levels {
+					if l == s.editValue {
+						s.editValue = levels[(i+1)%len(levels)]
+						matched = true
+						break
+					}
+				}
+				if !matched && len(levels) > 0 {
+					s.editValue = levels[0]
+				}
+			}
+			return s, cfg, "", nil
+		}
+	}
+
+	if s.activeTab == 0 && s.selectedSetting == LanguageSettingIndex() { // 语言设置采用 tab 切换
 		switch {
 		case key.Matches(msg, common.Keys.Escape):
 			s.editMode = false
 			s.editValue = ""
 		case key.Matches(msg, common.Keys.Enter):
-			settingKey := SettingKeys[s.selectedSetting]
+			settingKey := s.activeKeys()[s.selectedSetting]
 			if err := configSvc.SetConfigValue(settingKey, s.editValue); err == nil {
 				newCfg, _ := configSvc.LoadConfig()
 				s.editMode = false
@@ -246,7 +344,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 		return s, cfg, "", nil
 	}
 
-	if s.selectedSetting == ThemeSettingIndex() { // 主题设置采用 tab 切换，切换后热生效
+	if s.activeTab == 0 && s.selectedSetting == ThemeSettingIndex() { // 主题设置采用 tab 切换，切换后热生效
 		switch {
 		case key.Matches(msg, common.Keys.Escape):
 			s.editMode = false
@@ -278,7 +376,24 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 		s.editCursor = 0
 
 	case key.Matches(msg, common.Keys.Enter):
-		settingKey := SettingKeys[s.selectedSetting]
+		settingKey := s.activeKeys()[s.selectedSetting]
+		if s.activeTab == 1 {
+			var val interface{} = s.editValue
+			if settingKey == "mixed-port" {
+				var port int
+				if _, err := fmt.Sscanf(s.editValue, "%d", &port); err == nil {
+					val = port
+				} else {
+					s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
+					return s, cfg, "", nil
+				}
+			}
+			s.editMode = false
+			s.editValue = ""
+			s.editCursor = 0
+			return s, cfg, "", configSvc.SaveMihomoConfigField(client, settingKey, val)
+		}
+
 		if err := configSvc.SetConfigValue(settingKey, s.editValue); err != nil {
 			// 保存失败：保持编辑模式，显示错误提示
 			s.showToast(i18n.Tf("settings.toast.save_failed_with_err", err.Error()), common.ToastError)
@@ -337,12 +452,37 @@ func (s *State) showToast(msg string, toastType common.ToastType) {
 	s.toastManager.Add(msg, toastType, 2*time.Second)
 }
 
-func resolveMouseSettingIndex(pageY int) int {
+func resolveMouseSettingIndex(s State, pageY int) int {
 	settingIdx := pageY - settingsMouseRowsOffset
-	if settingIdx < 0 || settingIdx >= len(SettingKeys) {
+	if settingIdx < 0 || settingIdx >= len(s.activeKeys()) {
 		return -1
 	}
 	return settingIdx
+}
+
+// resolveSettingsTabMouseTarget 解析标签栏内容行的鼠标点击目标。
+// 标签栏带圆角边框：│[tab0]│[tab1]│...，第一个标签从 settingsContainerLeft+1 开始。
+// 返回 (tabIndex, true) 表示命中某个标签；否则返回 (0, false)。
+func resolveSettingsTabMouseTarget(pageX int) (int, bool) {
+	if pageX < 0 {
+		return 0, false
+	}
+
+	// 标签内容行：左边框在 settingsContainerLeft，内容从 +1 列开始
+	cursor := settingsContainerLeft + 1
+	labels := []string{i18n.T("settings.tab.mihosh"), i18n.T("settings.tab.mihomo")}
+	for i, label := range labels {
+		tabWidth := lipgloss.Width(" " + label + " ")
+		if pageX >= cursor && pageX < cursor+tabWidth {
+			return i, true
+		}
+		cursor += tabWidth
+		if i < len(labels)-1 {
+			cursor++ // 分隔符 │ 占 1 列
+		}
+	}
+
+	return 0, false
 }
 
 func (s *State) isMouseDoubleClick(settingIdx int, now time.Time) bool {
@@ -377,7 +517,7 @@ func prevLanguage(lang string) string {
 }
 
 func LanguageSettingIndex() int {
-	for i, key := range SettingKeys {
+	for i, key := range MihoshSettingKeys {
 		if key == "language" {
 			return i
 		}
@@ -387,12 +527,30 @@ func LanguageSettingIndex() int {
 
 // ThemeSettingIndex 返回主题设置项索引
 func ThemeSettingIndex() int {
-	for i, key := range SettingKeys {
+	for i, key := range MihoshSettingKeys {
 		if key == "theme" {
 			return i
 		}
 	}
 	return -1
+}
+
+func (s *State) activeKeys() []string {
+	if s.activeTab == 1 {
+		return MihomoSettingKeys
+	}
+	return MihoshSettingKeys
+}
+
+func (s State) ApplyMihomoConfig(msg *messages.MihomoConfigMsg) State {
+	if msg.Err != nil {
+		s.mihomoLoadErr = msg.Err
+	} else {
+		s.mihomoConfig = msg.Config
+		s.mihomoLoadErr = nil
+	}
+	s.mihomoLoaded = true
+	return s
 }
 
 func nextTheme(t string) string {
@@ -464,4 +622,26 @@ func resolveLanguageMouseTarget(pageX int) (string, bool) {
 
 func settingsTabDisplayWidth(label string) int {
 	return len(label) + settingsTabContentPadding + settingsTabHorizontalPadding
+}
+
+func (s State) getEditValue(cfg *config.Config, settingKey string) string {
+	if s.activeTab == 1 && s.mihomoConfig != nil {
+		switch settingKey {
+		case "external-controller":
+			return s.mihomoConfig.ExternalController
+		case "secret":
+			return s.mihomoConfig.Secret
+		case "mixed-port":
+			return fmt.Sprintf("%d", s.mihomoConfig.MixedPort)
+		case "allow-lan":
+			if s.mihomoConfig.AllowLan {
+				return "true"
+			}
+			return "false"
+		case "log-level":
+			return s.mihomoConfig.LogLevel
+		}
+		return ""
+	}
+	return GetSettingValue(s.ToPageState(cfg), settingKey)
 }

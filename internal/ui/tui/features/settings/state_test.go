@@ -1,13 +1,17 @@
 package settings
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/viper"
 )
 
@@ -102,30 +106,30 @@ func TestUpdate_NonEditMode_UpDown(t *testing.T) {
 
 	// 测试 Up 键
 	upMsg := tea.KeyMsg{Type: tea.KeyUp}
-	next, _, _, _ := s.Update(upMsg, cfg, configSvc)
+	next, _, _, _ := s.Update(upMsg, cfg, configSvc, nil)
 	if next.selectedSetting != 0 {
 		t.Errorf("expected Up key to change selectedSetting to 0, got %d", next.selectedSetting)
 	}
 
 	// 已经在 0，继续按 Up 不应越界
-	next, _, _, _ = next.Update(upMsg, cfg, configSvc)
+	next, _, _, _ = next.Update(upMsg, cfg, configSvc, nil)
 	if next.selectedSetting != 0 {
 		t.Errorf("expected selectedSetting to remain 0, got %d", next.selectedSetting)
 	}
 
 	// 测试 Down 键
 	downMsg := tea.KeyMsg{Type: tea.KeyDown}
-	next, _, _, _ = next.Update(downMsg, cfg, configSvc)
+	next, _, _, _ = next.Update(downMsg, cfg, configSvc, nil)
 	if next.selectedSetting != 1 {
 		t.Errorf("expected Down key to change selectedSetting to 1, got %d", next.selectedSetting)
 	}
 
-	// 移动到最后一项（索引 6）
-	for i := 0; i < 10; i++ {
-		next, _, _, _ = next.Update(downMsg, cfg, configSvc)
+	// Act: 向下移动直到尽头
+	for i := 0; i < len(MihoshSettingKeys)+5; i++ {
+		next, _, _, _ = next.Update(downMsg, cfg, configSvc, nil)
 	}
-	if next.selectedSetting != len(SettingKeys)-1 {
-		t.Errorf("expected selectedSetting to cap at %d, got %d", len(SettingKeys)-1, next.selectedSetting)
+	if next.selectedSetting != len(MihoshSettingKeys)-1 {
+		t.Errorf("expected selectedSetting to cap at %d, got %d", len(MihoshSettingKeys)-1, next.selectedSetting)
 	}
 }
 
@@ -135,7 +139,7 @@ func TestUpdate_NonEditMode_Enter(t *testing.T) {
 	s := State{selectedSetting: 3}
 
 	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
-	next, _, _, _ := s.Update(enterMsg, cfg, configSvc)
+	next, _, _, _ := s.Update(enterMsg, cfg, configSvc, nil)
 
 	if !next.editMode {
 		t.Errorf("expected editMode to be true")
@@ -164,33 +168,33 @@ func TestUpdate_LanguageEditMode(t *testing.T) {
 
 	// 1. 测试 right 键循环切换：auto -> zh-CN -> en-US -> auto
 	rightMsg := tea.KeyMsg{Type: tea.KeyRight}
-	next, _, _, _ := s.Update(rightMsg, cfg, configSvc)
+	next, _, _, _ := s.Update(rightMsg, cfg, configSvc, nil)
 	if next.editValue != "zh-CN" {
 		t.Errorf("expected next language zh-CN, got %q", next.editValue)
 	}
 
-	next, _, _, _ = next.Update(rightMsg, cfg, configSvc)
+	next, _, _, _ = next.Update(rightMsg, cfg, configSvc, nil)
 	if next.editValue != "en-US" {
 		t.Errorf("expected next language en-US, got %q", next.editValue)
 	}
 
 	// 测试 tab 键循环切换
 	tabMsg := tea.KeyMsg{Type: tea.KeyTab}
-	next, _, _, _ = next.Update(tabMsg, cfg, configSvc)
+	next, _, _, _ = next.Update(tabMsg, cfg, configSvc, nil)
 	if next.editValue != "auto" {
 		t.Errorf("expected next language auto, got %q", next.editValue)
 	}
 
 	// 2. 测试 left 键循环切换
 	leftMsg := tea.KeyMsg{Type: tea.KeyLeft}
-	next, _, _, _ = next.Update(leftMsg, cfg, configSvc)
+	next, _, _, _ = next.Update(leftMsg, cfg, configSvc, nil)
 	if next.editValue != "en-US" {
 		t.Errorf("expected prev language en-US, got %q", next.editValue)
 	}
 
 	// 3. 测试 Escape 键退出编辑且不保存
 	escMsg := tea.KeyMsg{Type: tea.KeyEsc}
-	nextEsc, _, _, _ := next.Update(escMsg, cfg, configSvc)
+	nextEsc, _, _, _ := next.Update(escMsg, cfg, configSvc, nil)
 	if nextEsc.editMode {
 		t.Errorf("expected editMode to be false after Esc")
 	}
@@ -200,7 +204,7 @@ func TestUpdate_LanguageEditMode(t *testing.T) {
 
 	// 4. 测试 Enter 键保存语言
 	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
-	nextEnter, newCfg, proxyAddr, _ := next.Update(enterMsg, cfg, configSvc)
+	nextEnter, newCfg, proxyAddr, _ := next.Update(enterMsg, cfg, configSvc, nil)
 	if nextEnter.editMode {
 		t.Errorf("expected editMode to be false after Enter")
 	}
@@ -217,7 +221,7 @@ func TestUpdate_LanguageEditMode(t *testing.T) {
 		editMode:        true,
 		editValue:       "invalid-lang",
 	}
-	nextInvalid, _, _, _ := sInvalid.Update(enterMsg, cfg, configSvc)
+	nextInvalid, _, _, _ := sInvalid.Update(enterMsg, cfg, configSvc, nil)
 	// 虽然语言设置键盘模式通常不会有非法值，但以防万一检查它的处理逻辑，保存失败会调用 s.showToast
 	if nextInvalid.toastManager == nil || nextInvalid.toastManager.Render(80) == "" {
 		t.Errorf("expected toast error message when saving invalid language")
@@ -227,48 +231,48 @@ func TestUpdate_LanguageEditMode(t *testing.T) {
 func TestUpdate_NormalEditMode_CursorAndInput(t *testing.T) {
 	configSvc, cfg := setupTestConfig(t, nil)
 	s := State{
-		selectedSetting: 0, // api-address
+		selectedSetting: 2, // test-url
 		editMode:        true,
-		editValue:       "http://127.0.0.1:9090",
-		editCursor:      21,
+		editValue:       "http://example.com",
+		editCursor:      18,
 	}
 
 	// 1. 测试 left 键移动光标
 	leftMsg := tea.KeyMsg{Type: tea.KeyLeft}
-	next, _, _, _ := s.Update(leftMsg, cfg, configSvc)
-	if next.editCursor != 20 {
-		t.Errorf("expected editCursor=20, got %d", next.editCursor)
+	next, _, _, _ := s.Update(leftMsg, cfg, configSvc, nil)
+	if next.editCursor != 17 {
+		t.Errorf("expected editCursor=17, got %d", next.editCursor)
 	}
 
 	// 2. 测试 Home 键
 	homeMsg := tea.KeyMsg{Type: tea.KeyHome}
-	next, _, _, _ = next.Update(homeMsg, cfg, configSvc)
+	next, _, _, _ = next.Update(homeMsg, cfg, configSvc, nil)
 	if next.editCursor != 0 {
 		t.Errorf("expected editCursor=0 after Home, got %d", next.editCursor)
 	}
 
 	// 已经到最左侧，按 left 应依然为 0
-	next, _, _, _ = next.Update(leftMsg, cfg, configSvc)
+	next, _, _, _ = next.Update(leftMsg, cfg, configSvc, nil)
 	if next.editCursor != 0 {
 		t.Errorf("expected editCursor to stay at 0, got %d", next.editCursor)
 	}
 
 	// 3. 测试 right 键
 	rightMsg := tea.KeyMsg{Type: tea.KeyRight}
-	next, _, _, _ = next.Update(rightMsg, cfg, configSvc)
+	next, _, _, _ = next.Update(rightMsg, cfg, configSvc, nil)
 	if next.editCursor != 1 {
 		t.Errorf("expected editCursor=1 after Right, got %d", next.editCursor)
 	}
 
 	// 4. 测试 End 键
 	endMsg := tea.KeyMsg{Type: tea.KeyEnd}
-	next, _, _, _ = next.Update(endMsg, cfg, configSvc)
+	next, _, _, _ = next.Update(endMsg, cfg, configSvc, nil)
 	if next.editCursor != len(next.editValue) {
 		t.Errorf("expected editCursor at end, got %d", next.editCursor)
 	}
 
 	// 已经到最右侧，按 right 不应越界
-	next, _, _, _ = next.Update(rightMsg, cfg, configSvc)
+	next, _, _, _ = next.Update(rightMsg, cfg, configSvc, nil)
 	if next.editCursor != len(next.editValue) {
 		t.Errorf("expected editCursor not to exceed length, got %d", next.editCursor)
 	}
@@ -276,19 +280,19 @@ func TestUpdate_NormalEditMode_CursorAndInput(t *testing.T) {
 	// 5. 测试输入普通字符
 	// 往末尾追加字符 "s"
 	sChar := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")}
-	next, _, _, _ = next.Update(sChar, cfg, configSvc)
-	if next.editValue != "http://127.0.0.1:9090s" {
+	next, _, _, _ = next.Update(sChar, cfg, configSvc, nil)
+	if next.editValue != "http://example.coms" {
 		t.Errorf("expected value to be updated, got %q", next.editValue)
 	}
-	if next.editCursor != 22 {
-		t.Errorf("expected editCursor to increment to 22, got %d", next.editCursor)
+	if next.editCursor != 19 {
+		t.Errorf("expected editCursor to increment to 19, got %d", next.editCursor)
 	}
 
 	// 在中间插入字符（如第 5 位插入 "x"）
 	next.editCursor = 5
 	xChar := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")}
-	next, _, _, _ = next.Update(xChar, cfg, configSvc)
-	if next.editValue != "http:x//127.0.0.1:9090s" {
+	next, _, _, _ = next.Update(xChar, cfg, configSvc, nil)
+	if next.editValue != "http:x//example.coms" {
 		t.Errorf("expected insertion, got %q", next.editValue)
 	}
 	if next.editCursor != 6 {
@@ -298,8 +302,8 @@ func TestUpdate_NormalEditMode_CursorAndInput(t *testing.T) {
 	// 6. 测试 Backspace 键
 	// 删除刚才插入的 "x" (此时光标在第6位，删除第5位的字符)
 	backspaceMsg := tea.KeyMsg{Type: tea.KeyBackspace}
-	next, _, _, _ = next.Update(backspaceMsg, cfg, configSvc)
-	if next.editValue != "http://127.0.0.1:9090s" {
+	next, _, _, _ = next.Update(backspaceMsg, cfg, configSvc, nil)
+	if next.editValue != "http://example.coms" {
 		t.Errorf("expected character to be deleted, got %q", next.editValue)
 	}
 	if next.editCursor != 5 {
@@ -308,16 +312,16 @@ func TestUpdate_NormalEditMode_CursorAndInput(t *testing.T) {
 
 	// 光标在 0 时按 Backspace 不应做任何事
 	next.editCursor = 0
-	next, _, _, _ = next.Update(backspaceMsg, cfg, configSvc)
-	if next.editValue != "http://127.0.0.1:9090s" {
+	next, _, _, _ = next.Update(backspaceMsg, cfg, configSvc, nil)
+	if next.editValue != "http://example.coms" {
 		t.Errorf("expected no deletion, got %q", next.editValue)
 	}
 
 	// 7. 测试 Delete 键
 	// 删除光标处的字符（光标在0，删除第一个 'h'）
 	deleteMsg := tea.KeyMsg{Type: tea.KeyDelete}
-	next, _, _, _ = next.Update(deleteMsg, cfg, configSvc)
-	if next.editValue != "ttp://127.0.0.1:9090s" {
+	next, _, _, _ = next.Update(deleteMsg, cfg, configSvc, nil)
+	if next.editValue != "ttp://example.coms" {
 		t.Errorf("expected first char deleted, got %q", next.editValue)
 	}
 	if next.editCursor != 0 {
@@ -326,8 +330,8 @@ func TestUpdate_NormalEditMode_CursorAndInput(t *testing.T) {
 
 	// 光标在末尾时按 Delete 不应做任何事
 	next.editCursor = len(next.editValue)
-	next, _, _, _ = next.Update(deleteMsg, cfg, configSvc)
-	if next.editValue != "ttp://127.0.0.1:9090s" {
+	next, _, _, _ = next.Update(deleteMsg, cfg, configSvc, nil)
+	if next.editValue != "ttp://example.coms" {
 		t.Errorf("expected no deletion when cursor at end, got %q", next.editValue)
 	}
 }
@@ -342,7 +346,7 @@ func TestUpdate_NormalEditMode_Escape(t *testing.T) {
 	}
 
 	escMsg := tea.KeyMsg{Type: tea.KeyEsc}
-	next, _, _, _ := s.Update(escMsg, cfg, configSvc)
+	next, _, _, _ := s.Update(escMsg, cfg, configSvc, nil)
 
 	if next.editMode {
 		t.Errorf("expected editMode to be false")
@@ -365,7 +369,7 @@ func TestUpdate_NormalEditMode_Enter_Success(t *testing.T) {
 	}
 
 	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
-	next, newCfg, proxyAddr, _ := s.Update(enterMsg, cfg, configSvc)
+	next, newCfg, proxyAddr, _ := s.Update(enterMsg, cfg, configSvc, nil)
 
 	if next.editMode {
 		t.Errorf("expected editMode to be false after save")
@@ -403,7 +407,7 @@ func TestUpdate_NormalEditMode_Enter_Fail(t *testing.T) {
 	}
 
 	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
-	next, _, _, _ := s.Update(enterMsg, cfg, configSvc)
+	next, _, _, _ := s.Update(enterMsg, cfg, configSvc, nil)
 
 	// 应仍保留在编辑模式
 	if !next.editMode {
@@ -448,12 +452,12 @@ func TestHandleMouseScroll(t *testing.T) {
 		t.Errorf("expected selectedSetting to increase to 1, got %d", next.selectedSetting)
 	}
 
-	// 向下滚动至最后一项，不应越界
-	for i := 0; i < 10; i++ {
+	// Act: 向下滚动直到尽头
+	for i := 0; i < len(MihoshSettingKeys)+5; i++ {
 		next = next.HandleMouseScroll(false)
 	}
-	if next.selectedSetting != len(SettingKeys)-1 {
-		t.Errorf("expected selectedSetting to cap at %d, got %d", len(SettingKeys)-1, next.selectedSetting)
+	if next.selectedSetting != len(MihoshSettingKeys)-1 {
+		t.Errorf("expected selectedSetting to cap at %d, got %d", len(MihoshSettingKeys)-1, next.selectedSetting)
 	}
 }
 
@@ -564,6 +568,7 @@ func TestThemeSwitchHotSwap(t *testing.T) {
 		tea.KeyMsg{Type: tea.KeyEnter},
 		cfg,
 		configSvc,
+		nil,
 	)
 
 	if next.editMode {
@@ -574,5 +579,85 @@ func TestThemeSwitchHotSwap(t *testing.T) {
 	}
 	if newCfg.Theme != "catppuccin" {
 		t.Fatalf("expected cfg.Theme=catppuccin, got %q", newCfg.Theme)
+	}
+}
+
+// TestUpdate_SwitchTabByKey 验证 h/l/Tab 键可在 Mihosh ↔ Mihomo 间切换，并重置选中项。
+func TestUpdate_SwitchTabByKey(t *testing.T) {
+	configSvc, cfg := setupTestConfig(t, nil)
+	s := State{activeTab: 0, selectedSetting: 3}
+
+	// h 键切换到 Mihomo 标签页
+	next, _, _, _ := s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")}, cfg, configSvc, nil)
+	if next.activeTab != 1 {
+		t.Fatalf("expected activeTab=1 after h, got %d", next.activeTab)
+	}
+	if next.selectedSetting != 0 {
+		t.Fatalf("expected selectedSetting reset to 0, got %d", next.selectedSetting)
+	}
+
+	// l 键切换回 Mihosh 标签页
+	next, _, _, _ = next.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")}, cfg, configSvc, nil)
+	if next.activeTab != 0 {
+		t.Fatalf("expected activeTab=0 after l, got %d", next.activeTab)
+	}
+
+	// Tab 键再次切换到 Mihomo
+	next, _, _, _ = next.Update(tea.KeyMsg{Type: tea.KeyTab}, cfg, configSvc, nil)
+	if next.activeTab != 1 {
+		t.Fatalf("expected activeTab=1 after tab, got %d", next.activeTab)
+	}
+}
+
+// TestHandleMouseLeft_ClickTabBarSwitchesTab 验证点击标签栏内容行可切换标签页。
+func TestHandleMouseLeft_ClickTabBarSwitchesTab(t *testing.T) {
+	configSvc, cfg := setupTestConfig(t, nil)
+	s := State{activeTab: 0, selectedSetting: 3}
+
+	// 标签内容行位于 pageY=settingsTabBarContentY；第二个标签 Mihomo 起始 x=12
+	mihomoTabX := settingsContainerLeft + 1 + lipgloss.Width(" "+i18n.T("settings.tab.mihosh")+" ") + 1
+	next, _, _ := s.HandleMouseLeft(mihomoTabX, settingsTabBarContentY, cfg, configSvc, nil)
+	if next.activeTab != 1 {
+		t.Fatalf("expected activeTab=1 after clicking Mihomo tab, got %d", next.activeTab)
+	}
+	if next.selectedSetting != 0 {
+		t.Fatalf("expected selectedSetting reset to 0 after tab switch, got %d", next.selectedSetting)
+	}
+
+	// 第一个标签 Mihomo 起始 x=containerLeft+1
+	mihoshTabX := settingsContainerLeft + 1
+	next, _, _ = next.HandleMouseLeft(mihoshTabX, settingsTabBarContentY, cfg, configSvc, nil)
+	if next.activeTab != 0 {
+		t.Fatalf("expected activeTab=0 after clicking Mihosh tab, got %d", next.activeTab)
+	}
+}
+
+// TestApplyMihomoConfig 验证 Mihomo 配置加载（成功/失败）状态。
+func TestApplyMihomoConfig(t *testing.T) {
+	s := State{activeTab: 1}
+
+	// 成功加载
+	cfg := &model.MihomoConfig{ExternalController: "127.0.0.1:9090", MixedPort: 7890}
+	next := s.ApplyMihomoConfig(&messages.MihomoConfigMsg{Config: cfg})
+	if !next.mihomoLoaded {
+		t.Fatalf("expected mihomoLoaded=true after successful load")
+	}
+	if next.mihomoLoadErr != nil {
+		t.Fatalf("expected no error, got %v", next.mihomoLoadErr)
+	}
+	if next.mihomoConfig != cfg {
+		t.Fatalf("expected mihomoConfig to be set")
+	}
+
+	// 失败加载
+	next = s.ApplyMihomoConfig(&messages.MihomoConfigMsg{Err: fmt.Errorf("boom")})
+	if !next.mihomoLoaded {
+		t.Fatalf("expected mihomoLoaded=true even on error")
+	}
+	if next.mihomoLoadErr == nil {
+		t.Fatalf("expected error to be recorded")
+	}
+	if next.mihomoConfig != nil {
+		t.Fatalf("expected mihomoConfig=nil on error")
 	}
 }

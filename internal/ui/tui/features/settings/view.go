@@ -19,50 +19,41 @@ const (
 	settingsDescWidth   = 30
 )
 
-var SettingKeys = []string{"api-address", "secret", "test-url", "timeout", "proxy-address", "language", "auto-refresh-interval", "theme"}
+var MihoshSettingKeys = []string{"api-address", "secret", "test-url", "timeout", "proxy-address", "language", "auto-refresh-interval", "theme"}
+var MihomoSettingKeys = []string{"external-controller", "secret", "mixed-port", "allow-lan", "log-level"}
 
-func GetSettingLabel(index int) string {
-	switch index {
-	case 0:
+func GetSettingLabel(key string) string {
+	switch key {
+	case "api-address":
 		return i18n.T("settings.label.api_address")
-	case 1:
+	case "external-controller":
+		return i18n.T("settings.label.external-controller")
+	case "secret":
 		return i18n.T("settings.label.secret")
-	case 2:
+	case "test-url":
 		return i18n.T("settings.label.test_url")
-	case 3:
+	case "timeout":
 		return i18n.T("settings.label.timeout")
-	case 4:
+	case "proxy-address":
 		return i18n.T("settings.label.proxy_address")
-	case 5:
+	case "language":
 		return i18n.T("settings.label.language")
-	case 6:
+	case "auto-refresh-interval":
 		return i18n.T("settings.label.auto_refresh_interval")
-	case 7:
+	case "theme":
 		return i18n.T("settings.label.theme")
+	case "mixed-port":
+		return i18n.T("settings.label.mixed-port")
+	case "allow-lan":
+		return i18n.T("settings.label.allow-lan")
+	case "log-level":
+		return i18n.T("settings.label.log-level")
 	}
 	return ""
 }
 
-func GetSettingDesc(index int) string {
-	switch index {
-	case 0:
-		return i18n.T("settings.desc.api_address")
-	case 1:
-		return i18n.T("settings.desc.secret")
-	case 2:
-		return i18n.T("settings.desc.test_url")
-	case 3:
-		return i18n.T("settings.desc.timeout")
-	case 4:
-		return i18n.T("settings.desc.proxy_address")
-	case 5:
-		return i18n.T("settings.desc.language")
-	case 6:
-		return i18n.T("settings.desc.auto_refresh_interval")
-	case 7:
-		return i18n.T("settings.desc.theme")
-	}
-	return ""
+func GetSettingDesc(key string) string {
+	return i18n.T("settings.desc." + strings.ReplaceAll(key, "-", "_"))
 }
 
 // PageState 设置页面状态
@@ -76,37 +67,60 @@ type PageState struct {
 	Toast *common.ToastManager
 
 	MihomoVersion string
+
+	ActiveTab     int
+	MihomoConfig  *model.MihomoConfig
+	MihomoLoaded  bool
+	MihomoLoadErr error
+}
+
+func (p PageState) activeKeys() []string {
+	if p.ActiveTab == 1 {
+		return MihomoSettingKeys
+	}
+	return MihoshSettingKeys
 }
 
 // GetSettingValue 获取配置值
-func GetSettingValue(cfg *config.Config, index int) string {
-	if cfg == nil {
-		return ""
-	}
-
-	switch index {
-	case 0:
-		return cfg.APIAddress
-	case 1:
-		return cfg.Secret
-	case 2:
-		return cfg.TestURL
-	case 3:
-		return fmt.Sprintf("%d", cfg.Timeout)
-	case 4:
-		return cfg.ProxyAddress
-	case 5:
-		if cfg.Language == "" {
-			return "auto"
+func GetSettingValue(state PageState, key string) string {
+	if state.ActiveTab == 0 && state.Config != nil {
+		switch key {
+		case "api-address", "external-controller":
+			return state.Config.APIAddress
+		case "secret":
+			return state.Config.Secret
+		case "test-url":
+			return state.Config.TestURL
+		case "timeout":
+			return fmt.Sprintf("%d", state.Config.Timeout)
+		case "proxy-address":
+			return state.Config.ProxyAddress
+		case "language":
+			if state.Config.Language == "" {
+				return "auto"
+			}
+			return state.Config.Language
+		case "auto-refresh-interval":
+			return fmt.Sprintf("%d", state.Config.AutoRefreshInterval)
+		case "theme":
+			if state.Config.Theme == "" {
+				return "tokyo-night"
+			}
+			return state.Config.Theme
 		}
-		return cfg.Language
-	case 6:
-		return fmt.Sprintf("%d", cfg.AutoRefreshInterval)
-	case 7:
-		if cfg.Theme == "" {
-			return "tokyo-night"
+	} else if state.ActiveTab == 1 && state.MihomoConfig != nil {
+		switch key {
+		case "external-controller":
+			return state.MihomoConfig.ExternalController
+		case "secret":
+			return state.MihomoConfig.Secret
+		case "mixed-port":
+			return fmt.Sprintf("%d", state.MihomoConfig.MixedPort)
+		case "allow-lan":
+			return fmt.Sprintf("%t", state.MihomoConfig.AllowLan)
+		case "log-level":
+			return state.MihomoConfig.LogLevel
 		}
-		return cfg.Theme
 	}
 	return ""
 }
@@ -124,10 +138,15 @@ func RenderSettingsPage(state PageState, width, height int) string {
 		MarginLeft(2).
 		MarginTop(1)
 
+	// Tab Bar：复用 connections 的带圆角边框样式（3 行高度：上边框 / 内容行 / 下边框）
+	tabs := []string{i18n.T("settings.tab.mihosh"), i18n.T("settings.tab.mihomo")}
+	tabBar := renderSettingsTabBar(tabs, state.ActiveTab, width-4)
+
 	// 渲染设置项列表
 	var settingItems []string
-	for i := 0; i < len(SettingKeys); i++ {
-		item := renderSettingItem(state, i, GetSettingLabel(i), width)
+	keys := state.activeKeys()
+	for i := 0; i < len(keys); i++ {
+		item := renderSettingItem(state, i, keys[i], GetSettingLabel(keys[i]), width)
 		settingItems = append(settingItems, item)
 	}
 
@@ -135,16 +154,28 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	listContent := strings.Join(settingItems, "\n")
 	settingsPanel := common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width-4)
 
-	// 渲染选中项描述（信息行左侧）
+	// 处理 Mihomo 状态
+	if state.ActiveTab == 1 {
+		if !state.MihomoLoaded {
+			listContent = "\n  " + i18n.T("settings.mihomo.loading") + "\n"
+			settingsPanel = common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width-4)
+		} else if state.MihomoLoadErr != nil {
+			listContent = "\n  " + fmt.Sprintf(i18n.T("settings.mihomo.load_error"), state.MihomoLoadErr) + "\n"
+			settingsPanel = common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width-4)
+		}
+	}
+
+	// 渲染选中项描述（信息行右侧，配置框右下方提示）
 	var descPart string
-	if state.SelectedSetting >= 0 && state.SelectedSetting < len(SettingKeys) {
+	keys = state.activeKeys()
+	if state.SelectedSetting >= 0 && state.SelectedSetting < len(keys) {
 		descPart = lipgloss.NewStyle().
 			Foreground(common.TokyoMuted()).
 			Italic(true).
-			Render("💡 " + GetSettingDesc(state.SelectedSetting))
+			Render("💡 " + GetSettingDesc(keys[state.SelectedSetting]))
 	}
 
-	// 渲染版本信息（信息行右侧，方框右下方）
+	// 渲染版本信息（左下角，状态栏上方）
 	mihomoVer := state.MihomoVersion
 	if mihomoVer == "" {
 		mihomoVer = "..."
@@ -153,30 +184,20 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	mihomoLink := utils.CreateHyperlink("https://github.com/MetaCubeX/mihomo", "Mihomo "+mihomoVer)
 	versionText := fmt.Sprintf("%s | Built: %s | %s", mihoshLink, model.Date, mihomoLink)
 
-	// 信息行：左侧描述、右侧版本信息，整体宽度对齐配置框
+	// 描述行：右对齐，与配置框同宽
 	rowWidth := width - 4
-	versionSlot := rowWidth - lipgloss.Width(descPart)
-	if versionSlot < 0 {
-		versionSlot = 0
-	}
-	// 防止版本信息超长折行破坏布局
-	if lipgloss.Width(versionText) > versionSlot {
-		versionText = common.TruncateDisplay(versionText, versionSlot)
-	}
-	versionPart := lipgloss.NewStyle().
-		Foreground(common.TokyoMuted()).
-		Align(lipgloss.Right).
-		Width(versionSlot).
-		Render(versionText)
-	infoRow := lipgloss.NewStyle().
+	descRow := lipgloss.NewStyle().
 		MarginTop(1).
-		Render(lipgloss.JoinHorizontal(lipgloss.Top, descPart, versionPart))
+		Width(rowWidth).
+		Align(lipgloss.Right).
+		Render(descPart)
 
-	// 组装主要内容：配置框 → 信息行（描述左 / 版本右）
+	// 组装主要内容：Tab Bar → 配置框 → 描述行
 	mainContent := lipgloss.JoinVertical(
 		lipgloss.Left,
+		tabBar,
 		settingsPanel,
-		infoRow,
+		descRow,
 	)
 
 	// 包裹容器边距
@@ -184,6 +205,9 @@ func RenderSettingsPage(state PageState, width, height int) string {
 
 	// 填充至页面高度，使右下角帮助提示浮层能正确定位到底部
 	mainContent = lipgloss.PlaceVertical(height, lipgloss.Top, mainContent)
+
+	// 将版本信息叠加在左下角（状态栏上方）
+	mainContent = overlayVersionAtBottomLeft(mainContent, versionText, width, height)
 
 	// 渲染 Toast（如果有）
 	toastStr := state.Toast.Render(width)
@@ -197,6 +221,34 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	}
 
 	return renderSettingsInlineHelp(result, state, width, height)
+}
+
+// overlayVersionAtBottomLeft 将版本信息叠加在页面左下角（状态栏上方一行）。
+func overlayVersionAtBottomLeft(page, versionText string, width, height int) string {
+	if versionText == "" {
+		return page
+	}
+
+	lines := strings.Split(page, "\n")
+	targetLine := height - 1 // 状态栏占最后一行，版本信息位于其上方一行
+	if targetLine < 0 || targetLine >= len(lines) {
+		return page
+	}
+
+	versionLine := lipgloss.NewStyle().
+		Foreground(common.TokyoMuted()).
+		Render(versionText)
+	// 宽度限制：保留原始行其余内容（叠加后可能被版本文字覆盖前缀，这里采用左对齐替换整行更安全）
+	maxWidth := width - 4
+	if maxWidth < 1 {
+		maxWidth = 1
+	}
+	versionLine = common.TruncateDisplay(versionLine, maxWidth)
+
+	// 用版本行替换目标行（左对齐，右侧保留空白），保证不影响右下角帮助浮层位置
+	lines[targetLine] = versionLine + strings.Repeat(" ", max(0, width-lipgloss.Width(versionLine)-1))
+
+	return strings.Join(lines, "\n")
 }
 
 // ============================================================
@@ -234,8 +286,9 @@ func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		}
 	}
 
-	// 普通模式：选择 + 编辑
+	// 普通模式：切换标签 + 选择 + 编辑
 	return []common.InlineHelpHint{
+		{Key: "h/l", Desc: i18n.T("help.settings.hint_tab")},
 		{Key: "↑↓", Desc: i18n.T("help.settings.hint_select")},
 		{Key: "Enter", Desc: i18n.T("help.settings.hint_edit")},
 	}
@@ -253,11 +306,11 @@ func renderSettingsInlineHelp(page string, state PageState, width, height int) s
 }
 
 // renderSettingItem 渲染单个设置项
-func renderSettingItem(state PageState, index int, label string, width int) string {
-	value := GetSettingValue(state.Config, index)
+func renderSettingItem(state PageState, index int, key string, label string, width int) string {
+	value := GetSettingValue(state, key)
 
 	// 密钥特殊处理
-	if index == 1 && value != "" {
+	if state.ActiveTab == 1 && key == "secret" && value != "" {
 		value = utils.MaskSecret(value)
 	}
 
@@ -310,13 +363,25 @@ func renderSettingItem(state PageState, index int, label string, width int) stri
 			valToRender = state.EditValue
 		}
 		renderedValue = renderLanguageTabs(valToRender, state.EditMode && index == state.SelectedSetting)
-	} else if index == ThemeSettingIndex() {
+	} else if key == "theme" {
 		// 主题选项使用 Tab 组件渲染
 		valToRender := value
 		if state.EditMode && index == state.SelectedSetting {
 			valToRender = state.EditValue
 		}
 		renderedValue = renderThemeTabs(valToRender, state.EditMode && index == state.SelectedSetting)
+	} else if key == "allow-lan" {
+		valToRender := value
+		if state.EditMode && index == state.SelectedSetting {
+			valToRender = state.EditValue
+		}
+		renderedValue = renderAllowLanTabs(valToRender, state.EditMode && index == state.SelectedSetting)
+	} else if key == "log-level" {
+		valToRender := value
+		if state.EditMode && index == state.SelectedSetting {
+			valToRender = state.EditValue
+		}
+		renderedValue = renderLogLevelTabs(valToRender, state.EditMode && index == state.SelectedSetting)
 	} else if state.EditMode && index == state.SelectedSetting {
 		// 在光标位置渲染真实光标指示符
 		cursorPos := state.EditCursor
@@ -425,6 +490,108 @@ func renderThemeTabs(currentTheme string, editMode bool) string {
 			parts = append(parts, inactiveStyle.Render(" "+m+" "))
 		}
 		if i < len(themes)-1 {
+			parts = append(parts, separatorStyle.Render("│"))
+		}
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Left, parts...)
+}
+
+func renderAllowLanTabs(current string, editMode bool) string {
+	modes := []string{"true", "false"}
+	return renderEnumTabs(current, modes, editMode)
+}
+
+func renderLogLevelTabs(current string, editMode bool) string {
+	modes := []string{"info", "warning", "error", "debug", "silent"}
+	return renderEnumTabs(current, modes, editMode)
+}
+
+// settingsTabBarHeight 标签栏（带圆角边框）的渲染高度：上边框 / 内容行 / 下边框。
+const settingsTabBarHeight = 3
+
+// settingsTabBarContentY 标签栏内容行（可点击行）相对页面内容顶部的 Y 坐标。
+// 布局：marginTop 空行(0) + 上边框(1) → 内容行位于 pageY=2。
+const settingsTabBarContentY = 2
+
+// renderSettingsTabBar 渲染带圆角边框的标签栏，样式与 connections 模式切换栏一致。
+func renderSettingsTabBar(labels []string, active int, width int) string {
+	if width < 24 {
+		width = 24
+	}
+	innerWidth := width - 2
+	if innerWidth < 1 {
+		innerWidth = 1
+	}
+
+	activeStyle := lipgloss.NewStyle().
+		Background(common.TokyoSelected()).
+		Foreground(common.TokyoCyan()).
+		Bold(true)
+	inactiveStyle := lipgloss.NewStyle().
+		Foreground(common.TokyoBlue())
+	separatorStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted())
+
+	var parts []string
+	for i, label := range labels {
+		rendered := " " + label + " "
+		if i == active {
+			parts = append(parts, activeStyle.Render(rendered))
+		} else {
+			parts = append(parts, inactiveStyle.Render(rendered))
+		}
+		if i < len(labels)-1 {
+			parts = append(parts, separatorStyle.Render("│"))
+		}
+	}
+
+	content := lipgloss.JoinHorizontal(lipgloss.Left, parts...)
+
+	// 内容已自带标签内 padding（" Mihosh "），直接填充至内边框宽度
+	contentWidth := lipgloss.Width(content)
+	if contentWidth < innerWidth {
+		content += strings.Repeat(" ", innerWidth-contentWidth)
+	}
+
+	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
+	topLine := borderStyle.Render("╭" + strings.Repeat("─", innerWidth) + "╮")
+	middleLine := borderStyle.Render("│") + content + borderStyle.Render("│")
+	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
+
+	return topLine + "\n" + middleLine + "\n" + bottomLine
+}
+
+// SettingsTabBarDisplayWidth 返回单个标签（含 padding）的显示宽度，供鼠标命中检测使用。
+func SettingsTabBarDisplayWidth(label string) int {
+	return len(label) + 2 // 两侧各一空格
+}
+
+func renderEnumTabs(current string, modes []string, editMode bool) string {
+	var parts []string
+
+	activeStyle := lipgloss.NewStyle().
+		Background(common.TokyoBlue()).
+		Foreground(common.Bright()).
+		Bold(true).
+		Padding(0, 1)
+
+	if editMode {
+		activeStyle = activeStyle.Background(common.TokyoGreen())
+	}
+
+	inactiveStyle := lipgloss.NewStyle().
+		Foreground(common.TokyoMuted()).
+		Background(common.Background()).
+		Padding(0, 1)
+
+	separatorStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted())
+
+	for i, m := range modes {
+		if current == m {
+			parts = append(parts, activeStyle.Render(" "+m+" "))
+		} else {
+			parts = append(parts, inactiveStyle.Render(" "+m+" "))
+		}
+		if i < len(modes)-1 {
 			parts = append(parts, separatorStyle.Render("│"))
 		}
 	}

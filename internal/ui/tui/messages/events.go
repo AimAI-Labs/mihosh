@@ -27,6 +27,15 @@ type ConfigModeMsg struct {
 	Mode string
 }
 
+type MihomoConfigMsg struct {
+	Config *model.MihomoConfig
+	Err    error
+}
+
+type MihomoConfigSavedMsg struct {
+	Err error
+}
+
 // ========= Node / Proxy Testing Messages =========
 
 type TestDoneMsg struct {
