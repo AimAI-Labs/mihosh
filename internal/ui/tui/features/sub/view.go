@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	subFixedLines   = 5 // header(3) + 间距(1) + 底部(1)
+	subFixedLines   = 4 // header(3) + 间距(1)
 	subMinHeight    = 5
 	subScrollWidth  = 1
 	subHeaderHeight = 3
@@ -217,7 +217,32 @@ func renderList(state PageState, maxLines int) string {
 }
 
 func renderSubEntry(p profile.Profile, seq int, _, isActive, isUpdating, selected bool, width int) string {
-	// 激活标记
+	// 列宽常量（固定列宽保证各列对齐）
+	const (
+		colIndexW  = 5  // 序号列
+		colKindW   = 6  // 类型列（remote/local 最长 6）
+		colTimeW   = 14 // 更新时间列
+		colNameMin = 8  // 名称列最小宽度
+		colSrcMin  = 16 // 来源列最小宽度
+	)
+	// 固定开销：选择符前缀(2) + 激活标记(2) + 列间分隔符(5) + 各固定列宽
+	const fixedOverhead = 2 + 2 + 5 + colIndexW + colKindW + colTimeW // = 34
+
+	// 名称/来源列共享剩余宽度。URL 通常更长，来源列占 5/6、名称列占 1/8。
+	flex := width - fixedOverhead
+	if flex < colNameMin+colSrcMin {
+		flex = colNameMin + colSrcMin
+	}
+	nameMax := flex * 1 / 8
+	if nameMax < colNameMin {
+		nameMax = colNameMin
+	}
+	srcMax := flex - nameMax
+	if srcMax < colSrcMin {
+		srcMax = colSrcMin
+	}
+
+	// 激活标记：绿色圆点表示激活，灰色空位表示未激活（不再使用 [激活] 文字徽标）
 	var mark string
 	if isActive {
 		mark = lipgloss.NewStyle().Foreground(common.Success()).Render("● ")
@@ -226,44 +251,42 @@ func renderSubEntry(p profile.Profile, seq int, _, isActive, isUpdating, selecte
 	}
 
 	// 序号
-	indexStr := lipgloss.NewStyle().Foreground(common.Success()).Width(4).Render(fmt.Sprintf("%d.", seq))
+	indexStr := lipgloss.NewStyle().Foreground(common.Success()).Width(colIndexW).Render(fmt.Sprintf("%d.", seq))
 
-	// 名称
-	nameStr := lipgloss.NewStyle().Foreground(common.Bright()).Render(p.Name)
-
-	// 激活徽标
-	var badge string
-	if isActive {
-		badge = " " + lipgloss.NewStyle().Foreground(common.TokyoGreen()).Render("["+i18n.T("sub.badge_active")+"]")
+	// 名称（截断）
+	name := p.Name
+	if common.DisplayWidth(name) > nameMax {
+		name = common.TruncateDisplay(name, nameMax)
 	}
-
-	var updatingBadge string
-	if isUpdating {
-		updatingBadge = " " + lipgloss.NewStyle().Foreground(common.TokyoCyan()).Render("["+i18n.T("sub.updating")+"]")
-	}
+	nameStr := lipgloss.NewStyle().Foreground(common.Bright()).Width(nameMax).Render(name)
 
 	// 类型
 	kindColor := common.TokyoBlue()
 	if p.Source.Kind == profile.SourceLocal {
 		kindColor = common.TokyoPurple()
 	}
-	kindStr := lipgloss.NewStyle().Foreground(kindColor).Render(p.Source.Kind.String())
+	kindStr := lipgloss.NewStyle().Foreground(kindColor).Width(colKindW).Render(p.Source.Kind.String())
 
 	// 来源（截断）
-	srcMax := width - 40
-	if srcMax < 16 {
-		srcMax = 16
-	}
 	src := p.Source.Display()
-	if len([]rune(src)) > srcMax {
-		src = string([]rune(src)[:srcMax-3]) + "..."
+	if common.DisplayWidth(src) > srcMax {
+		src = common.TruncateDisplay(src, srcMax)
 	}
-	srcStr := lipgloss.NewStyle().Foreground(common.Secondary()).Render(src)
+	srcStr := lipgloss.NewStyle().Foreground(common.Secondary()).Width(srcMax).Render(src)
 
-	// 更新时间
-	timeStr := lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render(relativeTime(p.UpdatedAt))
+	// 更新时间（预截断，避免 lipgloss.Width 因内容超宽而自动换行破坏单行布局）
+	tm := relativeTime(p.UpdatedAt)
+	if common.DisplayWidth(tm) > colTimeW {
+		tm = common.TruncateDisplay(tm, colTimeW)
+	}
+	timeStr := lipgloss.NewStyle().Foreground(common.TokyoMuted()).Width(colTimeW).Render(tm)
 
-	line := fmt.Sprintf("%s%s %s%s %s %s %s%s", mark, indexStr, nameStr, badge, kindStr, srcStr, timeStr, updatingBadge)
+	var updatingBadge string
+	if isUpdating {
+		updatingBadge = " " + lipgloss.NewStyle().Foreground(common.TokyoCyan()).Render("["+i18n.T("sub.updating")+"]")
+	}
+
+	line := fmt.Sprintf("%s %s %s %s %s %s%s", mark, indexStr, nameStr, kindStr, srcStr, timeStr, updatingBadge)
 	if selected {
 		line = lipgloss.NewStyle().Background(common.Highlight()).Render(common.SymbolSelectActive + line)
 	} else {

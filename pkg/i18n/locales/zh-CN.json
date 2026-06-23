@@ -434,7 +434,6 @@
   "sub.stats": "共 %d 个订阅",
   "sub.stats_filtered": " (过滤自 %d 个)",
   "sub.stats_remote": "%d 个远程",
-  "sub.badge_active": "激活",
   "sub.updating": "更新中",
   "sub.never_updated": "未更新",
   "sub.time_just_now": "刚刚",
