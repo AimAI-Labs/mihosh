@@ -25,10 +25,9 @@ func TestGetMemoryDecodesFirstObjectFromOpenStream(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(&config.Config{
-		APIAddress: server.URL,
-		Timeout:    100,
-	})
+	client := NewClient(config.MihomoEndpoint{
+		ExternalController: server.URL,
+	}, 100)
 
 	start := time.Now()
 	mem, err := client.GetMemory()
@@ -51,11 +50,10 @@ func TestUpdateEndpointSwitchesBaseURLAndSecret(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(&config.Config{
-		APIAddress: "http://127.0.0.1:1", // 故意指向不可达地址
-		Secret:     "old-secret",
-		Timeout:    100,
-	})
+	client := NewClient(config.MihomoEndpoint{
+		ExternalController: "http://127.0.0.1:1", // 故意指向不可达地址
+		Secret:             "old-secret",
+	}, 100)
 
 	// 切换到真实测试服务并改密钥
 	client.UpdateEndpoint(server.URL, "new-secret")

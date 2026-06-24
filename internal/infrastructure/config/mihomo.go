@@ -1,10 +1,77 @@
 package config
 
 import (
+	"fmt"
+	"log"
 	"os"
 
 	"gopkg.in/yaml.v3"
 )
+
+// MihomoEndpoint 从 mihomo 配置文件解析出的连接信息（原值，无 scheme）。
+// external-controller/secret 与 mihomo 配置文件保持一致；proxy 地址由 MixedPort 派生。
+type MihomoEndpoint struct {
+	ExternalController string
+	Secret             string
+	MixedPort          int
+}
+
+// DefaultMihomoEndpoint 内置默认（自动发现失败时回退）。
+var DefaultMihomoEndpoint = MihomoEndpoint{
+	ExternalController: "127.0.0.1:9090",
+	MixedPort:          7890,
+}
+
+// ResolveMihomoEndpoint 自动发现 mihomo 配置文件并解析连接信息。
+// 发现或解析失败时返回 DefaultMihomoEndpoint（不返回 error，保证启动零门槛）。
+// secret 统一在此收敛 fallback 逻辑：API 可能省略 secret，从 YAML 读取补全。
+func ResolveMihomoEndpoint() MihomoEndpoint {
+	path, err := GetMihomoConfigPath()
+	if err != nil {
+		log.Printf("ResolveMihomoEndpoint: auto discovery failed, using defaults: %v", err)
+		return DefaultMihomoEndpoint
+	}
+
+	data, err := ReadMihomoYAML(path)
+	if err != nil {
+		log.Printf("ResolveMihomoEndpoint: failed to read mihomo yaml (%s), using defaults: %v", path, err)
+		return DefaultMihomoEndpoint
+	}
+
+	endpoint := DefaultMihomoEndpoint
+	if v, ok := data["external-controller"].(string); ok && v != "" {
+		endpoint.ExternalController = v
+	}
+	if v, ok := data["secret"].(string); ok {
+		endpoint.Secret = v
+	}
+	endpoint.MixedPort = resolveMixedPort(data, endpoint.MixedPort)
+	return endpoint
+}
+
+// resolveMixedPort 从 YAML map 解析 mixed-port，兼容 int/int64/float64 等 YAML 解析类型。
+func resolveMixedPort(data map[string]interface{}, fallback int) int {
+	switch v := data["mixed-port"].(type) {
+	case int:
+		if v > 0 {
+			return v
+		}
+	case int64:
+		if v > 0 {
+			return int(v)
+		}
+	case float64:
+		if v > 0 {
+			return int(v)
+		}
+	}
+	return fallback
+}
+
+// MixedPortToProxyURL 由 mixed-port 派生 HTTP 代理地址（带 scheme 是 HTTP 协议要求）。
+func MixedPortToProxyURL(port int) string {
+	return fmt.Sprintf("http://127.0.0.1:%d", port)
+}
 
 // ReadMihomoYAML reads the mihomo config file into a map, primarily to fetch missing fields like secret
 func ReadMihomoYAML(configPath string) (map[string]interface{}, error) {

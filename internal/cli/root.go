@@ -1,12 +1,10 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
 
-	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
@@ -24,33 +22,21 @@ var rootCmd = &cobra.Command{
 	SilenceErrors: true,
 	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// 默认行为：启动TUI界面
+		// 默认行为：启动TUI界面。
+		// 配置缺失（含首次启动）直接用默认值继续，不在启动期写文件；
+		// 连接信息由 mihomo 配置文件自动发现。
 		cfg, err := config.Load()
 		if err == nil {
 			i18n.SetLanguageOverride(cfg.Language)
-		}
-		if err != nil {
-			if !errors.Is(err, config.ErrConfigNotFound) {
-				return wrapConfigError(fmt.Errorf(i18n.T("cli.root.err_load_config")+": %w", err))
-			}
-
-			// 友好的首次使用引导
-			configSvc := service.NewConfigService()
-			if err := configSvc.InitConfig(); err != nil {
-				return wrapConfigError(fmt.Errorf(i18n.T("cli.root.err_init_config")+": %w", err))
-			}
-
-			// 重新加载配置
-			cfg, err = config.Load()
-			if err != nil {
-				return wrapConfigError(fmt.Errorf(i18n.T("cli.root.err_load_config")+": %w", err))
-			}
+		} else {
+			cfg = &config.DefaultConfig
 		}
 
-		client := api.NewClient(cfg)
-		model := tui.NewModel(client, cfg.TestURL, cfg.Timeout)
+		endpoint := config.ResolveMihomoEndpoint()
+		client := api.NewClient(endpoint, cfg.Timeout)
+		m := tui.NewModel(client, cfg.TestURL, cfg.Timeout)
 
-		p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
+		p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf(i18n.T("cli.root.err_start")+": %w", err)
 		}
@@ -86,4 +72,11 @@ func executeRootCommand(root *cobra.Command, stderr io.Writer) int {
 		return exitCodeForError(err)
 	}
 	return exitCodeOK
+}
+
+// loadClient 统一构造 API Client：从 mihomo 配置文件解析连接信息，
+// 超时取自 Mihosh 配置（加载失败则回退默认）。供所有 CLI 子命令复用，
+// 避免各处重复 api.NewClient + endpoint 解析。
+func loadClient(cfg *config.Config) *api.Client {
+	return api.NewClient(config.ResolveMihomoEndpoint(), cfg.Timeout)
 }

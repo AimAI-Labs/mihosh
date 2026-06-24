@@ -39,7 +39,7 @@ func TestSettingsLanguageSaveAppliesI18nImmediately(t *testing.T) {
 		configSvc:   service.NewConfigService(),
 	}
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 2; i++ {
 		next, _ := model.dispatchKeyToPage(keyMsg("down"))
 		model = next.(Model)
 	}
@@ -88,7 +88,7 @@ func TestSettingsLanguageMouseClickAppliesI18nImmediately(t *testing.T) {
 	}
 
 	const pageX = 42
-	const pageY = 10
+	const pageY = 7
 	const rawX = pageX
 	const rawY = pageY + layout.TopNavHeight
 
@@ -135,7 +135,7 @@ func TestSettingsThemeMouseClickClearsScreen(t *testing.T) {
 	}
 
 	const pageX = 40
-	const pageY = 12
+	const pageY = 9
 	const rawX = pageX
 	const rawY = pageY + layout.TopNavHeight
 

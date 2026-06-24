@@ -403,18 +403,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.settingsState = m.settingsState.ApplyMihomoVersion(msg.Version)
 
 	case messages.MihomoConfigMsg:
-		// Mihomo 标签页配置加载完成（成功或失败）
+		// Mihomo 标签页配置加载完成（成功或失败）。
+		// 同步热刷新 client/wsClient 端点（external-controller/secret 变更），
+		// 并把 mixed-port 派生的代理地址同步到 connections。
 		m.settingsState = m.settingsState.ApplyMihomoConfig(&msg)
+		if msg.Config != nil {
+			m.reloadClients(msg.Config.ExternalController, msg.Config.Secret)
+			m.connsState = m.connsState.UpdateProxyAddr(config.MixedPortToProxyURL(msg.Config.MixedPort))
+			m.err = nil
+		}
 
 	case messages.MihomoConfigSavedMsg:
-		// Mihomo 配置项已保存（写 YAML + 热重载）：toast 提示 + 重新拉取运行时配置
+		// Mihomo 配置项已保存（写 YAML + 热重载）：toast 提示 + 重新拉取运行时配置。
+		// external-controller/secret/mixed-port 变更后重新解析 endpoint 热刷新 client/wsClient。
 		if msg.Err != nil {
 			m.err = messages.ErrMsg{Err: msg.Err}
 		} else {
 			m.notice = i18n.T("settings.toast.mihomo_save_success")
 			m.noticeTicks = autoRefreshNoticeTicks
+			endpoint := config.ResolveMihomoEndpoint()
+			m.reloadClients(endpoint.ExternalController, endpoint.Secret)
+			m.connsState = m.connsState.UpdateProxyAddr(config.MixedPortToProxyURL(endpoint.MixedPort))
+			m.err = nil
 		}
-		// external-controller / secret 变更会影响本地 api_address / secret → 同步刷新 client 与节点信息
 		return m, tea.Batch(m.fetchNodes(), m.configSvc.FetchMihomoConfig(m.client))
 
 	case messages.ThemeChangedMsg:
@@ -567,31 +578,19 @@ func (m Model) dispatchKeyToPage(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.subState, cmd = m.subState.Update(msg, m.profileSvc)
 
 	case layout.PageSettings:
-		var newCfg, proxyAddr = m.config, ""
+		var newCfg = m.config
 		oldLanguage := ""
-		oldAPIAddress := ""
-		oldSecret := ""
 		if m.config != nil {
 			oldLanguage = m.config.Language
-			oldAPIAddress = m.config.APIAddress
-			oldSecret = m.config.Secret
 		}
-		m.settingsState, newCfg, proxyAddr, cmd = m.settingsState.Update(msg, m.config, m.configSvc, m.client)
+		m.settingsState, newCfg, cmd = m.settingsState.Update(msg, m.config, m.configSvc, m.client)
 		m.config = newCfg
 		if newCfg != nil && newCfg.Language != oldLanguage {
 			i18n.SetLanguageOverride(newCfg.Language)
 			common.InitKeyBindings()
 			cmd = tea.Batch(cmd, tea.ClearScreen)
 		}
-		if proxyAddr != "" {
-			m.connsState = m.connsState.UpdateProxyAddr(proxyAddr)
-		}
-		// api_address / secret 变更 → 热刷新 client/wsClient，并清掉旧的"无法连接"错误
-		if newCfg != nil && (newCfg.APIAddress != oldAPIAddress || newCfg.Secret != oldSecret) {
-			m.reloadClients(newCfg.APIAddress, newCfg.Secret)
-			m.err = nil
-			cmd = tea.Batch(cmd, m.fetchNodes())
-		}
+		// 连接信息热刷新改由 MihomoConfigSavedMsg 驱动（Mihosh 配置不再含连接信息）。
 		if newCfg != nil {
 			m.autoRefreshRemaining = newCfg.AutoRefreshInterval
 			m.autoRefreshSynced = false
@@ -733,17 +732,12 @@ func (m Model) handleSettingsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 
 	oldLanguage := ""
 	oldTheme := ""
-	oldAPIAddress := ""
-	oldSecret := ""
 	if m.config != nil {
 		oldLanguage = m.config.Language
 		oldTheme = m.config.Theme
-		oldAPIAddress = m.config.APIAddress
-		oldSecret = m.config.Secret
 	}
 
-	var proxyAddr string
-	m.settingsState, m.config, proxyAddr = m.settingsState.HandleMouseLeft(pageX, pageY, m.config, m.configSvc, m.client)
+	m.settingsState, m.config = m.settingsState.HandleMouseLeft(pageX, pageY, m.config, m.configSvc, m.client)
 	if m.config != nil && m.config.Language != oldLanguage {
 		i18n.SetLanguageOverride(m.config.Language)
 		common.InitKeyBindings()
@@ -752,15 +746,7 @@ func (m Model) handleSettingsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 	if m.config != nil && m.config.Theme != oldTheme {
 		return m, tea.ClearScreen
 	}
-	if proxyAddr != "" {
-		m.connsState = m.connsState.UpdateProxyAddr(proxyAddr)
-	}
-	// api_address / secret 变更 → 热刷新 client/wsClient，并清掉旧的"无法连接"错误
-	if m.config != nil && (m.config.APIAddress != oldAPIAddress || m.config.Secret != oldSecret) {
-		m.reloadClients(m.config.APIAddress, m.config.Secret)
-		m.err = nil
-		return m, m.fetchNodes()
-	}
+	// 连接信息热刷新改由 MihomoConfigSavedMsg 驱动（Mihosh 配置不再含连接信息）。
 	if m.config != nil {
 		m.autoRefreshRemaining = m.config.AutoRefreshInterval
 		m.autoRefreshSynced = false

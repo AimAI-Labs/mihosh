@@ -8,7 +8,6 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/mattn/go-runewidth"
 	"github.com/spf13/cobra"
@@ -58,7 +57,7 @@ var testCmd = &cobra.Command{
 			return wrapConfigError(fmt.Errorf("加载配置失败: %w", err))
 		}
 
-		client := api.NewClient(cfg)
+		client := loadClient(cfg)
 		proxySvc := service.NewProxyService(client, cfg.TestURL, cfg.Timeout)
 
 		action, target, err := resolveTestAction(args)
@@ -66,7 +65,8 @@ var testCmd = &cobra.Command{
 			return wrapParameterError(err)
 		}
 
-		if err := runTestAction(os.Stdout, proxySvc, cfg.ProxyAddress, action, target, format); err != nil {
+		proxyURL := config.MixedPortToProxyURL(config.ResolveMihomoEndpoint().MixedPort)
+		if err := runTestAction(os.Stdout, proxySvc, proxyURL, action, target, format); err != nil {
 			return wrapNetworkError(err)
 		}
 		return nil
@@ -89,10 +89,11 @@ var testGroupCmd = &cobra.Command{
 			return wrapConfigError(fmt.Errorf("加载配置失败: %w", err))
 		}
 
-		client := api.NewClient(cfg)
+		client := loadClient(cfg)
 		proxySvc := service.NewProxyService(client, cfg.TestURL, cfg.Timeout)
 
-		if err := runTestAction(os.Stdout, proxySvc, cfg.ProxyAddress, actionGroup, args[0], format); err != nil {
+		proxyURL := config.MixedPortToProxyURL(config.ResolveMihomoEndpoint().MixedPort)
+		if err := runTestAction(os.Stdout, proxySvc, proxyURL, actionGroup, args[0], format); err != nil {
 			return wrapNetworkError(err)
 		}
 		return nil

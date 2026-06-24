@@ -27,7 +27,7 @@ func newIsolatedService(t *testing.T) *ProfileService {
 	dir, err := config.GetConfigDir()
 	require.NoError(t, err)
 	require.NoError(t, os.MkdirAll(dir, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "config.yaml"), []byte("api_address: http://127.0.0.1:9090\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "config.yaml"), []byte("test_url: http://example.com\n"), 0644))
 
 	return NewProfileService(nil)
 }
@@ -243,7 +243,7 @@ func TestProfileService_ActivateSkipsUnchangedConfig(t *testing.T) {
 	mihoshDir := filepath.Join(home, ".mihosh")
 	require.NoError(t, os.MkdirAll(mihoshDir, 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(mihoshDir, "config.yaml"),
-		[]byte("api_address: http://127.0.0.1:9090\n"), 0644))
+		[]byte("test_url: http://example.com\n"), 0644))
 
 	s := NewProfileService(nil)
 
@@ -284,7 +284,7 @@ func TestProfileService_ActivateRewritesWhenConfigChanged(t *testing.T) {
 	mihoshDir := filepath.Join(home, ".mihosh")
 	require.NoError(t, os.MkdirAll(mihoshDir, 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(mihoshDir, "config.yaml"),
-		[]byte("api_address: http://127.0.0.1:9090\n"), 0644))
+		[]byte("test_url: http://example.com\n"), 0644))
 
 	s := NewProfileService(nil)
 

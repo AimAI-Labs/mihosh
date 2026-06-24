@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/spf13/cobra"
@@ -36,7 +35,7 @@ var statusCmd = &cobra.Command{
 			return wrapConfigError(fmt.Errorf("加载配置失败: %w", err))
 		}
 
-		client := api.NewClient(cfg)
+		client := loadClient(cfg)
 
 		configs, err := client.GetConfigs()
 		if err != nil {

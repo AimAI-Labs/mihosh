@@ -115,9 +115,8 @@ func (s State) ToPageState(cfg *config.Config) PageState {
 	}
 }
 
-// Update 处理设置页面按键，返回：(新状态, 更新后的cfg, 更新后的proxyAddr, cmd)
-// proxyAddr 为空字符串时表示无变化
-func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, string, tea.Cmd) {
+// Update 处理设置页面按键，返回：(新状态, 更新后的cfg, cmd)
+func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, tea.Cmd) {
 	if s.editMode {
 		return s.handleEditMode(msg, cfg, configSvc, client)
 	}
@@ -125,7 +124,7 @@ func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.Con
 	if msg.String() == "h" || msg.String() == "l" || msg.String() == "tab" {
 		s.activeTab = 1 - s.activeTab
 		s.selectedSetting = 0
-		return s, cfg, "", nil
+		return s, cfg, nil
 	}
 
 	switch {
@@ -143,7 +142,7 @@ func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.Con
 		s.editCursor = len(s.editValue)
 	}
 
-	return s, cfg, "", nil
+	return s, cfg, nil
 }
 
 // HandleMouseScroll 鼠标滚轮处理
@@ -161,7 +160,7 @@ func (s State) HandleMouseScroll(up bool) State {
 }
 
 // HandleMouseLeft 处理 settings 页面左键单击/双击
-func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, string) {
+func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config) {
 	// 优先处理标签栏点击（带边框的标签栏内容行位于 settingsTabBarContentY）
 	if pageY == settingsTabBarContentY {
 		if tab, ok := resolveSettingsTabMouseTarget(pageX); ok {
@@ -173,7 +172,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 				s.editValue = ""
 				s.editCursor = 0
 			}
-			return s, cfg, ""
+			return s, cfg
 		}
 	}
 
@@ -188,10 +187,10 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 					s.editValue = ""
 					s.editCursor = 0
 					s.showToast(i18n.T("settings.toast.save_success_lang"), common.ToastSuccess)
-					return s, newCfg, newCfg.ProxyAddress
+					return s, newCfg
 				}
 				s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
-				return s, cfg, ""
+				return s, cfg
 			}
 		}
 		if s.activeTab == 0 && s.selectedSetting == ThemeSettingIndex() {
@@ -203,10 +202,10 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 					s.editValue = ""
 					s.editCursor = 0
 					s.showToast(i18n.T("settings.toast.save_success_theme"), common.ToastSuccess)
-					return s, newCfg, newCfg.ProxyAddress
+					return s, newCfg
 				}
 				s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
-				return s, cfg, ""
+				return s, cfg
 			}
 		}
 
@@ -216,11 +215,11 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 			s.editValue = ""
 			s.editCursor = 0
 		}
-		return s, cfg, ""
+		return s, cfg
 	}
 
 	if settingIdx < 0 || settingIdx >= len(s.activeKeys()) {
-		return s, cfg, ""
+		return s, cfg
 	}
 
 	s.selectedSetting = settingIdx
@@ -229,7 +228,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 			if err := configSvc.SetConfigValue(s.activeKeys()[settingIdx], lang); err == nil {
 				newCfg, _ := configSvc.LoadConfig()
 				s.showToast(i18n.T("settings.toast.save_success_lang"), common.ToastSuccess)
-				return s, newCfg, newCfg.ProxyAddress
+				return s, newCfg
 			}
 			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
 		}
@@ -240,7 +239,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 				newCfg, _ := configSvc.LoadConfig()
 				theme.SetTheme(t)
 				s.showToast(i18n.T("settings.toast.save_success_theme"), common.ToastSuccess)
-				return s, newCfg, newCfg.ProxyAddress
+				return s, newCfg
 			}
 			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
 		}
@@ -253,11 +252,11 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 		s.editCursor = len(s.editValue)
 	}
 
-	return s, cfg, ""
+	return s, cfg
 }
 
-// handleEditMode 处理编辑模式按键，返回更新后的 cfg 和 proxyAddr（空表示无变化）
-func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, string, tea.Cmd) {
+// handleEditMode 处理编辑模式按键
+func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, tea.Cmd) {
 	if s.activeTab == 1 {
 		keys := s.activeKeys()
 		settingKey := keys[s.selectedSetting]
@@ -271,7 +270,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 				val := s.editValue == "true"
 				s.editMode = false
 				s.editValue = ""
-				return s, cfg, "", configSvc.SaveMihomoConfigField(client, "allow-lan", val)
+				return s, cfg, configSvc.SaveMihomoConfigField(client, "allow-lan", val)
 			case msg.String() == "left", msg.String() == "right", msg.String() == "tab":
 				if s.editValue == "true" {
 					s.editValue = "false"
@@ -279,7 +278,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 					s.editValue = "true"
 				}
 			}
-			return s, cfg, "", nil
+			return s, cfg, nil
 		}
 		// log-level tab toggle
 		if settingKey == "log-level" {
@@ -291,7 +290,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 				val := s.editValue
 				s.editMode = false
 				s.editValue = ""
-				return s, cfg, "", configSvc.SaveMihomoConfigField(client, "log-level", val)
+				return s, cfg, configSvc.SaveMihomoConfigField(client, "log-level", val)
 			case msg.String() == "left":
 				matched := false
 				for i, l := range levels {
@@ -317,7 +316,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 					s.editValue = levels[0]
 				}
 			}
-			return s, cfg, "", nil
+			return s, cfg, nil
 		}
 	}
 
@@ -333,7 +332,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 				s.editMode = false
 				s.editValue = ""
 				s.showToast(i18n.T("settings.toast.save_success_lang"), common.ToastSuccess)
-				return s, newCfg, newCfg.ProxyAddress, nil
+				return s, newCfg, nil
 			}
 			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
 		case msg.String() == "left":
@@ -341,7 +340,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 		case msg.String() == "right", msg.String() == "tab":
 			s.editValue = nextLanguage(s.editValue)
 		}
-		return s, cfg, "", nil
+		return s, cfg, nil
 	}
 
 	if s.activeTab == 0 && s.selectedSetting == ThemeSettingIndex() { // 主题设置采用 tab 切换，切换后热生效
@@ -353,20 +352,20 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 			newTheme := s.editValue
 			if err := configSvc.SetConfigValue("theme", newTheme); err != nil {
 				s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
-				return s, cfg, "", nil
+				return s, cfg, nil
 			}
 			newCfg, _ := configSvc.LoadConfig()
 			theme.SetTheme(newTheme)
 			s.editMode = false
 			s.editValue = ""
 			s.showToast(i18n.T("settings.toast.save_success_theme"), common.ToastSuccess)
-			return s, newCfg, "", func() tea.Msg { return messages.ThemeChangedMsg{} }
+			return s, newCfg, func() tea.Msg { return messages.ThemeChangedMsg{} }
 		case msg.String() == "left":
 			s.editValue = prevTheme(s.editValue)
 		case msg.String() == "right", msg.String() == "tab":
 			s.editValue = nextTheme(s.editValue)
 		}
-		return s, cfg, "", nil
+		return s, cfg, nil
 	}
 
 	switch {
@@ -385,26 +384,26 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 					val = port
 				} else {
 					s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
-					return s, cfg, "", nil
+					return s, cfg, nil
 				}
 			}
 			s.editMode = false
 			s.editValue = ""
 			s.editCursor = 0
-			return s, cfg, "", configSvc.SaveMihomoConfigField(client, settingKey, val)
+			return s, cfg, configSvc.SaveMihomoConfigField(client, settingKey, val)
 		}
 
 		if err := configSvc.SetConfigValue(settingKey, s.editValue); err != nil {
 			// 保存失败：保持编辑模式，显示错误提示
 			s.showToast(i18n.Tf("settings.toast.save_failed_with_err", err.Error()), common.ToastError)
-			return s, cfg, "", nil
+			return s, cfg, nil
 		}
 		newCfg, _ := configSvc.LoadConfig()
 		s.editMode = false
 		s.editValue = ""
 		s.editCursor = 0
 		s.showToast(i18n.T("settings.toast.save_success"), common.ToastSuccess)
-		return s, newCfg, newCfg.ProxyAddress, nil
+		return s, newCfg, nil
 
 	case msg.String() == "left":
 		if s.editCursor > 0 {
@@ -441,7 +440,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 		}
 	}
 
-	return s, cfg, "", nil
+	return s, cfg, nil
 }
 
 // showToast 显示 Toast 提示

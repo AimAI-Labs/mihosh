@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	tea "github.com/charmbracelet/bubbletea"
@@ -22,19 +21,6 @@ import (
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "配置管理",
-}
-
-var configInitCmd = &cobra.Command{
-	Use:     "init",
-	Short:   "初始化配置",
-	Example: `  mihosh config init`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		configSvc := service.NewConfigService()
-		if err := configSvc.InitConfig(); err != nil {
-			return wrapConfigError(fmt.Errorf("初始化配置失败: %w", err))
-		}
-		return nil
-	},
 }
 
 var configShowCmd = &cobra.Command{
@@ -77,19 +63,18 @@ var configSetCmd = &cobra.Command{
 	Long: `设置配置项
 
 可用的配置项:
-  api-address  - mihosh API 地址 (例如: http://127.0.0.1:9090)
-  secret       - API 密钥
   test-url     - 测速 URL (例如: http://www.gstatic.com/generate_204)
   timeout      - 超时时间，单位毫秒 (例如: 5000)
-  proxy-address - HTTP 代理地址 (例如: http://127.0.0.1:7890)
+  language     - 界面语言 (auto, zh-CN, en-US)
   auto-refresh-interval - TUI 自动刷新间隔，单位秒，0 表示关闭
+  theme        - 界面配色主题
+
+注意：连接信息（external-controller/secret/mixed-port）已迁移至 mihomo 配置文件，
+请使用 TUI 的 Mihomo 标签页或 "mihosh config edit" 编辑 mihomo 配置。
 
 示例:
-  mihosh config set api-address http://127.0.0.1:9090
-  mihosh config set secret your-secret-here
   mihosh config set test-url http://www.google.com/generate_204
   mihosh config set timeout 3000
-  mihosh config set proxy-address http://127.0.0.1:7890
   mihosh config set auto-refresh-interval 5`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -161,7 +146,7 @@ func runMihoshConfigEdit() error {
 	if configPath == "" {
 		configPath = filepath.Join(configDir, "config.yaml")
 		if _, err := os.Stat(configPath); os.IsNotExist(err) {
-			return wrapConfigError(fmt.Errorf("配置文件不存在: %s\n可运行 `mihosh config init` 重新初始化配置。", configPath))
+			return wrapConfigError(fmt.Errorf("配置文件不存在: %s\n直接运行 `mihosh` 即可，首次保存时会自动生成。", configPath))
 		}
 	}
 
@@ -209,7 +194,7 @@ func reloadMihomoCore(configPath string) error {
 		return nil
 	}
 
-	client := api.NewClient(cfg)
+	client := loadClient(cfg)
 	if err := client.ReloadConfig(configPath); err != nil {
 		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
 		fmt.Println(warnStyle.Render(fmt.Sprintf("⚠ 自动重载核心失败: %v", err)))
@@ -226,7 +211,6 @@ func init() {
 	configShowCmd.Flags().StringVar(&configShowOutput, "output", string(outputFormatPlain), "输出格式: json|table|plain")
 	configEditCmd.Flags().StringVar(&configEditEditor, "editor", "", "指定编辑器 (例如: code, vim, nano)")
 	configEditCmd.Flags().StringVar(&configEditPath, "path", "", "指定 Mihomo 配置文件或目录路径")
-	configCmd.AddCommand(configInitCmd)
 	configCmd.AddCommand(configShowCmd)
 	configCmd.AddCommand(configSetCmd)
 	configCmd.AddCommand(configEditCmd)
@@ -388,48 +372,77 @@ func isConfigSetValidationError(err error) bool {
 }
 
 func renderConfigShow(w io.Writer, cfg *config.Config, configPath string, format outputFormat) error {
+	// 连接信息（external-controller/secret/mixed-port）由 mihomo 配置文件自动发现，
+	// 此处作为只读小节展示，值来自 ResolveMihomoEndpoint + GetMihomoConfigPath。
+	endpoint := config.ResolveMihomoEndpoint()
+	mihomoPath, _ := config.GetMihomoConfigPath()
+
 	switch format {
 	case outputFormatJSON:
 		payload := struct {
-			APIAddress          string `json:"api_address"`
-			Secret              string `json:"secret"`
 			TestURL             string `json:"test_url"`
 			TimeoutMS           int    `json:"timeout_ms"`
-			ProxyAddress        string `json:"proxy_address"`
 			AutoRefreshInterval int    `json:"auto_refresh_interval"`
 			ConfigFile          string `json:"config_file"`
+			Mihomo              mihomoShowInfo `json:"mihomo"`
 		}{
-			APIAddress:          cfg.APIAddress,
-			Secret:              utils.MaskSecret(cfg.Secret),
 			TestURL:             cfg.TestURL,
 			TimeoutMS:           cfg.Timeout,
-			ProxyAddress:        cfg.ProxyAddress,
 			AutoRefreshInterval: cfg.AutoRefreshInterval,
 			ConfigFile:          configPath,
+			Mihomo:              buildMihomoShowInfo(endpoint, mihomoPath),
 		}
 		return writeJSON(w, payload)
 	case outputFormatTable:
 		tw := newTabWriter(w)
 		fmt.Fprintln(tw, "KEY\tVALUE")
-		fmt.Fprintf(tw, "API_ADDRESS\t%s\n", cfg.APIAddress)
-		fmt.Fprintf(tw, "SECRET\t%s\n", utils.MaskSecret(cfg.Secret))
 		fmt.Fprintf(tw, "TEST_URL\t%s\n", cfg.TestURL)
 		fmt.Fprintf(tw, "TIMEOUT_MS\t%d\n", cfg.Timeout)
-		fmt.Fprintf(tw, "PROXY_ADDRESS\t%s\n", cfg.ProxyAddress)
 		fmt.Fprintf(tw, "AUTO_REFRESH_INTERVAL\t%d\n", cfg.AutoRefreshInterval)
 		fmt.Fprintf(tw, "CONFIG_FILE\t%s\n", configPath)
+		mi := buildMihomoShowInfo(endpoint, mihomoPath)
+		fmt.Fprintln(tw, "--- Mihomo 连接 ---\t")
+		fmt.Fprintf(tw, "EXTERNAL_CONTROLLER\t%s\n", mi.ExternalController)
+		fmt.Fprintf(tw, "SECRET\t%s\n", mi.Secret)
+		fmt.Fprintf(tw, "MIXED_PORT\t%d\n", mi.MixedPort)
+		fmt.Fprintf(tw, "PROXY_URL\t%s\n", mi.ProxyURL)
+		fmt.Fprintf(tw, "MIHOMO_CONFIG_FILE\t%s\n", mi.ConfigPath)
 		return tw.Flush()
 	case outputFormatPlain:
+		mi := buildMihomoShowInfo(endpoint, mihomoPath)
 		fmt.Fprintln(w, "当前配置:")
-		fmt.Fprintf(w, "  API 地址: %s\n", cfg.APIAddress)
-		fmt.Fprintf(w, "  密钥:     %s\n", utils.MaskSecret(cfg.Secret))
 		fmt.Fprintf(w, "  测速 URL: %s\n", cfg.TestURL)
 		fmt.Fprintf(w, "  超时:     %dms\n", cfg.Timeout)
-		fmt.Fprintf(w, "  代理地址: %s\n", cfg.ProxyAddress)
 		fmt.Fprintf(w, "  自动刷新: %ds\n", cfg.AutoRefreshInterval)
 		fmt.Fprintf(w, "\n配置文件位置: %s\n", configPath)
+		fmt.Fprintln(w, "\nMihomo 连接 (来自 mihomo 配置文件，只读):")
+		fmt.Fprintf(w, "  External Controller: %s\n", mi.ExternalController)
+		fmt.Fprintf(w, "  密钥:               %s\n", mi.Secret)
+		fmt.Fprintf(w, "  Mixed Port:         %d\n", mi.MixedPort)
+		fmt.Fprintf(w, "  派生代理地址:       %s\n", mi.ProxyURL)
+		fmt.Fprintf(w, "  Mihomo 配置文件:    %s\n", mi.ConfigPath)
 		return nil
 	default:
 		return fmt.Errorf("不支持的输出格式: %s", format)
+	}
+}
+
+// mihomoShowInfo config show 中只读展示的 Mihomo 连接信息。
+type mihomoShowInfo struct {
+	ExternalController string `json:"external_controller"`
+	Secret             string `json:"secret"`
+	MixedPort          int    `json:"mixed_port"`
+	ProxyURL           string `json:"proxy_url"`
+	ConfigPath         string `json:"config_path,omitempty"`
+}
+
+// buildMihomoShowInfo 由解析出的 endpoint + 配置文件路径构造展示信息（secret 掩码）。
+func buildMihomoShowInfo(endpoint config.MihomoEndpoint, mihomoPath string) mihomoShowInfo {
+	return mihomoShowInfo{
+		ExternalController: endpoint.ExternalController,
+		Secret:             utils.MaskSecret(endpoint.Secret),
+		MixedPort:          endpoint.MixedPort,
+		ProxyURL:           config.MixedPortToProxyURL(endpoint.MixedPort),
+		ConfigPath:         mihomoPath,
 	}
 }

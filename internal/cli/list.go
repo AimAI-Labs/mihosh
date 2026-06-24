@@ -8,7 +8,6 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/spf13/cobra"
 )
@@ -38,7 +37,7 @@ var listCmd = &cobra.Command{
 			return wrapConfigError(fmt.Errorf("加载配置失败: %w", err))
 		}
 
-		client := api.NewClient(cfg)
+		client := loadClient(cfg)
 		proxySvc := service.NewProxyService(client, cfg.TestURL, cfg.Timeout)
 
 		groups, orderedNames, err := proxySvc.GetGroups()

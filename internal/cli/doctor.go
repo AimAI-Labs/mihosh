@@ -26,7 +26,8 @@ var doctorCmd = &cobra.Command{
 	Short: "检查 Mihosh 配置和 Mihomo 连接健康状态",
 	Long: `检查 Mihosh 配置和 Mihomo 连接健康状态。
 
-检查项包括 API 地址、Secret、代理地址、Mihomo REST API 可达性和 WebSocket 可用性。
+连接信息（external-controller/secret/mixed-port）自动从 mihomo 配置文件发现。
+检查项包括：external-controller、secret、代理端口（mixed-port 派生）、Mihomo REST API 可达性、WebSocket 可用性。
 
 可通过 --output 选择输出格式：
   plain  人类可读文本（默认）
@@ -46,7 +47,9 @@ var doctorCmd = &cobra.Command{
 			return wrapConfigError(fmt.Errorf("加载配置失败: %w", err))
 		}
 
-		report := runDoctorChecks(cfg)
+		// 连接信息由 mihomo 配置文件自动发现
+		endpoint := config.ResolveMihomoEndpoint()
+		report := runDoctorChecks(cfg, endpoint)
 		if err := renderDoctorReport(os.Stdout, report, format); err != nil {
 			return fmt.Errorf("渲染输出失败: %w", err)
 		}
@@ -81,22 +84,24 @@ type doctorReport struct {
 	Checks   []doctorCheckResult `json:"checks"`
 }
 
-func runDoctorChecks(cfg *config.Config) doctorReport {
+func runDoctorChecks(cfg *config.Config, endpoint config.MihomoEndpoint) doctorReport {
 	checks := []doctorCheckResult{
-		checkAPIAddress(cfg.APIAddress),
-		checkSecret(cfg.Secret),
-		checkProxyAddress(cfg.ProxyAddress),
-		checkMihomoReachable(cfg),
-		checkWebSocketAvailable(cfg),
+		checkExternalController(endpoint.ExternalController),
+		checkSecret(endpoint.Secret),
+		checkProxyAddress(config.MixedPortToProxyURL(endpoint.MixedPort)),
+		checkMihomoReachable(cfg, endpoint),
+		checkWebSocketAvailable(endpoint),
 	}
 	return buildDoctorSummary(checks)
 }
 
-func checkAPIAddress(raw string) doctorCheckResult {
-	if err := validateDoctorHTTPURL(raw); err != nil {
-		return doctorCheckResult{Name: "api_address", Status: doctorStatusFail, Message: err.Error(), Target: raw}
+// checkExternalController 校验 external-controller 地址（原值，可能无 scheme）。
+func checkExternalController(raw string) doctorCheckResult {
+	normalized := ensureDoctorHTTPScheme(raw)
+	if err := validateDoctorHTTPURL(normalized); err != nil {
+		return doctorCheckResult{Name: "external_controller", Status: doctorStatusFail, Message: err.Error(), Target: raw}
 	}
-	return doctorCheckResult{Name: "api_address", Status: doctorStatusOK, Message: "valid", Target: raw}
+	return doctorCheckResult{Name: "external_controller", Status: doctorStatusOK, Message: "valid", Target: raw}
 }
 
 func checkSecret(secret string) doctorCheckResult {
@@ -110,36 +115,45 @@ func checkProxyAddress(raw string) doctorCheckResult {
 	target := raw
 	normalized, err := normalizeDoctorProxyURL(raw)
 	if err != nil {
-		return doctorCheckResult{Name: "proxy_address", Status: doctorStatusFail, Message: err.Error(), Target: target}
+		return doctorCheckResult{Name: "proxy", Status: doctorStatusFail, Message: err.Error(), Target: target}
 	}
 
 	if err := dialDoctorTCP(normalized.Host); err != nil {
-		return doctorCheckResult{Name: "proxy_address", Status: doctorStatusFail, Message: err.Error(), Target: target}
+		return doctorCheckResult{Name: "proxy", Status: doctorStatusFail, Message: err.Error(), Target: target}
 	}
-	return doctorCheckResult{Name: "proxy_address", Status: doctorStatusOK, Message: "reachable", Target: target}
+	return doctorCheckResult{Name: "proxy", Status: doctorStatusOK, Message: "reachable", Target: target}
 }
 
-func checkMihomoReachable(cfg *config.Config) doctorCheckResult {
-	client := api.NewClient(cfg)
+func checkMihomoReachable(cfg *config.Config, endpoint config.MihomoEndpoint) doctorCheckResult {
+	client := api.NewClient(endpoint, cfg.Timeout)
 	if _, err := client.GetConfigs(); err != nil {
-		return doctorCheckResult{Name: "mihomo", Status: doctorStatusFail, Message: err.Error(), Target: cfg.APIAddress}
+		return doctorCheckResult{Name: "mihomo", Status: doctorStatusFail, Message: err.Error(), Target: endpoint.ExternalController}
 	}
-	return doctorCheckResult{Name: "mihomo", Status: doctorStatusOK, Message: "reachable", Target: cfg.APIAddress}
+	return doctorCheckResult{Name: "mihomo", Status: doctorStatusOK, Message: "reachable", Target: endpoint.ExternalController}
 }
 
-func checkWebSocketAvailable(cfg *config.Config) doctorCheckResult {
-	wsURL, err := buildDoctorWSURL(cfg.APIAddress, cfg.Secret, "traffic")
+func checkWebSocketAvailable(endpoint config.MihomoEndpoint) doctorCheckResult {
+	wsURL, err := buildDoctorWSURL(endpoint.ExternalController, endpoint.Secret, "traffic")
 	if err != nil {
-		return doctorCheckResult{Name: "websocket", Status: doctorStatusFail, Message: err.Error(), Target: cfg.APIAddress}
+		return doctorCheckResult{Name: "websocket", Status: doctorStatusFail, Message: err.Error(), Target: endpoint.ExternalController}
 	}
 
 	dialer := websocket.Dialer{HandshakeTimeout: doctorProbeTimeout}
 	conn, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
-		return doctorCheckResult{Name: "websocket", Status: doctorStatusFail, Message: err.Error(), Target: cfg.APIAddress}
+		return doctorCheckResult{Name: "websocket", Status: doctorStatusFail, Message: err.Error(), Target: endpoint.ExternalController}
 	}
 	conn.Close()
-	return doctorCheckResult{Name: "websocket", Status: doctorStatusOK, Message: "reachable", Target: cfg.APIAddress}
+	return doctorCheckResult{Name: "websocket", Status: doctorStatusOK, Message: "reachable", Target: endpoint.ExternalController}
+}
+
+// ensureDoctorHTTPScheme 为 external-controller 原值（无 scheme）补 http://，
+// 供 doctor 校验/拼接 URL 时使用。
+func ensureDoctorHTTPScheme(raw string) string {
+	if strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://") {
+		return raw
+	}
+	return "http://" + raw
 }
 
 func buildDoctorSummary(checks []doctorCheckResult) doctorReport {
@@ -267,11 +281,13 @@ func dialDoctorTCP(address string) error {
 }
 
 func buildDoctorWSURL(baseURL, secret, endpoint string) (string, error) {
-	if err := validateDoctorHTTPURL(baseURL); err != nil {
+	// external-controller 原值无 scheme，先补 http:// 再校验/转换。
+	normalized := ensureDoctorHTTPScheme(baseURL)
+	if err := validateDoctorHTTPURL(normalized); err != nil {
 		return "", err
 	}
 
-	parsed, err := url.Parse(baseURL)
+	parsed, err := url.Parse(normalized)
 	if err != nil {
 		return "", err
 	}

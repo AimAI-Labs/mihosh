@@ -83,7 +83,7 @@ func renderCommandError(err error) string {
 	case commandErrorParameter:
 		return fmt.Sprintf("%s %s\n%s", errorStyle.Render("参数错误:"), detail, hintStyle.Render("使用 --help 查看命令帮助。"))
 	case commandErrorConfig:
-		return fmt.Sprintf("%s %s\n%s", errorStyle.Render("配置错误:"), detail, hintStyle.Render("可运行 `mihosh config init` 重新初始化配置。"))
+		return fmt.Sprintf("%s %s\n%s", errorStyle.Render("配置错误:"), detail, hintStyle.Render("使用 `mihosh config edit` 编辑配置。"))
 	case commandErrorNetwork:
 		return fmt.Sprintf("%s %s\n%s", errorStyle.Render("网络错误:"), detail, hintStyle.Render("请检查 API 地址、密钥和网络连通性。"))
 	default:

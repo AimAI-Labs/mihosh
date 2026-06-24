@@ -17,7 +17,8 @@ import (
 // Client mihomo API 客户端
 //
 // baseURL/secret 支持运行时热更新（UpdateEndpoint），用 mu 保护，
-// 使得用户在设置页改完 api_address/secret 后无需重启 mihosh 即可生效。
+// 使得用户在设置页改完 external-controller/secret 后无需重启 mihosh 即可生效。
+// baseURL 存原值（无 scheme，与 mihomo 配置文件一致）；仅 HTTP 层补 scheme。
 type Client struct {
 	mu         sync.RWMutex
 	baseURL    string
@@ -25,13 +26,14 @@ type Client struct {
 	httpClient *http.Client
 }
 
-// NewClient 创建新的 API 客户端
-func NewClient(cfg *config.Config) *Client {
+// NewClient 创建新的 API 客户端。
+// endpoint.ExternalController 存原值（无 scheme），由 doRawRequest 在请求时补 http://。
+func NewClient(endpoint config.MihomoEndpoint, timeout int) *Client {
 	return &Client{
-		baseURL: cfg.APIAddress,
-		secret:  cfg.Secret,
+		baseURL: endpoint.ExternalController,
+		secret:  endpoint.Secret,
 		httpClient: &http.Client{
-			Timeout: time.Duration(cfg.Timeout) * time.Millisecond,
+			Timeout: time.Duration(timeout) * time.Millisecond,
 		},
 	}
 }
@@ -43,6 +45,15 @@ func (c *Client) UpdateEndpoint(baseURL, secret string) {
 	c.baseURL = baseURL
 	c.secret = secret
 	c.mu.Unlock()
+}
+
+// ensureScheme 为 baseURL 补 http:// 前缀（若无 http:///https://）。
+// external-controller 原值无 scheme，与 mihomo 配置文件一致；仅 HTTP 层补全。
+func ensureScheme(baseURL string) string {
+	if strings.HasPrefix(baseURL, "http://") || strings.HasPrefix(baseURL, "https://") {
+		return baseURL
+	}
+	return "http://" + baseURL
 }
 
 // DoRequest 执行 HTTP 请求（导出供 endpoints 使用）
@@ -63,7 +74,7 @@ func (c *Client) doRawRequest(method, path string, body interface{}) (*http.Resp
 	secret := c.secret
 	c.mu.RUnlock()
 
-	reqURL := baseURL + path
+	reqURL := ensureScheme(baseURL) + path
 
 	var reqBody io.Reader
 	if body != nil {

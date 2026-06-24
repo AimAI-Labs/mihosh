@@ -9,7 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSavePersistsProxyAddress(t *testing.T) {
+// TestSavePersistsTestURL 验证 test_url 经 Save→磁盘后保持完整。
+// （取代已删除的 TestSavePersistsProxyAddress：proxy_address 已迁移至 mihomo 配置文件。）
+func TestSavePersistsTestURL(t *testing.T) {
 	t.Cleanup(func() {
 		viper.Reset()
 	})
@@ -22,11 +24,8 @@ func TestSavePersistsProxyAddress(t *testing.T) {
 	t.Setenv("HOMEPATH", "")
 
 	cfg := &Config{
-		APIAddress:   "http://127.0.0.1:9090",
-		Secret:       "test-secret",
-		TestURL:      "http://www.gstatic.com/generate_204",
-		Timeout:      5000,
-		ProxyAddress: "http://127.0.0.1:9999",
+		TestURL: "http://www.gstatic.com/generate_204",
+		Timeout: 5000,
 	}
 
 	err := Save(cfg)
@@ -40,8 +39,8 @@ func TestSavePersistsProxyAddress(t *testing.T) {
 	err = reader.ReadInConfig()
 	require.NoError(t, err, "ReadInConfig() returned error")
 
-	got := reader.GetString("proxy_address")
-	assert.Equal(t, cfg.ProxyAddress, got, "proxy_address not persisted")
+	got := reader.GetString("test_url")
+	assert.Equal(t, cfg.TestURL, got, "test_url not persisted")
 }
 
 func TestSavePersistsLanguage(t *testing.T) {
@@ -57,12 +56,9 @@ func TestSavePersistsLanguage(t *testing.T) {
 	t.Setenv("HOMEPATH", "")
 
 	cfg := &Config{
-		APIAddress:   "http://127.0.0.1:9090",
-		Secret:       "test-secret",
-		TestURL:      "http://www.gstatic.com/generate_204",
-		Timeout:      5000,
-		ProxyAddress: "http://127.0.0.1:7890",
-		Language:     "en-US",
+		TestURL: "http://www.gstatic.com/generate_204",
+		Timeout: 5000,
+		Language: "en-US",
 	}
 
 	err := Save(cfg)
@@ -93,11 +89,8 @@ func TestSavePersistsAutoRefreshInterval(t *testing.T) {
 	t.Setenv("HOMEPATH", "")
 
 	cfg := &Config{
-		APIAddress:          "http://127.0.0.1:9090",
-		Secret:              "test-secret",
 		TestURL:             "http://www.gstatic.com/generate_204",
 		Timeout:             5000,
-		ProxyAddress:        "http://127.0.0.1:7890",
 		Language:            "en-US",
 		AutoRefreshInterval: 9,
 	}

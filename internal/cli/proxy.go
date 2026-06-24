@@ -85,7 +85,8 @@ var proxyOnCmd = &cobra.Command{
 
   eval "$(mihosh on)"
 
-默认代理地址取自配置项 proxy_address（可用 mihosh config set proxy_address <地址> 修改）。
+默认代理地址由 mihomo 配置文件的 mixed-port 派生（http://127.0.0.1:<mixed-port>），
+如需修改请在 mihomo 配置中调整 mixed-port。
 设置的环境变量：HTTP_PROXY / HTTPS_PROXY / ALL_PROXY（大小写各一组）+ no_proxy。
 若当前终端已开启代理，会给出友好提示。
 
@@ -112,17 +113,15 @@ var proxyOffCmd = &cobra.Command{
 }
 
 func runProxyOn(cmd *cobra.Command, args []string) error {
-	// on 是"开关"型命令，配置缺失时回退到默认代理地址，避免冷启动门槛。
-	addr := config.DefaultConfig.ProxyAddress
-	cfg, err := config.Load()
-	if err != nil {
-		// 配置文件不存在 → 用默认地址；其它加载错误仍上抛。
+	// 代理地址由 mihomo 配置文件的 mixed-port 派生；自动发现失败回退默认端口。
+	// 先确保配置目录存在（首次运行）：on 是"开关"型命令，不应因缺配置卡住。
+	if _, err := config.Load(); err != nil {
 		if !errors.Is(err, config.ErrConfigNotFound) {
 			return wrapConfigError(fmt.Errorf(i18n.T("cli.root.err_load_config")+": %w", err))
 		}
-	} else if strings.TrimSpace(cfg.ProxyAddress) != "" {
-		addr = cfg.ProxyAddress
 	}
+
+	addr := config.MixedPortToProxyURL(config.ResolveMihomoEndpoint().MixedPort)
 
 	// 复用 doctor.go 的代理地址规范化：自动补 scheme、校验端口与协议。
 	parsed, err := normalizeDoctorProxyURL(addr)

@@ -24,11 +24,8 @@ func Save(cfg *Config) error {
 
 	configFile := filepath.Join(configDir, "config.yaml")
 
-	viper.Set("api_address", cfg.APIAddress)
-	viper.Set("secret", cfg.Secret)
 	viper.Set("test_url", cfg.TestURL)
 	viper.Set("timeout", cfg.Timeout)
-	viper.Set("proxy_address", cfg.ProxyAddress)
 	viper.Set("language", cfg.Language)
 	viper.Set("auto_refresh_interval", cfg.AutoRefreshInterval)
 	viper.Set("theme", cfg.Theme)

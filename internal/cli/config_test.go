@@ -12,12 +12,14 @@ import (
 )
 
 func TestRenderConfigShow(t *testing.T) {
+	// 将 mihomo 配置自动发现隔离到临时目录，避免读取真实环境。
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", t.TempDir())
+	t.Setenv("APPDATA", "")
+
 	cfg := &configpkg.Config{
-		APIAddress:          "http://127.0.0.1:9090",
-		Secret:              "secret-token",
 		TestURL:             "http://www.gstatic.com/generate_204",
 		Timeout:             5000,
-		ProxyAddress:        "http://127.0.0.1:7890",
 		AutoRefreshInterval: 5,
 	}
 
@@ -30,11 +32,13 @@ func TestRenderConfigShow(t *testing.T) {
 			name:   "JSON format",
 			format: outputFormatJSON,
 			contains: []string{
-				`"api_address": "http://127.0.0.1:9090"`,
-				`"secret": "sec****ken"`,
+				`"test_url": "http://www.gstatic.com/generate_204"`,
 				`"auto_refresh_interval": 5`,
 				`"config_file":`,
 				`config.yaml`,
+				`"mihomo"`,
+				`"external_controller": "127.0.0.1:9090"`,
+				`"proxy_url": "http://127.0.0.1:7890"`,
 			},
 		},
 		{
@@ -43,9 +47,9 @@ func TestRenderConfigShow(t *testing.T) {
 			contains: []string{
 				"KEY",
 				"VALUE",
-				"API_ADDRESS",
-				"http://127.0.0.1:9090",
+				"TEST_URL",
 				"AUTO_REFRESH_INTERVAL",
+				"EXTERNAL_CONTROLLER",
 			},
 		},
 	}

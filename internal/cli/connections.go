@@ -7,7 +7,6 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/spf13/cobra"
@@ -38,7 +37,7 @@ var connectionsCmd = &cobra.Command{
 			return wrapConfigError(fmt.Errorf("加载配置失败: %w", err))
 		}
 
-		client := api.NewClient(cfg)
+		client := loadClient(cfg)
 		connSvc := service.NewConnectionService(client)
 
 		conns, err := connSvc.GetConnections()

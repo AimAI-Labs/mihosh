@@ -22,7 +22,7 @@
 - **CLI (`internal/cli`)**: 新增命令须支持 `--output plain|table|json`，以便脚本化。
 - **TUI (`internal/ui/tui`)**: Feature-Sliced 结构。
 - **服务 (`internal/app/service`)**: 业务逻辑与 API 调用封装。
-- **配置 (`internal/infrastructure/config/types.go`)**: `language` 切换需刷新 i18n/快捷键；`proxy_address` 供测速用，需同步至 Connections；Mihomo 配置修改后会热重载。
+- **配置 (`internal/infrastructure/config/types.go`)**: `language` 切换需刷新 i18n/快捷键；连接信息由 mihomo 配置文件解析；Mihomo 配置修改后会热重载。
 - **国际化 (`pkg/i18n/locales/*.json`)**: 修改 UI 文案必须同时更新 `zh-CN` 与 `en-US`。
 
 ## 3. TUI 状态与通信规范 (严格遵守)

@@ -23,7 +23,6 @@ func TestConfig_SubsRoundTrip(t *testing.T) {
 	t.Setenv("USERPROFILE", tmpHome)
 
 	in := &Config{
-		APIAddress:          "http://127.0.0.1:9090",
 		Language:            "zh-CN",
 		AutoRefreshInterval: 5,
 		Theme:               "tokyo-night",
@@ -87,8 +86,7 @@ func TestConfig_SubsRoundTripFromDisk(t *testing.T) {
 	t.Setenv("HOMEPATH", "")
 
 	in := &Config{
-		APIAddress: "http://127.0.0.1:9090",
-		Language:   "zh-CN",
+		Language: "zh-CN",
 		Subs: []profile.Profile{{
 			UID:       "uid-x",
 			Name:      "磁盘往返订阅",

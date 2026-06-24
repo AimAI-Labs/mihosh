@@ -2,13 +2,12 @@ package config
 
 import "github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 
-// Config 配置结构
+// Config 配置结构。
+// 连接信息（external-controller/secret/mixed-port）已迁移至 mihomo 配置文件，
+// 由 ResolveMihomoEndpoint() 自动发现；Mihosh 配置仅保留本结构这些字段。
 type Config struct {
-	APIAddress          string `mapstructure:"api_address"`
-	Secret              string `mapstructure:"secret"`
 	TestURL             string `mapstructure:"test_url"`
-	Timeout             int `mapstructure:"timeout"`
-	ProxyAddress        string `mapstructure:"proxy_address"`
+	Timeout             int    `mapstructure:"timeout"`
 	Language            string `mapstructure:"language"`
 	AutoRefreshInterval int    `mapstructure:"auto_refresh_interval"`
 	Theme               string `mapstructure:"theme"`
@@ -21,11 +20,8 @@ type Config struct {
 
 // DefaultConfig 默认配置
 var DefaultConfig = Config{
-	APIAddress:          "http://127.0.0.1:9090",
-	Secret:              "",
 	TestURL:             "http://www.gstatic.com/generate_204",
 	Timeout:             5000,
-	ProxyAddress:        "http://127.0.0.1:7890",
 	Language:            "auto",
 	AutoRefreshInterval: 5,
 	Theme:               "tokyo-night",

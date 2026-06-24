@@ -18,24 +18,27 @@ func TestRenderSettingsPageToastUsesReservedTopLine(t *testing.T) {
 
 	rendered := stripANSISettings(RenderSettingsPage(PageState{
 		Config: &config.Config{
-			APIAddress: "http://127.0.0.1:9090",
-			Theme:      "tokyo-night",
+			TestURL: "http://example.com",
+			Theme:   "tokyo-night",
 		},
 		Toast: toast,
 	}, 80, 20))
 
 	lines := strings.Split(rendered, "\n")
-	if len(lines) < 3 {
-		t.Fatalf("expected at least 3 lines, got %d in %q", len(lines), rendered)
+	if len(MihoshSettingKeys) != 5 {
+		t.Fatalf("expected 5 setting keys, got %d", len(MihoshSettingKeys))
 	}
-	if !strings.Contains(lines[0], i18n.T("settings.toast.save_success_theme")) {
-		t.Fatalf("expected toast on first line, got %q", lines[0])
+	if MihoshSettingKeys[3] != "auto-refresh-interval" {
+		t.Fatalf("expected auto-refresh-interval setting key, got %q", MihoshSettingKeys[3])
+	}
+	if MihoshSettingKeys[4] != "theme" {
+		t.Fatalf("expected theme setting key, got %q", MihoshSettingKeys[4])
 	}
 	if !strings.Contains(lines[4], i18n.T("settings.panel_title")) {
 		t.Fatalf("expected settings panel border on fifth line, got %q", lines[4])
 	}
-	if !strings.Contains(lines[5], i18n.T("settings.label.api_address")) {
-		t.Fatalf("expected api-address row on sixth line, got %q", lines[5])
+	if !strings.Contains(lines[5], i18n.T("settings.label.test_url")) {
+		t.Fatalf("expected test-url row on sixth line, got %q", lines[5])
 	}
 }
 

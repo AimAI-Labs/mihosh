@@ -152,7 +152,9 @@ func (c *WSClient) buildWSURL(endpoint string) string {
 	secret := c.secret
 	c.mu.RUnlock()
 
-	wsURL := strings.Replace(baseURL, "https://", "wss://", 1)
+	// external-controller 原值无 scheme：先补 http:// 再转换为 ws scheme。
+	wsURL := ensureScheme(baseURL)
+	wsURL = strings.Replace(wsURL, "https://", "wss://", 1)
 	wsURL = strings.Replace(wsURL, "http://", "ws://", 1)
 
 	u, err := url.Parse(wsURL + "/" + endpoint)

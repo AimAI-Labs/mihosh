@@ -13,7 +13,7 @@ import (
 
 func TestDoctorSummaryFailsWhenAnyCheckFails(t *testing.T) {
 	results := []doctorCheckResult{
-		{Name: "api_address", Status: doctorStatusOK, Message: "valid"},
+		{Name: "external_controller", Status: doctorStatusOK, Message: "valid"},
 		{Name: "mihomo", Status: doctorStatusFail, Message: "connection refused"},
 		{Name: "secret", Status: doctorStatusWarn, Message: "not configured"},
 	}
@@ -28,7 +28,7 @@ func TestDoctorSummaryFailsWhenAnyCheckFails(t *testing.T) {
 
 func TestDoctorSummaryWarnsWhenOnlyWarningsExist(t *testing.T) {
 	results := []doctorCheckResult{
-		{Name: "api_address", Status: doctorStatusOK, Message: "valid"},
+		{Name: "external_controller", Status: doctorStatusOK, Message: "valid"},
 		{Name: "secret", Status: doctorStatusWarn, Message: "not configured"},
 	}
 
@@ -47,7 +47,7 @@ func TestRenderDoctorJSON(t *testing.T) {
 		Failed:   1,
 		Warnings: 1,
 		Checks: []doctorCheckResult{
-			{Name: "api_address", Status: doctorStatusOK, Message: "valid", Target: "http://127.0.0.1:9090"},
+			{Name: "external_controller", Status: doctorStatusOK, Message: "valid", Target: "http://127.0.0.1:9090"},
 			{Name: "secret", Status: doctorStatusWarn, Message: "not configured"},
 			{Name: "mihomo", Status: doctorStatusFail, Message: "API request failed"},
 		},
@@ -74,7 +74,7 @@ func TestRenderDoctorPlainAndTable(t *testing.T) {
 		Failed:   0,
 		Warnings: 1,
 		Checks: []doctorCheckResult{
-			{Name: "api_address", Status: doctorStatusOK, Message: "valid", Target: "http://127.0.0.1:9090"},
+			{Name: "external_controller", Status: doctorStatusOK, Message: "valid", Target: "http://127.0.0.1:9090"},
 			{Name: "secret", Status: doctorStatusWarn, Message: "not configured"},
 		},
 	}
@@ -89,7 +89,7 @@ func TestRenderDoctorPlainAndTable(t *testing.T) {
 			format: outputFormatPlain,
 			contains: []string{
 				"配置健康检查: warn",
-				"[ok] api_address",
+				"[ok] external_controller",
 				"[warn] secret",
 				"not configured",
 			},
@@ -100,7 +100,7 @@ func TestRenderDoctorPlainAndTable(t *testing.T) {
 			contains: []string{
 				"CHECK",
 				"STATUS",
-				"api_address",
+				"external_controller",
 				"warn",
 			},
 		},

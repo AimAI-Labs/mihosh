@@ -19,13 +19,11 @@ const (
 	settingsDescWidth   = 30
 )
 
-var MihoshSettingKeys = []string{"api-address", "secret", "test-url", "timeout", "proxy-address", "language", "auto-refresh-interval", "theme"}
+var MihoshSettingKeys = []string{"test-url", "timeout", "language", "auto-refresh-interval", "theme"}
 var MihomoSettingKeys = []string{"external-controller", "secret", "mixed-port", "allow-lan", "log-level"}
 
 func GetSettingLabel(key string) string {
 	switch key {
-	case "api-address":
-		return i18n.T("settings.label.api_address")
 	case "external-controller":
 		return i18n.T("settings.label.external-controller")
 	case "secret":
@@ -34,8 +32,6 @@ func GetSettingLabel(key string) string {
 		return i18n.T("settings.label.test_url")
 	case "timeout":
 		return i18n.T("settings.label.timeout")
-	case "proxy-address":
-		return i18n.T("settings.label.proxy_address")
 	case "language":
 		return i18n.T("settings.label.language")
 	case "auto-refresh-interval":
@@ -85,16 +81,10 @@ func (p PageState) activeKeys() []string {
 func GetSettingValue(state PageState, key string) string {
 	if state.ActiveTab == 0 && state.Config != nil {
 		switch key {
-		case "api-address", "external-controller":
-			return state.Config.APIAddress
-		case "secret":
-			return state.Config.Secret
 		case "test-url":
 			return state.Config.TestURL
 		case "timeout":
 			return fmt.Sprintf("%d", state.Config.Timeout)
-		case "proxy-address":
-			return state.Config.ProxyAddress
 		case "language":
 			if state.Config.Language == "" {
 				return "auto"

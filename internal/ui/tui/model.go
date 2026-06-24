@@ -96,7 +96,9 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 	connSvc := service.NewConnectionService(client)
 	profileSvc := service.NewProfileService(client)
 
-	wsClient := api.NewWSClient(cfg.APIAddress, cfg.Secret)
+	// 连接信息由 mihomo 配置文件自动发现（external-controller/secret/mixed-port）
+	endpoint := config.ResolveMihomoEndpoint()
+	wsClient := api.NewWSClient(endpoint.ExternalController, endpoint.Secret)
 	wsCtx, wsCancel := context.WithCancel(context.Background())
 	ipResolver := service.NewIPResolver()
 
@@ -117,7 +119,7 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 		wsCancel:             wsCancel,
 		ipResolver:           ipResolver,
 		nodesState:           nodes.State{},
-		connsState:           connections.NewState(cfg.ProxyAddress, model.DefaultSiteTests()),
+		connsState:           connections.NewState(config.MixedPortToProxyURL(endpoint.MixedPort), model.DefaultSiteTests()),
 		logsState:            logs.NewState(),
 		rulesState:           newRulesState(),
 		subState:             sub.State{},
