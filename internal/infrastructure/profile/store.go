@@ -4,7 +4,7 @@ package profile
 //
 // 布局（相对 mihosh 配置目录 ~/.mihosh）：
 //   profiles/<uid>/raw.yaml    订阅原始配置快照（fetcher 写入）
-//   profiles/<uid>/merge.yaml  用户覆写 YAML（TUI 编辑器写入）
+//   merge.yaml                 全局覆写 YAML（TUI 编辑器写入）
 //
 // 元数据（Profile 列表）不在此处持久化，由 mihosh config 包管理（存 config.yaml
 // 的 subs/active_sub 字段）。本包只读写 raw/merge 内容文件。
@@ -59,6 +59,9 @@ func MergePath() (string, error) {
 	root, err := mihoshConfigDir()
 	if err != nil {
 		return "", err
+	}
+	if err := os.MkdirAll(root, 0755); err != nil {
+		return "", fmt.Errorf("创建配置目录失败: %w", err)
 	}
 	return filepath.Join(root, "merge.yaml"), nil
 }
@@ -190,7 +193,7 @@ func atomicWrite(path string, data []byte) error {
 
 // mihoshConfigDir 返回 ~/.mihosh 配置目录。
 // （从 config 包取，但为避免循环依赖此处独立实现，逻辑与 config.GetConfigDir 一致。）
-func mihoshConfigDir() (string, error) {
+var mihoshConfigDir = func() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err

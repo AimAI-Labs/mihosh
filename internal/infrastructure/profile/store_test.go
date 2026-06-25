@@ -10,8 +10,21 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// mockMihoshConfigDir mocks the global config dir to avoid destructive changes.
+func mockMihoshConfigDir(t *testing.T) {
+	tempDir := t.TempDir()
+	orig := mihoshConfigDir
+	mihoshConfigDir = func() (string, error) {
+		return tempDir, nil
+	}
+	t.Cleanup(func() {
+		mihoshConfigDir = orig
+	})
+}
+
 // TestStore_RawRoundTrip 验证 raw.yaml 的写入与读取往返。
 func TestStore_RawRoundTrip(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uid := "test-raw-rt"
 	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
 
@@ -35,6 +48,7 @@ func TestStore_RawRoundTrip(t *testing.T) {
 
 // TestStore_MergeRoundTrip 验证 merge.yaml 的写入与读取，以及空文件降级。
 func TestStore_MergeRoundTrip(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uid := "test-merge-rt"
 	t.Cleanup(func() {
 		_ = DeleteProfileDir(uid)
@@ -73,6 +87,7 @@ func TestStore_MergeRoundTrip(t *testing.T) {
 
 // TestStore_WriteMergeInvalidYAML 验证非法 YAML 不写盘。
 func TestStore_WriteMergeInvalidYAML(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uid := "test-merge-invalid"
 	t.Cleanup(func() {
 		_ = DeleteProfileDir(uid)
@@ -98,6 +113,7 @@ func TestStore_WriteMergeInvalidYAML(t *testing.T) {
 
 // TestStore_DeleteProfileDir 验证目录删除。
 func TestStore_DeleteProfileDir(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uid := "test-delete"
 	require.NoError(t, WriteRaw(uid, []byte("mode: rule\n")))
 
@@ -114,6 +130,7 @@ func TestStore_DeleteProfileDir(t *testing.T) {
 
 // TestStore_DirIsolation 验证不同 UID 目录相互隔离。
 func TestStore_DirIsolation(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uidA, uidB := "iso-a", "iso-b"
 	t.Cleanup(func() {
 		_ = DeleteProfileDir(uidA)
@@ -137,8 +154,9 @@ func TestStore_DirIsolation(t *testing.T) {
 	assert.Equal(t, "global", topLevelMapping(b).Content[1].Value)
 }
 
-// TestStore_ProfileDirCreation 验证 RawPath/MergePath 会自动创建目录。
+// TestStore_ProfileDirCreation 验证 RawPath/MergePath 都能正确建立或确保对应目录的存在。
 func TestStore_ProfileDirCreation(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uid := "test-dir-create"
 	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
 

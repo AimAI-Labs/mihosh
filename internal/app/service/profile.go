@@ -200,7 +200,7 @@ func (s *ProfileService) LoadMerge(uid string) ([]byte, error) {
 	if _, err := s.findProfile(uid); err != nil {
 		return nil, err
 	}
-	return profile.ReadMerge(uid)
+	return profile.ReadMerge()
 }
 
 // SaveMerge 写入 merge.yaml（语法校验在 profile.WriteMerge 内）。
@@ -208,7 +208,7 @@ func (s *ProfileService) SaveMerge(uid string, content []byte) error {
 	if _, err := s.findProfile(uid); err != nil {
 		return err
 	}
-	return profile.WriteMerge(uid, content)
+	return profile.WriteMerge(content)
 }
 
 // ActivateResult 激活流程的结果。

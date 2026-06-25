@@ -27,7 +27,7 @@ func (s State) openMergeExternalEditor(svc *service.ProfileService) (State, tea.
 	}
 	uid := s.subs[s.filteredIdx[s.selected]].UID
 
-	mergePath, err := profile.MergePath(uid)
+	mergePath, err := profile.MergePath()
 	if err != nil {
 		return s, mergeEditError(uid, err)
 	}
