@@ -177,39 +177,30 @@ func TestProfileService_FetchLocal(t *testing.T) {
 func TestProfileService_MergeRoundTrip(t *testing.T) {
 	s := newIsolatedService(t)
 
-	p, err := s.AddProfile("合并测试", profile.SubSource{Kind: profile.SourceLocal, Path: "/p/a.yaml"})
+	_, err := s.AddProfile("合并测试", profile.SubSource{Kind: profile.SourceLocal, Path: "/p/a.yaml"})
 	require.NoError(t, err)
 
 	// 初始无 merge
-	data, err := s.LoadMerge(p.UID)
+	data, err := s.LoadMerge()
 	require.NoError(t, err)
 	assert.Nil(t, data)
 
 	// 写入合法 merge
 	merge := []byte("prepend-rules:\n  - DOMAIN,a.com,DIRECT\n")
-	require.NoError(t, s.SaveMerge(p.UID, merge))
+	require.NoError(t, s.SaveMerge(merge))
 
-	data, err = s.LoadMerge(p.UID)
+	data, err = s.LoadMerge()
 	require.NoError(t, err)
 	assert.Equal(t, merge, data)
 
 	// 非法 YAML 拒绝写盘
-	err = s.SaveMerge(p.UID, []byte("mode: {broken:\n"))
+	err = s.SaveMerge([]byte("mode: {broken:\n"))
 	require.Error(t, err)
 
 	// 原内容未变
-	data, err = s.LoadMerge(p.UID)
+	data, err = s.LoadMerge()
 	require.NoError(t, err)
 	assert.Equal(t, merge, data)
-}
-
-func TestProfileService_MergeOnMissingProfile(t *testing.T) {
-	s := newIsolatedService(t)
-	_, err := s.LoadMerge("ghost")
-	assert.ErrorIs(t, err, ErrSubNotFound)
-
-	err = s.SaveMerge("ghost", []byte("mode: rule\n"))
-	assert.ErrorIs(t, err, ErrSubNotFound)
 }
 
 func TestProfileService_ActivateMissingRaw(t *testing.T) {

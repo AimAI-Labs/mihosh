@@ -195,19 +195,13 @@ func (s *ProfileService) FetchProfile(uid string) error {
 	})
 }
 
-// LoadMerge 读取某订阅的 merge.yaml 内容（不存在返回 nil）。
-func (s *ProfileService) LoadMerge(uid string) ([]byte, error) {
-	if _, err := s.findProfile(uid); err != nil {
-		return nil, err
-	}
+// LoadMerge 读取全局 merge.yaml 内容（不存在返回 nil）。
+func (s *ProfileService) LoadMerge() ([]byte, error) {
 	return profile.ReadMerge()
 }
 
-// SaveMerge 写入 merge.yaml（语法校验在 profile.WriteMerge 内）。
-func (s *ProfileService) SaveMerge(uid string, content []byte) error {
-	if _, err := s.findProfile(uid); err != nil {
-		return err
-	}
+// SaveMerge 写入全局 merge.yaml（语法校验在 profile.WriteMerge 内）。
+func (s *ProfileService) SaveMerge(content []byte) error {
 	return profile.WriteMerge(content)
 }
 
