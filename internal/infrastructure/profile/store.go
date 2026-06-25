@@ -54,13 +54,13 @@ func RawPath(uid string) (string, error) {
 	return filepath.Join(dir, "raw.yaml"), nil
 }
 
-// MergePath 返回某订阅 merge.yaml 的完整路径（不保证文件存在）。
-func MergePath(uid string) (string, error) {
-	dir, err := profileDir(uid)
+// MergePath 返回全局 merge.yaml 的完整路径。
+func MergePath() (string, error) {
+	root, err := mihoshConfigDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "merge.yaml"), nil
+	return filepath.Join(root, "merge.yaml"), nil
 }
 
 // ReadRaw 读取并解析某订阅的 raw.yaml 为 yaml.Node。
@@ -93,10 +93,9 @@ func WriteRaw(uid string, data []byte) error {
 	return atomicWrite(p, data)
 }
 
-// ReadMerge 读取某订阅的 merge.yaml 内容（原始字节）。
-// 文件不存在或为空时返回 nil（视为无覆写），不报错。
-func ReadMerge(uid string) ([]byte, error) {
-	p, err := MergePath(uid)
+// ReadMerge 读取全局 merge.yaml 内容（原始字节）。
+func ReadMerge() ([]byte, error) {
+	p, err := MergePath()
 	if err != nil {
 		return nil, err
 	}
@@ -113,9 +112,9 @@ func ReadMerge(uid string) ([]byte, error) {
 	return data, nil
 }
 
-// ReadMergeNode 读取并解析 merge.yaml 为 yaml.Node；不存在/为空返回 nil。
-func ReadMergeNode(uid string) (*yaml.Node, error) {
-	data, err := ReadMerge(uid)
+// ReadMergeNode 读取并解析全局 merge.yaml 为 yaml.Node。
+func ReadMergeNode() (*yaml.Node, error) {
+	data, err := ReadMerge()
 	if err != nil {
 		return nil, err
 	}
@@ -129,17 +128,15 @@ func ReadMergeNode(uid string) (*yaml.Node, error) {
 	return &doc, nil
 }
 
-// WriteMerge 原子写入 merge.yaml（覆盖）。
-// 写入前校验 YAML 语法，非法则返回错误且不写盘。
-func WriteMerge(uid string, data []byte) error {
+// WriteMerge 原子写入全局 merge.yaml。
+func WriteMerge(data []byte) error {
 	if len(trimSpaceBytes(data)) > 0 {
-		// 非空内容必须可被 YAML 解析。
 		var probe yaml.Node
 		if err := yaml.Unmarshal(data, &probe); err != nil {
 			return fmt.Errorf("覆写 YAML 语法错误: %w", err)
 		}
 	}
-	p, err := MergePath(uid)
+	p, err := MergePath()
 	if err != nil {
 		return err
 	}

@@ -36,32 +36,37 @@ func TestStore_RawRoundTrip(t *testing.T) {
 // TestStore_MergeRoundTrip 验证 merge.yaml 的写入与读取，以及空文件降级。
 func TestStore_MergeRoundTrip(t *testing.T) {
 	uid := "test-merge-rt"
-	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
+	t.Cleanup(func() {
+		_ = DeleteProfileDir(uid)
+		if p, err := MergePath(); err == nil {
+			_ = os.Remove(p)
+		}
+	})
 
 	// 不存在时返回 nil（无覆写），不报错
-	data, err := ReadMerge(uid)
+	data, err := ReadMerge()
 	require.NoError(t, err)
 	assert.Nil(t, data)
 
-	node, err := ReadMergeNode(uid)
+	node, err := ReadMergeNode()
 	require.NoError(t, err)
 	assert.Nil(t, node)
 
 	// 写入合法 merge
 	merge := []byte("prepend-rules:\n  - DOMAIN,a.com,DIRECT\n")
-	require.NoError(t, WriteMerge(uid, merge))
+	require.NoError(t, WriteMerge(merge))
 
-	data, err = ReadMerge(uid)
+	data, err = ReadMerge()
 	require.NoError(t, err)
 	assert.Equal(t, merge, data)
 
-	node, err = ReadMergeNode(uid)
+	node, err = ReadMergeNode()
 	require.NoError(t, err)
 	require.NotNil(t, node)
 
 	// 写入空内容（应允许，覆盖为空）
-	require.NoError(t, WriteMerge(uid, nil))
-	data, err = ReadMerge(uid)
+	require.NoError(t, WriteMerge(nil))
+	data, err = ReadMerge()
 	require.NoError(t, err)
 	assert.Nil(t, data)
 }
@@ -69,19 +74,24 @@ func TestStore_MergeRoundTrip(t *testing.T) {
 // TestStore_WriteMergeInvalidYAML 验证非法 YAML 不写盘。
 func TestStore_WriteMergeInvalidYAML(t *testing.T) {
 	uid := "test-merge-invalid"
-	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
+	t.Cleanup(func() {
+		_ = DeleteProfileDir(uid)
+		if p, err := MergePath(); err == nil {
+			_ = os.Remove(p)
+		}
+	})
 
 	// 先写一个合法 merge
-	require.NoError(t, WriteMerge(uid, []byte("mode: rule\n")))
+	require.NoError(t, WriteMerge([]byte("mode: rule\n")))
 
 	// 尝试写非法 YAML（未闭合的 flow）
 	invalid := []byte("mode: {broken: \n")
-	err := WriteMerge(uid, invalid)
+	err := WriteMerge(invalid)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "语法错误")
 
 	// 原内容应未被覆盖
-	data, err := ReadMerge(uid)
+	data, err := ReadMerge()
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "mode: rule")
 }

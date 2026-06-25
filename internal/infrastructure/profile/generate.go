@@ -69,7 +69,7 @@ func GenerateAndWriteForUID(uid string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	merge, err := ReadMergeNode(uid)
+	merge, err := ReadMergeNode()
 	if err != nil {
 		// merge 语法错误：跳过覆写，调用方决定是否警告。
 		// 此处返回错误以便上层给出明确提示；上层可捕获后用 nil merge 重试。
@@ -91,7 +91,7 @@ func GenerateAndWriteForUIDIgnoreMergeError(uid string) (data []byte, mergeErr e
 	if err != nil {
 		return nil, nil
 	}
-	merge, mergeErr := ReadMergeNode(uid)
+	merge, mergeErr := ReadMergeNode()
 	if mergeErr != nil {
 		merge = nil // 降级：忽略覆写
 	}
