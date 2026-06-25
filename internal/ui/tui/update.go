@@ -557,12 +557,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.noticeTicks = 0
 			return m, reenableMouse
 		}
-		// 编辑的是当前激活订阅 → 重新生成最终配置并热重载核心（专属 toast）；
-		// 否则仅提示已保存（下次激活该订阅时自然合并生效）。
-		if msg.UID == m.subState.ActiveUID() {
+		// 如果有激活的订阅，则立即应用这份全局覆写并热重载
+		if m.subState.ActiveUID() != "" {
 			m.notice = i18n.T("sub.merge_applied_toast")
 			m.noticeTicks = autoRefreshNoticeTicks
-			return m, tea.Batch(reenableMouse, sub.ApplyActiveMergeCmd(m.profileSvc, msg.UID))
+			return m, tea.Batch(reenableMouse, sub.ApplyActiveMergeCmd(m.profileSvc, m.subState.ActiveUID()))
 		}
 		m.notice = i18n.T("sub.merge_saved_toast")
 		m.noticeTicks = autoRefreshNoticeTicks

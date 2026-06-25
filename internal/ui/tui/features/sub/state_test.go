@@ -151,10 +151,10 @@ func TestUpdate_MKeyOpensMergeEditor(t *testing.T) {
 }
 
 func TestOpenMergeExternalEditor_NoSelection(t *testing.T) {
-	// 空列表时按 m 应返回 nil 命令。
+	// 无论列表是否为空，都可以打开全局覆写配置。
 	s := State{}.ApplySubs(nil, "")
 	_, cmd := s.openMergeExternalEditor(nil)
-	assert.Nil(t, cmd, "空列表不应发出编辑器命令")
+	assert.NotNil(t, cmd, "空列表也应该发出编辑器命令")
 }
 
 func TestOpenEditForm_PrefillsCurrentSub(t *testing.T) {

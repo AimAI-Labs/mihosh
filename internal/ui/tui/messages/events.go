@@ -206,10 +206,9 @@ type SubMergeSaveErrorMsg struct {
 
 func (m SubMergeSaveErrorMsg) Error() string { return m.Err.Error() }
 
-// MergeEditFinishedMsg 外部编辑器编辑某订阅的 merge.yaml 结束。
+// MergeEditFinishedMsg 外部编辑器编辑全局 merge.yaml 结束。
 // Err 为 nil 表示编辑器正常退出（文件已写盘）；非 nil 表示启动或退出失败。
 type MergeEditFinishedMsg struct {
-	UID string
 	Err error
 }
 
