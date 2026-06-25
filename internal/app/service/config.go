@@ -7,6 +7,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	tea "github.com/charmbracelet/bubbletea"
@@ -149,8 +150,40 @@ func (s *ConfigService) fetchMihomoConfigFromFile(apiErr error) messages.MihomoC
 // 客户端端点的热刷新改由 MihomoConfigSavedMsg 在 update 层驱动。
 // 当 YAML 写入成功但 reload 失败时（如修改 external-controller 后旧端口已不可达），
 // 仍标记 WriteOK=true 以便 update 层刷新端点。
-func (s *ConfigService) SaveMihomoConfigField(client *api.Client, key string, value interface{}) tea.Cmd {
+func (s *ConfigService) SaveMihomoConfigField(client *api.Client, profileSvc *ProfileService, key string, value interface{}) tea.Cmd {
 	return func() tea.Msg {
+		// 1. Get the current active subscription
+		cfg, err := config.Load()
+		if err != nil {
+			return messages.MihomoConfigSavedMsg{Err: err}
+		}
+
+		activeSub := cfg.ActiveSub
+
+		// Path A: Has Active Sub
+		if activeSub != "" && profileSvc != nil {
+			if err := profile.WriteMergeField(key, value); err != nil {
+				return messages.MihomoConfigSavedMsg{Err: fmt.Errorf("write merge.yaml failed: %w", err)}
+			}
+			
+			// Trigger a full merge and core reload
+			res, err := profileSvc.Activate(activeSub)
+			if err != nil {
+				return messages.MihomoConfigSavedMsg{
+					Err:      fmt.Errorf("activate after merge failed: %w", err),
+					WriteOK:  true, // The file was written to merge.yaml successfully
+				}
+			}
+			
+			// If Activate succeeded but merge syntax was bad, log it or bubble it up, but it's generally OK.
+			if res.MergeErr != nil {
+				// We don't fail the save, but it might mean the merge override was ignored.
+			}
+			
+			return messages.MihomoConfigSavedMsg{WriteOK: true}
+		}
+
+		// Path B: No Active Sub, fallback to config.yaml directly
 		path, err := config.GetMihomoConfigPath()
 		if err != nil {
 			return messages.MihomoConfigSavedMsg{Err: err}

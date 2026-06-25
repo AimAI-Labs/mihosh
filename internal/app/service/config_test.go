@@ -36,7 +36,7 @@ func TestConfigService_SaveMihomoConfigField_Success(t *testing.T) {
 	// We can't fully test success without mocking the file system and API client easily,
 	// but we can at least invoke it to make sure it doesn't panic.
 	s := NewConfigService()
-	cmd := s.SaveMihomoConfigField(nil, "test_key", "test_value")
+	cmd := s.SaveMihomoConfigField(nil, nil, "test_key", "test_value")
 	if cmd == nil {
 		t.Fatal("expected a tea.Cmd, got nil")
 	}
