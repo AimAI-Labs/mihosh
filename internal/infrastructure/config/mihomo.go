@@ -65,6 +65,20 @@ func resolveMixedPort(data map[string]interface{}, fallback int) int {
 			return int(v)
 		}
 	}
+	switch v := data["port"].(type) {
+	case int:
+		if v > 0 {
+			return v
+		}
+	case int64:
+		if v > 0 {
+			return int(v)
+		}
+	case float64:
+		if v > 0 {
+			return int(v)
+		}
+	}
 	return fallback
 }
 

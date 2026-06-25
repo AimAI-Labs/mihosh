@@ -67,12 +67,12 @@ func (s State) SelectedSettingIndex() int {
 
 // IsLanguageSelected 返回当前是否选中语言设置项
 func (s State) IsLanguageSelected() bool {
-	return s.selectedSetting == LanguageSettingIndex()
+	return s.activeTab == 0 && s.selectedSetting == LanguageSettingIndex()
 }
 
 // IsThemeSelected 返回当前是否选中主题设置项
 func (s State) IsThemeSelected() bool {
-	return s.selectedSetting == ThemeSettingIndex()
+	return s.activeTab == 0 && s.selectedSetting == ThemeSettingIndex()
 }
 
 // FetchMihomoVersion 返回一个拉取 Mihomo 版本信息的 Cmd
@@ -141,7 +141,7 @@ func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.Con
 	case key.Matches(msg, common.Keys.Enter):
 		s.editMode = true
 		s.editValue = s.getEditValue(cfg, s.activeKeys()[s.selectedSetting])
-		s.editCursor = len(s.editValue)
+		s.editCursor = len([]rune(s.editValue))
 	}
 
 	return s, cfg, nil
@@ -251,7 +251,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 	if s.isMouseDoubleClick(settingIdx, now) {
 		s.editMode = true
 		s.editValue = s.getEditValue(cfg, s.activeKeys()[settingIdx])
-		s.editCursor = len(s.editValue)
+		s.editCursor = len([]rune(s.editValue))
 	}
 
 	return s, cfg
@@ -413,7 +413,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 		}
 
 	case msg.String() == "right":
-		if s.editCursor < len(s.editValue) {
+		if s.editCursor < len([]rune(s.editValue)) {
 			s.editCursor++
 		}
 
@@ -421,24 +421,33 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 		s.editCursor = 0
 
 	case key.Matches(msg, common.Keys.End):
-		s.editCursor = len(s.editValue)
+		s.editCursor = len([]rune(s.editValue))
 
 	case key.Matches(msg, common.Keys.Backspace):
-		if s.editCursor > 0 {
-			s.editValue = s.editValue[:s.editCursor-1] + s.editValue[s.editCursor:]
+		runes := []rune(s.editValue)
+		if s.editCursor > 0 && s.editCursor <= len(runes) {
+			s.editValue = string(append(runes[:s.editCursor-1], runes[s.editCursor:]...))
 			s.editCursor--
 		}
 
 	case key.Matches(msg, common.Keys.Delete):
-		if s.editCursor < len(s.editValue) {
-			s.editValue = s.editValue[:s.editCursor] + s.editValue[s.editCursor+1:]
+		runes := []rune(s.editValue)
+		if s.editCursor < len(runes) {
+			s.editValue = string(append(runes[:s.editCursor], runes[s.editCursor+1:]...))
 		}
 
 	default:
 		if msg.Type == tea.KeyRunes || msg.Type == tea.KeySpace {
-			input := msg.String()
-			s.editValue = s.editValue[:s.editCursor] + input + s.editValue[s.editCursor:]
-			s.editCursor += len(input)
+			inputRunes := []rune(msg.String())
+			runes := []rune(s.editValue)
+			if s.editCursor > len(runes) {
+				s.editCursor = len(runes)
+			}
+			newRunes := append([]rune(nil), runes[:s.editCursor]...)
+			newRunes = append(newRunes, inputRunes...)
+			newRunes = append(newRunes, runes[s.editCursor:]...)
+			s.editValue = string(newRunes)
+			s.editCursor += len(inputRunes)
 		}
 	}
 

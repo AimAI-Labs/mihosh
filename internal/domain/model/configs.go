@@ -15,6 +15,7 @@ type ConfigsResponse struct {
 	ExternalController string `json:"external-controller"`
 	Secret             string `json:"secret"`
 	MixedPort          int    `json:"mixed-port"`
+	Port               int    `json:"port"`
 	AllowLan           bool   `json:"allow-lan"`
 	LogLevel           string `json:"log-level"`
 }

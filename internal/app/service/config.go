@@ -95,6 +95,10 @@ func (s *ConfigService) FetchMihomoConfig(client *api.Client) tea.Cmd {
 			LogLevel:           resp.LogLevel,
 		}
 
+		if mihomoCfg.MixedPort == 0 && resp.Port > 0 {
+			mihomoCfg.MixedPort = resp.Port
+		}
+
 		// Fallback for connection settings if empty (API might omit them)
 		endpoint := config.ResolveMihomoEndpoint()
 		if mihomoCfg.ExternalController == "" {

@@ -270,7 +270,7 @@ func overlayVersionAtBottomLeft(page, versionText string, width, height int) str
 func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
 	// 编辑模式：根据是否语言项分流
 	if state.EditMode {
-		if state.SelectedSetting == LanguageSettingIndex() {
+		if state.ActiveTab == 0 && state.SelectedSetting == LanguageSettingIndex() {
 			// 语言项：Tab/方向键切换 + 保存 + 取消
 			return []common.InlineHelpHint{
 				{Key: "←→/Tab", Desc: i18n.T("help.settings_edit_lang.switch")},
@@ -278,7 +278,7 @@ func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
 				{Key: "Esc", Desc: i18n.T("help.settings_edit_lang.cancel")},
 			}
 		}
-		if state.SelectedSetting == ThemeSettingIndex() {
+		if state.ActiveTab == 0 && state.SelectedSetting == ThemeSettingIndex() {
 			// 主题项：Tab/方向键切换 + 应用 + 取消
 			return []common.InlineHelpHint{
 				{Key: "←→/Tab", Desc: i18n.T("help.settings_edit_theme.switch")},
@@ -362,7 +362,7 @@ func renderSettingItem(state PageState, index int, key string, label string, wid
 
 	// 渲染值
 	var renderedValue string
-	if index == LanguageSettingIndex() {
+	if key == "language" {
 		// 语言选项使用 Tab 组件渲染
 		valToRender := value
 		if state.EditMode && index == state.SelectedSetting {
