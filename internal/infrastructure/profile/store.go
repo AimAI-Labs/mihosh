@@ -60,9 +60,6 @@ func MergePath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(root, 0755); err != nil {
-		return "", fmt.Errorf("创建配置目录失败: %w", err)
-	}
 	return filepath.Join(root, "merge.yaml"), nil
 }
 
@@ -142,6 +139,9 @@ func WriteMerge(data []byte) error {
 	p, err := MergePath()
 	if err != nil {
 		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+		return fmt.Errorf("创建配置目录失败: %w", err)
 	}
 	return atomicWrite(p, data)
 }
