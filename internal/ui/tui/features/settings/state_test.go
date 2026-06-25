@@ -489,21 +489,21 @@ func TestLanguageHelpers(t *testing.T) {
 
 	// 4. resolveLanguageMouseTarget
 	// 根据 state.go 中实现：
-	// valueStartX = settingsContainerLeft (2) + settingsRowPaddingLeft (1) + settingsLabelWidth (20) = 23
+	// valueStartX = settingsContainerLeft (2) + settingsRowPaddingLeft (1) + settingsLabelWidth (24) = 27
 	// modes: "auto", "zh-CN", "en-US"
 	// 每个 tab 宽度包含内容两侧空格和 lipgloss 横向 padding。
 
-	lang, ok := resolveLanguageMouseTarget(25)
+	lang, ok := resolveLanguageMouseTarget(29) // 27..34
 	if !ok || lang != "auto" {
 		t.Errorf("expected auto, got %q (ok=%v)", lang, ok)
 	}
 
-	lang, ok = resolveLanguageMouseTarget(34)
+	lang, ok = resolveLanguageMouseTarget(38) // 36..44
 	if !ok || lang != "zh-CN" {
 		t.Errorf("expected zh-CN, got %q (ok=%v)", lang, ok)
 	}
 
-	lang, ok = resolveLanguageMouseTarget(44)
+	lang, ok = resolveLanguageMouseTarget(48) // 46..54
 	if !ok || lang != "en-US" {
 		t.Errorf("expected en-US, got %q (ok=%v)", lang, ok)
 	}

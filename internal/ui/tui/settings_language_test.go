@@ -87,7 +87,7 @@ func TestSettingsLanguageMouseClickAppliesI18nImmediately(t *testing.T) {
 		height:      30,
 	}
 
-	const pageX = 42
+	const pageX = 48 // originally 42, shifted by 4 due to label width increase, +2 to be safe
 	const pageY = 7
 	const rawX = pageX
 	const rawY = pageY + layout.TopNavHeight
@@ -134,7 +134,7 @@ func TestSettingsThemeMouseClickClearsScreen(t *testing.T) {
 		height:      30,
 	}
 
-	const pageX = 40
+	const pageX = 48 // originally 40, shifted by 4 due to label width increase, +4 to be safe
 	const pageY = 9
 	const rawX = pageX
 	const rawY = pageY + layout.TopNavHeight

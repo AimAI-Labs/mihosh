@@ -184,7 +184,7 @@
   "rules.edit_toast": "Rule updated and core reloaded",
 
   "settings.panel_title": "Settings",
-  "settings.label.secret": "Secret",
+  "settings.label.secret": "secret",
   "settings.label.test_url": "Test URL",
   "settings.label.timeout": "Timeout(ms)",
   "settings.label.language": "Language",
@@ -207,10 +207,10 @@
 
   "settings.tab.mihosh": "Mihosh",
   "settings.tab.mihomo": "Mihomo",
-  "settings.label.external-controller": "API Address / External Controller",
-  "settings.label.mixed-port": "Mixed Port",
-  "settings.label.allow-lan": "Allow LAN",
-  "settings.label.log-level": "Log Level",
+  "settings.label.external-controller": "external-controller",
+  "settings.label.mixed-port": "mixed-port",
+  "settings.label.allow-lan": "allow-lan",
+  "settings.label.log-level": "log-level",
   "settings.desc.external-controller": "Mihomo core external controller API address",
   "settings.desc.mixed-port": "Mihomo core HTTP/SOCKS mixed proxy port",
   "settings.desc.allow-lan": "Allow connections from the local network",

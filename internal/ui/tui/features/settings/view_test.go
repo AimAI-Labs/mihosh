@@ -97,7 +97,7 @@ func TestRenderSettingsPage_MihomoTabShowsConfig(t *testing.T) {
 		t.Fatalf("expected no loading hint when Mihomo loaded, got %q", rendered)
 	}
 	// 已加载时应渲染 external-controller 等配置项（标签较长会在窄宽下换行，故匹配稳定子串）
-	if !strings.Contains(rendered, "Controller") {
+	if !strings.Contains(rendered, "external-controller") {
 		t.Fatalf("expected external-controller row when loaded, got %q", rendered)
 	}
 }

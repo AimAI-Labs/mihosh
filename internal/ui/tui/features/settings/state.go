@@ -433,8 +433,8 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 		}
 
 	default:
-		input := msg.String()
-		if len(input) > 0 && (len(input) > 1 || (input[0] >= asciiMinPrintable && input[0] < asciiMaxPrintable)) {
+		if msg.Type == tea.KeyRunes || msg.Type == tea.KeySpace {
+			input := msg.String()
 			s.editValue = s.editValue[:s.editCursor] + input + s.editValue[s.editCursor:]
 			s.editCursor += len(input)
 		}

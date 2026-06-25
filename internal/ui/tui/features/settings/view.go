@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	settingsLabelWidth  = 20
+	settingsLabelWidth  = 24
 	settingsMinRowWidth = 40
 	settingsDescWidth   = 30
 )
@@ -327,8 +327,6 @@ func renderSettingItem(state PageState, index int, key string, label string, wid
 	editBoxStyle := lipgloss.NewStyle().
 		Foreground(common.TokyoYellow()).
 		Background(common.Background()).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(common.TokyoBlue()).
 		Padding(0, 1)
 
 	// 光标样式
