@@ -14,6 +14,7 @@
   "status.err.timeout_node": "测速超时，节点可能不可用",
   "status.err.refused": "无法连接mihomo API，请检查mihomo是否运行",
   "status.err.timeout": "请求超时，请检查网络或增加超时时间",
+  "status.err.detail": "报错详情",
   "status.testing": "⏳ 正在测速",
   "status.normal": "正常",
   "status.help_hint": "1-5 切页 │ / 搜索 │ ? 帮助 │ q 退出",

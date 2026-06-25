@@ -56,9 +56,10 @@ type Model struct {
 	chartData *model.ChartData
 
 	// 全局错误（状态栏显示）
-	err         error
-	notice      string
-	noticeTicks int
+	err            error
+	showErrorPopup bool
+	notice         string
+	noticeTicks    int
 
 	// WebSocket
 	wsClient  *api.WSClient

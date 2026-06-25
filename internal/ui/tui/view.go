@@ -6,7 +6,9 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/help"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // View 渲染视图
@@ -87,6 +89,11 @@ func (m Model) View() string {
 
 	fullPage := lipgloss.JoinVertical(lipgloss.Left, topNav, pageContent, statusBar)
 
+	// ── 报错弹窗叠加 ──
+	if m.showErrorPopup && m.err != nil {
+		fullPage = overlayErrorPopup(fullPage, m.width, m.height, m.err.Error())
+	}
+
 	// ── 帮助弹窗叠加（lazygit 风格，叠加在完整页面之上）──
 	// 节点页始终显示右下角内联帮助提示；按 ? 可叠加完整帮助弹窗
 	if m.showHelp {
@@ -137,3 +144,84 @@ func clampToHeight(content string, h int) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// overlayErrorPopup 将报错信息完整弹窗居中叠加在 base 页面之上
+func overlayErrorPopup(base string, width, height int, errText string) string {
+	// ── 1. 暗化底层 ──
+	baseLines := strings.Split(base, "\n")
+	for len(baseLines) < height {
+		baseLines = append(baseLines, "")
+	}
+	if len(baseLines) > height {
+		baseLines = baseLines[:height]
+	}
+
+	faint := lipgloss.NewStyle().Faint(true)
+	dimmed := make([]string, height)
+	for i, l := range baseLines {
+		dimmed[i] = faint.Render(l)
+	}
+
+	// ── 2. 弹窗尺寸计算 ──
+	popupWidth := width * 60 / 100
+	if popupWidth < 40 {
+		popupWidth = 40
+	}
+	if popupWidth > 80 {
+		popupWidth = 80
+	}
+	if popupWidth > width {
+		popupWidth = width
+	}
+
+	// ── 3. 内容换行与截断 ──
+	contentWidth := popupWidth - 4 // border 2 + padding 2
+	wrappedErr := lipgloss.NewStyle().Width(contentWidth).Render(errText)
+	errLines := strings.Split(wrappedErr, "\n")
+	
+	maxLines := height * 60 / 100
+	if maxLines < 5 {
+		maxLines = 5
+	}
+	if len(errLines) > maxLines {
+		errLines = errLines[:maxLines]
+		errLines = append(errLines, lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render("..."))
+	}
+	
+	body := strings.Join(errLines, "\n")
+	
+	title := i18n.T("status.err.detail")
+	popup := common.RenderBorderedPanel(title, body, popupWidth, common.TokyoRed(), common.TokyoRed())
+
+	// ── 4. 弹窗居中合并 ──
+	popupLines := strings.Split(popup, "\n")
+	popupHeight := len(popupLines)
+
+	leftOffset := (width - popupWidth) / 2
+	if leftOffset < 0 {
+		leftOffset = 0
+	}
+	topOffset := (height - popupHeight) / 2
+	if topOffset < 0 {
+		topOffset = 0
+	}
+
+	for i, pl := range popupLines {
+		y := topOffset + i
+		if y >= height {
+			break
+		}
+
+		leftPart := ansi.Cut(dimmed[y], 0, leftOffset)
+		leftW := lipgloss.Width(leftPart)
+		if leftW < leftOffset {
+			leftPart += strings.Repeat(" ", leftOffset-leftW)
+		}
+
+		rightPart := ansi.Cut(dimmed[y], leftOffset+popupWidth, width)
+		dimmed[y] = leftPart + pl + rightPart
+	}
+
+	return strings.Join(dimmed, "\n")
+}
+

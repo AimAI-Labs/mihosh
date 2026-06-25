@@ -87,13 +87,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logsState = m.logsState.UpdateMaxHScrollOffset(m.width, m.height)
 		return m, tea.ClearScreen
 
-	// ── 全局：鼠标事件 ──
 	case tea.MouseMsg:
 		// 帮助弹窗打开时吞掉所有鼠标事件，防止穿透到底层
 		if m.showHelp {
 			// 左键点击任意位置关闭弹窗
 			if isMouseLeftPress(msg) {
 				m.showHelp = false
+			}
+			return m, nil
+		}
+		// 报错弹窗打开时吞掉所有鼠标事件
+		if m.showErrorPopup {
+			if isMouseLeftPress(msg) {
+				m.showErrorPopup = false
 			}
 			return m, nil
 		}
@@ -107,6 +113,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			// 检查是否点击了底栏 (Status Bar)
 			if msg.Y >= contentHeight {
+				if m.err != nil {
+					// 粗略判断点击区域：假设状态栏左侧显示错误信息
+					if msg.X >= 0 && msg.X < m.width/2 {
+						m.showErrorPopup = true
+						return m, nil
+					}
+				}
+
 				activeProxy, _, exists := m.nodesState.GetActiveProxyAndDelay()
 				if exists && activeProxy != "" && !m.nodesState.Testing {
 					// 粗略判断点击区域：假设状态栏左侧宽约 50 个字符 (包含运行状态和节点名称及延时)
@@ -159,6 +173,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "esc", "q", "?":
 				m.showHelp = false
+				return m, nil
+			}
+			if key.Matches(msg, common.Keys.Quit) {
+				return m, tea.Quit
+			}
+			return m, nil
+		}
+
+		// 报错弹窗拦截
+		if m.showErrorPopup {
+			switch msg.String() {
+			case "esc", "enter", "q":
+				m.showErrorPopup = false
 				return m, nil
 			}
 			if key.Matches(msg, common.Keys.Quit) {
@@ -388,6 +415,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case messages.ErrMsg:
 		m.err = msg
+		m.showErrorPopup = false // 收到新错误时不要自动弹出，除非用户主动点击，如果当前开着弹窗则关掉。或者也可以保持不管。保险起见设为 false。
 		m.notice = ""
 		m.noticeTicks = 0
 		m.nodesState.Testing = false
