@@ -48,10 +48,11 @@ type State struct {
 	mihomoVersion string
 	versionLoaded bool
 
-	activeTab     int // 0=Mihosh, 1=Mihomo
-	mihomoConfig  *model.MihomoConfig
-	mihomoLoaded  bool
-	mihomoLoadErr error
+	activeTab      int // 0=Mihosh, 1=Mihomo
+	mihomoConfig   *model.MihomoConfig
+	mihomoLoaded   bool
+	mihomoLoadErr  error
+	mihomoFromFile bool // API 不可达时从 YAML 文件降级读取
 }
 
 // IsEditing 返回是否处于编辑模式
@@ -112,6 +113,7 @@ func (s State) ToPageState(cfg *config.Config) PageState {
 		MihomoConfig:    s.mihomoConfig,
 		MihomoLoaded:    s.mihomoLoaded,
 		MihomoLoadErr:   s.mihomoLoadErr,
+		MihomoFromFile:  s.mihomoFromFile,
 	}
 }
 
@@ -542,13 +544,20 @@ func (s *State) activeKeys() []string {
 }
 
 func (s State) ApplyMihomoConfig(msg *messages.MihomoConfigMsg) State {
-	if msg.Err != nil {
-		s.mihomoLoadErr = msg.Err
-	} else {
-		s.mihomoConfig = msg.Config
-		s.mihomoLoadErr = nil
-	}
 	s.mihomoLoaded = true
+	s.mihomoFromFile = msg.FromFile
+	if msg.Config != nil {
+		// 无论来自 API 还是 YAML 降级，只要有 Config 就展示
+		s.mihomoConfig = msg.Config
+		if msg.FromFile {
+			s.mihomoLoadErr = msg.Err // 保留原始错误用于警告提示
+		} else {
+			s.mihomoLoadErr = nil
+		}
+	} else {
+		// Config 也为 nil 才是真正的加载失败
+		s.mihomoLoadErr = msg.Err
+	}
 	return s
 }
 

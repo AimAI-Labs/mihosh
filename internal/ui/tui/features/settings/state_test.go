@@ -623,11 +623,11 @@ func TestHandleMouseLeft_ClickTabBarSwitchesTab(t *testing.T) {
 	}
 }
 
-// TestApplyMihomoConfig 验证 Mihomo 配置加载（成功/失败）状态。
+// TestApplyMihomoConfig 验证 Mihomo 配置加载（成功/降级/失败）状态。
 func TestApplyMihomoConfig(t *testing.T) {
 	s := State{activeTab: 1}
 
-	// 成功加载
+	// 成功加载（API 正常）
 	cfg := &model.MihomoConfig{ExternalController: "127.0.0.1:9090", MixedPort: 7890}
 	next := s.ApplyMihomoConfig(&messages.MihomoConfigMsg{Config: cfg})
 	if !next.mihomoLoaded {
@@ -639,8 +639,31 @@ func TestApplyMihomoConfig(t *testing.T) {
 	if next.mihomoConfig != cfg {
 		t.Fatalf("expected mihomoConfig to be set")
 	}
+	if next.mihomoFromFile {
+		t.Fatalf("expected mihomoFromFile=false for API success")
+	}
 
-	// 失败加载
+	// 降级加载（API 不可达，从 YAML 读取）
+	fallbackCfg := &model.MihomoConfig{ExternalController: "127.0.0.1:9099", MixedPort: 7890}
+	next = s.ApplyMihomoConfig(&messages.MihomoConfigMsg{
+		Config:   fallbackCfg,
+		Err:      fmt.Errorf("connection refused"),
+		FromFile: true,
+	})
+	if !next.mihomoLoaded {
+		t.Fatalf("expected mihomoLoaded=true in degraded mode")
+	}
+	if next.mihomoConfig != fallbackCfg {
+		t.Fatalf("expected mihomoConfig to be set from YAML fallback")
+	}
+	if next.mihomoLoadErr == nil {
+		t.Fatalf("expected mihomoLoadErr to record API error in degraded mode")
+	}
+	if !next.mihomoFromFile {
+		t.Fatalf("expected mihomoFromFile=true in degraded mode")
+	}
+
+	// 完全失败（Config 也为 nil）
 	next = s.ApplyMihomoConfig(&messages.MihomoConfigMsg{Err: fmt.Errorf("boom")})
 	if !next.mihomoLoaded {
 		t.Fatalf("expected mihomoLoaded=true even on error")
@@ -649,6 +672,6 @@ func TestApplyMihomoConfig(t *testing.T) {
 		t.Fatalf("expected error to be recorded")
 	}
 	if next.mihomoConfig != nil {
-		t.Fatalf("expected mihomoConfig=nil on error")
+		t.Fatalf("expected mihomoConfig=nil on complete failure")
 	}
 }

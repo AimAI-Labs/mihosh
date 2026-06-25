@@ -74,15 +74,17 @@ func (s *ConfigService) SetConfigValue(key, value string) error {
 	return config.Save(cfg)
 }
 
-// FetchMihomoConfig fetches the live config from Mihomo API and supplements with YAML if needed
+// FetchMihomoConfig fetches the live config from Mihomo API and supplements with YAML if needed.
+// 当 API 不可达时（如端口错误），降级从 YAML 文件读取，让用户仍可查看/编辑配置。
 func (s *ConfigService) FetchMihomoConfig(client *api.Client) tea.Cmd {
 	return func() tea.Msg {
 		if client == nil {
-			return messages.MihomoConfigMsg{Err: fmt.Errorf("API client is nil")}
+			return s.fetchMihomoConfigFromFile(fmt.Errorf("API client is nil"))
 		}
 		resp, err := client.GetConfigs()
 		if err != nil {
-			return messages.MihomoConfigMsg{Err: err}
+			// API 不可达，降级从 YAML 文件读取
+			return s.fetchMihomoConfigFromFile(err)
 		}
 
 		mihomoCfg := &model.MihomoConfig{
@@ -108,9 +110,41 @@ func (s *ConfigService) FetchMihomoConfig(client *api.Client) tea.Cmd {
 	}
 }
 
+// fetchMihomoConfigFromFile 从 YAML 文件降级读取 Mihomo 配置。
+// 返回的 MihomoConfigMsg 同时携带 Config（文件读取结果）和 Err（原始 API 错误），
+// FromFile=true 告诉 UI 层当前为离线模式。
+func (s *ConfigService) fetchMihomoConfigFromFile(apiErr error) messages.MihomoConfigMsg {
+	endpoint := config.ResolveMihomoEndpoint()
+	mihomoCfg := &model.MihomoConfig{
+		ExternalController: endpoint.ExternalController,
+		Secret:             endpoint.Secret,
+		MixedPort:          endpoint.MixedPort,
+	}
+
+	// 尝试从 YAML 读取 allow-lan / log-level 等 API-only 字段
+	if path, err := config.GetMihomoConfigPath(); err == nil {
+		if data, err := config.ReadMihomoYAML(path); err == nil {
+			if v, ok := data["allow-lan"].(bool); ok {
+				mihomoCfg.AllowLan = v
+			}
+			if v, ok := data["log-level"].(string); ok {
+				mihomoCfg.LogLevel = v
+			}
+		}
+	}
+
+	return messages.MihomoConfigMsg{
+		Config:   mihomoCfg,
+		Err:      apiErr,
+		FromFile: true,
+	}
+}
+
 // SaveMihomoConfigField writes to YAML and reloads the API.
 // 连接信息完全归 mihomo 配置文件管理：保存后不再反向同步到 Mihosh 配置，
 // 客户端端点的热刷新改由 MihomoConfigSavedMsg 在 update 层驱动。
+// 当 YAML 写入成功但 reload 失败时（如修改 external-controller 后旧端口已不可达），
+// 仍标记 WriteOK=true 以便 update 层刷新端点。
 func (s *ConfigService) SaveMihomoConfigField(client *api.Client, key string, value interface{}) tea.Cmd {
 	return func() tea.Msg {
 		path, err := config.GetMihomoConfigPath()
@@ -124,10 +158,14 @@ func (s *ConfigService) SaveMihomoConfigField(client *api.Client, key string, va
 
 		if client != nil {
 			if err := client.ReloadConfig(path); err != nil {
-				return messages.MihomoConfigSavedMsg{Err: fmt.Errorf("reload failed: %w", err)}
+				// YAML 已写入，但 reload 失败（端口变更后预期行为）
+				return messages.MihomoConfigSavedMsg{
+					Err:     fmt.Errorf("reload failed: %w", err),
+					WriteOK: true,
+				}
 			}
 		}
 
-		return messages.MihomoConfigSavedMsg{}
+		return messages.MihomoConfigSavedMsg{WriteOK: true}
 	}
 }

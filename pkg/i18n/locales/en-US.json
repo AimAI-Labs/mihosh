@@ -204,6 +204,7 @@
   "settings.toast.save_failed": "Failed to save",
   "settings.toast.save_failed_with_err": "Failed to save: %s",
   "settings.toast.mihomo_save_success": "Mihomo config saved and reloaded",
+  "settings.toast.mihomo_save_reload_warn": "Config saved, reload failed (confirm Mihomo restarted after port change)",
 
   "settings.tab.mihosh": "Mihosh",
   "settings.tab.mihomo": "Mihomo",
@@ -218,6 +219,7 @@
   "settings.mihomo.loading": "Loading Mihomo config...",
   "settings.mihomo.load_error": "Failed to load Mihomo config: %s",
   "settings.mihomo.config_not_found": "Config file not found",
+  "settings.mihomo.offline_warning": "API unreachable, reading from config file (save to apply changes)",
 
   "help.popup_title": "Mihosh Keybindings Help",
   "help.close_hint": "? / Esc / q  Close",

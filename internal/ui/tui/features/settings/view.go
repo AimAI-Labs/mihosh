@@ -64,10 +64,11 @@ type PageState struct {
 
 	MihomoVersion string
 
-	ActiveTab     int
-	MihomoConfig  *model.MihomoConfig
-	MihomoLoaded  bool
-	MihomoLoadErr error
+	ActiveTab      int
+	MihomoConfig   *model.MihomoConfig
+	MihomoLoaded   bool
+	MihomoLoadErr  error
+	MihomoFromFile bool // API 不可达时从 YAML 降级读取
 }
 
 func (p PageState) activeKeys() []string {
@@ -145,13 +146,18 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	settingsPanel := common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width-4)
 
 	// 处理 Mihomo 状态
+	var warningText string
 	if state.ActiveTab == 1 {
 		if !state.MihomoLoaded {
 			listContent = "\n  " + i18n.T("settings.mihomo.loading") + "\n"
 			settingsPanel = common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width-4)
-		} else if state.MihomoLoadErr != nil {
+		} else if state.MihomoLoadErr != nil && state.MihomoConfig == nil {
+			// YAML 也读不到，才展示全屏错误
 			listContent = "\n  " + fmt.Sprintf(i18n.T("settings.mihomo.load_error"), state.MihomoLoadErr) + "\n"
 			settingsPanel = common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width-4)
+		} else if state.MihomoFromFile && state.MihomoLoadErr != nil {
+			// API 不可达但 YAML 可读：记录警告，稍后显示在配置框左下方
+			warningText = "⚠ " + i18n.T("settings.mihomo.offline_warning")
 		}
 	}
 
@@ -174,13 +180,25 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	mihomoLink := utils.CreateHyperlink("https://github.com/MetaCubeX/mihomo", "Mihomo "+mihomoVer)
 	versionText := fmt.Sprintf("%s | Built: %s | %s", mihoshLink, model.Date, mihomoLink)
 
-	// 描述行：右对齐，与配置框同宽
+	// 描述行：左侧警告（如果有），右侧描述，与配置框同宽
 	rowWidth := width - 4
+	var warningPart string
+	if warningText != "" {
+		warningPart = lipgloss.NewStyle().
+			Foreground(common.TokyoYellow()).
+			Render(warningText)
+	}
+
+	gap := rowWidth - lipgloss.Width(warningPart) - lipgloss.Width(descPart)
+	if gap < 0 {
+		gap = 0
+	}
+	descRowContent := warningPart + strings.Repeat(" ", gap) + descPart
+
 	descRow := lipgloss.NewStyle().
 		MarginTop(1).
 		Width(rowWidth).
-		Align(lipgloss.Right).
-		Render(descPart)
+		Render(descRowContent)
 
 	// 组装主要内容：Tab Bar → 配置框 → 描述行
 	mainContent := lipgloss.JoinVertical(

@@ -204,6 +204,7 @@
   "settings.toast.save_failed": "保存失败",
   "settings.toast.save_failed_with_err": "保存失败: %s",
   "settings.toast.mihomo_save_success": "Mihomo 配置已保存并重载",
+  "settings.toast.mihomo_save_reload_warn": "配置已保存，重载失败（端口变更后请确认 Mihomo 已重启）",
 
   "settings.tab.mihosh": "Mihosh",
   "settings.tab.mihomo": "Mihomo",
@@ -218,6 +219,7 @@
   "settings.mihomo.loading": "正在加载 Mihomo 配置...",
   "settings.mihomo.load_error": "加载 Mihomo 配置失败: %s",
   "settings.mihomo.config_not_found": "未找到配置文件",
+  "settings.mihomo.offline_warning": "API 不可达，当前从配置文件读取（修改后保存即可生效）",
 
   "help.popup_title": "Mihosh 快捷键帮助",
   "help.close_hint": "? / Esc / q  关闭",

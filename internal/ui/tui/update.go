@@ -444,14 +444,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.MihomoConfigSavedMsg:
 		// Mihomo 配置项已保存（写 YAML + 热重载）：toast 提示 + 重新拉取运行时配置。
 		// external-controller/secret/mixed-port 变更后重新解析 endpoint 热刷新 client/wsClient。
-		if msg.Err != nil {
+		if msg.Err != nil && !msg.WriteOK {
+			// YAML 写入就失败了（如路径不存在），显示硬错误
 			m.err = messages.ErrMsg{Err: msg.Err}
 		} else {
-			m.notice = i18n.T("settings.toast.mihomo_save_success")
-			m.noticeTicks = autoRefreshNoticeTicks
+			// YAML 写入成功：即使 reload 失败也刷新端点（修改 external-controller 后旧端口不可达是预期行为）
 			endpoint := config.ResolveMihomoEndpoint()
 			m.reloadClients(endpoint.ExternalController, endpoint.Secret)
 			m.connsState = m.connsState.UpdateProxyAddr(config.MixedPortToProxyURL(endpoint.MixedPort))
+			if msg.Err != nil {
+				// reload 失败但 YAML 已保存，提示用户配置已保存但需重启内核生效
+				m.notice = i18n.T("settings.toast.mihomo_save_reload_warn")
+			} else {
+				m.notice = i18n.T("settings.toast.mihomo_save_success")
+			}
+			m.noticeTicks = autoRefreshNoticeTicks
 			m.err = nil
 		}
 		return m, tea.Batch(m.fetchNodes(), m.configSvc.FetchMihomoConfig(m.client))

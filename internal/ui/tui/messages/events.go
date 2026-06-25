@@ -28,12 +28,14 @@ type ConfigModeMsg struct {
 }
 
 type MihomoConfigMsg struct {
-	Config *model.MihomoConfig
-	Err    error
+	Config   *model.MihomoConfig
+	Err      error
+	FromFile bool // API 不可达时从 YAML 文件降级读取
 }
 
 type MihomoConfigSavedMsg struct {
-	Err error
+	Err     error
+	WriteOK bool // YAML 已写入成功（即使 reload 失败也应刷新端点）
 }
 
 // ========= Node / Proxy Testing Messages =========
