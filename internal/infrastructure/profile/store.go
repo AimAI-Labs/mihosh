@@ -93,6 +93,67 @@ func WriteRaw(uid string, data []byte) error {
 	return atomicWrite(p, data)
 }
 
+// WriteMergeField modifies a specific field in the global merge.yaml file while preserving structure.
+func WriteMergeField(key string, value interface{}) error {
+	data, err := ReadMerge()
+	if err != nil {
+		return err
+	}
+
+	var root yaml.Node
+	if len(data) > 0 {
+		if err := yaml.Unmarshal(data, &root); err != nil {
+			return err
+		}
+	}
+
+	if len(root.Content) == 0 {
+		root = yaml.Node{
+			Kind: yaml.DocumentNode,
+			Content: []*yaml.Node{
+				{Kind: yaml.MappingNode},
+			},
+		}
+	}
+
+	mapping := root.Content[0]
+	if mapping.Kind != yaml.MappingNode {
+		mapping = &yaml.Node{Kind: yaml.MappingNode}
+		root.Content[0] = mapping
+	}
+
+	found := false
+	for i := 0; i < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == key {
+			// Update existing
+			node := yaml.Node{}
+			if err := node.Encode(value); err != nil {
+				return err
+			}
+			mapping.Content[i+1] = &node
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		// Append new key-value pair
+		keyNode := &yaml.Node{Kind: yaml.ScalarNode, Value: key}
+		valNode := &yaml.Node{}
+		if err := valNode.Encode(value); err != nil {
+			return err
+		}
+		mapping.Content = append(mapping.Content, keyNode, valNode)
+	}
+
+	out, err := yaml.Marshal(&root)
+	if err != nil {
+		return err
+	}
+
+	return WriteMerge(out)
+}
+
 // ReadMerge 读取全局 merge.yaml 内容（原始字节）。
 func ReadMerge() ([]byte, error) {
 	p, err := MergePath()

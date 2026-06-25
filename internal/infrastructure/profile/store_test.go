@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -171,4 +172,27 @@ func TestStore_ProfileDirCreation(t *testing.T) {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func TestStore_WriteMergeField(t *testing.T) {
+	mockMihoshConfigDir(t)
+
+	// Write initial data
+	initial := []byte("allow-lan: false\n")
+	err := WriteMerge(initial)
+	require.NoError(t, err)
+
+	// Update field
+	err = WriteMergeField("allow-lan", true)
+	require.NoError(t, err)
+
+	// Add new field
+	err = WriteMergeField("log-level", "info")
+	require.NoError(t, err)
+
+	data, err := ReadMerge()
+	require.NoError(t, err)
+
+	assert.True(t, bytes.Contains(data, []byte("allow-lan: true")))
+	assert.True(t, bytes.Contains(data, []byte("log-level: info")))
 }
