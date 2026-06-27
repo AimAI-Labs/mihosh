@@ -6,20 +6,17 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type SysStatusTickMsg time.Time
-type SysStatusResultMsg struct {
-	Output string
-	Err    error
-}
 
 type SysStatusState struct {
-	Supported bool
-	Viewport  viewport.Model
-	LastTick  time.Time
+	Supported  bool
+	Viewport   viewport.Model
+	LastTick   time.Time
+	lastOutput string
 }
 
 func NewSysStatusState() SysStatusState {
@@ -39,7 +36,7 @@ func FetchSysStatusCmd() tea.Cmd {
 		cmd := exec.CommandContext(ctx, "systemctl", "status", "mihomo", "--no-pager", "-n", "50")
 		// systemctl often returns exit code 3 if service is not running but status is requested
 		out, err := cmd.CombinedOutput()
-		return SysStatusResultMsg{
+		return messages.SysStatusResultMsg{
 			Output: string(out),
 			Err:    err,
 		}
@@ -48,7 +45,7 @@ func FetchSysStatusCmd() tea.Cmd {
 
 func TickSysStatusCmd() tea.Cmd {
 	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
-		return SysStatusTickMsg(t)
+		return messages.SysStatusTickMsg(t)
 	})
 }
 
@@ -58,16 +55,19 @@ func (s *SysStatusState) Update(msg tea.Msg) tea.Cmd {
 	}
 
 	switch msg := msg.(type) {
-	case SysStatusTickMsg:
+	case messages.SysStatusTickMsg:
 		s.LastTick = time.Time(msg)
 		return FetchSysStatusCmd()
 
-	case SysStatusResultMsg:
+	case messages.SysStatusResultMsg:
 		// Only update if changed to avoid flicker
 		if msg.Output != "" {
-			// Using SetContent resets to top, so we should try to avoid resetting scroll if possible,
-			// or just set it. For simplicity, just set it.
-			s.Viewport.SetContent(msg.Output)
+			if msg.Output != s.lastOutput {
+				s.lastOutput = msg.Output
+				// Using SetContent resets to top, so we should try to avoid resetting scroll if possible,
+				// or just set it. For simplicity, just set it.
+				s.Viewport.SetContent(msg.Output)
+			}
 		} else if msg.Err != nil {
 			s.Viewport.SetContent(msg.Err.Error())
 		}

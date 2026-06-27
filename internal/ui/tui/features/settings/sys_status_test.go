@@ -3,6 +3,8 @@ package settings
 import (
 	"testing"
 	"time"
+
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 )
 
 func TestSysStatusState_Update(t *testing.T) {
@@ -12,13 +14,13 @@ func TestSysStatusState_Update(t *testing.T) {
 	state.Viewport.Height = 20
 
 	// Test TickMsg triggers Cmd
-	cmd := state.Update(SysStatusTickMsg(time.Now()))
+	cmd := state.Update(messages.SysStatusTickMsg(time.Now()))
 	if cmd == nil {
 		t.Error("expected cmd to be returned on TickMsg")
 	}
 
 	// Test ResultMsg updates viewport and returns new tick
-	resultMsg := SysStatusResultMsg{Output: "active (running)", Err: nil}
+	resultMsg := messages.SysStatusResultMsg{Output: "active (running)", Err: nil}
 	cmd = state.Update(resultMsg)
 	if cmd == nil {
 		t.Error("expected new tick cmd on ResultMsg")

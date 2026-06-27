@@ -266,3 +266,11 @@ type SubRawEditFinishedMsg struct {
 	UID string
 	Err error
 }
+
+// ========= System Status Messages =========
+
+type SysStatusTickMsg time.Time
+type SysStatusResultMsg struct {
+	Output string
+	Err    error
+}
