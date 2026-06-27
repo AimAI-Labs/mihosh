@@ -149,6 +149,10 @@ func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.Con
 
 // HandleMouseScroll 鼠标滚轮处理
 func (s State) HandleMouseScroll(up bool) State {
+	// 编辑模式下禁用滚轮，避免误切当前正在编辑的配置项
+	if s.editMode {
+		return s
+	}
 	if up {
 		if s.selectedSetting > 0 {
 			s.selectedSetting--

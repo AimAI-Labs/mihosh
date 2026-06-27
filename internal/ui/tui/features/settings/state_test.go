@@ -452,6 +452,20 @@ func TestHandleMouseScroll(t *testing.T) {
 	}
 }
 
+func TestHandleMouseScroll_DisabledInEditMode(t *testing.T) {
+	s := State{selectedSetting: 2, editMode: true}
+
+	// 编辑模式下滚动不应改变选中项
+	next := s.HandleMouseScroll(true)
+	if next.selectedSetting != 2 {
+		t.Errorf("expected selectedSetting to remain 2 in edit mode, got %d", next.selectedSetting)
+	}
+	next = s.HandleMouseScroll(false)
+	if next.selectedSetting != 2 {
+		t.Errorf("expected selectedSetting to remain 2 in edit mode, got %d", next.selectedSetting)
+	}
+}
+
 func TestLanguageHelpers(t *testing.T) {
 	// 1. nextLanguage
 	if nextLanguage("auto") != "zh-CN" {
