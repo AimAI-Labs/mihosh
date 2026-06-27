@@ -220,13 +220,14 @@ func renderSubEntry(p profile.Profile, seq int, _, isActive, isUpdating, selecte
 	// 列宽常量（固定列宽保证各列对齐）
 	const (
 		colIndexW  = 5  // 序号列
+		colUidW    = 8  // UID列
 		colKindW   = 6  // 类型列（remote/local 最长 6）
 		colTimeW   = 14 // 更新时间列
 		colNameMin = 8  // 名称列最小宽度
 		colSrcMin  = 16 // 来源列最小宽度
 	)
-	// 固定开销：选择符前缀(2) + 激活标记(2) + 列间分隔符(5) + 各固定列宽
-	const fixedOverhead = 2 + 2 + 5 + colIndexW + colKindW + colTimeW // = 34
+	// 固定开销：选择符前缀(2) + 激活标记(2) + 列间分隔符(6) + 各固定列宽
+	const fixedOverhead = 2 + 2 + 6 + colIndexW + colUidW + colKindW + colTimeW // = 43
 
 	// 名称/来源列共享剩余宽度。URL 通常更长，来源列占 5/6、名称列占 1/8。
 	flex := width - fixedOverhead
@@ -260,6 +261,13 @@ func renderSubEntry(p profile.Profile, seq int, _, isActive, isUpdating, selecte
 	}
 	nameStr := lipgloss.NewStyle().Foreground(common.Bright()).Width(nameMax).Render(name)
 
+	// UID
+	uid := p.UID
+	if common.DisplayWidth(uid) > colUidW {
+		uid = common.TruncateDisplay(uid, colUidW)
+	}
+	uidStr := lipgloss.NewStyle().Foreground(common.TokyoMuted()).Width(colUidW).Render(uid)
+
 	// 类型
 	kindColor := common.TokyoBlue()
 	if p.Source.Kind == profile.SourceLocal {
@@ -286,7 +294,7 @@ func renderSubEntry(p profile.Profile, seq int, _, isActive, isUpdating, selecte
 		updatingBadge = " " + lipgloss.NewStyle().Foreground(common.TokyoCyan()).Render("["+i18n.T("sub.updating")+"]")
 	}
 
-	line := fmt.Sprintf("%s %s %s %s %s %s%s", mark, indexStr, nameStr, kindStr, srcStr, timeStr, updatingBadge)
+	line := fmt.Sprintf("%s %s %s %s %s %s %s%s", mark, indexStr, nameStr, uidStr, kindStr, srcStr, timeStr, updatingBadge)
 	if selected {
 		line = lipgloss.NewStyle().Background(common.Highlight()).Render(common.SymbolSelectActive + line)
 	} else {
