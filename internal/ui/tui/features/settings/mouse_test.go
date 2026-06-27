@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/spf13/viper"
 )
@@ -16,7 +17,7 @@ func TestHandleMouseLeft_SingleClickSelectsSetting(t *testing.T) {
 	}
 	configSvc := service.NewConfigService()
 
-	next, _ := state.HandleMouseLeft(0, 6, cfg, configSvc, nil)
+	next, _, _ := state.HandleMouseLeft(0, 6, cfg, configSvc, nil)
 	if next.selectedSetting != 1 {
 		t.Fatalf("expected selectedSetting=1, got %d", next.selectedSetting)
 	}
@@ -33,12 +34,12 @@ func TestHandleMouseLeft_DoubleClickEntersEditMode(t *testing.T) {
 	configSvc := service.NewConfigService()
 
 	const timeoutRowY = 6 // timeout index=1, offset=5
-	next, _ := state.HandleMouseLeft(0, timeoutRowY, cfg, configSvc, nil)
+	next, _, _ := state.HandleMouseLeft(0, timeoutRowY, cfg, configSvc, nil)
 	if next.editMode {
 		t.Fatalf("expected editMode=false on first click")
 	}
 
-	next, _ = next.HandleMouseLeft(0, timeoutRowY, cfg, configSvc, nil)
+	next, _, _ = next.HandleMouseLeft(0, timeoutRowY, cfg, configSvc, nil)
 	if !next.editMode {
 		t.Fatalf("expected editMode=true after double click")
 	}
@@ -73,7 +74,7 @@ func TestHandleMouseLeft_ClickLanguageTabSavesImmediately(t *testing.T) {
 
 	const languageRowY = 7 // language index=2, offset=5
 	zhCNTabX := settingsContainerLeft + settingsRowPaddingLeft + settingsLabelWidth + settingsTabDisplayWidth("auto") + 1
-	next, newCfg := state.HandleMouseLeft(zhCNTabX, languageRowY, &cfg, configSvc, nil)
+	next, newCfg, _ := state.HandleMouseLeft(zhCNTabX, languageRowY, &cfg, configSvc, nil)
 
 	if next.selectedSetting != 2 {
 		t.Fatalf("expected language row selected, got %d", next.selectedSetting)
@@ -133,7 +134,7 @@ func TestHandleMouseLeft_ClickOutsideClosesEdit(t *testing.T) {
 	configSvc := service.NewConfigService()
 
 	// 点击无效行 (pageY = 0, yOffset=2，所以 idx = -2)
-	next, _ := state.HandleMouseLeft(0, 0, cfg, configSvc, nil)
+	next, _, _ := state.HandleMouseLeft(0, 0, cfg, configSvc, nil)
 	if next.editMode {
 		t.Fatalf("expected editMode to be false after clicking outside")
 	}
@@ -151,7 +152,7 @@ func TestHandleMouseLeft_ClickInvalidRowDoesNothing(t *testing.T) {
 	configSvc := service.NewConfigService()
 
 	// 键盘模式或非编辑模式下，点击无效的行应该直接返回原状态，不改变选中状态
-	next, _ := state.HandleMouseLeft(0, 0, cfg, configSvc, nil)
+	next, _, _ := state.HandleMouseLeft(0, 0, cfg, configSvc, nil)
 	if next.selectedSetting != 2 {
 		t.Fatalf("expected selectedSetting to remain 2, got %d", next.selectedSetting)
 	}
@@ -167,11 +168,73 @@ func TestHandleMouseLeft_LanguageClickSaveFailure(t *testing.T) {
 	configSvc := service.NewConfigService()
 
 	// 点击非 Tab 区域的 X 坐标 (如 X = 0)，pageY=7 对应语言行 (index=2, offset=5)
-	next, newCfg := state.HandleMouseLeft(0, 7, cfg, configSvc, nil)
+	next, newCfg, _ := state.HandleMouseLeft(0, 7, cfg, configSvc, nil)
 	if !next.editMode {
 		t.Fatalf("expected editMode to remain true when clicking language row but missing tabs")
 	}
 	if newCfg != cfg {
 		t.Fatalf("expected config to be unchanged")
+	}
+}
+
+func TestHandleMouseLeft_ClickAllowLanRowToggles(t *testing.T) {
+	// allow-lan index=3 in MihomoSettingKeys, offset=5 => rowY=8
+	const allowLanRowY = 8
+	state := State{
+		activeTab:    1,
+		mihomoConfig: &model.MihomoConfig{AllowLan: false},
+	}
+	configSvc := service.NewConfigService()
+
+	next, _, cmd := state.HandleMouseLeft(0, allowLanRowY, &config.Config{}, configSvc, nil)
+	if next.selectedSetting != 3 {
+		t.Fatalf("expected allow-lan row selected, got %d", next.selectedSetting)
+	}
+	if next.editMode {
+		t.Fatalf("expected click allow-lan row does not enter edit mode")
+	}
+	if cmd == nil {
+		t.Fatalf("expected save command after clicking allow-lan row")
+	}
+}
+
+func TestHandleMouseLeft_ClickLogLevelRowCycles(t *testing.T) {
+	// log-level index=4 in MihomoSettingKeys, offset=5 => rowY=9
+	const logLevelRowY = 9
+	state := State{
+		activeTab:    1,
+		mihomoConfig: &model.MihomoConfig{LogLevel: "info"},
+	}
+	configSvc := service.NewConfigService()
+
+	next, _, cmd := state.HandleMouseLeft(0, logLevelRowY, &config.Config{}, configSvc, nil)
+	if next.selectedSetting != 4 {
+		t.Fatalf("expected log-level row selected, got %d", next.selectedSetting)
+	}
+	if next.editMode {
+		t.Fatalf("expected click log-level row does not enter edit mode")
+	}
+	if cmd == nil {
+		t.Fatalf("expected save command after clicking log-level row")
+	}
+}
+
+func TestHandleMouseLeft_EditModeAllowLanClickToggles(t *testing.T) {
+	const allowLanRowY = 8
+	state := State{
+		activeTab:       1,
+		selectedSetting: 3,
+		editMode:        true,
+		editValue:       "false",
+		mihomoConfig:    &model.MihomoConfig{AllowLan: false},
+	}
+	configSvc := service.NewConfigService()
+
+	next, _, cmd := state.HandleMouseLeft(0, allowLanRowY, &config.Config{}, configSvc, nil)
+	if next.editMode {
+		t.Fatalf("expected editMode to exit after clicking allow-lan row")
+	}
+	if cmd == nil {
+		t.Fatalf("expected save command after edit-mode allow-lan click")
 	}
 }

@@ -802,7 +802,8 @@ func (m Model) handleSettingsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 		oldTheme = m.config.Theme
 	}
 
-	m.settingsState, m.config = m.settingsState.HandleMouseLeft(pageX, pageY, m.config, m.configSvc, m.client)
+	var cmd tea.Cmd
+	m.settingsState, m.config, cmd = m.settingsState.HandleMouseLeft(pageX, pageY, m.config, m.configSvc, m.client)
 	if m.config != nil && m.config.Language != oldLanguage {
 		i18n.SetLanguageOverride(m.config.Language)
 		common.InitKeyBindings()
@@ -819,7 +820,7 @@ func (m Model) handleSettingsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 		m.notice = ""
 		m.noticeTicks = 0
 	}
-	return m, nil
+	return m, cmd
 }
 
 func (m *Model) advanceAutoRefreshTransientState() {

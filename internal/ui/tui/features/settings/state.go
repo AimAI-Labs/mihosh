@@ -166,7 +166,7 @@ func (s State) HandleMouseScroll(up bool) State {
 }
 
 // HandleMouseLeft 处理 settings 页面左键单击/双击
-func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config) {
+func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, tea.Cmd) {
 	// 优先处理标签栏点击（带边框的标签栏内容行位于 settingsTabBarContentY）
 	if pageY == settingsTabBarContentY {
 		if tab, ok := resolveSettingsTabMouseTarget(pageX); ok {
@@ -178,7 +178,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 				s.editValue = ""
 				s.editCursor = 0
 			}
-			return s, cfg
+			return s, cfg, nil
 		}
 	}
 
@@ -193,10 +193,10 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 					s.editValue = ""
 					s.editCursor = 0
 					s.showToast(i18n.T("settings.toast.save_success_lang"), common.ToastSuccess)
-					return s, newCfg
+					return s, newCfg, nil
 				}
 				s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
-				return s, cfg
+				return s, cfg, nil
 			}
 		}
 		if s.activeTab == 0 && s.selectedSetting == ThemeSettingIndex() {
@@ -208,10 +208,28 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 					s.editValue = ""
 					s.editCursor = 0
 					s.showToast(i18n.T("settings.toast.save_success_theme"), common.ToastSuccess)
-					return s, newCfg
+					return s, newCfg, nil
 				}
 				s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
-				return s, cfg
+				return s, cfg, nil
+			}
+		}
+
+		if s.activeTab == 1 {
+			settingKey := s.activeKeys()[s.selectedSetting]
+			if settingKey == "allow-lan" {
+				val := !s.mihomoConfig.AllowLan
+				s.editMode = false
+				s.editValue = ""
+				s.editCursor = 0
+				return s, cfg, configSvc.SaveMihomoConfigField(client, "allow-lan", val)
+			}
+			if settingKey == "log-level" {
+				val := nextLogLevel(s.mihomoConfig.LogLevel)
+				s.editMode = false
+				s.editValue = ""
+				s.editCursor = 0
+				return s, cfg, configSvc.SaveMihomoConfigField(client, "log-level", val)
 			}
 		}
 
@@ -221,11 +239,11 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 			s.editValue = ""
 			s.editCursor = 0
 		}
-		return s, cfg
+		return s, cfg, nil
 	}
 
 	if settingIdx < 0 || settingIdx >= len(s.activeKeys()) {
-		return s, cfg
+		return s, cfg, nil
 	}
 
 	s.selectedSetting = settingIdx
@@ -234,7 +252,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 			if err := configSvc.SetConfigValue(s.activeKeys()[settingIdx], lang); err == nil {
 				newCfg, _ := configSvc.LoadConfig()
 				s.showToast(i18n.T("settings.toast.save_success_lang"), common.ToastSuccess)
-				return s, newCfg
+				return s, newCfg, nil
 			}
 			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
 		}
@@ -245,9 +263,21 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 				newCfg, _ := configSvc.LoadConfig()
 				theme.SetTheme(t)
 				s.showToast(i18n.T("settings.toast.save_success_theme"), common.ToastSuccess)
-				return s, newCfg
+				return s, newCfg, nil
 			}
 			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
+		}
+	}
+
+	if s.activeTab == 1 {
+		settingKey := s.activeKeys()[settingIdx]
+		if settingKey == "allow-lan" {
+			val := !s.mihomoConfig.AllowLan
+			return s, cfg, configSvc.SaveMihomoConfigField(client, "allow-lan", val)
+		}
+		if settingKey == "log-level" {
+			val := nextLogLevel(s.mihomoConfig.LogLevel)
+			return s, cfg, configSvc.SaveMihomoConfigField(client, "log-level", val)
 		}
 	}
 
@@ -258,7 +288,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 		s.editCursor = len([]rune(s.editValue))
 	}
 
-	return s, cfg
+	return s, cfg, nil
 }
 
 // handleEditMode 处理编辑模式按键
@@ -520,6 +550,16 @@ func nextLanguage(lang string) string {
 	return "auto"
 }
 
+func nextLogLevel(level string) string {
+	levels := []string{"info", "warning", "error", "debug", "silent"}
+	for i, l := range levels {
+		if l == level {
+			return levels[(i+1)%len(levels)]
+		}
+	}
+	return levels[0]
+}
+
 func prevLanguage(lang string) string {
 	langs := []string{"auto", "zh-CN", "en-US"}
 	for i, l := range langs {
@@ -666,3 +706,4 @@ func (s State) getEditValue(cfg *config.Config, settingKey string) string {
 	}
 	return GetSettingValue(s.ToPageState(cfg), settingKey)
 }
+
