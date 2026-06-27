@@ -558,6 +558,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.notice = ""
 		m.noticeTicks = 0
 
+	case messages.SubRawEditFinishedMsg:
+		reenableMouse := func() tea.Msg { return tea.EnableMouseCellMotion() }
+		if msg.Err != nil {
+			m.err = messages.ErrMsg{Err: msg.Err}
+		}
+		m.notice = ""
+		m.noticeTicks = 0
+		return m, reenableMouse
+
 	case messages.MergeEditFinishedMsg:
 		// 外部编辑器结束：tea.ExecProcess 期间会 ReleaseTerminal（禁用鼠标），
 		// 但 RestoreTerminal 不恢复鼠标模式（Bubble Tea v1.3.10 缺陷），需显式重新启用。

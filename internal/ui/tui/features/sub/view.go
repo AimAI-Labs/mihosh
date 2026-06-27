@@ -374,6 +374,7 @@ func buildHints(state PageState) []common.InlineHelpHint {
 		{Key: "Enter", Desc: i18n.T("help.sub.activate")},
 		{Key: "u", Desc: i18n.T("help.sub.update")},
 		{Key: "m", Desc: i18n.T("help.sub.edit_merge")},
+		{Key: "c", Desc: i18n.T("help.sub.view_raw")},
 		{Key: "e", Desc: i18n.T("help.sub.edit_profile")},
 		{Key: "n", Desc: i18n.T("help.sub.add")},
 		{Key: "d", Desc: i18n.T("help.sub.delete")},

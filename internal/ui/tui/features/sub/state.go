@@ -153,6 +153,8 @@ func (s State) Update(msg tea.KeyMsg, svc *service.ProfileService) (State, tea.C
 		return s.updateSelected(svc)
 	case msg.String() == "m":
 		return s.openMergeExternalEditor(svc)
+	case msg.String() == "c":
+		return s.openRawExternalEditor(svc)
 	case msg.String() == "e":
 		return s.openEditForm(svc)
 	case msg.String() == "n":

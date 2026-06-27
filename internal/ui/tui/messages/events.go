@@ -244,3 +244,9 @@ type LocalSubImportedMsg struct {
 	Profile *profile.Profile
 	Err     error
 }
+
+// SubRawEditFinishedMsg 外部编辑器查看/编辑具体的订阅 raw.yaml 结束。
+type SubRawEditFinishedMsg struct {
+	UID string
+	Err error
+}
