@@ -9,5 +9,5 @@ const (
 	// 数据容量 (Ring Buffer)
 	ClosedConnCap = 1000
 	LogsCap       = 1000
-	ChartPoints   = 60
+	ChartPoints   = 1000
 )

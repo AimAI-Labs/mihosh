@@ -2,12 +2,12 @@ package components
 
 import (
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
+	"github.com/NimbleMarkets/ntcharts/sparkline"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -71,7 +71,7 @@ func RenderChartsSection(chartData *model.ChartData, width int, maxHeight int) s
 		chartWidth = 16
 	}
 
-	body := RenderSymmetricBarChart(
+	body := RenderSpeedChart(
 		chartData.SpeedUpHistory,
 		chartData.SpeedDownHistory,
 		FormatSpeed,
@@ -105,9 +105,18 @@ func FormatMemory(bytes int64) string {
 	}
 }
 
-// RenderSymmetricBarChart 渲染对称柱状图（下载在上，上传在下）
-// halfH 控制上半或下半的高度（行数），实现高度响应式。
-func RenderSymmetricBarChart(uploadData, downloadData []int64, formatFunc func(int64) string, width int, halfH int) string {
+// toFloatSlice 转换 int64 为 float64 供 sparkline 使用
+func toFloatSlice(data []int64) []float64 {
+	res := make([]float64, len(data))
+	for i, v := range data {
+		res[i] = float64(v)
+	}
+	return res
+}
+
+// RenderSpeedChart 渲染固定时间采样的双向堆叠柱状图
+// halfH 控制上半（下载）或下半（上传）的高度（行数），实现高度响应式。
+func RenderSpeedChart(uploadData, downloadData []int64, formatFunc func(int64) string, width int, halfH int) string {
 	if width < 16 {
 		width = 16
 	}
@@ -134,98 +143,83 @@ func RenderSymmetricBarChart(uploadData, downloadData []int64, formatFunc func(i
 		chartWidth = 8
 	}
 
-	// 流量监控图通常比历史窗口更宽；拉伸采样能避免少量数据被挤到最右侧。
-	sampledUp := sampleChartData(uploadData, chartWidth)
-	sampledDown := sampleChartData(downloadData, chartWidth)
-
 	// 颜色样式
 	purpleStyle := lipgloss.NewStyle().Foreground(common.TokyoPurple())
 	blueStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
 	labelStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted())
 	axisStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted())
 
-	halfHF := float64(halfH)
+	// === 下载图表 ===
+	downSL := sparkline.New(chartWidth, halfH,
+		sparkline.WithData(toFloatSlice(downloadData)),
+		sparkline.WithStyle(purpleStyle),
+		sparkline.WithMaxValue(float64(maxVal)),
+	)
+	downSL.Draw()
+	downView := downSL.View()
 
-	var lines []string
-
-	// === 上半部分（下载柱，从中轴往上生长） ===
-	for row := 0; row < halfH; row++ {
-		// Y 轴标签
-		var label string
-		if row == 0 {
-			label = labelStyle.Render(fmt.Sprintf("%*s", labelWidth, labelMax))
+	var downLabels strings.Builder
+	for i := 0; i < halfH; i++ {
+		if i == 0 {
+			downLabels.WriteString(labelStyle.Render(fmt.Sprintf("%*s", labelWidth, labelMax)))
 		} else {
-			label = strings.Repeat(" ", labelWidth)
+			downLabels.WriteString(strings.Repeat(" ", labelWidth))
 		}
-
-		// 渲染柱子（从中轴往上生长：row(halfH-1) = 靠近中轴，row 0 = 顶部）
-		var bars strings.Builder
-		for i := 0; i < chartWidth; i++ {
-			barH := math.Round(float64(sampledDown[i]) / float64(maxVal) * halfHF)
-			// 从中轴往上填充：barH=1 填 row(halfH-1)，barH=halfH 填 row0-row(halfH-1)
-			if row >= halfH-int(barH) {
-				bars.WriteString(purpleStyle.Render("█"))
-			} else {
-				bars.WriteRune(' ')
-			}
+		downLabels.WriteString(axisStyle.Render(" ┤"))
+		if i < halfH-1 {
+			downLabels.WriteString("\n")
 		}
-
-		separator := axisStyle.Render(" ┤")
-		lines = append(lines, label+separator+bars.String())
 	}
+	downSection := lipgloss.JoinHorizontal(lipgloss.Top, downLabels.String(), downView)
 
 	// === 中轴行 ===
-	var centerLabel strings.Builder
-	centerLabel.WriteString(strings.Repeat(" ", labelWidth))
-	centerLabel.WriteString(axisStyle.Render(" ┼"))
+	var center strings.Builder
+	center.WriteString(strings.Repeat(" ", labelWidth))
+	center.WriteString(axisStyle.Render(" ┼"))
+	center.WriteString(axisStyle.Render(strings.Repeat("─", chartWidth)))
 
-	for i := 0; i < chartWidth; i++ {
-		centerLabel.WriteString(axisStyle.Render("─"))
-	}
-	lines = append(lines, centerLabel.String())
+	// === 上传图表 ===
+	upSL := sparkline.New(chartWidth, halfH,
+		sparkline.WithData(toFloatSlice(uploadData)),
+		sparkline.WithStyle(blueStyle),
+		sparkline.WithMaxValue(float64(maxVal)),
+	)
+	upSL.Draw()
+	upView := invertSparkline(upSL.View())
 
-	// === 下半部分（上传柱，从中心轴向下生长） ===
-	for row := 0; row < halfH; row++ {
-		label := strings.Repeat(" ", labelWidth)
-
-		// 渲染柱子
-		var bars strings.Builder
-		for i := 0; i < chartWidth; i++ {
-			barH := math.Round(float64(sampledUp[i]) / float64(maxVal) * halfHF)
-			// row 0 是最靠近中轴的行，需要 barH > row
-			if barH > float64(row) {
-				bars.WriteString(blueStyle.Render("█"))
-			} else {
-				bars.WriteRune(' ')
-			}
+	var upLabels strings.Builder
+	for i := 0; i < halfH; i++ {
+		if i == halfH-1 {
+			upLabels.WriteString(labelStyle.Render(fmt.Sprintf("%*s", labelWidth, labelMax)))
+		} else {
+			upLabels.WriteString(strings.Repeat(" ", labelWidth))
 		}
-
-		separator := axisStyle.Render(" ┤")
-		lines = append(lines, label+separator+bars.String())
+		upLabels.WriteString(axisStyle.Render(" ┤"))
+		if i < halfH-1 {
+			upLabels.WriteString("\n")
+		}
 	}
+	upSection := lipgloss.JoinHorizontal(lipgloss.Top, upLabels.String(), upView)
 
-	return strings.Join(lines, "\n")
+	return lipgloss.JoinVertical(lipgloss.Left, downSection, center.String(), upSection)
 }
 
-func sampleChartData(data []int64, width int) []int64 {
-	if width <= 0 {
-		return nil
+func invertSparkline(view string) string {
+	lines := strings.Split(view, "\n")
+	for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
+		lines[i], lines[j] = lines[j], lines[i]
 	}
-	if len(data) == 0 {
-		return make([]int64, width)
-	}
-	if len(data) == 1 {
-		result := make([]int64, width)
-		for i := range result {
-			result[i] = data[0]
+	mapped := strings.Join(lines, "\n")
+	return strings.Map(func(r rune) rune {
+		switch r {
+		case '\u2581': return '\u2594' //  
+		case '\u2582': return '\u2594' // ▂
+		case '\u2583': return '\u2580' // ▃
+		case '\u2584': return '\u2580' // ▄
+		case '\u2585': return '\u2580' // ▅
+		case '\u2586': return '\u2588' // ▆
+		case '\u2587': return '\u2588' // ▇
 		}
-		return result
-	}
-
-	result := make([]int64, width)
-	for i := 0; i < width; i++ {
-		idx := i * (len(data) - 1) / max(width-1, 1)
-		result[i] = data[idx]
-	}
-	return result
+		return r
+	}, mapped)
 }
