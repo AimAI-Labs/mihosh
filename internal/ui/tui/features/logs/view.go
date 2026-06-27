@@ -140,7 +140,7 @@ func buildLogsInlineHelpHints(state PageState) []common.InlineHelpHint {
 	// 过滤输入模式：确认 + 取消 + 删除
 	if state.FilterMode {
 		return []common.InlineHelpHint{
-			{Key: "Enter", Desc: i18n.T("help.logs_search.confirm")},
+			{Key: "↵", Desc: i18n.T("help.logs_search.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.logs_search.cancel")},
 			{Key: "⌫", Desc: i18n.T("help.logs_search.backspace")},
 		}
@@ -149,7 +149,7 @@ func buildLogsInlineHelpHints(state PageState) []common.InlineHelpHint {
 	// 普通模式：核心操作
 	return []common.InlineHelpHint{
 		{Key: "↑↓", Desc: i18n.T("help.logs.hint_select")},
-		{Key: "Enter", Desc: i18n.T("help.logs.hint_detail")},
+		{Key: "↵", Desc: i18n.T("help.logs.hint_detail")},
 		{Key: "[/]", Desc: i18n.T("help.logs.hint_level")},
 		{Key: "←→", Desc: i18n.T("help.logs.hint_scroll")},
 		{Key: "/", Desc: i18n.T("help.logs.hint_search")},

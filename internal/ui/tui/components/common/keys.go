@@ -48,7 +48,7 @@ var Keys = KeyMap{
 	),
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),
-		key.WithHelp("enter", "确认"),
+		key.WithHelp("↵", "确认"),
 	),
 	Test: key.NewBinding(
 		key.WithKeys("t"),
@@ -119,7 +119,7 @@ func InitKeyBindings() {
 	Keys.Down.SetHelp("↓/j", i18n.T("key.down"))
 	Keys.Left.SetHelp("←/h", i18n.T("key.left"))
 	Keys.Right.SetHelp("→/l", i18n.T("key.right"))
-	Keys.Enter.SetHelp("enter", i18n.T("key.enter"))
+	Keys.Enter.SetHelp("↵", i18n.T("key.enter"))
 	Keys.Test.SetHelp("t", i18n.T("key.test"))
 	Keys.TestAll.SetHelp("a", i18n.T("key.testall"))
 	Keys.Refresh.SetHelp("r", i18n.T("key.refresh"))

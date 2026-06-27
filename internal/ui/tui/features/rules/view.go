@@ -176,7 +176,7 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 		return []common.InlineHelpHint{
 			{Key: "Tab", Desc: i18n.T("help.rules_add.picker_tab")},
 			{Key: "↑/↓", Desc: i18n.T("help.rules_add.picker_pick")},
-			{Key: "Enter", Desc: i18n.T("help.rules_add.confirm")},
+			{Key: "↵", Desc: i18n.T("help.rules_add.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.rules_add.picker_back")},
 		}
 	}
@@ -186,7 +186,7 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 		return []common.InlineHelpHint{
 			{Key: "Tab", Desc: i18n.T("help.rules_add.picker_tab")},
 			{Key: "↑/↓", Desc: i18n.T("help.rules_add.picker_pick")},
-			{Key: "Enter", Desc: i18n.T("help.rules_add.confirm")},
+			{Key: "↵", Desc: i18n.T("help.rules_add.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.rules_add.picker_back")},
 		}
 	}
@@ -204,7 +204,7 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 		return []common.InlineHelpHint{
 			{Key: "←/→", Desc: i18n.T("help.rules_add.type")},
 			{Key: "↑/↓", Desc: i18n.T("help.rules_add.field")},
-			{Key: "Enter", Desc: i18n.T("help.rules_add.confirm")},
+			{Key: "↵", Desc: i18n.T("help.rules_add.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.rules_add.cancel")},
 		}
 	}
@@ -214,7 +214,7 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 		return []common.InlineHelpHint{
 			{Key: "←/→", Desc: i18n.T("help.rules_add.type")},
 			{Key: "↑/↓", Desc: i18n.T("help.rules_add.field")},
-			{Key: "Enter", Desc: i18n.T("help.rules_add.confirm")},
+			{Key: "↵", Desc: i18n.T("help.rules_add.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.rules_add.cancel")},
 		}
 	}
@@ -224,7 +224,7 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 		return []common.InlineHelpHint{
 			{Key: "↑/↓", Desc: i18n.T("help.rules_filter.select")},
 			{Key: "Space", Desc: i18n.T("help.rules_filter.toggle")},
-			{Key: "Enter", Desc: i18n.T("help.rules_filter.confirm")},
+			{Key: "↵", Desc: i18n.T("help.rules_filter.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.rules_filter.cancel")},
 		}
 	}
@@ -232,7 +232,7 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 	// 过滤输入模式：确认 + 取消 + 删除 + 引擎切换
 	if state.FilterMode {
 		return []common.InlineHelpHint{
-			{Key: "Enter", Desc: i18n.T("help.rules_search.confirm")},
+			{Key: "↵", Desc: i18n.T("help.rules_search.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.rules_search.cancel")},
 			{Key: "⌫", Desc: i18n.T("help.rules_search.backspace")},
 			{Key: "Ctrl+R/F", Desc: i18n.T("help.rules_search.regex_fuzzy")},
@@ -242,7 +242,7 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 	// 普通模式：核心操作
 	return []common.InlineHelpHint{
 		{Key: "↑↓", Desc: i18n.T("help.rules.hint_select")},
-		{Key: "Enter", Desc: i18n.T("help.rules.hint_modify")},
+		{Key: "↵", Desc: i18n.T("help.rules.hint_modify")},
 		{Key: "/", Desc: i18n.T("help.rules.hint_search")},
 		{Key: "t", Desc: i18n.T("help.rules.hint_type")},
 		{Key: "n", Desc: i18n.T("help.rules.hint_add")},

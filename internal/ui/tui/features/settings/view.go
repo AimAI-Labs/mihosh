@@ -261,7 +261,7 @@ func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
 			// 语言项：Tab/方向键切换 + 保存 + 取消
 			return []common.InlineHelpHint{
 				{Key: "←→/Tab", Desc: i18n.T("help.settings_edit_lang.switch")},
-				{Key: "Enter", Desc: i18n.T("help.settings_edit_lang.confirm")},
+				{Key: "↵", Desc: i18n.T("help.settings_edit_lang.confirm")},
 				{Key: "Esc", Desc: i18n.T("help.settings_edit_lang.cancel")},
 			}
 		}
@@ -269,14 +269,14 @@ func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
 			// 主题项：Tab/方向键切换 + 应用 + 取消
 			return []common.InlineHelpHint{
 				{Key: "←→/Tab", Desc: i18n.T("help.settings_edit_theme.switch")},
-				{Key: "Enter", Desc: i18n.T("help.settings_edit_theme.confirm")},
+				{Key: "↵", Desc: i18n.T("help.settings_edit_theme.confirm")},
 				{Key: "Esc", Desc: i18n.T("help.settings_edit_theme.cancel")},
 			}
 		}
 		// 普通编辑项：移动光标 + 保存 + 取消
 		return []common.InlineHelpHint{
 			{Key: "←→", Desc: i18n.T("help.settings_edit_config.move")},
-			{Key: "Enter", Desc: i18n.T("help.settings_edit_config.confirm")},
+			{Key: "↵", Desc: i18n.T("help.settings_edit_config.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.settings_edit_config.cancel")},
 		}
 	}
@@ -285,7 +285,7 @@ func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
 	return []common.InlineHelpHint{
 		{Key: "h/l", Desc: i18n.T("help.settings.hint_tab")},
 		{Key: "↑↓", Desc: i18n.T("help.settings.hint_select")},
-		{Key: "Enter", Desc: i18n.T("help.settings.hint_edit")},
+		{Key: "↵", Desc: i18n.T("help.settings.hint_edit")},
 		{Key: "r", Desc: i18n.T("help.settings.hint_refresh")},
 	}
 }

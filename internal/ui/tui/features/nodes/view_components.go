@@ -697,7 +697,7 @@ func renderTokyoPanel(title, body string, width int) string {
 func buildNodesInlineHelpHints(state PageState) []common.InlineHelpHint {
 	if state.FilterMode {
 		return []common.InlineHelpHint{
-			{Key: "Enter", Desc: i18n.T("help.nodes_search.confirm")},
+			{Key: "↵", Desc: i18n.T("help.nodes_search.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.nodes_search.cancel")},
 			{Key: "Ctrl+R/F", Desc: "正则/模糊"},
 		}
@@ -715,7 +715,7 @@ func buildNodesInlineHelpHints(state PageState) []common.InlineHelpHint {
 	return []common.InlineHelpHint{
 		{Key: "↑↓", Desc: i18n.T("help.nodes.hint_select")},
 		{Key: "←→", Desc: i18n.T("help.nodes.hint_group")},
-		{Key: "Enter", Desc: i18n.T("help.nodes.hint_switch")},
+		{Key: "↵", Desc: i18n.T("help.nodes.hint_switch")},
 		{Key: "t", Desc: i18n.T("help.nodes.hint_test")},
 		{Key: "a", Desc: i18n.T("help.nodes.hint_test_all")},
 		{Key: "m", Desc: i18n.T("help.nodes.hint_mode")},

@@ -365,13 +365,13 @@ func buildHints(state PageState) []common.InlineHelpHint {
 	if state.ShowAddForm || state.ShowEditForm {
 		return []common.InlineHelpHint{
 			{Key: "↑↓/Tab", Desc: i18n.T("help.sub_add.field")},
-			{Key: "Enter", Desc: i18n.T("help.sub_add.confirm")},
+			{Key: "↵", Desc: i18n.T("help.sub_add.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.sub_add.cancel")},
 		}
 	}
 	if state.FilterMode {
 		return []common.InlineHelpHint{
-			{Key: "Enter", Desc: i18n.T("help.sub_search.confirm")},
+			{Key: "↵", Desc: i18n.T("help.sub_search.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.sub_search.cancel")},
 			{Key: "⌫", Desc: i18n.T("help.sub_search.backspace")},
 			{Key: "Ctrl+R/F", Desc: i18n.T("help.rules_search.regex_fuzzy")},
@@ -379,7 +379,7 @@ func buildHints(state PageState) []common.InlineHelpHint {
 	}
 	return []common.InlineHelpHint{
 		{Key: "↑↓", Desc: i18n.T("help.sub.select")},
-		{Key: "Enter", Desc: i18n.T("help.sub.activate")},
+		{Key: "↵", Desc: i18n.T("help.sub.activate")},
 		{Key: "u", Desc: i18n.T("help.sub.update")},
 		{Key: "m", Desc: i18n.T("help.sub.edit_merge")},
 		{Key: "c", Desc: i18n.T("help.sub.view_raw")},

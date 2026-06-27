@@ -125,7 +125,7 @@ func buildNodesSections(ctx HelpContext) []section {
 				{"Backspace", i18n.T("help.nodes_search.backspace")},
 				{"Ctrl+R", i18n.T("help.nodes_search.regex")},
 				{"Ctrl+F", i18n.T("help.nodes_search.fuzzy")},
-				{"Enter", i18n.T("help.nodes_search.confirm")},
+				{"↵", i18n.T("help.nodes_search.confirm")},
 				{"Esc", i18n.T("help.nodes_search.cancel")},
 			},
 		}}
@@ -147,7 +147,7 @@ func buildNodesSections(ctx HelpContext) []section {
 		bindings: []keybinding{
 			{"↑/↓  k/j", i18n.T("help.nodes.select")},
 			{"←/→  h/l", i18n.T("help.nodes.switch_group")},
-			{"Enter", i18n.T("help.nodes.switch_node")},
+			{"↵", i18n.T("help.nodes.switch_node")},
 			{"t", i18n.T("help.nodes.test")},
 			{"a", i18n.T("help.nodes.test_all")},
 			{"m", i18n.T("help.nodes.mode")},
@@ -176,7 +176,7 @@ func buildConnectionsSections(ctx HelpContext) []section {
 			title: i18n.T("help.section.conns_topn"),
 			bindings: []keybinding{
 				{"↑/↓  k/j", i18n.T("help.conns_topn.scroll")},
-				{"Enter", i18n.T("help.conns_topn.detail")},
+				{"↵", i18n.T("help.conns_topn.detail")},
 				{"Esc / q", i18n.T("help.conns_topn.close")},
 			},
 		}}
@@ -187,7 +187,7 @@ func buildConnectionsSections(ctx HelpContext) []section {
 			title: i18n.T("help.section.conns_search"),
 			bindings: []keybinding{
 				{"输入字符", i18n.T("help.conns_search.append")},
-				{"Enter", i18n.T("help.conns_search.confirm")},
+				{"↵", i18n.T("help.conns_search.confirm")},
 				{"Esc", i18n.T("help.conns_search.cancel")},
 			},
 		}}
@@ -210,7 +210,7 @@ func buildConnectionsSections(ctx HelpContext) []section {
 			title: i18n.T("help.section.conns_active"),
 			bindings: []keybinding{
 				{"↑/↓  k/j", i18n.T("help.conns_active.select")},
-				{"Enter", i18n.T("help.conns_active.detail")},
+				{"↵", i18n.T("help.conns_active.detail")},
 				{"x", i18n.T("help.conns_active.close_conn")},
 				{"X", i18n.T("help.conns_active.close_all")},
 				{"/", i18n.T("help.conns_active.search")},
@@ -224,7 +224,7 @@ func buildConnectionsSections(ctx HelpContext) []section {
 			title: i18n.T("help.section.conns_history"),
 			bindings: []keybinding{
 				{"↑/↓  k/j", i18n.T("help.conns_history.select")},
-				{"Enter", i18n.T("help.conns_history.detail")},
+				{"↵", i18n.T("help.conns_history.detail")},
 				{"/", i18n.T("help.conns_history.search")},
 				{"h", i18n.T("help.conns_history.switch")},
 				{"Esc", i18n.T("help.conns_history.clear")},
@@ -253,7 +253,7 @@ func buildLogsSections(ctx HelpContext) []section {
 			bindings: []keybinding{
 				{"输入字符", i18n.T("help.logs_search.append")},
 				{"Backspace", i18n.T("help.logs_search.backspace")},
-				{"Enter", i18n.T("help.logs_search.confirm")},
+				{"↵", i18n.T("help.logs_search.confirm")},
 				{"Esc", i18n.T("help.logs_search.cancel")},
 			},
 		}}
@@ -263,7 +263,7 @@ func buildLogsSections(ctx HelpContext) []section {
 		title: i18n.T("help.section.logs"),
 		bindings: []keybinding{
 			{"↑/↓  k/j", i18n.T("help.logs.select")},
-			{"Enter", i18n.T("help.logs.detail")},
+			{"↵", i18n.T("help.logs.detail")},
 			{"[ / ]", i18n.T("help.logs.level_down")},
 			{"←/→  h/l", i18n.T("help.logs.scroll")},
 			{"/", i18n.T("help.logs.search")},
@@ -279,7 +279,7 @@ func buildRulesSections(ctx HelpContext) []section {
 		return []section{{
 			title: i18n.T("help.section.rules_delete"),
 			bindings: []keybinding{
-				{"Enter / y", i18n.T("help.rules_delete.confirm")},
+				{"↵ / y", i18n.T("help.rules_delete.confirm")},
 				{"Esc / n", i18n.T("help.rules_delete.cancel")},
 			},
 		}}
@@ -292,7 +292,7 @@ func buildRulesSections(ctx HelpContext) []section {
 				bindings: []keybinding{
 					{"← / →", i18n.T("help.rules_add.type")},
 					{"↑ / ↓", i18n.T("help.rules_add.field")},
-					{"Enter", i18n.T("help.rules_add.confirm")},
+					{"↵", i18n.T("help.rules_add.confirm")},
 					{"Esc", i18n.T("help.rules_add.cancel")},
 				},
 			},
@@ -307,7 +307,7 @@ func buildRulesSections(ctx HelpContext) []section {
 				{"Space", i18n.T("help.rules_filter.toggle")},
 				{"输入字符", i18n.T("help.rules_filter.search")},
 				{"Backspace", i18n.T("help.rules_filter.backspace")},
-				{"Enter", i18n.T("help.rules_filter.confirm")},
+				{"↵", i18n.T("help.rules_filter.confirm")},
 				{"Esc", i18n.T("help.rules_filter.cancel")},
 			},
 		}}
@@ -319,7 +319,7 @@ func buildRulesSections(ctx HelpContext) []section {
 			bindings: []keybinding{
 				{"输入字符", i18n.T("help.rules_search.append")},
 				{"Backspace", i18n.T("help.rules_search.backspace")},
-				{"Enter", i18n.T("help.rules_search.confirm")},
+				{"↵", i18n.T("help.rules_search.confirm")},
 				{"Esc", i18n.T("help.rules_search.cancel")},
 			},
 		}}
@@ -347,7 +347,7 @@ func buildSettingsSections(ctx HelpContext) []section {
 				title: i18n.T("help.section.settings_edit_lang"),
 				bindings: []keybinding{
 					{"←/→ / Tab", i18n.T("help.settings_edit_lang.switch")},
-					{"Enter", i18n.T("help.settings_edit_lang.confirm")},
+					{"↵", i18n.T("help.settings_edit_lang.confirm")},
 					{"Esc", i18n.T("help.settings_edit_lang.cancel")},
 				},
 			}}
@@ -357,7 +357,7 @@ func buildSettingsSections(ctx HelpContext) []section {
 				title: i18n.T("settings.label.theme"),
 				bindings: []keybinding{
 					{"←/→ / Tab", i18n.T("help.settings_edit_theme.switch")},
-					{"Enter", i18n.T("help.settings_edit_theme.confirm")},
+					{"↵", i18n.T("help.settings_edit_theme.confirm")},
 					{"Esc", i18n.T("help.settings_edit_theme.cancel")},
 				},
 			}}
@@ -369,7 +369,7 @@ func buildSettingsSections(ctx HelpContext) []section {
 				{"Home / End", i18n.T("help.settings_edit_config.jump")},
 				{"Backspace", i18n.T("help.settings_edit_config.backspace")},
 				{"Delete", i18n.T("help.settings_edit_config.delete")},
-				{"Enter", i18n.T("help.settings_edit_config.confirm")},
+				{"↵", i18n.T("help.settings_edit_config.confirm")},
 				{"Esc", i18n.T("help.settings_edit_config.cancel")},
 			},
 		}}
@@ -401,7 +401,7 @@ func buildSubSections(ctx HelpContext) []section {
 			bindings: []keybinding{
 				{"输入字符", i18n.T("help.sub_search.append")},
 				{"Backspace", i18n.T("help.sub_search.backspace")},
-				{"Enter", i18n.T("help.sub_search.confirm")},
+				{"↵", i18n.T("help.sub_search.confirm")},
 				{"Esc", i18n.T("help.sub_search.cancel")},
 			},
 		}}
@@ -410,7 +410,7 @@ func buildSubSections(ctx HelpContext) []section {
 			title: i18n.T("help.section.sub_add"),
 			bindings: []keybinding{
 				{"↑/↓", i18n.T("help.sub_add.field")},
-				{"Enter", i18n.T("help.sub_add.confirm")},
+				{"↵", i18n.T("help.sub_add.confirm")},
 				{"Esc", i18n.T("help.sub_add.cancel")},
 			},
 		}}
@@ -418,7 +418,7 @@ func buildSubSections(ctx HelpContext) []section {
 		return []section{{
 			title: i18n.T("help.section.sub_delete"),
 			bindings: []keybinding{
-				{"Enter / y", i18n.T("help.sub_delete.confirm")},
+				{"↵ / y", i18n.T("help.sub_delete.confirm")},
 				{"Esc / n", i18n.T("help.sub_delete.cancel")},
 			},
 		}}

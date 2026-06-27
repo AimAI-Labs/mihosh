@@ -480,7 +480,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 	// 过滤输入模式：确认 + 取消
 	if state.FilterMode {
 		return []common.InlineHelpHint{
-			{Key: "Enter", Desc: i18n.T("help.conns_search.confirm")},
+			{Key: "↵", Desc: i18n.T("help.conns_search.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.conns_search.cancel")},
 		}
 	}
@@ -498,7 +498,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 	case ConnViewActive:
 		hints := []common.InlineHelpHint{
 			{Key: "↑↓", Desc: i18n.T("help.conns.hint_select")},
-			{Key: "Enter", Desc: i18n.T("help.conns.hint_detail")},
+			{Key: "↵", Desc: i18n.T("help.conns.hint_detail")},
 			{Key: "i", Desc: i18n.T("help.conns.hint_inline")},
 			{Key: "x/X", Desc: i18n.T("help.conns.hint_close")},
 			{Key: "/", Desc: i18n.T("help.conns.hint_search")},
@@ -513,7 +513,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 	case ConnViewHistory:
 		hints := []common.InlineHelpHint{
 			{Key: "↑↓", Desc: i18n.T("help.conns.hint_select")},
-			{Key: "Enter", Desc: i18n.T("help.conns.hint_detail")},
+			{Key: "↵", Desc: i18n.T("help.conns.hint_detail")},
 			{Key: "i", Desc: i18n.T("help.conns.hint_inline")},
 			{Key: "/", Desc: i18n.T("help.conns.hint_search")},
 			{Key: "h", Desc: i18n.T("help.conns.hint_switch")},

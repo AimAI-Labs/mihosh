@@ -14,7 +14,7 @@ var stripANSI = regexp.MustCompile("\x1b\\[[0-9;?]*[ -/]*[@-~]")
 func TestFormatInlineHintRow_JoinsWithSeparator(t *testing.T) {
 	hints := []InlineHelpHint{
 		{Key: "↑↓", Desc: "Select"},
-		{Key: "Enter", Desc: "Detail"},
+		{Key: "↵", Desc: "Detail"},
 	}
 	row := FormatInlineHintRow(hints)
 	plain := stripANSI.ReplaceAllString(row, "")
@@ -23,7 +23,7 @@ func TestFormatInlineHintRow_JoinsWithSeparator(t *testing.T) {
 	if !strings.Contains(plain, "↑↓ Select") {
 		t.Fatalf("expected '↑↓ Select' in row, got %q", plain)
 	}
-	if !strings.Contains(plain, "Enter Detail") {
+	if !strings.Contains(plain, "↵ Detail") {
 		t.Fatalf("expected 'Enter Detail' in row, got %q", plain)
 	}
 	if !strings.Contains(plain, " · ") {
