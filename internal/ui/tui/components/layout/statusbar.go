@@ -10,6 +10,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 // renderNodeInfo 渲染节点信息：Mode ● Group · Node · Delay
@@ -73,49 +74,6 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, n
 	// ── 左侧：节点信息 + 运行状态 / 错误 ──
 	nodeInfo := renderNodeInfo(mode, groupName, nodeName, delay, width)
 
-	var status string
-	if err != nil {
-		errText := err.Error()
-		// 截断长度需减去节点信息宽度
-		maxErrLen := width - lipgloss.Width(nodeInfo) - 20
-		if maxErrLen < 10 {
-			maxErrLen = 10
-		}
-		if len(errText) > maxErrLen {
-			errText = errText[:maxErrLen] + "..."
-		}
-		friendlyErr := errText
-		if strings.Contains(errText, "context dead") {
-			friendlyErr = i18n.T("status.err.timeout_node")
-		} else if strings.Contains(errText, "connection refused") {
-			friendlyErr = i18n.T("status.err.refused")
-		} else if strings.Contains(errText, "timeout") {
-			friendlyErr = i18n.T("status.err.timeout")
-		}
-		status = styles.ErrorStyle().Render(fmt.Sprintf("✗ %s", friendlyErr))
-	} else if strings.TrimSpace(notice) != "" {
-		status = styles.StatusStyle().Render("✔ " + truncateRunes(notice, width/2))
-	} else if testing {
-		statusText := i18n.T("status.testing")
-		if target := strings.TrimSpace(testingTarget); target != "" {
-			maxTargetLen := width / 3
-			if maxTargetLen < 8 {
-				maxTargetLen = 8
-			}
-			target = truncateRunes(target, maxTargetLen)
-			statusText = fmt.Sprintf("%s: %s", i18n.T("status.testing"), target)
-		}
-		status = styles.TestingStyle().Render(statusText)
-	} else {
-		status = ""
-	}
-
-	// 组合左侧内容（节点信息始终显示）
-	leftPart := nodeInfo
-	if status != "" {
-		leftPart = nodeInfo + " " + status
-	}
-
 	// ── 右侧：实时指标 ──
 	var metricsStr string
 	dimStyle := lipgloss.NewStyle().Foreground(styles.Gray())
@@ -154,6 +112,55 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, n
 		}
 	}
 
+	var status string
+	metricsWidth := lipgloss.Width(metricsStr)
+	nodeInfoWidth := lipgloss.Width(nodeInfo)
+
+	if err != nil {
+		errText := err.Error()
+		friendlyErr := errText
+		if strings.Contains(errText, "context dead") {
+			friendlyErr = i18n.T("status.err.timeout_node")
+		} else if strings.Contains(errText, "connection refused") {
+			friendlyErr = i18n.T("status.err.refused")
+		} else if strings.Contains(errText, "timeout") {
+			friendlyErr = i18n.T("status.err.timeout")
+		}
+		
+		// 截断长度需减去节点信息宽度和右侧指标宽度，以及图标等占用的边距
+		maxErrLen := width - nodeInfoWidth - metricsWidth - 6
+		if maxErrLen < 5 {
+			maxErrLen = 5
+		}
+		status = styles.ErrorStyle().Render(fmt.Sprintf("✗ %s", truncateRunes(friendlyErr, maxErrLen)))
+	} else if strings.TrimSpace(notice) != "" {
+		maxNoticeLen := width - nodeInfoWidth - metricsWidth - 6
+		if maxNoticeLen < 5 {
+			maxNoticeLen = 5
+		}
+		status = styles.StatusStyle().Render("✔ " + truncateRunes(notice, maxNoticeLen))
+	} else if testing {
+		statusText := i18n.T("status.testing")
+		if target := strings.TrimSpace(testingTarget); target != "" {
+			statusText = fmt.Sprintf("%s: %s", i18n.T("status.testing"), target)
+		}
+		maxTestingLen := width - nodeInfoWidth - metricsWidth - 6
+		if maxTestingLen < 5 {
+			maxTestingLen = 5
+		}
+		status = styles.TestingStyle().Render(truncateRunes(statusText, maxTestingLen))
+	} else {
+		status = ""
+	}
+
+	// 组合左侧内容（节点信息始终显示）
+	leftPart := nodeInfo
+	if status != "" {
+		leftPart = nodeInfo + " " + status
+	}
+
+
+
 	// ── 分隔线 ──
 	divider := styles.DividerStyle().
 		Render(strings.Repeat("─", width))
@@ -170,14 +177,25 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, n
 }
 
 func truncateRunes(s string, max int) string {
-	runes := []rune(s)
-	if len(runes) <= max {
+	if runewidth.StringWidth(s) <= max {
 		return s
 	}
 	if max <= 1 {
 		return "…"
 	}
-	return string(runes[:max-1]) + "…"
+
+	var b strings.Builder
+	w := 0
+	for _, r := range s {
+		rw := runewidth.RuneWidth(r)
+		if w+rw > max-1 {
+			break
+		}
+		b.WriteRune(r)
+		w += rw
+	}
+	b.WriteString("…")
+	return b.String()
 }
 
 // lastValue 获取切片最后一个元素，空切片返回 0
