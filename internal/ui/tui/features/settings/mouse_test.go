@@ -186,7 +186,8 @@ func TestHandleMouseLeft_ClickAllowLanRowToggles(t *testing.T) {
 	}
 	configSvc := service.NewConfigService()
 
-	next, _, cmd := state.HandleMouseLeft(0, allowLanRowY, 100, 30, &config.Config{}, configSvc, nil)
+	trueTabX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth + 1
+	next, _, cmd := state.HandleMouseLeft(trueTabX, allowLanRowY, 100, 30, &config.Config{}, configSvc, nil)
 	if next.selectedSetting != 3 {
 		t.Fatalf("expected allow-lan row selected, got %d", next.selectedSetting)
 	}
@@ -198,7 +199,7 @@ func TestHandleMouseLeft_ClickAllowLanRowToggles(t *testing.T) {
 	}
 }
 
-func TestHandleMouseLeft_ClickLogLevelRowCycles(t *testing.T) {
+func TestHandleMouseLeft_ClickLogLevelRowSets(t *testing.T) {
 	// log-level index=4 in MihomoSettingKeys, offset=5 => rowY=9
 	const logLevelRowY = 9
 	state := State{
@@ -207,7 +208,10 @@ func TestHandleMouseLeft_ClickLogLevelRowCycles(t *testing.T) {
 	}
 	configSvc := service.NewConfigService()
 
-	next, _, cmd := state.HandleMouseLeft(0, logLevelRowY, 100, 30, &config.Config{}, configSvc, nil)
+	// "warning" is the second tab. 
+	// info tab width = 4 + 4 = 8. + 1 (separator) = 9
+	warningTabX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth + 9 + 1
+	next, _, cmd := state.HandleMouseLeft(warningTabX, logLevelRowY, 100, 30, &config.Config{}, configSvc, nil)
 	if next.selectedSetting != 4 {
 		t.Fatalf("expected log-level row selected, got %d", next.selectedSetting)
 	}
@@ -230,7 +234,8 @@ func TestHandleMouseLeft_EditModeAllowLanClickToggles(t *testing.T) {
 	}
 	configSvc := service.NewConfigService()
 
-	next, _, cmd := state.HandleMouseLeft(0, allowLanRowY, 100, 30, &config.Config{}, configSvc, nil)
+	trueTabX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth + 1
+	next, _, cmd := state.HandleMouseLeft(trueTabX, allowLanRowY, 100, 30, &config.Config{}, configSvc, nil)
 	if next.editMode {
 		t.Fatalf("expected editMode to exit after clicking allow-lan row")
 	}

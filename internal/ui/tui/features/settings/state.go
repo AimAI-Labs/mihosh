@@ -298,18 +298,27 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *con
 		if s.activeTab == 1 {
 			settingKey := s.activeKeys()[s.selectedSetting]
 			if settingKey == "allow-lan" {
-				val := !s.mihomoConfig.AllowLan
-				s.editMode = false
-				s.editValue = ""
-				s.editCursor = 0
-				return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "allow-lan", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+				if val, ok := resolveEnumMouseTarget(pageX, []string{"true", "false"}); ok {
+					boolVal := val == "true"
+					s.editMode = false
+					s.editValue = ""
+					s.editCursor = 0
+					if boolVal != s.mihomoConfig.AllowLan {
+						return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "allow-lan", boolVal), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+					}
+					return s, cfg, nil
+				}
 			}
 			if settingKey == "log-level" {
-				val := nextLogLevel(s.mihomoConfig.LogLevel)
-				s.editMode = false
-				s.editValue = ""
-				s.editCursor = 0
-				return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "log-level", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+				if level, ok := resolveEnumMouseTarget(pageX, []string{"info", "warning", "error", "debug", "silent"}); ok {
+					s.editMode = false
+					s.editValue = ""
+					s.editCursor = 0
+					if level != s.mihomoConfig.LogLevel {
+						return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "log-level", level), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+					}
+					return s, cfg, nil
+				}
 			}
 		}
 
@@ -350,12 +359,19 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *con
 	if s.activeTab == 1 {
 		settingKey := s.activeKeys()[settingIdx]
 		if settingKey == "allow-lan" {
-			val := !s.mihomoConfig.AllowLan
-			return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "allow-lan", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+			if val, ok := resolveEnumMouseTarget(pageX, []string{"true", "false"}); ok {
+				boolVal := val == "true"
+				if boolVal != s.mihomoConfig.AllowLan {
+					return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "allow-lan", boolVal), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+				}
+			}
 		}
 		if settingKey == "log-level" {
-			val := nextLogLevel(s.mihomoConfig.LogLevel)
-			return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "log-level", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+			if level, ok := resolveEnumMouseTarget(pageX, []string{"info", "warning", "error", "debug", "silent"}); ok {
+				if level != s.mihomoConfig.LogLevel {
+					return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "log-level", level), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+				}
+			}
 		}
 	}
 
@@ -750,13 +766,17 @@ func resolveThemeMouseTarget(pageX int) (string, bool) {
 }
 
 func resolveLanguageMouseTarget(pageX int) (string, bool) {
+	modes := []string{"auto", "zh-CN", "en-US"}
+	return resolveEnumMouseTarget(pageX, modes)
+}
+
+func resolveEnumMouseTarget(pageX int, modes []string) (string, bool) {
 	if pageX < 0 {
 		return "", false
 	}
 
 	// 2 是 TokyoPanel 的左侧边框和空格 (`│ `) 的宽度
 	valueStartX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth
-	modes := []string{"auto", "zh-CN", "en-US"}
 	cursor := valueStartX
 
 	for i, mode := range modes {
