@@ -197,8 +197,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 					s.editMode = false
 					s.editValue = ""
 					s.editCursor = 0
-					s.showToast(i18n.T("settings.toast.save_success_lang"), common.ToastSuccess)
-					return s, newCfg, nil
+					return s, newCfg, noticeCmd(i18n.T("settings.toast.save_success_lang"))
 				}
 				s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
 				return s, cfg, nil
@@ -212,8 +211,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 					s.editMode = false
 					s.editValue = ""
 					s.editCursor = 0
-					s.showToast(i18n.T("settings.toast.save_success_theme"), common.ToastSuccess)
-					return s, newCfg, nil
+					return s, newCfg, noticeCmd(i18n.T("settings.toast.save_success_theme"))
 				}
 				s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
 				return s, cfg, nil
@@ -227,14 +225,14 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 				s.editMode = false
 				s.editValue = ""
 				s.editCursor = 0
-				return s, cfg, configSvc.SaveMihomoConfigField(client, "allow-lan", val)
+				return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "allow-lan", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 			}
 			if settingKey == "log-level" {
 				val := nextLogLevel(s.mihomoConfig.LogLevel)
 				s.editMode = false
 				s.editValue = ""
 				s.editCursor = 0
-				return s, cfg, configSvc.SaveMihomoConfigField(client, "log-level", val)
+				return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "log-level", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 			}
 		}
 
@@ -256,8 +254,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 		if lang, ok := resolveLanguageMouseTarget(pageX); ok {
 			if err := configSvc.SetConfigValue(s.activeKeys()[settingIdx], lang); err == nil {
 				newCfg, _ := configSvc.LoadConfig()
-				s.showToast(i18n.T("settings.toast.save_success_lang"), common.ToastSuccess)
-				return s, newCfg, nil
+				return s, newCfg, noticeCmd(i18n.T("settings.toast.save_success_lang"))
 			}
 			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
 		}
@@ -267,8 +264,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 			if err := configSvc.SetConfigValue("theme", t); err == nil {
 				newCfg, _ := configSvc.LoadConfig()
 				theme.SetTheme(t)
-				s.showToast(i18n.T("settings.toast.save_success_theme"), common.ToastSuccess)
-				return s, newCfg, nil
+				return s, newCfg, noticeCmd(i18n.T("settings.toast.save_success_theme"))
 			}
 			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
 		}
@@ -278,11 +274,11 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 		settingKey := s.activeKeys()[settingIdx]
 		if settingKey == "allow-lan" {
 			val := !s.mihomoConfig.AllowLan
-			return s, cfg, configSvc.SaveMihomoConfigField(client, "allow-lan", val)
+			return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "allow-lan", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 		}
 		if settingKey == "log-level" {
 			val := nextLogLevel(s.mihomoConfig.LogLevel)
-			return s, cfg, configSvc.SaveMihomoConfigField(client, "log-level", val)
+			return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "log-level", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 		}
 	}
 
@@ -311,7 +307,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 				val := s.editValue == "true"
 				s.editMode = false
 				s.editValue = ""
-				return s, cfg, configSvc.SaveMihomoConfigField(client, "allow-lan", val)
+				return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "allow-lan", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 			case msg.String() == "left", msg.String() == "right", msg.String() == "tab":
 				if s.editValue == "true" {
 					s.editValue = "false"
@@ -331,7 +327,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 				val := s.editValue
 				s.editMode = false
 				s.editValue = ""
-				return s, cfg, configSvc.SaveMihomoConfigField(client, "log-level", val)
+				return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "log-level", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 			case msg.String() == "left":
 				matched := false
 				for i, l := range levels {
@@ -372,8 +368,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 				newCfg, _ := configSvc.LoadConfig()
 				s.editMode = false
 				s.editValue = ""
-				s.showToast(i18n.T("settings.toast.save_success_lang"), common.ToastSuccess)
-				return s, newCfg, nil
+				return s, newCfg, noticeCmd(i18n.T("settings.toast.save_success_lang"))
 			}
 			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
 		case msg.String() == "left":
@@ -399,8 +394,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 			theme.SetTheme(newTheme)
 			s.editMode = false
 			s.editValue = ""
-			s.showToast(i18n.T("settings.toast.save_success_theme"), common.ToastSuccess)
-			return s, newCfg, func() tea.Msg { return messages.ThemeChangedMsg{} }
+			return s, newCfg, tea.Batch(func() tea.Msg { return messages.ThemeChangedMsg{} }, noticeCmd(i18n.T("settings.toast.save_success_theme")))
 		case msg.String() == "left":
 			s.editValue = prevTheme(s.editValue)
 		case msg.String() == "right", msg.String() == "tab":
@@ -431,7 +425,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 			s.editMode = false
 			s.editValue = ""
 			s.editCursor = 0
-			return s, cfg, configSvc.SaveMihomoConfigField(client, settingKey, val)
+			return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, settingKey, val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 		}
 
 		if err := configSvc.SetConfigValue(settingKey, s.editValue); err != nil {
@@ -499,6 +493,13 @@ func (s *State) showToast(msg string, toastType common.ToastType) {
 		s.toastManager = common.NewToastManager()
 	}
 	s.toastManager.Add(msg, toastType, 2*time.Second)
+}
+
+// noticeCmd 返回一个 tea.Cmd，向底栏发送通知消息。
+func noticeCmd(text string) tea.Cmd {
+	return func() tea.Msg {
+		return messages.NoticeMsg{Text: text}
+	}
 }
 
 func resolveMouseSettingIndex(s State, pageY int) int {

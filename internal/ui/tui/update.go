@@ -478,6 +478,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// 主题已切换，触发重绘（View 会读取新主题色）
 		return m, tea.ClearScreen
 
+	case messages.NoticeMsg:
+		// 页面通过 tea.Cmd 推送的底栏通知
+		m.notice = msg.Text
+		m.noticeTicks = autoRefreshNoticeTicks
+		return m, nil
+
 	// ── 订阅管理 (Sub) 消息 ──
 	case messages.SubsLoadedMsg:
 		m.subState = m.subState.ApplySubs(msg.Subs, msg.Active)
@@ -816,10 +822,10 @@ func (m Model) handleSettingsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 	if m.config != nil && m.config.Language != oldLanguage {
 		i18n.SetLanguageOverride(m.config.Language)
 		common.InitKeyBindings()
-		return m, tea.ClearScreen
+		return m, tea.Batch(cmd, tea.ClearScreen)
 	}
 	if m.config != nil && m.config.Theme != oldTheme {
-		return m, tea.ClearScreen
+		return m, tea.Batch(cmd, tea.ClearScreen)
 	}
 	// 连接信息热刷新改由 MihomoConfigSavedMsg 驱动（Mihosh 配置不再含连接信息）。
 	if m.config != nil {

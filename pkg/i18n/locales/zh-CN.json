@@ -205,6 +205,7 @@
   "settings.toast.save_failed_with_err": "保存失败: %s",
   "settings.toast.mihomo_save_success": "Mihomo 配置已保存并重载",
   "settings.toast.mihomo_save_reload_warn": "配置已保存，重载失败（端口变更后请确认 Mihomo 已重启）",
+  "settings.toast.mihomo_reloading": "重启内核中",
 
   "settings.tab.mihosh": "Mihosh",
   "settings.tab.mihomo": "Mihomo",

@@ -150,6 +150,9 @@ type MihomoVersionMsg struct {
 // ThemeChangedMsg 主题已切换，触发全屏重绘
 type ThemeChangedMsg struct{}
 
+// NoticeMsg 底栏通知消息，页面通过 tea.Cmd 发送至主 Model 设置 notice。
+type NoticeMsg struct{ Text string }
+
 // ========= Sub (订阅管理) Messages =========
 
 // SubsLoadedMsg 订阅列表已从配置加载。

@@ -205,6 +205,7 @@
   "settings.toast.save_failed_with_err": "Failed to save: %s",
   "settings.toast.mihomo_save_success": "Mihomo config saved and reloaded",
   "settings.toast.mihomo_save_reload_warn": "Config saved, reload failed (confirm Mihomo restarted after port change)",
+  "settings.toast.mihomo_reloading": "Reloading kernel",
 
   "settings.tab.mihosh": "Mihosh",
   "settings.tab.mihomo": "Mihomo",
