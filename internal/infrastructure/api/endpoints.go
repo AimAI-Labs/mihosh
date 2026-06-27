@@ -204,3 +204,44 @@ func (c *Client) UpdateConfig(reqBody model.UpdateConfigRequest) error {
 	_, err := c.DoRequest("PATCH", "/configs", reqBody)
 	return err
 }
+
+// UpgradeCore 升级核心
+func (c *Client) UpgradeCore(channel string) error {
+	path := "/upgrade"
+	if channel != "" {
+		path += "?channel=" + url.QueryEscape(channel)
+	}
+	_, err := c.DoRequest("POST", path, nil)
+	return err
+}
+
+// RestartCore 重启核心
+func (c *Client) RestartCore() error {
+	_, err := c.DoRequest("POST", "/restart", nil)
+	return err
+}
+
+// ReloadConfigsAPI 重载配置
+func (c *Client) ReloadConfigsAPI() error {
+	payload := map[string]string{"path": "", "payload": ""}
+	_, err := c.DoRequest("PUT", "/configs?reload=true", payload)
+	return err
+}
+
+// UpdateGeoData 更新 GEO 数据
+func (c *Client) UpdateGeoData() error {
+	_, err := c.DoRequest("POST", "/configs/geo", nil)
+	return err
+}
+
+// FlushDNSCache 清空 DNS 缓存
+func (c *Client) FlushDNSCache() error {
+	_, err := c.DoRequest("POST", "/cache/dns/flush", nil)
+	return err
+}
+
+// FlushFakeIP 清空 Fake IP
+func (c *Client) FlushFakeIP() error {
+	_, err := c.DoRequest("POST", "/cache/fakeip/flush", nil)
+	return err
+}

@@ -438,6 +438,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.nodesState.TestAllDone = 0
 		m.nodesState.TestPending = 0
 
+	
+	case messages.CoreActionDoneMsg:
+		m.settingsState = m.settingsState.ClearActionStates()
+		m.notice = msg.Action + " " + i18n.T("settings.action.success")
+		m.noticeTicks = autoRefreshNoticeTicks
+		if msg.NeedReloadAll {
+			cmds := []tea.Cmd{
+				nodes.FetchGroups(m.client),
+				nodes.FetchProxies(m.client),
+				nodes.FetchConfigMode(m.client),
+				rules.FetchRules(m.client),
+				settings.FetchMihomoVersion(m.client),
+				m.configSvc.FetchMihomoConfig(m.client),
+			}
+			if msg.DelayMs > 0 {
+				return m, tea.Sequence(
+					tea.Tick(time.Duration(msg.DelayMs)*time.Millisecond, func(_ time.Time) tea.Msg { return nil }),
+					tea.Batch(cmds...),
+				)
+			}
+			return m, tea.Batch(cmds...)
+		}
+
+	case messages.CoreActionErrorMsg:
+		m.settingsState = m.settingsState.ClearActionStates()
+		m.err = messages.ErrMsg{Err: msg.Err}
+		m.notice = ""
+		m.noticeTicks = 0
+
 	case messages.MihomoVersionMsg:
 		m.settingsState = m.settingsState.ApplyMihomoVersion(msg.Version)
 
@@ -809,7 +838,7 @@ func (m Model) handleSubMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleSettingsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
-	pageX, pageY, _, _, ok := m.resolveMainPageMouseHit(x, y)
+	pageX, pageY, pageWidth, pageHeight, ok := m.resolveMainPageMouseHit(x, y)
 	if !ok {
 		return m, nil
 	}
@@ -822,7 +851,7 @@ func (m Model) handleSettingsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	m.settingsState, m.config, cmd = m.settingsState.HandleMouseLeft(pageX, pageY, m.config, m.configSvc, m.client)
+	m.settingsState, m.config, cmd = m.settingsState.HandleMouseLeft(pageX, pageY, pageWidth, pageHeight, m.config, m.configSvc, m.client)
 	if m.config != nil && m.config.Language != oldLanguage {
 		i18n.SetLanguageOverride(m.config.Language)
 		common.InitKeyBindings()

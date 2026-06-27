@@ -69,6 +69,10 @@ type PageState struct {
 	MihomoLoaded   bool
 	MihomoLoadErr  error
 	MihomoFromFile bool // API 不可达时从 YAML 降级读取
+	IsCoreUpgrading   bool
+	IsCoreRestarting  bool
+	IsConfigReloading bool
+	IsGeoUpdating     bool
 }
 
 func (p PageState) activeKeys() []string {
@@ -156,6 +160,52 @@ func RenderSettingsPage(state PageState, width, height int) string {
 		}
 	}
 
+	var actionsPanel string
+	if state.ActiveTab == 1 {
+		loadingBtn := lipgloss.NewStyle().Background(common.TokyoMuted()).Foreground(common.TokyoForeground()).Padding(0, 1).MarginRight(1)
+
+		renderBtn := func(btn ActionButton) string {
+			isLoading := false
+			bgColor := common.TokyoCyan()
+
+			switch btn.ID {
+			case "upgrade_auto", "upgrade_release", "upgrade_alpha":
+				isLoading = state.IsCoreUpgrading
+				bgColor = common.TokyoCyan()
+			case "restart":
+				isLoading = state.IsCoreRestarting
+				bgColor = common.TokyoRed()
+			case "reload":
+				isLoading = state.IsConfigReloading
+				bgColor = common.TokyoGreen()
+			case "update_geo":
+				isLoading = state.IsGeoUpdating
+				bgColor = common.TokyoGreen()
+			case "flush_dns", "flush_fakeip":
+				bgColor = common.TokyoYellow()
+			}
+
+			if isLoading {
+				return loadingBtn.Render(btn.Label + "...")
+			}
+			return lipgloss.NewStyle().Background(bgColor).Foreground(common.Background()).Padding(0, 1).MarginRight(1).Render(btn.Label)
+		}
+
+		rows := LayoutActionButtons(width)
+		var rowStrings []string
+		for _, row := range rows {
+			var rowNodes []string
+			for _, btn := range row {
+				rowNodes = append(rowNodes, renderBtn(btn))
+			}
+			rowStrings = append(rowStrings, lipgloss.JoinHorizontal(lipgloss.Left, rowNodes...))
+		}
+		
+		actionsBody := "\n" + strings.Join(rowStrings, "\n\n") + "\n"
+
+		actionsPanel = lipgloss.NewStyle().MarginTop(1).Render(common.RenderTokyoPanel(i18n.T("settings.action.panel_title"), actionsBody, width))
+	}
+
 	// 渲染选中项描述（信息行右侧，配置框右下方提示）已按需求取消
 	var descPart string
 	keys = state.activeKeys()
@@ -189,14 +239,13 @@ func RenderSettingsPage(state PageState, width, height int) string {
 		Width(rowWidth).
 		Render(descRowContent)
 
-	// 组装主要内容：Tab Bar → 空行 → 配置框 → 描述行
-	mainContent := lipgloss.JoinVertical(
-		lipgloss.Left,
-		tabBar,
-		"",
-		settingsPanel,
-		descRow,
-	)
+	// 组装主要内容：Tab Bar → 空行 → 配置框 → (空行+Actions) → 描述行
+	parts := []string{tabBar, "", settingsPanel}
+	if actionsPanel != "" {
+		parts = append(parts, actionsPanel)
+	}
+	parts = append(parts, descRow)
+	mainContent := lipgloss.JoinVertical(lipgloss.Left, parts...)
 
 	// 填充至页面高度，使右下角帮助提示浮层能正确定位到底部
 	mainContent = lipgloss.PlaceVertical(height, lipgloss.Top, mainContent)
@@ -612,3 +661,4 @@ func overlayToast(page, toast string, width int) string {
 
 	return strings.Join(pageLines, "\n")
 }
+

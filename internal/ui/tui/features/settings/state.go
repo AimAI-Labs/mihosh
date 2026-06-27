@@ -53,6 +53,10 @@ type State struct {
 	mihomoLoaded   bool
 	mihomoLoadErr  error
 	mihomoFromFile bool // API 不可达时从 YAML 文件降级读取
+	IsCoreUpgrading   bool
+	IsCoreRestarting  bool
+	IsConfigReloading bool
+	IsGeoUpdating     bool
 }
 
 // IsEditing 返回是否处于编辑模式
@@ -114,6 +118,10 @@ func (s State) ToPageState(cfg *config.Config) PageState {
 		MihomoLoaded:    s.mihomoLoaded,
 		MihomoLoadErr:   s.mihomoLoadErr,
 		MihomoFromFile:  s.mihomoFromFile,
+		IsCoreUpgrading:   s.IsCoreUpgrading,
+		IsCoreRestarting:  s.IsCoreRestarting,
+		IsConfigReloading: s.IsConfigReloading,
+		IsGeoUpdating:     s.IsGeoUpdating,
 	}
 }
 
@@ -171,7 +179,76 @@ func (s State) HandleMouseScroll(up bool) State {
 }
 
 // HandleMouseLeft 处理 settings 页面左键单击/双击
-func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, tea.Cmd) {
+func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, tea.Cmd) {
+	// 检查是否点击了底部核心操作按钮
+	if s.activeTab == 1 {
+		settingsPanelHeight := 0
+		if !s.mihomoLoaded {
+			settingsPanelHeight = 5 // "\n  Loading...\n" len is 3, + 2 = 5
+		} else if s.mihomoLoadErr != nil && s.mihomoConfig == nil {
+			settingsPanelHeight = 5
+		} else {
+			height := 0
+			pageState := s.ToPageState(cfg)
+			for i, key := range s.activeKeys() {
+				item := renderSettingItem(pageState, i, key, GetSettingLabel(key), pageWidth)
+				height += lipgloss.Height(item)
+			}
+			settingsPanelHeight = height + 2
+		}
+
+		actionsPanelTop := 4 + settingsPanelHeight + 1
+		rows := LayoutActionButtons(pageWidth)
+		
+		for i := 0; i < len(rows); i++ {
+			if pageY == actionsPanelTop + 2 + i*2 {
+				row := rows[i]
+				cur := 2 // Left border "│ " occupies 2 chars
+				for _, btn := range row {
+					if pageX >= cur && pageX < cur+btn.Width {
+						switch btn.ID {
+						case "upgrade_auto":
+							if !s.IsCoreUpgrading {
+								s.IsCoreUpgrading = true
+								return s, cfg, UpgradeCoreCmd(client, "")
+							}
+						case "upgrade_release":
+							if !s.IsCoreUpgrading {
+								s.IsCoreUpgrading = true
+								return s, cfg, UpgradeCoreCmd(client, "release")
+							}
+						case "upgrade_alpha":
+							if !s.IsCoreUpgrading {
+								s.IsCoreUpgrading = true
+								return s, cfg, UpgradeCoreCmd(client, "alpha")
+							}
+						case "restart":
+							if !s.IsCoreRestarting {
+								s.IsCoreRestarting = true
+								return s, cfg, RestartCoreCmd(client)
+							}
+						case "reload":
+							if !s.IsConfigReloading {
+								s.IsConfigReloading = true
+								return s, cfg, ReloadConfigsCmd(client)
+							}
+						case "update_geo":
+							if !s.IsGeoUpdating {
+								s.IsGeoUpdating = true
+								return s, cfg, UpdateGeoDataCmd(client)
+							}
+						case "flush_dns":
+							return s, cfg, FlushDNSCacheCmd(client)
+						case "flush_fakeip":
+							return s, cfg, FlushFakeIPCmd(client)
+						}
+						return s, cfg, nil
+					}
+					cur += btn.Width
+				}
+			}
+		}
+	}
 	// 优先处理标签栏点击（带边框的标签栏内容行位于 settingsTabBarContentY）
 	if pageY == settingsTabBarContentY {
 		if tab, ok := resolveSettingsTabMouseTarget(pageX); ok {
@@ -722,3 +799,67 @@ func (s State) getEditValue(cfg *config.Config, settingKey string) string {
 	return GetSettingValue(s.ToPageState(cfg), settingKey)
 }
 
+
+// Core Actions
+func UpgradeCoreCmd(client *api.Client, channel string) tea.Cmd {
+	return func() tea.Msg {
+		if err := client.UpgradeCore(channel); err != nil {
+			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.upgrade_auto"), Err: err}
+		}
+		return messages.CoreActionDoneMsg{Action: i18n.T("settings.action.upgrade_auto"), NeedReloadAll: true}
+	}
+}
+
+func RestartCoreCmd(client *api.Client) tea.Cmd {
+	return func() tea.Msg {
+		if err := client.RestartCore(); err != nil {
+			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.restart"), Err: err}
+		}
+		return messages.CoreActionDoneMsg{Action: i18n.T("settings.action.restart"), NeedReloadAll: true, DelayMs: 500}
+	}
+}
+
+func ReloadConfigsCmd(client *api.Client) tea.Cmd {
+	return func() tea.Msg {
+		if err := client.ReloadConfigsAPI(); err != nil {
+			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.reload"), Err: err}
+		}
+		return messages.CoreActionDoneMsg{Action: i18n.T("settings.action.reload"), NeedReloadAll: true}
+	}
+}
+
+func UpdateGeoDataCmd(client *api.Client) tea.Cmd {
+	return func() tea.Msg {
+		if err := client.UpdateGeoData(); err != nil {
+			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.update_geo"), Err: err}
+		}
+		return messages.CoreActionDoneMsg{Action: i18n.T("settings.action.update_geo"), NeedReloadAll: true}
+	}
+}
+
+func FlushDNSCacheCmd(client *api.Client) tea.Cmd {
+	return func() tea.Msg {
+		if err := client.FlushDNSCache(); err != nil {
+			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.flush_dns"), Err: err}
+		}
+		return messages.CoreActionDoneMsg{Action: i18n.T("settings.action.flush_dns"), NeedReloadAll: false}
+	}
+}
+
+func FlushFakeIPCmd(client *api.Client) tea.Cmd {
+	return func() tea.Msg {
+		if err := client.FlushFakeIP(); err != nil {
+			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.flush_fakeip"), Err: err}
+		}
+		return messages.CoreActionDoneMsg{Action: i18n.T("settings.action.flush_fakeip"), NeedReloadAll: false}
+	}
+}
+
+// Clear action states
+func (s State) ClearActionStates() State {
+	s.IsCoreUpgrading = false
+	s.IsCoreRestarting = false
+	s.IsConfigReloading = false
+	s.IsGeoUpdating = false
+	return s
+}

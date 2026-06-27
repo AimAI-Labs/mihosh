@@ -109,6 +109,19 @@ type ConfigReloadedMsg struct{ Err error }
 // Err 为 nil 表示编辑器正常退出（调用方负责热重载核心与刷新）；非 nil 表示启动或退出失败。
 type ConfigEditFinishedMsg struct{ Err error }
 
+// CoreActionDoneMsg 核心管理操作（升级、重启、重载等）完成。
+type CoreActionDoneMsg struct {
+	Action        string
+	NeedReloadAll bool
+	DelayMs       int
+}
+
+// CoreActionErrorMsg 核心管理操作失败。
+type CoreActionErrorMsg struct {
+	Action string
+	Err    error
+}
+
 // ========= WebSocket Streaming Messages =========
 
 type MemoryWSMsg struct {

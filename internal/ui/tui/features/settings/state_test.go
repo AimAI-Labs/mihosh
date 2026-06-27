@@ -621,7 +621,7 @@ func TestHandleMouseLeft_ClickTabBarSwitchesTab(t *testing.T) {
 
 	// 标签内容行位于 pageY=settingsTabBarContentY；第二个标签 Mihomo 起始 x=12
 	mihomoTabX := settingsContainerLeft + 1 + lipgloss.Width(" "+i18n.T("settings.tab.mihosh")+" ") + 1
-	next, _, _ := s.HandleMouseLeft(mihomoTabX, settingsTabBarContentY, cfg, configSvc, nil)
+	next, _, _ := s.HandleMouseLeft(mihomoTabX, settingsTabBarContentY, 100, 30, cfg, configSvc, nil)
 	if next.activeTab != 1 {
 		t.Fatalf("expected activeTab=1 after clicking Mihomo tab, got %d", next.activeTab)
 	}
@@ -631,7 +631,7 @@ func TestHandleMouseLeft_ClickTabBarSwitchesTab(t *testing.T) {
 
 	// 第一个标签 Mihomo 起始 x=containerLeft+1
 	mihoshTabX := settingsContainerLeft + 1
-	next, _, _ = next.HandleMouseLeft(mihoshTabX, settingsTabBarContentY, cfg, configSvc, nil)
+	next, _, _ = next.HandleMouseLeft(mihoshTabX, settingsTabBarContentY, 100, 30, cfg, configSvc, nil)
 	if next.activeTab != 0 {
 		t.Fatalf("expected activeTab=0 after clicking Mihosh tab, got %d", next.activeTab)
 	}

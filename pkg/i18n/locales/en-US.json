@@ -525,4 +525,17 @@
   "help.sub_add.cancel": "cancel",
   "help.sub_delete.confirm": "confirm delete",
   "help.sub_delete.cancel": "cancel"
+,
+  "settings.action.upgrade_auto": "Upgrade Core(Auto)",
+  "settings.action.upgrade_release": "Upgrade(Release)",
+  "settings.action.upgrade_alpha": "Upgrade(Alpha)",
+  "settings.action.restart": "Restart Core",
+  "settings.action.reload": "Reload Configs",
+  "settings.action.update_geo": "Update GEO",
+  "settings.action.flush_dns": "Flush DNS",
+  "settings.action.flush_fakeip": "Flush FakeIP",
+  "settings.action.success": "Success",
+  "settings.action.error": "Error"
+,
+  "settings.action.panel_title": "Core Actions"
 }

@@ -525,4 +525,17 @@
   "help.sub_add.cancel": "取消",
   "help.sub_delete.confirm": "确认删除",
   "help.sub_delete.cancel": "取消"
+,
+  "settings.action.upgrade_auto": "升级核心(Auto)",
+  "settings.action.upgrade_release": "升级(Release)",
+  "settings.action.upgrade_alpha": "升级(Alpha)",
+  "settings.action.restart": "重启核心",
+  "settings.action.reload": "重载配置",
+  "settings.action.update_geo": "更新GEO",
+  "settings.action.flush_dns": "清空DNS",
+  "settings.action.flush_fakeip": "清空FakeIP",
+  "settings.action.success": "成功",
+  "settings.action.error": "失败"
+,
+  "settings.action.panel_title": "核心操作"
 }
