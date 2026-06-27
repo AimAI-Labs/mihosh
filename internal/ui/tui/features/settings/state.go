@@ -179,24 +179,7 @@ func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.Con
 func (s State) HandleMouseScroll(up bool, pageY, pageWidth int, cfg *config.Config) (State, tea.Cmd) {
 	// If we are in the Mihomo tab and the mouse is below the actions panel (where viewport is)
 	if s.activeTab == 1 && s.SysStatus.Supported && pageY > 0 {
-		settingsPanelHeight := 0
-		if !s.mihomoLoaded {
-			settingsPanelHeight = 5 // "\n  Loading...\n" len is 3, + 2 = 5
-		} else if s.mihomoLoadErr != nil && s.mihomoConfig == nil {
-			settingsPanelHeight = 5
-		} else {
-			height := 0
-			pageState := s.ToPageState(cfg)
-			for i, key := range s.activeKeys() {
-				item := renderSettingItem(pageState, i, key, GetSettingLabel(key), pageWidth)
-				height += lipgloss.Height(item)
-			}
-			settingsPanelHeight = height + 2
-		}
-
-		actionsPanelTop := 4 + settingsPanelHeight + 1
-		rows := LayoutActionButtons(pageWidth)
-		actionsPanelBottomY := actionsPanelTop + 2 + len(rows)*2
+		actionsPanelBottomY := s.calculateActionsPanelBottomY(pageWidth)
 
 		if pageY > actionsPanelBottomY {
 			var mouseMsg tea.MouseMsg
@@ -236,13 +219,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *con
 		} else if s.mihomoLoadErr != nil && s.mihomoConfig == nil {
 			settingsPanelHeight = 5
 		} else {
-			height := 0
-			pageState := s.ToPageState(cfg)
-			for i, key := range s.activeKeys() {
-				item := renderSettingItem(pageState, i, key, GetSettingLabel(key), pageWidth)
-				height += lipgloss.Height(item)
-			}
-			settingsPanelHeight = height + 2
+			settingsPanelHeight = len(s.activeKeys()) + 2
 		}
 
 		actionsPanelTop := 4 + settingsPanelHeight + 1
@@ -656,6 +633,21 @@ func resolveMouseSettingIndex(s State, pageY int) int {
 		return -1
 	}
 	return settingIdx
+}
+
+func (s State) calculateActionsPanelBottomY(pageWidth int) int {
+	settingsPanelHeight := 0
+	if !s.mihomoLoaded {
+		settingsPanelHeight = 5
+	} else if s.mihomoLoadErr != nil && s.mihomoConfig == nil {
+		settingsPanelHeight = 5
+	} else {
+		settingsPanelHeight = len(s.activeKeys()) + 2
+	}
+
+	actionsPanelTop := 4 + settingsPanelHeight + 1
+	rows := LayoutActionButtons(pageWidth)
+	return actionsPanelTop + 2 + len(rows)*2
 }
 
 // resolveSettingsTabMouseTarget 解析标签栏内容行的鼠标点击目标。

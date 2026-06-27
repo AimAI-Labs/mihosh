@@ -392,6 +392,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, logsTick()
 		}
 
+	case messages.SysStatusTickMsg, messages.SysStatusResultMsg:
+		if m.currentPage == layout.PageSettings {
+			var cmd tea.Cmd
+			m.settingsState, cmd = m.settingsState.HandleMsg(msg)
+			return m, cmd
+		}
+
 	case messages.AutoRefreshTickMsg:
 		interval := m.autoRefreshInterval()
 		m.advanceAutoRefreshTransientState()
