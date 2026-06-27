@@ -57,6 +57,8 @@ type State struct {
 	IsCoreRestarting  bool
 	IsConfigReloading bool
 	IsGeoUpdating     bool
+
+	SysStatus SysStatusState
 }
 
 // IsEditing 返回是否处于编辑模式
@@ -122,6 +124,7 @@ func (s State) ToPageState(cfg *config.Config) PageState {
 		IsCoreRestarting:  s.IsCoreRestarting,
 		IsConfigReloading: s.IsConfigReloading,
 		IsGeoUpdating:     s.IsGeoUpdating,
+		SysStatus:         s.SysStatus,
 	}
 }
 
@@ -134,7 +137,11 @@ func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.Con
 	if msg.String() == "h" || msg.String() == "l" || msg.String() == "tab" {
 		s.activeTab = 1 - s.activeTab
 		s.selectedSetting = 0
-		return s, cfg, nil
+		var cmd tea.Cmd
+		if s.activeTab == 1 && s.SysStatus.Supported {
+			cmd = TickSysStatusCmd()
+		}
+		return s, cfg, cmd
 	}
 
 	if msg.String() == "r" {
@@ -161,7 +168,19 @@ func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.Con
 }
 
 // HandleMouseScroll 鼠标滚轮处理
-func (s State) HandleMouseScroll(up bool) State {
+func (s State) HandleMouseScroll(up bool, pageY, pageHeight, actionsPanelBottomY int) State {
+	// If we are in the Mihomo tab and the mouse is below the actions panel (where viewport is)
+	if s.activeTab == 1 && s.SysStatus.Supported && pageY > actionsPanelBottomY {
+		var mouseMsg tea.MouseMsg
+		if up {
+			mouseMsg.Type = tea.MouseWheelUp
+		} else {
+			mouseMsg.Type = tea.MouseWheelDown
+		}
+		s.SysStatus.Update(mouseMsg)
+		return s
+	}
+
 	// 编辑模式下禁用滚轮，避免误切当前正在编辑的配置项
 	if s.editMode {
 		return s
@@ -883,3 +902,9 @@ func (s State) ClearActionStates() State {
 	s.IsGeoUpdating = false
 	return s
 }
+
+func (s State) HandleMsg(msg tea.Msg) (State, tea.Cmd) {
+	cmd := s.SysStatus.Update(msg)
+	return s, cmd
+}
+

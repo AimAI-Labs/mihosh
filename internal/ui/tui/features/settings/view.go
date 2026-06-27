@@ -73,6 +73,7 @@ type PageState struct {
 	IsCoreRestarting  bool
 	IsConfigReloading bool
 	IsGeoUpdating     bool
+	SysStatus         SysStatusState
 }
 
 func (p PageState) activeKeys() []string {
