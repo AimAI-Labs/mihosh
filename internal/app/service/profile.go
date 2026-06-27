@@ -229,17 +229,17 @@ func (s *ProfileService) Activate(uid string) (ActivateResult, error) {
 	}
 	_ = p // UID 已通过 findProfile 校验存在
 
-	// 1. 生成（merge 损坏时降级；data 为空表示 raw 缺失或序列化失败）
-	data, mergeErr := profile.GenerateAndWriteForUIDIgnoreMergeError(uid)
-	if len(data) == 0 {
-		// raw.yaml 尚未拉取（最常见），给出可操作的提示。
-		return ActivateResult{}, profile.ErrRawNotFound
-	}
-
-	// 2. 解析 mihomo 配置路径
+	// 1. 解析 mihomo 配置路径（提前获取用于保留字段）
 	mihomoPath, err := config.GetMihomoConfigPath()
 	if err != nil {
 		return ActivateResult{}, ErrMihomoPathMissing
+	}
+
+	// 2. 生成（merge 损坏时降级；保留现有 mihomo 配置中的托管字段）
+	data, mergeErr := profile.GenerateAndWriteForUIDIgnoreMergeErrorWithPreserve(uid, mihomoPath)
+	if len(data) == 0 {
+		// raw.yaml 尚未拉取（最常见），给出可操作的提示。
+		return ActivateResult{}, profile.ErrRawNotFound
 	}
 
 	// 3. 配置未变更时跳过写盘与重载。

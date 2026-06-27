@@ -1,6 +1,8 @@
 package profile
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -240,6 +242,80 @@ func TestApplyMerge_DeepMergeNestedMapping(t *testing.T) {
 	require.Len(t, np.Content, 4) // 两个子键，每个 key+value 各 2 节点
 	assert.NotNil(t, findMappingValue(np, "geosite:cn"))
 	assert.NotNil(t, findMappingValue(np, "geosite:geolocation-!cn"))
+}
+
+func TestGenerateYAMLWithPreserve_InsertsMissingManagedFields(t *testing.T) {
+	dir := t.TempDir()
+	managedPath := filepath.Join(dir, "config.yaml")
+	require.NoError(t, os.WriteFile(managedPath, []byte("" +
+		"external-controller: 127.0.0.1:9090\n" +
+		"secret: abc123\n" +
+		"mixed-port: 7890\n" +
+		"allow-lan: true\n" +
+		"log-level: debug\n"), 0644))
+
+	raw := parseDoc(t, `mode: rule
+proxies: []
+`)
+	merge := parseDoc(t, `prepend-rules:
+  - MATCH,DIRECT
+`)
+
+	out, err := GenerateYAMLWithPreserve(raw, merge, managedPath)
+	require.NoError(t, err)
+	got := string(out)
+	assert.Contains(t, got, "external-controller: 127.0.0.1:9090")
+	assert.Contains(t, got, "secret: abc123")
+	assert.Contains(t, got, "mixed-port: 7890")
+	assert.Contains(t, got, "allow-lan: true")
+	assert.Contains(t, got, "log-level: debug")
+	assert.Contains(t, got, "- MATCH,DIRECT")
+}
+
+func TestGenerateYAMLWithPreserve_OverridesManagedFieldsFromSubscription(t *testing.T) {
+	dir := t.TempDir()
+	managedPath := filepath.Join(dir, "config.yaml")
+	require.NoError(t, os.WriteFile(managedPath, []byte("" +
+		"external-controller: 0.0.0.0:9090\n" +
+		"secret: xxxxx\n" +
+		"mixed-port: 7890\n" +
+		"allow-lan: true\n" +
+		"log-level: info\n"), 0644))
+
+	raw := parseDoc(t, `external-controller: 127.0.0.1:19090
+secret: from-subscription
+mixed-port: 17890
+allow-lan: false
+log-level: debug
+mode: rule
+proxies: []
+`)
+
+	out, err := GenerateYAMLWithPreserve(raw, nil, managedPath)
+	require.NoError(t, err)
+	got := string(out)
+	assert.Contains(t, got, "external-controller: 0.0.0.0:9090")
+	assert.Contains(t, got, "secret: xxxxx")
+	assert.Contains(t, got, "mixed-port: 7890")
+	assert.Contains(t, got, "allow-lan: true")
+	assert.Contains(t, got, "log-level: info")
+	assert.NotContains(t, got, "external-controller: 127.0.0.1:19090")
+	assert.NotContains(t, got, "secret: from-subscription")
+	assert.NotContains(t, got, "mixed-port: 17890")
+	assert.NotContains(t, got, "allow-lan: false")
+}
+
+func TestGenerateYAMLWithPreserve_InvalidManagedYAMLReturnsError(t *testing.T) {
+	dir := t.TempDir()
+	managedPath := filepath.Join(dir, "config.yaml")
+	require.NoError(t, os.WriteFile(managedPath, []byte("external-controller: [\n"), 0644))
+
+	raw := parseDoc(t, `mode: rule
+`)
+
+	_, err := GenerateYAMLWithPreserve(raw, nil, managedPath)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "解析现有 mihomo 配置失败")
 }
 
 func TestApplyMerge_DeepMergeSequenceReplaced(t *testing.T) {

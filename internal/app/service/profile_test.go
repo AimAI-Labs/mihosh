@@ -295,6 +295,122 @@ func TestProfileService_ActivateRewritesWhenConfigChanged(t *testing.T) {
 	assert.Contains(t, err.Error(), "未配置 mihomo 客户端")
 }
 
+// TestProfileService_ActivatePreservesManagedFields 验证：当订阅 S 与 merge M 都未提供
+// mihomo 设置页托管的 5 个字段时，Activate 仍会从当前 O 中保留它们，避免被订阅覆盖丢失。
+func TestProfileService_ActivatePreservesManagedFields(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("APPDATA", "")
+	t.Setenv("HOMEDRIVE", "")
+	t.Setenv("HOMEPATH", "")
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+
+	mihoshDir := filepath.Join(home, ".mihosh")
+	require.NoError(t, os.MkdirAll(mihoshDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(mihoshDir, "config.yaml"),
+		[]byte("test_url: http://example.com\n"), 0644))
+
+	s := NewProfileService(nil)
+	p, err := s.AddProfile("保留字段测试", profile.SubSource{Kind: profile.SourceLocal, Path: "/p/a.yaml"})
+	require.NoError(t, err)
+
+	// 订阅 S 不包含 5 个托管字段。
+	require.NoError(t, profile.WriteRaw(p.UID, []byte("" +
+		"mode: rule\n" +
+		"proxies: []\n" +
+		"proxy-groups: []\n")))
+
+	// merge M 也不包含 5 个托管字段。
+	require.NoError(t, profile.WriteMerge([]byte("prepend-rules:\n  - MATCH,DIRECT\n")))
+
+	// 当前 O 已包含设置页托管字段，Activate 后应继续保留。
+	mihomoDir := filepath.Join(home, ".config", "mihomo")
+	require.NoError(t, os.MkdirAll(mihomoDir, 0755))
+	mihomoPath := filepath.Join(mihomoDir, "config.yaml")
+	require.NoError(t, os.WriteFile(mihomoPath, []byte("" +
+		"external-controller: 127.0.0.1:9090\n" +
+		"secret: abc123\n" +
+		"mixed-port: 7890\n" +
+		"allow-lan: true\n" +
+		"log-level: debug\n" +
+		"mode: global\n"), 0644))
+
+	// client==nil：会在写入后进入重载阶段报错，但足以验证最终 O 已被正确写回。
+	_, err = s.Activate(p.UID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "未配置 mihomo 客户端")
+
+	written, err := os.ReadFile(mihomoPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(written), "external-controller: 127.0.0.1:9090")
+	assert.Contains(t, string(written), "secret: abc123")
+	assert.Contains(t, string(written), "mixed-port: 7890")
+	assert.Contains(t, string(written), "allow-lan: true")
+	assert.Contains(t, string(written), "log-level: debug")
+}
+
+// TestProfileService_ActivateManagedFieldsOverrideSubscription 验证：即使订阅 S 自带
+// 这 5 个字段，Activate 后也必须以当前 O 中的托管值为准，避免设置页值被订阅覆盖。
+func TestProfileService_ActivateManagedFieldsOverrideSubscription(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("APPDATA", "")
+	t.Setenv("HOMEDRIVE", "")
+	t.Setenv("HOMEPATH", "")
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+
+	mihoshDir := filepath.Join(home, ".mihosh")
+	require.NoError(t, os.MkdirAll(mihoshDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(mihoshDir, "config.yaml"),
+		[]byte("test_url: http://example.com\n"), 0644))
+
+	s := NewProfileService(nil)
+	p, err := s.AddProfile("托管字段优先级测试", profile.SubSource{Kind: profile.SourceLocal, Path: "/p/a.yaml"})
+	require.NoError(t, err)
+
+	// 订阅 S 明确带了与当前 O 冲突的 5 个字段。
+	require.NoError(t, profile.WriteRaw(p.UID, []byte("" +
+		"mixed-port: 17890\n" +
+		"allow-lan: false\n" +
+		"log-level: debug\n" +
+		"external-controller: 127.0.0.1:19090\n" +
+		"secret: from-subscription\n" +
+		"mode: rule\n" +
+		"proxies: []\n")))
+
+	mihomoDir := filepath.Join(home, ".config", "mihomo")
+	require.NoError(t, os.MkdirAll(mihomoDir, 0755))
+	mihomoPath := filepath.Join(mihomoDir, "config.yaml")
+	require.NoError(t, os.WriteFile(mihomoPath, []byte("" +
+		"mixed-port: 7890\n" +
+		"allow-lan: true\n" +
+		"log-level: info\n" +
+		"external-controller: 0.0.0.0:9090\n" +
+		"secret: xxxxx\n" +
+		"mode: global\n"), 0644))
+
+	_, err = s.Activate(p.UID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "未配置 mihomo 客户端")
+
+	written, err := os.ReadFile(mihomoPath)
+	require.NoError(t, err)
+	got := string(written)
+	assert.Contains(t, got, "mixed-port: 7890")
+	assert.Contains(t, got, "allow-lan: true")
+	assert.Contains(t, got, "log-level: info")
+	assert.Contains(t, got, "external-controller: 0.0.0.0:9090")
+	assert.Contains(t, got, "secret: xxxxx")
+	assert.NotContains(t, got, "mixed-port: 17890")
+	assert.NotContains(t, got, "allow-lan: false")
+	assert.NotContains(t, got, "external-controller: 127.0.0.1:19090")
+	assert.NotContains(t, got, "secret: from-subscription")
+}
+
 // TestNewUID verifies UID uniqueness and format.
 func TestNewUID(t *testing.T) {
 	seen := map[string]bool{}

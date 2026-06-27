@@ -18,15 +18,96 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// 托管字段列表：这些字段从现有 mihomo 配置文件保留，不被订阅覆盖
+var managedFields = []string{
+	"external-controller",
+	"secret",
+	"mixed-port",
+	"allow-lan",
+	"log-level",
+}
+
+// readManagedFieldsFromFile 从现有配置文件读取托管字段
+func readManagedFieldsFromFile(path string) (map[string]*yaml.Node, error) {
+	managed := make(map[string]*yaml.Node)
+	if !FileExists(path) {
+		return managed, nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("读取现有 mihomo 配置失败: %w", err)
+	}
+	if len(trimSpaceBytes(data)) == 0 {
+		return managed, nil
+	}
+
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return nil, fmt.Errorf("解析现有 mihomo 配置失败: %w", err)
+	}
+
+	mapping := topLevelMapping(&root)
+	if mapping == nil {
+		return managed, nil
+	}
+
+	for _, field := range managedFields {
+		if val := findMappingValue(mapping, field); val != nil {
+			managed[field] = deepCopyNode(val)
+		}
+	}
+
+	return managed, nil
+}
+
+// injectManagedFields 向最终配置写回托管字段。
+// 这些字段由设置页托管，只要当前 O 中存在，就应始终覆盖 S/M 生成结果。
+func injectManagedFields(final *yaml.Node, managed map[string]*yaml.Node) {
+	for _, field := range managedFields {
+		if val, ok := managed[field]; ok {
+			setMappingField(final, field, val)
+		}
+	}
+}
+
 // Generate 合并 raw 与 merge，返回最终 yaml.Node。
 // merge 为 nil 时直接返回 raw（深拷贝）。
 func Generate(raw, merge *yaml.Node) (*yaml.Node, error) {
 	return ApplyMerge(raw, merge)
 }
 
+// GenerateWithPreserve 合并 raw 与 merge，同时保留现有配置文件中的托管字段。
+// managedPath 为现有 mihomo 配置文件路径。
+func GenerateWithPreserve(raw, merge *yaml.Node, managedPath string) (*yaml.Node, error) {
+	final, err := ApplyMerge(raw, merge)
+	if err != nil {
+		return nil, err
+	}
+
+	managed, err := readManagedFieldsFromFile(managedPath)
+	if err != nil {
+		return nil, err
+	}
+	if len(managed) > 0 {
+		injectManagedFields(final, managed)
+	}
+
+	return final, nil
+}
+
 // GenerateYAML 合并并序列化为 2 空格缩进的 YAML 字节。
 func GenerateYAML(raw, merge *yaml.Node) ([]byte, error) {
 	final, err := Generate(raw, merge)
+	if err != nil {
+		return nil, err
+	}
+	return marshalNode(final)
+}
+
+// GenerateYAMLWithPreserve 合并并序列化为 2 空格缩进的 YAML 字节，同时保留现有配置中的托管字段。
+func GenerateYAMLWithPreserve(raw, merge *yaml.Node, managedPath string) ([]byte, error) {
+	final, err := GenerateWithPreserve(raw, merge, managedPath)
 	if err != nil {
 		return nil, err
 	}
@@ -96,6 +177,24 @@ func GenerateAndWriteForUIDIgnoreMergeError(uid string) (data []byte, mergeErr e
 		merge = nil // 降级：忽略覆写
 	}
 	data, err = GenerateYAML(raw, merge)
+	if err != nil {
+		return nil, mergeErr
+	}
+	return data, mergeErr
+}
+
+// GenerateAndWriteForUIDIgnoreMergeErrorWithPreserve 与 GenerateAndWriteForUIDIgnoreMergeError 类似，
+// 但会从现有 mihomo 配置文件中保留托管字段，避免它们被订阅覆盖。
+func GenerateAndWriteForUIDIgnoreMergeErrorWithPreserve(uid string, managedPath string) (data []byte, mergeErr error) {
+	raw, err := ReadRaw(uid)
+	if err != nil {
+		return nil, nil
+	}
+	merge, mergeErr := ReadMergeNode()
+	if mergeErr != nil {
+		merge = nil // 降级：忽略覆写
+	}
+	data, err = GenerateYAMLWithPreserve(raw, merge, managedPath)
 	if err != nil {
 		return nil, mergeErr
 	}
