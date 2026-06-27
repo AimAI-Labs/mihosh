@@ -158,7 +158,7 @@ func WriteMihomoField(configPath, key string, value interface{}) error {
 		mapping.Content = append(mapping.Content, keyNode, valNode)
 	}
 
-	out, err := yaml.Marshal(&root)
+	out, err := marshalYAML(&root)
 	if err != nil {
 		return err
 	}

@@ -12,6 +12,7 @@ package profile
 // 所有写入均原子（临时文件 + Rename），与 config.atomicWriteFile 风格一致。
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -146,7 +147,7 @@ func WriteMergeField(key string, value interface{}) error {
 		mapping.Content = append(mapping.Content, keyNode, valNode)
 	}
 
-	out, err := yaml.Marshal(&root)
+	out, err := marshalYAML2Spaces(&root)
 	if err != nil {
 		return err
 	}
@@ -276,3 +277,19 @@ func trimSpaceBytes(b []byte) []byte {
 func isSpaceByte(c byte) bool {
 	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
 }
+
+// marshalYAML2Spaces 以 2 空格缩进序列化。
+func marshalYAML2Spaces(v interface{}) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	err := enc.Encode(v)
+	if err != nil {
+		return nil, err
+	}
+	if err := enc.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+

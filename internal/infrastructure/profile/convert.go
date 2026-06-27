@@ -17,8 +17,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 )
 
 // v2ray 协议前缀。
@@ -356,7 +354,7 @@ func buildMihomoYAML(proxies []map[string]any) ([]byte, error) {
 		"rules":        rules,
 	}
 
-	data, err := yaml.Marshal(config)
+	data, err := marshalYAML2Spaces(config)
 	if err != nil {
 		return nil, err
 	}

@@ -252,7 +252,7 @@ func deepCopyNode(n *yaml.Node) *yaml.Node {
 	if n == nil {
 		return nil
 	}
-	out, err := yaml.Marshal(n)
+	out, err := marshalYAML2Spaces(n)
 	if err != nil {
 		// marshal 失败时退化为浅拷贝（极少触发）。
 		c := *n
