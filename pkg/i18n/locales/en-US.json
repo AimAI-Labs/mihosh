@@ -277,6 +277,7 @@
   "help.conns.hint_test": "Test",
   "help.conns.hint_test_all": "Test All",
   "help.conns.hint_site": "Site",
+  "help.conns.hint_inline": "Inline",
   "help.conns.hint_select": "Select",
   "help.conns.hint_detail": "Detail",
   "help.conns.hint_close": "Close",

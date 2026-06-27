@@ -35,7 +35,7 @@ func TestRenderConnectionInfoSection(t *testing.T) {
 	}
 
 	content := strings.Join(renderConnectionInfoSection(conn, s), "\n")
-	assertContains(t, content, "─── 连接详情 ───")
+	assertContains(t, content, "─── 连接信息 ───")
 	assertContains(t, content, "主机： example.com")
 	assertContains(t, content, "源地址： 10.0.0.1:52345")
 	assertContains(t, content, "目标地址： 8.8.8.8:443")

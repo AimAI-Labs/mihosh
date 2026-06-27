@@ -496,23 +496,33 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		}
 
 	case ConnViewActive:
-		// 活跃连接 tab：选择 + 详情 + 关闭 + 搜索 + 切换
-		return []common.InlineHelpHint{
+		hints := []common.InlineHelpHint{
 			{Key: "↑↓", Desc: i18n.T("help.conns.hint_select")},
 			{Key: "Enter", Desc: i18n.T("help.conns.hint_detail")},
+			{Key: "i", Desc: i18n.T("help.conns.hint_inline")},
 			{Key: "x/X", Desc: i18n.T("help.conns.hint_close")},
 			{Key: "/", Desc: i18n.T("help.conns.hint_search")},
 			{Key: "h", Desc: i18n.T("help.conns.hint_switch")},
 		}
+		if state.InlineFocused {
+			hints[0] = common.InlineHelpHint{Key: "↑↓", Desc: i18n.T("help.conns_detail.scroll")}
+			hints = append(hints, common.InlineHelpHint{Key: "Esc", Desc: i18n.T("help.conns_search.cancel")})
+		}
+		return hints
 
 	case ConnViewHistory:
-		// 历史连接 tab：选择 + 详情 + 搜索 + 切换
-		return []common.InlineHelpHint{
+		hints := []common.InlineHelpHint{
 			{Key: "↑↓", Desc: i18n.T("help.conns.hint_select")},
 			{Key: "Enter", Desc: i18n.T("help.conns.hint_detail")},
+			{Key: "i", Desc: i18n.T("help.conns.hint_inline")},
 			{Key: "/", Desc: i18n.T("help.conns.hint_search")},
 			{Key: "h", Desc: i18n.T("help.conns.hint_switch")},
 		}
+		if state.InlineFocused {
+			hints[0] = common.InlineHelpHint{Key: "↑↓", Desc: i18n.T("help.conns_detail.scroll")}
+			hints = append(hints, common.InlineHelpHint{Key: "Esc", Desc: i18n.T("help.conns_search.cancel")})
+		}
+		return hints
 	}
 
 	return nil

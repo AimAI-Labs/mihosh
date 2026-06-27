@@ -277,6 +277,7 @@
   "help.conns.hint_test": "测速",
   "help.conns.hint_test_all": "全测",
   "help.conns.hint_site": "选站",
+  "help.conns.hint_inline": "内联",
   "help.conns.hint_select": "选择",
   "help.conns.hint_detail": "详情",
   "help.conns.hint_close": "关闭",
