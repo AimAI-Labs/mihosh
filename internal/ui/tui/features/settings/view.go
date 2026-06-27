@@ -294,11 +294,12 @@ func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		}
 	}
 
-	// 普通模式：切换标签 + 选择 + 编辑
+	// 普通模式：切换标签 + 选择 + 编辑 + 刷新
 	return []common.InlineHelpHint{
 		{Key: "h/l", Desc: i18n.T("help.settings.hint_tab")},
 		{Key: "↑↓", Desc: i18n.T("help.settings.hint_select")},
 		{Key: "Enter", Desc: i18n.T("help.settings.hint_edit")},
+		{Key: "r", Desc: i18n.T("help.settings.hint_refresh")},
 	}
 }
 

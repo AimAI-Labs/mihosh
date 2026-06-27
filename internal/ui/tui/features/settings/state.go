@@ -129,6 +129,11 @@ func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.Con
 		return s, cfg, nil
 	}
 
+	if msg.String() == "r" {
+		s.mihomoLoaded = false
+		return s, cfg, tea.Batch(FetchMihomoVersion(client), configSvc.FetchMihomoConfig(client))
+	}
+
 	switch {
 	case key.Matches(msg, common.Keys.Up):
 		if s.selectedSetting > 0 {
