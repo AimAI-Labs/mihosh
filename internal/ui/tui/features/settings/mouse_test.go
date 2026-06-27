@@ -73,7 +73,7 @@ func TestHandleMouseLeft_ClickLanguageTabSavesImmediately(t *testing.T) {
 	state := State{}
 
 	const languageRowY = 7 // language index=2, offset=5
-	zhCNTabX := settingsContainerLeft + settingsRowPaddingLeft + settingsLabelWidth + settingsTabDisplayWidth("auto") + 1
+	zhCNTabX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth + settingsTabDisplayWidth("auto") + 1
 	next, newCfg, _ := state.HandleMouseLeft(zhCNTabX, languageRowY, &cfg, configSvc, nil)
 
 	if next.selectedSetting != 2 {
@@ -91,7 +91,7 @@ func TestHandleMouseLeft_ClickLanguageTabSavesImmediately(t *testing.T) {
 }
 
 func TestResolveThemeMouseTargetIncludesRenderedTabPadding(t *testing.T) {
-	valueStartX := settingsContainerLeft + settingsRowPaddingLeft + settingsLabelWidth
+	valueStartX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth
 
 	themeName, ok := resolveThemeMouseTarget(valueStartX + len("tokyo-night") + 3)
 	if !ok {

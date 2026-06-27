@@ -112,13 +112,13 @@ func TestRenderSettingsPage_TabBarHasBorder(t *testing.T) {
 	}, 80, 20))
 	lines := strings.Split(rendered, "\n")
 
-	if !strings.Contains(lines[1], "╭") || !strings.Contains(lines[1], "╮") {
-		t.Fatalf("expected tab bar top border on line 1, got %q", lines[1])
+	if !strings.Contains(lines[0], "╭") || !strings.Contains(lines[0], "╮") {
+		t.Fatalf("expected tab bar top border on line 0, got %q", lines[0])
 	}
-	if !strings.Contains(lines[2], i18n.T("settings.tab.mihosh")) || !strings.Contains(lines[2], i18n.T("settings.tab.mihomo")) {
-		t.Fatalf("expected tab labels on line 2, got %q", lines[2])
+	if !strings.Contains(lines[1], i18n.T("settings.tab.mihosh")) || !strings.Contains(lines[1], i18n.T("settings.tab.mihomo")) {
+		t.Fatalf("expected tab labels on line 1, got %q", lines[1])
 	}
-	if !strings.Contains(lines[3], "╰") || !strings.Contains(lines[3], "╯") {
-		t.Fatalf("expected tab bar bottom border on line 3, got %q", lines[3])
+	if !strings.Contains(lines[2], "╰") || !strings.Contains(lines[2], "╯") {
+		t.Fatalf("expected tab bar bottom border on line 2, got %q", lines[2])
 	}
 }

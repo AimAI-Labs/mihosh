@@ -124,14 +124,9 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	}
 	state.Toast.CleanExpired()
 
-	// 容器统一样式
-	containerStyle := lipgloss.NewStyle().
-		MarginLeft(2).
-		MarginTop(1)
-
 	// Tab Bar：复用 connections 的带圆角边框样式（3 行高度：上边框 / 内容行 / 下边框）
 	tabs := []string{i18n.T("settings.tab.mihosh"), i18n.T("settings.tab.mihomo")}
-	tabBar := renderSettingsTabBar(tabs, state.ActiveTab, width-4)
+	tabBar := renderSettingsTabBar(tabs, state.ActiveTab, width)
 
 	// 渲染设置项列表
 	var settingItems []string
@@ -143,33 +138,27 @@ func RenderSettingsPage(state PageState, width, height int) string {
 
 	// 使用 Tokyo 面板包裹设置列表
 	listContent := strings.Join(settingItems, "\n")
-	settingsPanel := common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width-4)
+	settingsPanel := common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width)
 
 	// 处理 Mihomo 状态
 	var warningText string
 	if state.ActiveTab == 1 {
 		if !state.MihomoLoaded {
 			listContent = "\n  " + i18n.T("settings.mihomo.loading") + "\n"
-			settingsPanel = common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width-4)
+			settingsPanel = common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width)
 		} else if state.MihomoLoadErr != nil && state.MihomoConfig == nil {
 			// YAML 也读不到，才展示全屏错误
 			listContent = "\n  " + fmt.Sprintf(i18n.T("settings.mihomo.load_error"), state.MihomoLoadErr) + "\n"
-			settingsPanel = common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width-4)
+			settingsPanel = common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width)
 		} else if state.MihomoFromFile && state.MihomoLoadErr != nil {
 			// API 不可达但 YAML 可读：记录警告，稍后显示在配置框左下方
 			warningText = "⚠ " + i18n.T("settings.mihomo.offline_warning")
 		}
 	}
 
-	// 渲染选中项描述（信息行右侧，配置框右下方提示）
+	// 渲染选中项描述（信息行右侧，配置框右下方提示）已按需求取消
 	var descPart string
 	keys = state.activeKeys()
-	if state.SelectedSetting >= 0 && state.SelectedSetting < len(keys) {
-		descPart = lipgloss.NewStyle().
-			Foreground(common.TokyoMuted()).
-			Italic(true).
-			Render("💡 " + GetSettingDesc(keys[state.SelectedSetting]))
-	}
 
 	// 渲染版本信息（左下角，状态栏上方）
 	mihomoVer := state.MihomoVersion
@@ -181,7 +170,7 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	versionText := fmt.Sprintf("%s | Built: %s | %s", mihoshLink, model.Date, mihomoLink)
 
 	// 描述行：左侧警告（如果有），右侧描述，与配置框同宽
-	rowWidth := width - 4
+	rowWidth := width - 2
 	var warningPart string
 	if warningText != "" {
 		warningPart = lipgloss.NewStyle().
@@ -200,16 +189,14 @@ func RenderSettingsPage(state PageState, width, height int) string {
 		Width(rowWidth).
 		Render(descRowContent)
 
-	// 组装主要内容：Tab Bar → 配置框 → 描述行
+	// 组装主要内容：Tab Bar → 空行 → 配置框 → 描述行
 	mainContent := lipgloss.JoinVertical(
 		lipgloss.Left,
 		tabBar,
+		"",
 		settingsPanel,
 		descRow,
 	)
-
-	// 包裹容器边距
-	mainContent = containerStyle.Render(mainContent)
 
 	// 填充至页面高度，使右下角帮助提示浮层能正确定位到底部
 	mainContent = lipgloss.PlaceVertical(height, lipgloss.Top, mainContent)
@@ -247,7 +234,7 @@ func overlayVersionAtBottomLeft(page, versionText string, width, height int) str
 		Foreground(common.TokyoMuted()).
 		Render(versionText)
 	// 宽度限制：保留原始行其余内容（叠加后可能被版本文字覆盖前缀，这里采用左对齐替换整行更安全）
-	maxWidth := width - 4
+	maxWidth := width - 2
 	if maxWidth < 1 {
 		maxWidth = 1
 	}
@@ -421,7 +408,7 @@ func renderSettingItem(state PageState, index int, key string, label string, wid
 	lineInner := lipgloss.JoinHorizontal(lipgloss.Top, renderedLabel, renderedValue)
 
 	// 定义单行块的样式
-	rowWidth := width - 8
+	rowWidth := width - 4
 	if rowWidth < settingsMinRowWidth {
 		rowWidth = settingsMinRowWidth
 	}
@@ -517,8 +504,8 @@ func renderLogLevelTabs(current string, editMode bool) string {
 const settingsTabBarHeight = 3
 
 // settingsTabBarContentY 标签栏内容行（可点击行）相对页面内容顶部的 Y 坐标。
-// 布局：marginTop 空行(0) + 上边框(1) → 内容行位于 pageY=2。
-const settingsTabBarContentY = 2
+// 布局：上边框(0) → 内容行位于 pageY=1。
+const settingsTabBarContentY = 1
 
 // renderSettingsTabBar 渲染带圆角边框的标签栏，样式与 connections 模式切换栏一致。
 func renderSettingsTabBar(labels []string, active int, width int) string {

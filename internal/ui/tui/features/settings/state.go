@@ -25,7 +25,7 @@ const (
 	// 布局：marginTop 空行(1) + 标签栏带边框(3 行: 上边框/内容行/下边框) + 配置面板上边框(1) = 5
 	settingsMouseRowsOffset      = 5
 	settingsDoubleClickThreshold = 350 * time.Millisecond
-	settingsContainerLeft        = 2
+	settingsContainerLeft        = 0
 	settingsRowPaddingLeft       = 1
 	settingsTabHorizontalPadding = 2
 	settingsTabContentPadding    = 2
@@ -646,7 +646,8 @@ func resolveThemeMouseTarget(pageX int) (string, bool) {
 		return "", false
 	}
 
-	valueStartX := settingsContainerLeft + settingsRowPaddingLeft + settingsLabelWidth
+	// 2 是 TokyoPanel 的左侧边框和空格 (`│ `) 的宽度
+	valueStartX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth
 	themes := theme.Names()
 	cursor := valueStartX
 
@@ -669,7 +670,8 @@ func resolveLanguageMouseTarget(pageX int) (string, bool) {
 		return "", false
 	}
 
-	valueStartX := settingsContainerLeft + settingsRowPaddingLeft + settingsLabelWidth
+	// 2 是 TokyoPanel 的左侧边框和空格 (`│ `) 的宽度
+	valueStartX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth
 	modes := []string{"auto", "zh-CN", "en-US"}
 	cursor := valueStartX
 
