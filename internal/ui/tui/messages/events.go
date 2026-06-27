@@ -235,3 +235,10 @@ type SubEditErrorMsg struct {
 }
 
 func (m SubEditErrorMsg) Error() string { return m.Err.Error() }
+
+// LocalSubImportedMsg 首次启动时自动导入本地 mihomo 配置为本地订阅完成。
+// Profile 非空表示导入成功；Err 非 nil 表示导入失败（非致命，静默忽略）。
+type LocalSubImportedMsg struct {
+	Profile *profile.Profile
+	Err     error
+}

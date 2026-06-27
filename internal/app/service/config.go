@@ -74,49 +74,17 @@ func (s *ConfigService) SetConfigValue(key, value string) error {
 	return config.Save(cfg)
 }
 
-// FetchMihomoConfig fetches the live config from Mihomo API and supplements with YAML if needed.
-// 当 API 不可达时（如端口错误），降级从 YAML 文件读取，让用户仍可查看/编辑配置。
+// FetchMihomoConfig 从 mihomo 配置文件（YAML）读取 5 个托管字段。
+// 路径通过 GetMihomoConfigPath() 解析（Linux 下优先用 systemctl -d 参数）。
+// 始终从磁盘读取，不依赖 API（API 响应可能含运行时变化，文件才是真实来源）。
 func (s *ConfigService) FetchMihomoConfig(client *api.Client) tea.Cmd {
 	return func() tea.Msg {
-		if client == nil {
-			return s.fetchMihomoConfigFromFile(fmt.Errorf("API client is nil"))
-		}
-		resp, err := client.GetConfigs()
-		if err != nil {
-			// API 不可达，降级从 YAML 文件读取
-			return s.fetchMihomoConfigFromFile(err)
-		}
-
-		mihomoCfg := &model.MihomoConfig{
-			ExternalController: resp.ExternalController,
-			Secret:             resp.Secret,
-			MixedPort:          resp.MixedPort,
-			AllowLan:           resp.AllowLan,
-			LogLevel:           resp.LogLevel,
-		}
-
-		if mihomoCfg.MixedPort == 0 && resp.Port > 0 {
-			mihomoCfg.MixedPort = resp.Port
-		}
-
-		// Fallback for connection settings if empty (API might omit them)
-		endpoint := config.ResolveMihomoEndpoint()
-		if mihomoCfg.ExternalController == "" {
-			mihomoCfg.ExternalController = endpoint.ExternalController
-		}
-		if mihomoCfg.Secret == "" {
-			mihomoCfg.Secret = endpoint.Secret
-		}
-		if mihomoCfg.MixedPort == 0 {
-			mihomoCfg.MixedPort = endpoint.MixedPort
-		}
-		return messages.MihomoConfigMsg{Config: mihomoCfg}
+		return s.fetchMihomoConfigFromFile(nil)
 	}
 }
 
-// fetchMihomoConfigFromFile 从 YAML 文件降级读取 Mihomo 配置。
-// 返回的 MihomoConfigMsg 同时携带 Config（文件读取结果）和 Err（原始 API 错误），
-// FromFile=true 告诉 UI 层当前为离线模式。
+// fetchMihomoConfigFromFile 从 YAML 文件读取 Mihomo 配置的 5 个托管字段。
+// 始终从磁盘读取，确保展示的是配置文件实际内容（而非 API 运行时状态）。
 func (s *ConfigService) fetchMihomoConfigFromFile(apiErr error) messages.MihomoConfigMsg {
 	endpoint := config.ResolveMihomoEndpoint()
 	mihomoCfg := &model.MihomoConfig{
@@ -125,7 +93,7 @@ func (s *ConfigService) fetchMihomoConfigFromFile(apiErr error) messages.MihomoC
 		MixedPort:          endpoint.MixedPort,
 	}
 
-	// 尝试从 YAML 读取 allow-lan / log-level 等 API-only 字段
+	// 从 YAML 读取 allow-lan / log-level（ResolveMihomoEndpoint 未解析的字段）
 	if path, err := config.GetMihomoConfigPath(); err == nil {
 		if data, err := config.ReadMihomoYAML(path); err == nil {
 			if v, ok := data["allow-lan"].(bool); ok {

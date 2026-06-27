@@ -19,16 +19,17 @@ func TestConfigService_FetchMihomoConfig_NilClient(t *testing.T) {
 		t.Fatalf("expected messages.MihomoConfigMsg, got %T", msg)
 	}
 
-	// API 不可达时降级到 YAML 文件读取
+	// 始终从 YAML 文件读取，不再依赖 API
 	if !configMsg.FromFile {
-		t.Error("expected FromFile=true for nil client fallback")
+		t.Error("expected FromFile=true (always reads from YAML)")
 	}
-	if configMsg.Err == nil || configMsg.Err.Error() != "API client is nil" {
-		t.Errorf("expected err 'API client is nil', got %v", configMsg.Err)
+	// 从文件读取时无 API 错误
+	if configMsg.Err != nil {
+		t.Errorf("expected no error when reading from file, got %v", configMsg.Err)
 	}
-	// 即使 API 不可达，Config 也应从 YAML/默认值填充，不为 nil
+	// 即使 API client 为 nil，Config 也应从 YAML/默认值填充，不为 nil
 	if configMsg.Config == nil {
-		t.Fatal("expected Config to be populated from YAML fallback, got nil")
+		t.Fatal("expected Config to be populated from YAML, got nil")
 	}
 }
 

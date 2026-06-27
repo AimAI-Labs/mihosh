@@ -73,6 +73,11 @@ func (m Model) Init() tea.Cmd {
 		autoRefreshTick(),
 		startWSStreams(m.wsClient, m.wsMsgChan),
 		listenWSMessages(m.wsCtx, m.wsMsgChan),
+		// 首次启动时自动将本地 mihomo 配置导入为本地订阅（幂等，已有则跳过）
+		func() tea.Msg {
+			p, err := m.profileSvc.AutoImportLocalSub()
+			return messages.LocalSubImportedMsg{Profile: p, Err: err}
+		},
 	)
 }
 
@@ -587,6 +592,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			nodes.FetchGroups(m.client),
 			nodes.FetchProxies(m.client),
 		)
+
+	case messages.LocalSubImportedMsg:
+		// 首次启动自动导入本地订阅完成（成功时刷新列表，失败时静默忽略）
+		if msg.Profile != nil && msg.Err == nil {
+			return m, sub.FetchSubs(m.profileSvc)
+		}
 	}
 
 	return m, nil
@@ -667,6 +678,10 @@ func (m *Model) refreshCurrentPage() tea.Cmd {
 	case layout.PageSettings:
 		cfg, _ := m.configSvc.LoadConfig()
 		m.config = cfg
+		return tea.Batch(
+			settings.FetchMihomoVersion(m.client),
+			m.configSvc.FetchMihomoConfig(m.client),
+		)
 	}
 	return nil
 }

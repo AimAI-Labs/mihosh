@@ -285,6 +285,72 @@ func (s *ProfileService) Activate(uid string) (ActivateResult, error) {
 
 // ===== 内部辅助 =====
 
+// AutoImportLocalSub 首次启动时自动将当前运行的 mihomo 配置文件复制为本地订阅。
+// 若已有 SourceLocal 类型的订阅，或无法解析 mihomo 配置路径，则静默跳过。
+// 返回导入的 Profile（成功时）或 nil（跳过/失败时）。
+func (s *ProfileService) AutoImportLocalSub() (*profile.Profile, error) {
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, nil // 配置未初始化，静默跳过
+	}
+
+	// 已有本地订阅，跳过
+	for _, p := range cfg.Subs {
+		if p.Source.Kind == profile.SourceLocal {
+			return nil, nil
+		}
+	}
+
+	// 解析 mihomo 运行配置路径（已通过 -d 参数优先解析）
+	mihomoPath, err := config.GetMihomoConfigPath()
+	if err != nil {
+		return nil, nil // 无本地内核配置，静默跳过
+	}
+
+	// 读取 mihomo 配置文件内容
+	data, err := os.ReadFile(mihomoPath)
+	if err != nil || len(data) == 0 {
+		return nil, nil // 文件不可读或为空，静默跳过
+	}
+
+	// 生成 UID 并创建目录
+	uid, err := newUID()
+	if err != nil {
+		return nil, fmt.Errorf("生成订阅 ID 失败: %w", err)
+	}
+	if _, err := profile.RawPath(uid); err != nil {
+		return nil, err
+	}
+
+	// 写入 raw.yaml
+	if err := profile.WriteRaw(uid, data); err != nil {
+		_ = profile.DeleteProfileDir(uid)
+		return nil, fmt.Errorf("写入本地订阅配置失败: %w", err)
+	}
+
+	// 构建 Profile 元数据（Source.Path 指向复制后的 raw.yaml，而非原始 mihomo 配置路径）
+	rawPath, _ := profile.RawPath(uid)
+	p := profile.Profile{
+		UID:       uid,
+		Name:      i18nLocalSubName,
+		Source:    profile.SubSource{Kind: profile.SourceLocal, Path: rawPath},
+		UpdatedAt: time.Now().Unix(),
+	}
+
+	// 持久化元数据
+	if err := s.persistMutation(func(cfg *config.Config) {
+		cfg.Subs = append(cfg.Subs, p)
+	}); err != nil {
+		_ = profile.DeleteProfileDir(uid)
+		return nil, err
+	}
+
+	return &p, nil
+}
+
+// i18nLocalSubName 本地订阅默认名称（硬编码，不依赖 i18n 初始化时序）。
+const i18nLocalSubName = "Local Config"
+
 // findProfile 按 UID 查找订阅元数据。
 func (s *ProfileService) findProfile(uid string) (profile.Profile, error) {
 	cfg, err := config.Load()
