@@ -61,6 +61,14 @@ type State struct {
 	SysStatus SysStatusState
 }
 
+// NewState 创建新的设置页面状态
+func NewState() State {
+	return State{
+		SysStatus:    NewSysStatusState(),
+		toastManager: common.NewToastManager(),
+	}
+}
+
 // IsEditing 返回是否处于编辑模式
 func (s State) IsEditing() bool {
 	return s.editMode
@@ -168,22 +176,43 @@ func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.Con
 }
 
 // HandleMouseScroll 鼠标滚轮处理
-func (s State) HandleMouseScroll(up bool, pageY, pageHeight, actionsPanelBottomY int) State {
+func (s State) HandleMouseScroll(up bool, pageY, pageWidth int, cfg *config.Config) (State, tea.Cmd) {
 	// If we are in the Mihomo tab and the mouse is below the actions panel (where viewport is)
-	if s.activeTab == 1 && s.SysStatus.Supported && pageY > actionsPanelBottomY {
-		var mouseMsg tea.MouseMsg
-		if up {
-			mouseMsg.Type = tea.MouseWheelUp
+	if s.activeTab == 1 && s.SysStatus.Supported && pageY > 0 {
+		settingsPanelHeight := 0
+		if !s.mihomoLoaded {
+			settingsPanelHeight = 5 // "\n  Loading...\n" len is 3, + 2 = 5
+		} else if s.mihomoLoadErr != nil && s.mihomoConfig == nil {
+			settingsPanelHeight = 5
 		} else {
-			mouseMsg.Type = tea.MouseWheelDown
+			height := 0
+			pageState := s.ToPageState(cfg)
+			for i, key := range s.activeKeys() {
+				item := renderSettingItem(pageState, i, key, GetSettingLabel(key), pageWidth)
+				height += lipgloss.Height(item)
+			}
+			settingsPanelHeight = height + 2
 		}
-		s.SysStatus.Update(mouseMsg)
-		return s
+
+		actionsPanelTop := 4 + settingsPanelHeight + 1
+		rows := LayoutActionButtons(pageWidth)
+		actionsPanelBottomY := actionsPanelTop + 2 + len(rows)*2
+
+		if pageY > actionsPanelBottomY {
+			var mouseMsg tea.MouseMsg
+			if up {
+				mouseMsg.Type = tea.MouseWheelUp
+			} else {
+				mouseMsg.Type = tea.MouseWheelDown
+			}
+			cmd := s.SysStatus.Update(mouseMsg)
+			return s, cmd
+		}
 	}
 
 	// 编辑模式下禁用滚轮，避免误切当前正在编辑的配置项
 	if s.editMode {
-		return s
+		return s, nil
 	}
 	if up {
 		if s.selectedSetting > 0 {
@@ -194,7 +223,7 @@ func (s State) HandleMouseScroll(up bool, pageY, pageHeight, actionsPanelBottomY
 			s.selectedSetting++
 		}
 	}
-	return s
+	return s, nil
 }
 
 // HandleMouseLeft 处理 settings 页面左键单击/双击

@@ -124,7 +124,7 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 		logsState:            logs.NewState(),
 		rulesState:           newRulesState(),
 		subState:             sub.State{},
-		settingsState:        settings.State{},
+		settingsState:        settings.NewState(),
 		autoRefreshRemaining: cfg.AutoRefreshInterval,
 	}
 }

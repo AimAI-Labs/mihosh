@@ -425,27 +425,27 @@ func TestHandleMouseScroll(t *testing.T) {
 	s := State{selectedSetting: 2}
 
 	// 向上滚动
-	next := s.HandleMouseScroll(true)
+	next, _ := s.HandleMouseScroll(true, -1, 100, nil)
 	if next.selectedSetting != 1 {
 		t.Errorf("expected selectedSetting to decrease to 1, got %d", next.selectedSetting)
 	}
 
 	// 向上滚动至 0，不应再减少
-	next = next.HandleMouseScroll(true)
-	next = next.HandleMouseScroll(true)
+	next, _ = next.HandleMouseScroll(true, -1, 100, nil)
+	next, _ = next.HandleMouseScroll(true, -1, 100, nil)
 	if next.selectedSetting != 0 {
 		t.Errorf("expected selectedSetting to stop at 0, got %d", next.selectedSetting)
 	}
 
 	// 向下滚动
-	next = next.HandleMouseScroll(false)
+	next, _ = next.HandleMouseScroll(false, -1, 100, nil)
 	if next.selectedSetting != 1 {
 		t.Errorf("expected selectedSetting to increase to 1, got %d", next.selectedSetting)
 	}
 
 	// Act: 向下滚动直到尽头
 	for i := 0; i < len(MihoshSettingKeys)+5; i++ {
-		next = next.HandleMouseScroll(false)
+		next, _ = next.HandleMouseScroll(false, -1, 100, nil)
 	}
 	if next.selectedSetting != len(MihoshSettingKeys)-1 {
 		t.Errorf("expected selectedSetting to cap at %d, got %d", len(MihoshSettingKeys)-1, next.selectedSetting)
@@ -456,11 +456,11 @@ func TestHandleMouseScroll_DisabledInEditMode(t *testing.T) {
 	s := State{selectedSetting: 2, editMode: true}
 
 	// 编辑模式下滚动不应改变选中项
-	next := s.HandleMouseScroll(true)
+	next, _ := s.HandleMouseScroll(true, -1, 100, nil)
 	if next.selectedSetting != 2 {
 		t.Errorf("expected selectedSetting to remain 2 in edit mode, got %d", next.selectedSetting)
 	}
-	next = s.HandleMouseScroll(false)
+	next, _ = s.HandleMouseScroll(false, -1, 100, nil)
 	if next.selectedSetting != 2 {
 		t.Errorf("expected selectedSetting to remain 2 in edit mode, got %d", next.selectedSetting)
 	}
