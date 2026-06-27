@@ -471,7 +471,14 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 
 	default:
 		if msg.Type == tea.KeyRunes || msg.Type == tea.KeySpace {
-			inputRunes := []rune(msg.String())
+			var inputRunes []rune
+			if msg.Type == tea.KeySpace {
+				inputRunes = []rune{' '}
+			} else if len(msg.Runes) > 0 {
+				inputRunes = msg.Runes
+			} else {
+				inputRunes = []rune(msg.String())
+			}
 			runes := []rune(s.editValue)
 			if s.editCursor > len(runes) {
 				s.editCursor = len(runes)
