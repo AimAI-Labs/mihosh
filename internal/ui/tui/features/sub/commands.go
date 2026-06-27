@@ -100,19 +100,28 @@ func ActivateSubCmd(svc *service.ProfileService, uid string) tea.Cmd {
 // ApplyActiveMergeCmd 复用 Activate 流程做覆写编辑后的重载
 // （生成 → 备份 → 写入 → 热重载核心；配置未变更时跳过）。
 // 与 ActivateSubCmd 的唯一差别：返回 SubMergeAppliedMsg 以走专属 toast 文案。
-func ApplyActiveMergeCmd(svc *service.ProfileService, uid string) tea.Cmd {
+func ApplyActiveMergeCmd(svc *service.ProfileService, uid string, hasUnsupportedManagedFields bool) tea.Cmd {
 	return func() tea.Msg {
 		if svc == nil {
-			return messages.SubMergeAppliedMsg{UID: uid, Err: errNoService}
+			return messages.SubMergeAppliedMsg{
+				UID:                         uid,
+				Err:                         errNoService,
+				HasUnsupportedManagedFields: hasUnsupportedManagedFields,
+			}
 		}
 		res, err := svc.Activate(uid)
 		if err != nil {
-			return messages.SubMergeAppliedMsg{UID: uid, Err: err}
+			return messages.SubMergeAppliedMsg{
+				UID:                         uid,
+				Err:                         err,
+				HasUnsupportedManagedFields: hasUnsupportedManagedFields,
+			}
 		}
 		return messages.SubMergeAppliedMsg{
-			UID:        uid,
-			BackupName: res.BackupName,
-			MergeErr:   res.MergeErr,
+			UID:                         uid,
+			BackupName:                  res.BackupName,
+			MergeErr:                    res.MergeErr,
+			HasUnsupportedManagedFields: hasUnsupportedManagedFields,
 		}
 	}
 }

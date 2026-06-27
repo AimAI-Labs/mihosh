@@ -33,7 +33,13 @@ func (s State) openMergeExternalEditor(svc *service.ProfileService) (State, tea.
 	args = append(args, mergePath)
 	c := exec.Command(fields[0], args...)
 	return s, tea.ExecProcess(c, func(err error) tea.Msg {
-		return messages.MergeEditFinishedMsg{Err: err}
+		msg := messages.MergeEditFinishedMsg{Err: err}
+		if err == nil {
+			if keys, detectErr := profile.MergeManagedFieldOverrideKeys(); detectErr == nil && len(keys) > 0 {
+				msg.HasUnsupportedManagedFields = true
+			}
+		}
+		return msg
 	})
 }
 

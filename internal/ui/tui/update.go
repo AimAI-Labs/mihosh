@@ -234,15 +234,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// ── 数据消息：分发到子状态 ──
 
 	case messages.GroupsMsg:
-		m.notice = ""
+		if m.noticeTicks <= 0 {
+			m.notice = ""
+		}
 		m.nodesState = m.nodesState.ApplyGroups(msg.Groups, msg.OrderedNames)
 
 	case messages.ProxiesMsg:
-		m.notice = ""
+		if m.noticeTicks <= 0 {
+			m.notice = ""
+		}
 		m.nodesState = m.nodesState.ApplyProxies(msg)
 
 	case messages.ConfigModeMsg:
-		m.notice = ""
+		if m.noticeTicks <= 0 {
+			m.notice = ""
+		}
 		m.nodesState = m.nodesState.ApplyConfigMode(msg.Mode)
 
 	case messages.ConnectionsMsg:
@@ -320,13 +326,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg
 		m.notice = ""
 		m.noticeTicks = 0
-	
+
 	case messages.RuleEditedMsg:
 		// 规则已修改：热重载核心 + 刷新规则列表 + 显示成功提示
 		m.notice = i18n.T("rules.edit_toast")
 		m.noticeTicks = autoRefreshNoticeTicks
 		return m, reloadConfigCmd(m.client)
-	
+
 	case messages.RuleEditErrorMsg:
 		// 修改失败：沿用全局错误显示
 		m.err = msg
@@ -564,11 +570,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// 如果有激活的订阅，则立即应用这份全局覆写并热重载
 		if m.subState.ActiveUID() != "" {
-			m.notice = i18n.T("sub.merge_applied_toast")
+			if msg.HasUnsupportedManagedFields {
+				m.notice = i18n.T("sub.merge_applied_unsupported_toast")
+			} else {
+				m.notice = i18n.T("sub.merge_applied_toast")
+			}
 			m.noticeTicks = autoRefreshNoticeTicks
-			return m, tea.Batch(reenableMouse, sub.ApplyActiveMergeCmd(m.profileSvc, m.subState.ActiveUID()))
+			return m, tea.Batch(reenableMouse, sub.ApplyActiveMergeCmd(m.profileSvc, m.subState.ActiveUID(), msg.HasUnsupportedManagedFields))
 		}
-		m.notice = i18n.T("sub.merge_saved_toast")
+		if msg.HasUnsupportedManagedFields {
+			m.notice = i18n.T("sub.merge_saved_unsupported_toast")
+		} else {
+			m.notice = i18n.T("sub.merge_saved_toast")
+		}
 		m.noticeTicks = autoRefreshNoticeTicks
 		return m, reenableMouse
 
@@ -581,7 +595,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		notice := i18n.T("sub.merge_applied_toast")
-		if msg.MergeErr != nil {
+		if msg.HasUnsupportedManagedFields {
+			notice = i18n.T("sub.merge_applied_unsupported_toast")
+		} else if msg.MergeErr != nil {
 			notice = i18n.T("sub.merge_applied_warn_toast")
 		}
 		m.notice = notice

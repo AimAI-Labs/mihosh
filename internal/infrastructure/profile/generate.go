@@ -27,6 +27,30 @@ var managedFields = []string{
 	"log-level",
 }
 
+func managedFieldKeysInNode(n *yaml.Node) []string {
+	mapping := topLevelMapping(n)
+	if mapping == nil {
+		return nil
+	}
+	keys := make([]string, 0, len(managedFields))
+	for _, field := range managedFields {
+		if findMappingValue(mapping, field) != nil {
+			keys = append(keys, field)
+		}
+	}
+	return keys
+}
+
+// MergeManagedFieldOverrideKeys 返回 merge.yaml 中出现的托管字段。
+// 这些字段由设置页托管，不支持在覆写配置中设置。
+func MergeManagedFieldOverrideKeys() ([]string, error) {
+	merge, err := ReadMergeNode()
+	if err != nil {
+		return nil, err
+	}
+	return managedFieldKeysInNode(merge), nil
+}
+
 // readManagedFieldsFromFile 从现有配置文件读取托管字段
 func readManagedFieldsFromFile(path string) (map[string]*yaml.Node, error) {
 	managed := make(map[string]*yaml.Node)

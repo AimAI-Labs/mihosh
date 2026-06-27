@@ -247,11 +247,11 @@ func TestApplyMerge_DeepMergeNestedMapping(t *testing.T) {
 func TestGenerateYAMLWithPreserve_InsertsMissingManagedFields(t *testing.T) {
 	dir := t.TempDir()
 	managedPath := filepath.Join(dir, "config.yaml")
-	require.NoError(t, os.WriteFile(managedPath, []byte("" +
-		"external-controller: 127.0.0.1:9090\n" +
-		"secret: abc123\n" +
-		"mixed-port: 7890\n" +
-		"allow-lan: true\n" +
+	require.NoError(t, os.WriteFile(managedPath, []byte(""+
+		"external-controller: 127.0.0.1:9090\n"+
+		"secret: abc123\n"+
+		"mixed-port: 7890\n"+
+		"allow-lan: true\n"+
 		"log-level: debug\n"), 0644))
 
 	raw := parseDoc(t, `mode: rule
@@ -275,11 +275,11 @@ proxies: []
 func TestGenerateYAMLWithPreserve_OverridesManagedFieldsFromSubscription(t *testing.T) {
 	dir := t.TempDir()
 	managedPath := filepath.Join(dir, "config.yaml")
-	require.NoError(t, os.WriteFile(managedPath, []byte("" +
-		"external-controller: 0.0.0.0:9090\n" +
-		"secret: xxxxx\n" +
-		"mixed-port: 7890\n" +
-		"allow-lan: true\n" +
+	require.NoError(t, os.WriteFile(managedPath, []byte(""+
+		"external-controller: 0.0.0.0:9090\n"+
+		"secret: xxxxx\n"+
+		"mixed-port: 7890\n"+
+		"allow-lan: true\n"+
 		"log-level: info\n"), 0644))
 
 	raw := parseDoc(t, `external-controller: 127.0.0.1:19090
@@ -316,6 +316,22 @@ func TestGenerateYAMLWithPreserve_InvalidManagedYAMLReturnsError(t *testing.T) {
 	_, err := GenerateYAMLWithPreserve(raw, nil, managedPath)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "解析现有 mihomo 配置失败")
+}
+
+func TestMergeManagedFieldOverrideKeys(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	require.NoError(t, WriteMerge([]byte(`mixed-port: 17890
+allow-lan: false
+mode: rule
+secret: from-override
+`)))
+
+	keys, err := MergeManagedFieldOverrideKeys()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"secret", "mixed-port", "allow-lan"}, keys)
 }
 
 func TestApplyMerge_DeepMergeSequenceReplaced(t *testing.T) {

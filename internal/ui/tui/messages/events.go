@@ -209,17 +209,19 @@ func (m SubMergeSaveErrorMsg) Error() string { return m.Err.Error() }
 // MergeEditFinishedMsg 外部编辑器编辑全局 merge.yaml 结束。
 // Err 为 nil 表示编辑器正常退出（文件已写盘）；非 nil 表示启动或退出失败。
 type MergeEditFinishedMsg struct {
-	Err error
+	Err                         error
+	HasUnsupportedManagedFields bool
 }
 
 // SubMergeAppliedMsg 激活订阅流程（覆写编辑后触发的重载）结束。
 // Err != nil 表示生成/备份/写入/重载中某步失败；
 // MergeErr != nil 表示 merge.yaml 语法错误（已降级忽略覆写，非致命）。
 type SubMergeAppliedMsg struct {
-	UID        string
-	BackupName string
-	Err        error
-	MergeErr   error
+	UID                         string
+	BackupName                  string
+	Err                         error
+	MergeErr                    error
+	HasUnsupportedManagedFields bool
 }
 
 // SubRenameDoneMsg 订阅已重命名。

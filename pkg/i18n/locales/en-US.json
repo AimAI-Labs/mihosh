@@ -482,7 +482,9 @@
   "sub.activated_toast": "Switched subscription and reloaded core",
   "sub.activated_merge_warn_toast": "Switched subscription (override syntax error, override ignored)",
   "sub.merge_saved_toast": "Override saved",
+  "sub.merge_saved_unsupported_toast": "Override saved; external-controller/secret/mixed-port/allow-lan/log-level are not supported in override and were ignored",
   "sub.merge_applied_toast": "Override saved and core reloaded",
+  "sub.merge_applied_unsupported_toast": "Override saved and reloaded; external-controller/secret/mixed-port/allow-lan/log-level are not supported in override and were ignored",
   "sub.merge_applied_warn_toast": "Override saved but had syntax error, ignored override and reloaded",
 
   "help.section.sub": "Subscriptions",

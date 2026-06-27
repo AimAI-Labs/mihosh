@@ -482,7 +482,9 @@
   "sub.activated_toast": "已切换订阅并重载核心",
   "sub.activated_merge_warn_toast": "已切换订阅（覆写语法错误，已忽略覆写）",
   "sub.merge_saved_toast": "已保存覆写",
+  "sub.merge_saved_unsupported_toast": "已保存覆写；不支持在覆写中设置 external-controller/secret/mixed-port/allow-lan/log-level，已忽略",
   "sub.merge_applied_toast": "覆写已保存并重载核心",
+  "sub.merge_applied_unsupported_toast": "覆写已保存并重载；不支持在覆写中设置 external-controller/secret/mixed-port/allow-lan/log-level，已忽略",
   "sub.merge_applied_warn_toast": "覆写已保存但语法错误，已忽略覆写并重载",
 
   "help.section.sub": "订阅管理",
