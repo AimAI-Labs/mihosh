@@ -33,16 +33,20 @@ func GetConfigDir() (string, error) {
 	return configDir, nil
 }
 
-// GetMihomoConfigPath 获取 mihomo 配置文件的默认路径
+// GetMihomoConfigPath 获取 mihomo 配置文件的默认路径。
+// Linux 下优先从 systemctl status 解析 -d 参数（运行时实际生效的配置），
+// 再降级搜索已知目录；其他平台直接搜索已知目录。
 func GetMihomoConfigPath() (string, error) {
-	if configFile := searchKnownMihomoDirectories(); configFile != "" {
-		return configFile, nil
-	}
-
+	// 优先：从运行中的 mihomo 进程解析 -d 参数（最权威的实际配置路径）
 	if runtime.GOOS != "windows" {
 		if configFile, err := GetMihomoConfigPathFromProcess(); err == nil {
 			return configFile, nil
 		}
+	}
+
+	// 降级：搜索已知目录（Clash Verge 等桌面客户端场景）
+	if configFile := searchKnownMihomoDirectories(); configFile != "" {
+		return configFile, nil
 	}
 
 	return "", buildMihomoConfigPathNotFoundError()

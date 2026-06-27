@@ -617,7 +617,7 @@ func (m Model) dispatchKeyToPage(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.config != nil {
 			oldLanguage = m.config.Language
 		}
-		m.settingsState, newCfg, cmd = m.settingsState.Update(msg, m.config, m.configSvc, m.profileSvc, m.client)
+		m.settingsState, newCfg, cmd = m.settingsState.Update(msg, m.config, m.configSvc, m.client)
 		m.config = newCfg
 		if newCfg != nil && newCfg.Language != oldLanguage {
 			i18n.SetLanguageOverride(newCfg.Language)

@@ -7,7 +7,6 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	tea "github.com/charmbracelet/bubbletea"
@@ -145,45 +144,11 @@ func (s *ConfigService) fetchMihomoConfigFromFile(apiErr error) messages.MihomoC
 	}
 }
 
-// SaveMihomoConfigField writes to YAML and reloads the API.
-// 连接信息完全归 mihomo 配置文件管理：保存后不再反向同步到 Mihosh 配置，
-// 客户端端点的热刷新改由 MihomoConfigSavedMsg 在 update 层驱动。
-// 当 YAML 写入成功但 reload 失败时（如修改 external-controller 后旧端口已不可达），
-// 仍标记 WriteOK=true 以便 update 层刷新端点。
-func (s *ConfigService) SaveMihomoConfigField(client *api.Client, profileSvc *ProfileService, key string, value interface{}) tea.Cmd {
+// SaveMihomoConfigField 将单个字段写入 mihomo 物理配置文件并使其生效。
+// 流程：写 YAML -> systemctl restart（确保所有变更生效，含端口等不可热重载字段）。
+// 非 Linux 或 systemctl 不可用时降级为 API 热重载。
+func (s *ConfigService) SaveMihomoConfigField(client *api.Client, key string, value interface{}) tea.Cmd {
 	return func() tea.Msg {
-		// 1. Get the current active subscription
-		cfg, err := config.Load()
-		if err != nil {
-			return messages.MihomoConfigSavedMsg{Err: err}
-		}
-
-		activeSub := cfg.ActiveSub
-
-		// Path A: Has Active Sub
-		if activeSub != "" && profileSvc != nil {
-			if err := profile.WriteMergeField(key, value); err != nil {
-				return messages.MihomoConfigSavedMsg{Err: fmt.Errorf("write merge.yaml failed: %w", err)}
-			}
-			
-			// Trigger a full merge and core reload
-			res, err := profileSvc.Activate(activeSub)
-			if err != nil {
-				return messages.MihomoConfigSavedMsg{
-					Err:      fmt.Errorf("activate after merge failed: %w", err),
-					WriteOK:  true, // The file was written to merge.yaml successfully
-				}
-			}
-			
-			// If Activate succeeded but merge syntax was bad, log it or bubble it up, but it's generally OK.
-			if res.MergeErr != nil {
-				// We don't fail the save, but it might mean the merge override was ignored.
-			}
-			
-			return messages.MihomoConfigSavedMsg{WriteOK: true}
-		}
-
-		// Path B: No Active Sub, fallback to config.yaml directly
 		path, err := config.GetMihomoConfigPath()
 		if err != nil {
 			return messages.MihomoConfigSavedMsg{Err: err}
@@ -193,11 +158,16 @@ func (s *ConfigService) SaveMihomoConfigField(client *api.Client, profileSvc *Pr
 			return messages.MihomoConfigSavedMsg{Err: fmt.Errorf("write yaml failed: %w", err)}
 		}
 
+		// 优先 systemctl restart：确保端口等不可热重载字段也能生效
+		if err := config.RestartMihomoService(); err == nil {
+			return messages.MihomoConfigSavedMsg{WriteOK: true}
+		}
+
+		// 降级：API 热重载（非 Linux 或 systemctl 不可用时）
 		if client != nil {
 			if err := client.ReloadConfig(path); err != nil {
-				// YAML 已写入，但 reload 失败（端口变更后预期行为）
 				return messages.MihomoConfigSavedMsg{
-					Err:     fmt.Errorf("reload failed: %w", err),
+					Err:     fmt.Errorf("systemctl restart and API reload both failed: %w", err),
 					WriteOK: true,
 				}
 			}

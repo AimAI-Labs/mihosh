@@ -118,9 +118,9 @@ func (s State) ToPageState(cfg *config.Config) PageState {
 }
 
 // Update 处理设置页面按键，返回：(新状态, 更新后的cfg, cmd)
-func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService, profileSvc *service.ProfileService, client *api.Client) (State, *config.Config, tea.Cmd) {
+func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, tea.Cmd) {
 	if s.editMode {
-		return s.handleEditMode(msg, cfg, configSvc, profileSvc, client)
+		return s.handleEditMode(msg, cfg, configSvc, client)
 	}
 
 	if msg.String() == "h" || msg.String() == "l" || msg.String() == "tab" {
@@ -258,7 +258,7 @@ func (s State) HandleMouseLeft(pageX, pageY int, cfg *config.Config, configSvc *
 }
 
 // handleEditMode 处理编辑模式按键
-func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService, profileSvc *service.ProfileService, client *api.Client) (State, *config.Config, tea.Cmd) {
+func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, tea.Cmd) {
 	if s.activeTab == 1 {
 		keys := s.activeKeys()
 		settingKey := keys[s.selectedSetting]
@@ -272,7 +272,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 				val := s.editValue == "true"
 				s.editMode = false
 				s.editValue = ""
-				return s, cfg, configSvc.SaveMihomoConfigField(client, profileSvc, "allow-lan", val)
+				return s, cfg, configSvc.SaveMihomoConfigField(client, "allow-lan", val)
 			case msg.String() == "left", msg.String() == "right", msg.String() == "tab":
 				if s.editValue == "true" {
 					s.editValue = "false"
@@ -292,7 +292,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 				val := s.editValue
 				s.editMode = false
 				s.editValue = ""
-				return s, cfg, configSvc.SaveMihomoConfigField(client, profileSvc, "log-level", val)
+				return s, cfg, configSvc.SaveMihomoConfigField(client, "log-level", val)
 			case msg.String() == "left":
 				matched := false
 				for i, l := range levels {
@@ -392,7 +392,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 			s.editMode = false
 			s.editValue = ""
 			s.editCursor = 0
-			return s, cfg, configSvc.SaveMihomoConfigField(client, profileSvc, settingKey, val)
+			return s, cfg, configSvc.SaveMihomoConfigField(client, settingKey, val)
 		}
 
 		if err := configSvc.SetConfigValue(settingKey, s.editValue); err != nil {
