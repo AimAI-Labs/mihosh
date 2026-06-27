@@ -448,6 +448,29 @@ func fuzzyMatch(pattern, text string) bool {
 // HandleMouseLeft 处理 nodes 页面左键单击/双击
 func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *api.Client) (State, tea.Cmd) {
 	if s.ShowTestDetail {
+		pageState := s.ToPageState(pageWidth, pageHeight)
+		modal := buildTestResultModal(pageState)
+		overlayLines := strings.Split(modal, "\n")
+		overlayH := len(overlayLines)
+		overlayW := 0
+		for _, l := range overlayLines {
+			if w := common.DisplayWidth(l); w > overlayW {
+				overlayW = w
+			}
+		}
+		startRow := (pageHeight - overlayH) / 2
+		if startRow < 0 {
+			startRow = 0
+		}
+		startCol := (pageWidth - overlayW) / 2
+		if startCol < 0 {
+			startCol = 0
+		}
+
+		if pageY < startRow || pageY >= startRow+overlayH || pageX < startCol || pageX >= startCol+overlayW {
+			s.ShowTestDetail = false
+			s.DetailScrollTop = 0
+		}
 		return s, nil
 	}
 
