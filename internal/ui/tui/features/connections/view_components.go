@@ -34,6 +34,8 @@ const (
 	MouseTargetChart
 	MouseTargetTopN
 	MouseTargetTopNModalItem
+	MouseTargetInlineToggle
+	MouseTargetInlineDetail
 )
 
 // MouseHit 是 connections 页面鼠标命中结果
@@ -158,6 +160,14 @@ func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 		}
 	}
 
+	maxDisplay, detailHeight := calcConnectionsMaxDisplay(state)
+	listEndLine := line + maxDisplay
+	if state.InlineMode && state.ViewMode != ConnViewTraffic && detailHeight > 0 {
+		if pageY >= listEndLine && pageY < listEndLine+detailHeight {
+			return MouseHit{Target: MouseTargetInlineDetail, Index: -1}
+		}
+	}
+
 	return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}
 }
 
@@ -188,6 +198,19 @@ func resolveViewModeHit(state PageState, pageX, pageY int) (MouseHit, bool) {
 					x += separatorWidth
 				}
 			}
+
+			if state.ViewMode == ConnViewActive || state.ViewMode == ConnViewHistory {
+				toggleLabel := " Inline ◫ "
+				toggleWidth := lipgloss.Width(toggleLabel)
+				innerWidth := state.Width - 2
+				if innerWidth < 1 {
+					innerWidth = 1
+				}
+				toggleStartX := 1 + innerWidth - toggleWidth
+				if pageX >= toggleStartX && pageX < toggleStartX+toggleWidth {
+					return MouseHit{Target: MouseTargetInlineToggle, Index: -1}, true
+				}
+			}
 		}
 		return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}, true
 	}
@@ -211,7 +234,7 @@ func connectionTabLabels(viewMode int) (trafficLabel, activeLabel, historyLabel 
 }
 
 // RenderConnModeSwitchComponent 渲染连接页面模式切换按钮（带边框，与节点模式切换风格一致）
-func RenderConnModeSwitchComponent(viewMode int, width int) string {
+func RenderConnModeSwitchComponent(viewMode int, width int, inlineMode bool) string {
 	modes := []struct {
 		Label string
 		Value int
@@ -242,6 +265,16 @@ func RenderConnModeSwitchComponent(viewMode int, width int) string {
 		}
 	}
 
+	var toggleStr string
+	if viewMode == ConnViewActive || viewMode == ConnViewHistory {
+		label := " Inline ◫ "
+		if inlineMode {
+			toggleStr = activeStyle.Render(label)
+		} else {
+			toggleStr = inactiveStyle.Render(label)
+		}
+	}
+
 	content := lipgloss.JoinHorizontal(lipgloss.Left, parts...)
 
 	// 计算内边框宽度
@@ -250,10 +283,11 @@ func RenderConnModeSwitchComponent(viewMode int, width int) string {
 		innerWidth = 1
 	}
 
-	// 填充内容到指定宽度
+	// 填充内容到指定宽度，并将 toggleStr 放在最右侧
 	contentWidth := lipgloss.Width(content)
-	if contentWidth < innerWidth {
-		content += strings.Repeat(" ", innerWidth-contentWidth)
+	toggleWidth := lipgloss.Width(toggleStr)
+	if contentWidth+toggleWidth <= innerWidth {
+		content += strings.Repeat(" ", innerWidth-contentWidth-toggleWidth) + toggleStr
 	}
 
 	// 渲染带边框的模式切换栏
@@ -314,7 +348,7 @@ func resolveConnectionsListWindow(state PageState, total int) connectionsListWin
 		selected = total - 1
 	}
 
-	maxDisplay := calcConnectionsMaxDisplay(state)
+	maxDisplay, _ := calcConnectionsMaxDisplay(state)
 	scrollTop := state.ScrollTop
 	if scrollTop < 0 {
 		scrollTop = 0
@@ -365,7 +399,7 @@ func calcMaxChartHeight(state PageState) int {
 	return 0
 }
 
-func calcConnectionsMaxDisplay(state PageState) int {
+func calcConnectionsMaxDisplay(state PageState) (int, int) {
 	// 活跃/历史 tab：表格独占，不计算图表/TopN/站点卡片占用
 	usedLines := connectionsBaseUsedLines
 	if state.FilterMode || state.FilterText != "" {
@@ -373,10 +407,34 @@ func calcConnectionsMaxDisplay(state PageState) int {
 	}
 
 	maxDisplay := state.Height - usedLines
-	if maxDisplay < connectionsMinDisplayRows {
-		maxDisplay = connectionsMinDisplayRows
+	if maxDisplay < 3 {
+		maxDisplay = 3
 	}
-	return maxDisplay
+	if usedLines+maxDisplay > state.Height {
+		maxDisplay = state.Height - usedLines
+		if maxDisplay < 1 {
+			maxDisplay = 1
+		}
+	}
+
+	detailHeight := 0
+	// 这里的 len(filteredConns) 判断在实际应用中如果难以获取可以简化，
+	// 但是 view.go 中的逻辑是必须 len(filteredConns) > 0 才渲染 inline detail。
+	// 为了确保点击区域准确，这里假定只要处于 InlineMode 且不是流量模式，就预留。
+	// 因为如果没有连接，整个列表都是空的，也不存在点击问题。
+	if state.InlineMode && state.ViewMode != ConnViewTraffic {
+		detailHeight = maxDisplay / 2
+		if detailHeight < 5 {
+			detailHeight = 5
+		}
+		
+		maxDisplay -= detailHeight
+		if maxDisplay < 3 {
+			maxDisplay = 3
+		}
+	}
+
+	return maxDisplay, detailHeight
 }
 
 func connectionsByViewMode(state PageState) []model.Connection {

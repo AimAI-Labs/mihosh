@@ -39,13 +39,16 @@ type PageState struct {
 	TopNModalMode   bool
 	TopNModalItems  []components.TopNItem
 	TopNModalScroll int
+	InlineMode      bool // 是否开启内联详情模式
+	InlineFocused   bool // 内联详情是否获取焦点
+	InlineScroll    int  // 内联详情滚动偏移
 }
 
 // RenderConnectionsPage 渲染连接监控页面
 func RenderConnectionsPage(state PageState) string {
 	// 详情模式优先级最高：渲染沉浸式连接详情（位于模式切换栏下方）
 	if state.DetailMode && state.SelectedConnection != nil {
-		modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width)
+		modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width, state.InlineMode)
 		modeSwitchHeight := lipgloss.Height(modeSwitch)
 		// 再减 1 行，用于在详情面板下方预留底栏提示行，
 		// 避免 OverlayHelpAtBottomRight 将提示叠加到详情面板底边框（╰──╯）上。
@@ -75,7 +78,7 @@ func RenderConnectionsPage(state PageState) string {
 	}
 
 	// 渲染模式切换组件（带边框）
-	modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width)
+	modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width, state.InlineMode)
 
 	// 组装页面
 	var content []string
@@ -179,6 +182,32 @@ func renderConnectionListTab(state PageState, content []string) string {
 		}
 	}
 
+	var detailContent string
+	if state.InlineMode && state.ViewMode != ConnViewTraffic && len(filteredConns) > 0 {
+		selectedIdx := state.SelectedIndex
+		if selectedIdx >= len(filteredConns) {
+			selectedIdx = len(filteredConns) - 1
+		}
+		if selectedIdx < 0 {
+			selectedIdx = 0
+		}
+		conn := &filteredConns[selectedIdx]
+
+		detailHeight := maxDisplay / 2
+		if detailHeight < 5 {
+			detailHeight = 5
+		}
+		
+		maxDisplay -= detailHeight
+		if maxDisplay < 3 {
+			maxDisplay = 3
+		}
+
+		detailContent = components.RenderConnectionDetailInline(
+			conn, state.Width, detailHeight, state.InlineFocused, state.InlineScroll,
+		)
+	}
+
 	// 连接列表
 	var rows []string
 	if len(filteredConns) == 0 {
@@ -228,12 +257,21 @@ func renderConnectionListTab(state PageState, content []string) string {
 		}
 	}
 
+	// 补齐空行以固定列表高度，防止底部详情上移（崩塌）
+	for len(rows) < maxDisplay {
+		rows = append(rows, "")
+	}
+
 	if filterLine != "" {
 		content = append(content, filterLine)
 	}
 	content = append(content, tableHeader)
 	content = append(content, common.TableBorderStyle().Render(strings.Repeat("─", max(state.Width-2, 1))))
 	content = append(content, strings.Join(rows, "\n"))
+
+	if detailContent != "" {
+		content = append(content, detailContent)
+	}
 
 	return strings.Join(content, "\n")
 }

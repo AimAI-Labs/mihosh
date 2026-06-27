@@ -746,7 +746,11 @@ func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
 			m.nodesState = m.nodesState.HandleMouseScroll(up, -1, -1, m.width, m.height)
 		}
 	case layout.PageConnections:
-		m.connsState = m.connsState.HandleMouseScroll(up, mainX, mainY, mainWidth, mainHeight)
+		var cmd tea.Cmd
+		m.connsState, cmd = m.connsState.HandleMouseScroll(up, mainX, mainY, mainWidth, mainHeight)
+		if cmd != nil {
+			return m, cmd
+		}
 	case layout.PageLogs:
 		m.logsState = m.logsState.HandleMouseScroll(up)
 	case layout.PageRules:

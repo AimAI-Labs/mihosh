@@ -493,7 +493,7 @@ func TestConnsDetailInputTakesPriorityOverTopNModal(t *testing.T) {
 		t.Fatalf("expected hidden topN modal scroll unchanged, got %d", next.topNModalScroll)
 	}
 
-	next = next.HandleMouseScroll(false, 90, 10, 120, 30)
+	next, _ = next.HandleMouseScroll(false, 90, 10, 120, 30)
 	if next.connDetailRightScroll != 2 {
 		t.Fatalf("expected mouse wheel to advance right detail scroll, got %d", next.connDetailRightScroll)
 	}

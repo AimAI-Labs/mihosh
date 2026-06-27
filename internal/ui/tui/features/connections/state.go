@@ -46,6 +46,9 @@ type State struct {
 	connDetailFocusPanel    int // 0=左侧(基础+地理), 1=右侧(JSON)
 	connDetailJSONLineCount int // JSON行数缓存，用于滚动上限约束
 	connViewMode            int // 0=流量监控, 1=活跃, 2=历史
+	inlineDetailMode        bool // 新增：内联详情模式
+	inlineDetailFocused     bool
+	inlineDetailScroll      int
 
 	siteTests        []model.SiteTest
 	selectedSiteTest int
@@ -184,6 +187,9 @@ func (s State) ToPageState(chartData *model.ChartData, width, height int) PageSt
 		TopNModalMode:      s.topNModalMode,
 		TopNModalItems:     topNModalItems,
 		TopNModalScroll:    s.topNModalScroll,
+		InlineMode:         s.inlineDetailMode,
+		InlineFocused:      s.inlineDetailFocused,
+		InlineScroll:       s.inlineDetailScroll,
 	}
 }
 
@@ -275,18 +281,35 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client, timeout int) (State, t
 
 	// 活跃/历史连接 tab：连接列表操作
 	switch {
+	case msg.String() == "i":
+		if s.connViewMode == ConnViewActive || s.connViewMode == ConnViewHistory {
+			s.inlineDetailMode = !s.inlineDetailMode
+		}
+
 	case key.Matches(msg, common.Keys.Up):
-		if s.selectedConn > 0 {
-			s.selectedConn--
-			if s.selectedConn < s.connScrollTop {
-				s.connScrollTop = s.selectedConn
+		if s.inlineDetailFocused {
+			if s.inlineDetailScroll > 0 {
+				s.inlineDetailScroll--
+			}
+		} else {
+			if s.selectedConn > 0 {
+				s.selectedConn--
+				if s.selectedConn < s.connScrollTop {
+					s.connScrollTop = s.selectedConn
+				}
+				s.inlineDetailScroll = 0 // 切换连接时重置内联详情滚动
 			}
 		}
 
 	case key.Matches(msg, common.Keys.Down):
-		connCount := s.filteredConnCount()
-		if s.selectedConn < connCount-1 {
-			s.selectedConn++
+		if s.inlineDetailFocused {
+			s.inlineDetailScroll++
+		} else {
+			connCount := s.filteredConnCount()
+			if s.selectedConn < connCount-1 {
+				s.selectedConn++
+			}
+			s.inlineDetailScroll = 0
 		}
 
 	case key.Matches(msg, common.Keys.Enter):
@@ -316,7 +339,9 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client, timeout int) (State, t
 		s.connFilter.Focus()
 
 	case key.Matches(msg, common.Keys.Escape):
-		if s.connFilter.Value() != "" {
+		if s.inlineDetailFocused {
+			s.inlineDetailFocused = false
+		} else if s.connFilter.Value() != "" {
 			s.connFilter.Reset()
 			s.selectedConn = 0
 			s.connScrollTop = 0
@@ -399,6 +424,10 @@ func (s State) HandleMouseLeft(
 	hit := ResolveMouseHit(s.ToPageState(chartData, pageWidth, pageHeight), pageX, pageY)
 	now := time.Now()
 
+	if s.inlineDetailFocused && hit.Target != MouseTargetInlineDetail {
+		s.inlineDetailFocused = false
+	}
+
 	switch hit.Target {
 	case MouseTargetChart, MouseTargetTopN:
 		if s.isMouseDoubleClickWithThreshold(hit.Target, 0, now, connsChartDoubleClickMax) {
@@ -419,13 +448,32 @@ func (s State) HandleMouseLeft(
 		s.setConnViewMode(ConnViewHistory)
 		return s, nil
 
+	case MouseTargetInlineToggle:
+		if s.connViewMode == ConnViewActive || s.connViewMode == ConnViewHistory {
+			s.inlineDetailMode = !s.inlineDetailMode
+		}
+		if s.inlineDetailFocused {
+			s.inlineDetailFocused = false
+		}
+		return s, nil
+		
+	case MouseTargetInlineDetail:
+		s.inlineDetailFocused = true
+		return s, nil
+
 	case MouseTargetConnection:
+		if s.inlineDetailFocused {
+			s.inlineDetailFocused = false
+		}
 		if hit.Index < 0 {
 			return s, nil
 		}
-		s.selectedConn = hit.Index
-		if s.selectedConn < s.connScrollTop {
-			s.connScrollTop = s.selectedConn
+		if s.selectedConn != hit.Index {
+			s.selectedConn = hit.Index
+			s.inlineDetailScroll = 0
+			if s.selectedConn < s.connScrollTop {
+				s.connScrollTop = s.selectedConn
+			}
 		}
 		if !s.isMouseDoubleClick(MouseTargetConnection, hit.Index, now) {
 			return s, nil
@@ -447,7 +495,7 @@ func (s State) HandleMouseLeft(
 }
 
 // HandleMouseScroll 鼠标滚轮处理
-func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight int) State {
+func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight int) (State, tea.Cmd) {
 	if s.connDetailMode {
 		isRightSide := false
 		if mainWidth >= 100 {
@@ -485,7 +533,7 @@ func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight in
 			s.connDetailFocusPanel = 0
 		}
 
-		return s
+		return s, nil
 	}
 
 	if s.topNModalMode {
@@ -496,7 +544,18 @@ func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight in
 		} else {
 			s.topNModalScroll++
 		}
-		return s
+		return s, nil
+	}
+
+	if s.inlineDetailFocused {
+		if up {
+			if s.inlineDetailScroll > 0 {
+				s.inlineDetailScroll--
+			}
+		} else {
+			s.inlineDetailScroll++
+		}
+		return s, nil
 	}
 
 	count := s.filteredConnCount()
@@ -506,13 +565,16 @@ func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight in
 			if s.selectedConn < s.connScrollTop {
 				s.connScrollTop = s.selectedConn
 			}
+			s.inlineDetailScroll = 0
 		}
 	} else {
 		if s.selectedConn < count-1 {
 			s.selectedConn++
+			s.inlineDetailScroll = 0
 		}
 	}
-	return s
+
+	return s, nil
 }
 
 func (s *State) isMouseDoubleClick(target MouseTarget, idx int, now time.Time) bool {
