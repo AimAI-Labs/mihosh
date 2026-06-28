@@ -103,7 +103,7 @@ func (s State) GetSysLogs() []model.LogEntry {
 	var infoLogs []model.LogEntry
 	allLogs := s.Logs()
 	for _, l := range allLogs {
-		if l.Type == "info" {
+		if l.Type != "debug" {
 			infoLogs = append(infoLogs, l)
 			if len(infoLogs) >= 50 {
 				break

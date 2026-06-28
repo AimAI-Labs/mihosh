@@ -234,7 +234,7 @@ func buildSettingsLayoutBase(state PageState, width int) (parts []string, descRo
 func CalculateViewportHeight(state PageState, width, height int) int {
 	parts, descRow, _ := buildSettingsLayoutBase(state, width)
 	usedHeight := lipgloss.Height(lipgloss.JoinVertical(lipgloss.Left, append(parts, descRow)...))
-	return height - usedHeight - 6
+	return height - usedHeight - 7
 }
 
 // RenderSettingsPage 渲染设置页面
@@ -248,11 +248,11 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	parts, descRow, versionText := buildSettingsLayoutBase(state, width)
 
 	if state.ActiveTab == 1 && state.SysStatus.Supported && state.SysStatus.Viewport.Height > 0 {
-		statusView := common.RenderTokyoPanel(
+		statusView := lipgloss.NewStyle().MarginTop(1).Render(common.RenderTokyoPanel(
 			i18n.T("settings.sys_status.panel_title"),
 			"\n"+state.SysStatus.Viewport.View()+"\n",
 			width,
-		)
+		))
 		parts = append(parts, statusView)
 	}
 
