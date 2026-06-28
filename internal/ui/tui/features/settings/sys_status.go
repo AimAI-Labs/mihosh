@@ -3,7 +3,9 @@ package settings
 import (
 	"context"
 	"os/exec"
+	"regexp"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
@@ -16,7 +18,7 @@ type SysStatusState struct {
 	Supported  bool
 	Viewport   viewport.Model
 	LastTick   time.Time
-	lastOutput string
+	LastOutput string
 }
 
 func NewSysStatusState() SysStatusState {
@@ -33,7 +35,7 @@ func FetchSysStatusCmd() tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
-		cmd := exec.CommandContext(ctx, "systemctl", "status", "mihomo", "--no-pager", "-n", "50")
+		cmd := exec.CommandContext(ctx, "systemctl", "status", "mihomo", "--no-pager", "-n", "0")
 		// systemctl often returns exit code 3 if service is not running but status is requested
 		out, err := cmd.CombinedOutput()
 		return messages.SysStatusResultMsg{
@@ -60,16 +62,13 @@ func (s *SysStatusState) Update(msg tea.Msg) tea.Cmd {
 		return FetchSysStatusCmd()
 
 	case messages.SysStatusResultMsg:
-		// Only update if changed to avoid flicker
 		if msg.Output != "" {
-			if msg.Output != s.lastOutput {
-				s.lastOutput = msg.Output
-				// Using SetContent resets to top, so we should try to avoid resetting scroll if possible,
-				// or just set it. For simplicity, just set it.
-				s.Viewport.SetContent(msg.Output)
+			parsed := parseSystemctlStatusCompact(msg.Output)
+			if parsed != s.LastOutput {
+				s.LastOutput = parsed
 			}
 		} else if msg.Err != nil {
-			s.Viewport.SetContent(msg.Err.Error())
+			s.LastOutput = msg.Err.Error()
 		}
 		return TickSysStatusCmd()
 
@@ -80,4 +79,54 @@ func (s *SysStatusState) Update(msg tea.Msg) tea.Cmd {
 	}
 
 	return nil
+}
+
+func parseSystemctlStatusCompact(output string) string {
+	if output == "" {
+		return ""
+	}
+
+	loaded := "unknown"
+	active := "unknown"
+	pid := "unknown"
+	mem := "unknown"
+	cpu := "unknown"
+
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Loaded:") {
+			parts := strings.SplitN(line, " ", 3)
+			if len(parts) >= 2 {
+				loaded = parts[1]
+			}
+		} else if strings.HasPrefix(line, "Active:") {
+			re := regexp.MustCompile(`Active: (.*? (?:.*?\)))`)
+			if matches := re.FindStringSubmatch(line); len(matches) > 1 {
+				active = matches[1]
+			} else {
+				parts := strings.SplitN(line, " ", 3)
+				if len(parts) >= 2 {
+					active = parts[1]
+				}
+			}
+		} else if strings.HasPrefix(line, "Main PID:") {
+			parts := strings.Fields(line)
+			if len(parts) >= 3 {
+				pid = parts[2]
+			}
+		} else if strings.HasPrefix(line, "Memory:") {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				mem = parts[1]
+			}
+		} else if strings.HasPrefix(line, "CPU:") {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				cpu = parts[1]
+			}
+		}
+	}
+
+	return "Service: mihomo (" + loaded + ") | PID: " + pid + "\nState: " + active + " | Mem: " + mem + " | CPU: " + cpu
 }
