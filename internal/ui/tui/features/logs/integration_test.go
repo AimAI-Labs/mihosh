@@ -76,7 +76,7 @@ func TestRenderLogEntry_VeryLongLine_HScrollOffsetNearMax(t *testing.T) {
 		Timestamp: time.Now(),
 	}
 
-	result := renderLogEntry(log, false, 80, 495)
+	result := RenderLogEntry(log, false, 80, 495)
 	lines := strings.Split(result, "\n")
 	for _, line := range lines {
 		if len(line) > 100 {
@@ -94,7 +94,7 @@ func TestRenderLogEntry_UnicodeCJKScroll(t *testing.T) {
 	}
 
 	for hOffset := 0; hOffset <= 60; hOffset += 10 {
-		result := renderLogEntry(log, false, 80, hOffset)
+		result := RenderLogEntry(log, false, 80, hOffset)
 		if result == "" {
 			t.Fatalf("empty result at hOffset=%d", hOffset)
 		}
@@ -115,7 +115,7 @@ func TestRenderLogEntry_SpecialChars(t *testing.T) {
 		Timestamp: time.Now(),
 	}
 
-	result := renderLogEntry(log, false, 80, 0)
+	result := RenderLogEntry(log, false, 80, 0)
 	if result == "" {
 		t.Fatal("expected non-empty result with special chars")
 	}

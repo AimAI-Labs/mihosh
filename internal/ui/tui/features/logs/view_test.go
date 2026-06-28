@@ -20,7 +20,7 @@ func TestRenderLogEntry_HOffsetZero(t *testing.T) {
 		Payload:   "This is a test log message",
 		Timestamp: time.Now(),
 	}
-	result := renderLogEntry(log, false, 80, 0)
+	result := RenderLogEntry(log, false, 80, 0)
 	if result == "" {
 		t.Fatal("expected non-empty result")
 	}
@@ -35,7 +35,7 @@ func TestRenderLogEntry_HOffsetPositive(t *testing.T) {
 		Payload:   "This is a test log message that is quite long",
 		Timestamp: time.Now(),
 	}
-	result := renderLogEntry(log, false, 80, 10)
+	result := RenderLogEntry(log, false, 80, 10)
 	if result == "" {
 		t.Fatal("expected non-empty result with hOffset")
 	}
@@ -50,7 +50,7 @@ func TestRenderLogEntry_HOffsetExceedsContent(t *testing.T) {
 		Payload:   "Short",
 		Timestamp: time.Now(),
 	}
-	result := renderLogEntry(log, false, 80, 100)
+	result := RenderLogEntry(log, false, 80, 100)
 	if result == "" {
 		t.Fatal("expected empty content but still a rendered row")
 	}
@@ -62,7 +62,7 @@ func TestRenderLogEntry_Selected(t *testing.T) {
 		Payload:   "Selected log",
 		Timestamp: time.Now(),
 	}
-	result := renderLogEntry(log, true, 80, 0)
+	result := RenderLogEntry(log, true, 80, 0)
 	if !strings.Contains(result, "INFO") {
 		t.Fatalf("expected INFO level in selected result, got %q", result)
 	}
@@ -77,7 +77,7 @@ func TestRenderLogEntry_CJKContent(t *testing.T) {
 		Payload:   "测试日志内容很长需要滚动查看",
 		Timestamp: time.Now(),
 	}
-	result := renderLogEntry(log, false, 60, 0)
+	result := RenderLogEntry(log, false, 60, 0)
 	if result == "" {
 		t.Fatal("expected non-empty result for CJK content")
 	}
@@ -89,7 +89,7 @@ func TestRenderLogEntry_MaxWidthNarrow(t *testing.T) {
 		Payload:   "A very long log message that should be truncated",
 		Timestamp: time.Now(),
 	}
-	result := renderLogEntry(log, false, 20, 0)
+	result := RenderLogEntry(log, false, 20, 0)
 	if result == "" {
 		t.Fatal("expected non-empty result even with narrow maxWidth")
 	}
@@ -132,7 +132,7 @@ func TestRenderLogEntry_URLEncoded(t *testing.T) {
 		Payload:   "url%3Dencoded%20content",
 		Timestamp: time.Now(),
 	}
-	result := renderLogEntry(log, false, 80, 0)
+	result := RenderLogEntry(log, false, 80, 0)
 	if !strings.Contains(result, "url=encoded") {
 		t.Fatalf("expected URL-decoded content, got %q", result)
 	}

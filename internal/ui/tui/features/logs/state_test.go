@@ -146,7 +146,7 @@ func TestState_RingBufferBasicOperation(t *testing.T) {
 	if s.logCount != common.LogsCap {
 		t.Fatalf("expected logCount=%d after overflow, got %d", common.LogsCap, s.logCount)
 	}
-	logs := s.logs()
+	logs := s.Logs()
 	if len(logs) != common.LogsCap {
 		t.Fatalf("expected logs length=%d, got %d", common.LogsCap, len(logs))
 	}

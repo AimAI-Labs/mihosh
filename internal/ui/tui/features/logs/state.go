@@ -59,8 +59,8 @@ func (s State) DetailMode() bool { return s.detailMode }
 // FilterMode 返回是否处于过滤模式
 func (s State) FilterMode() bool { return s.logFilterMode }
 
-// logs 返回日志列表（最新在前，用于渲染）
-func (s State) logs() []model.LogEntry {
+// Logs 返回日志列表（最新在前，用于渲染）
+func (s State) Logs() []model.LogEntry {
 	if s.logCount == 0 {
 		return nil
 	}
@@ -101,7 +101,7 @@ func (s State) ClearLogs() State {
 // ToPageState 转换为渲染层所需的 PageState
 func (s State) ToPageState(width, height int) PageState {
 	return PageState{
-		Logs:                s.logs(),
+		Logs:                s.Logs(),
 		FilteredLogIndices:  s.filteredLogIndices,
 		LogLevel:            s.logLevel,
 		FilterText:          s.logFilter,
@@ -250,7 +250,7 @@ func (s State) selectedLogEntry() *model.LogEntry {
 		return nil
 	}
 	logIdx := s.filteredLogIndices[s.selectedLog]
-	allLogs := s.logs()
+	allLogs := s.Logs()
 	if logIdx < 0 || logIdx >= len(allLogs) {
 		return nil
 	}
@@ -416,7 +416,7 @@ func (s State) handleLogFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 
 // updateFilteredLogs 重建过滤索引缓存（索引对应 logs() 的下标）
 func (s *State) updateFilteredLogs() {
-	logList := s.logs()
+	logList := s.Logs()
 	// 重用预分配的切片，重置长度
 	s.filteredLogIndices = s.filteredLogIndices[:0]
 

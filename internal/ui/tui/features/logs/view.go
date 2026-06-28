@@ -327,15 +327,15 @@ func renderLogList(logs []model.LogEntry, selectedIdx, scrollTop, maxLines, widt
 
 	for i := scrollTop; i < endIdx; i++ {
 		log := logs[i]
-		line := renderLogEntry(log, i == selectedIdx, maxWidth, hOffset)
+		line := RenderLogEntry(log, i == selectedIdx, maxWidth, hOffset)
 		lines = append(lines, line)
 	}
 
 	return strings.Join(lines, "\n")
 }
 
-// renderLogEntry 渲染单条日志
-func renderLogEntry(log model.LogEntry, selected bool, maxWidth int, hOffset int) string {
+// RenderLogEntry 渲染单条日志
+func RenderLogEntry(log model.LogEntry, selected bool, maxWidth int, hOffset int) string {
 	color := logLevelColors()[log.Type]
 	if color == "" {
 		color = common.TokyoMuted()
