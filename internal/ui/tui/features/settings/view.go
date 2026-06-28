@@ -129,7 +129,71 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	}
 	state.Toast.CleanExpired()
 
-	tabBar, settingsPanel, actionsPanel, warningText := buildSettingsPanels(state, width)
+	// Tab Bar
+	tabs := []string{i18n.T("settings.tab.mihosh"), i18n.T("settings.tab.mihomo")}
+	tabBar := renderSettingsTabBar(tabs, state.ActiveTab, width)
+
+	// 渲染设置项列表
+	var settingItems []string
+	keys := state.activeKeys()
+	for i := 0; i < len(keys); i++ {
+		item := renderSettingItem(state, i, keys[i], GetSettingLabel(keys[i]), width)
+		settingItems = append(settingItems, item)
+	}
+	listContent := strings.Join(settingItems, "\n")
+	settingsPanel := common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width)
+
+	var actionsPanel, warningText string
+	if state.ActiveTab == 1 {
+		if !state.MihomoLoaded {
+			listContent = "\n  " + i18n.T("settings.mihomo.loading") + "\n"
+			settingsPanel = common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width)
+		} else if state.MihomoLoadErr != nil && state.MihomoConfig == nil {
+			listContent = "\n  " + fmt.Sprintf(i18n.T("settings.mihomo.load_error"), state.MihomoLoadErr) + "\n"
+			settingsPanel = common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width)
+		} else if state.MihomoFromFile && state.MihomoLoadErr != nil {
+			warningText = "⚠ " + i18n.T("settings.mihomo.offline_warning")
+		}
+
+		loadingBtn := lipgloss.NewStyle().Background(common.TokyoMuted()).Foreground(common.TokyoForeground()).Padding(0, 1).MarginRight(1)
+		renderBtn := func(btn ActionButton) string {
+			isLoading := false
+			bgColor := common.TokyoCyan()
+			switch btn.ID {
+			case "upgrade_auto", "upgrade_release", "upgrade_alpha":
+				isLoading = state.IsCoreUpgrading
+				bgColor = common.TokyoCyan()
+			case "restart":
+				isLoading = state.IsCoreRestarting
+				bgColor = common.TokyoRed()
+			case "reload":
+				isLoading = state.IsConfigReloading
+				bgColor = common.TokyoGreen()
+			case "update_geo":
+				isLoading = state.IsGeoUpdating
+				bgColor = common.TokyoGreen()
+			case "flush_dns", "flush_fakeip":
+				bgColor = common.TokyoYellow()
+			}
+			if isLoading {
+				return loadingBtn.Render(btn.Label + "...")
+			}
+			return lipgloss.NewStyle().Background(bgColor).Foreground(common.Background()).Padding(0, 1).MarginRight(1).Render(btn.Label)
+		}
+
+		rows := LayoutActionButtons(width)
+		var rowStrings []string
+		for _, row := range rows {
+			var rowNodes []string
+			for _, btn := range row {
+				rowNodes = append(rowNodes, renderBtn(btn))
+			}
+			rowStrings = append(rowStrings, lipgloss.JoinHorizontal(lipgloss.Left, rowNodes...))
+		}
+		
+		actionsBody := "\n" + strings.Join(rowStrings, "\n\n") + "\n"
+		actionsPanel = lipgloss.NewStyle().MarginTop(1).Render(common.RenderTokyoPanel(i18n.T("settings.action.panel_title"), actionsBody, width))
+	}
 
 	// 渲染选中项描述（信息行右侧，配置框右下方提示）已按需求取消
 	var descPart string
@@ -163,13 +227,23 @@ func RenderSettingsPage(state PageState, width, height int) string {
 		Width(rowWidth).
 		Render(descRowContent)
 
-	// 组装主要内容：Tab Bar → 空行 → 配置框 → (空行+Actions) → 描述行
+	// 组装主要内容：Tab Bar → 空行 → 配置框 → (空行+Actions)
 	parts := []string{tabBar, "", settingsPanel}
 	if actionsPanel != "" {
 		parts = append(parts, actionsPanel)
 	}
+	
+	// Measure used height to calculate viewport height
+	usedHeight := lipgloss.Height(lipgloss.JoinVertical(lipgloss.Left, append(parts, descRow)...))
+	remainingHeight := height - usedHeight - 6
 
 	if state.ActiveTab == 1 && state.SysStatus.Supported {
+		state.SysStatus.Viewport.Width = width - 4
+		if remainingHeight < 0 {
+			remainingHeight = 0
+		}
+		state.SysStatus.Viewport.Height = remainingHeight
+
 		if state.SysStatus.Viewport.Height > 0 {
 			statusView := common.RenderTokyoPanel(
 				i18n.T("settings.sys_status.panel_title"),
@@ -598,107 +672,3 @@ func overlayToast(page, toast string, width int) string {
 	return strings.Join(pageLines, "\n")
 }
 
-// CalculateTakenHeight measures the height taken by all settings UI components
-// (excluding the SysStatus viewport content).
-func CalculateTakenHeight(state PageState, width int) int {
-	tabBar, settingsPanel, actionsPanel, warningText := buildSettingsPanels(state, width)
-
-	rowWidth := width - 2
-	var warningPart string
-	if warningText != "" {
-		warningPart = lipgloss.NewStyle().Foreground(common.TokyoYellow()).Render(warningText)
-	}
-	descRow := lipgloss.NewStyle().MarginTop(1).Width(rowWidth).Render(warningPart)
-
-	parts := []string{tabBar, "", settingsPanel}
-	if actionsPanel != "" {
-		parts = append(parts, actionsPanel)
-	}
-	if state.ActiveTab == 1 && state.SysStatus.Supported {
-		statusView := common.RenderTokyoPanel(i18n.T("settings.sys_status.panel_title"), "\n\n", width)
-		parts = append(parts, statusView)
-	}
-	parts = append(parts, descRow)
-	mainContent := lipgloss.JoinVertical(lipgloss.Left, parts...)
-	return lipgloss.Height(mainContent) + 2 // +2 to provide some padding for bottom overlay elements
-}
-
-func buildSettingsPanels(state PageState, width int) (tabBar, settingsPanel, actionsPanel, warningText string) {
-	// Tab Bar：复用 connections 的带圆角边框样式（3 行高度：上边框 / 内容行 / 下边框）
-	tabs := []string{i18n.T("settings.tab.mihosh"), i18n.T("settings.tab.mihomo")}
-	tabBar = renderSettingsTabBar(tabs, state.ActiveTab, width)
-
-	// 渲染设置项列表
-	var settingItems []string
-	keys := state.activeKeys()
-	for i := 0; i < len(keys); i++ {
-		item := renderSettingItem(state, i, keys[i], GetSettingLabel(keys[i]), width)
-		settingItems = append(settingItems, item)
-	}
-
-	// 使用 Tokyo 面板包裹设置列表
-	listContent := strings.Join(settingItems, "\n")
-	settingsPanel = common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width)
-
-	// 处理 Mihomo 状态
-	if state.ActiveTab == 1 {
-		if !state.MihomoLoaded {
-			listContent = "\n  " + i18n.T("settings.mihomo.loading") + "\n"
-			settingsPanel = common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width)
-		} else if state.MihomoLoadErr != nil && state.MihomoConfig == nil {
-			// YAML 也读不到，才展示全屏错误
-			listContent = "\n  " + fmt.Sprintf(i18n.T("settings.mihomo.load_error"), state.MihomoLoadErr) + "\n"
-			settingsPanel = common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width)
-		} else if state.MihomoFromFile && state.MihomoLoadErr != nil {
-			// API 不可达但 YAML 可读：记录警告，稍后显示在配置框左下方
-			warningText = "⚠ " + i18n.T("settings.mihomo.offline_warning")
-		}
-	}
-
-	if state.ActiveTab == 1 {
-		loadingBtn := lipgloss.NewStyle().Background(common.TokyoMuted()).Foreground(common.TokyoForeground()).Padding(0, 1).MarginRight(1)
-
-		renderBtn := func(btn ActionButton) string {
-			isLoading := false
-			bgColor := common.TokyoCyan()
-
-			switch btn.ID {
-			case "upgrade_auto", "upgrade_release", "upgrade_alpha":
-				isLoading = state.IsCoreUpgrading
-				bgColor = common.TokyoCyan()
-			case "restart":
-				isLoading = state.IsCoreRestarting
-				bgColor = common.TokyoRed()
-			case "reload":
-				isLoading = state.IsConfigReloading
-				bgColor = common.TokyoGreen()
-			case "update_geo":
-				isLoading = state.IsGeoUpdating
-				bgColor = common.TokyoGreen()
-			case "flush_dns", "flush_fakeip":
-				bgColor = common.TokyoYellow()
-			}
-
-			if isLoading {
-				return loadingBtn.Render(btn.Label + "...")
-			}
-			return lipgloss.NewStyle().Background(bgColor).Foreground(common.Background()).Padding(0, 1).MarginRight(1).Render(btn.Label)
-		}
-
-		rows := LayoutActionButtons(width)
-		var rowStrings []string
-		for _, row := range rows {
-			var rowNodes []string
-			for _, btn := range row {
-				rowNodes = append(rowNodes, renderBtn(btn))
-			}
-			rowStrings = append(rowStrings, lipgloss.JoinHorizontal(lipgloss.Left, rowNodes...))
-		}
-		
-		actionsBody := "\n" + strings.Join(rowStrings, "\n\n") + "\n"
-
-		actionsPanel = lipgloss.NewStyle().MarginTop(1).Render(common.RenderTokyoPanel(i18n.T("settings.action.panel_title"), actionsBody, width))
-	}
-
-	return
-}

@@ -186,6 +186,8 @@ func (s State) HandleMouseScroll(up bool, pageY, pageHeight, actionsPanelBottomY
 			} else {
 				mouseMsg.Type = tea.MouseWheelDown
 			}
+			vpHeight := pageHeight - actionsPanelBottomY - 6
+			s.SysStatus.Viewport.Height = vpHeight
 			cmd := s.SysStatus.Update(mouseMsg)
 			return s, cmd
 		}
@@ -915,20 +917,6 @@ func (s State) ClearActionStates() State {
 }
 
 func (s State) HandleMsg(msg tea.Msg, cfg *config.Config) (State, tea.Cmd) {
-	if winMsg, ok := msg.(tea.WindowSizeMsg); ok {
-		pageState := s.ToPageState(cfg)
-		
-		takenHeight := CalculateTakenHeight(pageState, winMsg.Width)
-		
-		vpHeight := (winMsg.Height - 5) - takenHeight
-		if vpHeight < 0 {
-			vpHeight = 0
-		}
-		
-		s.SysStatus.Viewport.Width = winMsg.Width - 4
-		s.SysStatus.Viewport.Height = vpHeight
-	}
-
 	cmd := s.SysStatus.Update(msg)
 	return s, cmd
 }
