@@ -395,7 +395,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.SysStatusTickMsg, messages.SysStatusResultMsg:
 		if m.currentPage == layout.PageSettings {
 			var cmd tea.Cmd
-			m.settingsState, cmd = m.settingsState.HandleMsg(msg, m.config)
+			m.settingsState, cmd = m.settingsState.HandleMsg(msg)
 			return m, cmd
 		}
 
