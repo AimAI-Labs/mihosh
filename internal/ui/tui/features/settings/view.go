@@ -245,6 +245,25 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	if actionsPanel != "" {
 		parts = append(parts, actionsPanel)
 	}
+
+	if state.ActiveTab == 1 && state.SysStatus.Supported {
+		usedHeight := lipgloss.Height(lipgloss.JoinVertical(lipgloss.Left, parts...))
+		// descRow and versionRow take about 2-3 lines.
+		remainingHeight := height - usedHeight - 4
+
+		if remainingHeight > 2 {
+			state.SysStatus.Viewport.Width = width - 4
+			state.SysStatus.Viewport.Height = remainingHeight
+
+			statusView := common.RenderTokyoPanel(
+				i18n.T("settings.sys_status.panel_title"),
+				"\n"+state.SysStatus.Viewport.View()+"\n",
+				width,
+			)
+			parts = append(parts, statusView)
+		}
+	}
+
 	parts = append(parts, descRow)
 	mainContent := lipgloss.JoinVertical(lipgloss.Left, parts...)
 
