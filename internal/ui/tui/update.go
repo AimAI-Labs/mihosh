@@ -90,7 +90,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.logsState = m.logsState.UpdateMaxHScrollOffset(m.width, m.height)
-		m.settingsState, _ = m.settingsState.HandleMsg(msg)
+		m.settingsState, _ = m.settingsState.HandleMsg(msg, m.config)
 		return m, tea.ClearScreen
 
 	case tea.MouseMsg:
@@ -396,7 +396,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.SysStatusTickMsg, messages.SysStatusResultMsg:
 		if m.currentPage == layout.PageSettings {
 			var cmd tea.Cmd
-			m.settingsState, cmd = m.settingsState.HandleMsg(msg)
+			m.settingsState, cmd = m.settingsState.HandleMsg(msg, m.config)
 			return m, cmd
 		}
 

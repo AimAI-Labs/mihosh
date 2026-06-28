@@ -914,19 +914,13 @@ func (s State) ClearActionStates() State {
 	return s
 }
 
-func (s State) HandleMsg(msg tea.Msg) (State, tea.Cmd) {
+func (s State) HandleMsg(msg tea.Msg, cfg *config.Config) (State, tea.Cmd) {
 	if winMsg, ok := msg.(tea.WindowSizeMsg); ok {
-		settingsPanelHeight := len(s.activeKeys()) + 2
+		pageState := s.ToPageState(cfg)
 		
-		actionsPanelHeight := 0
-		if s.activeTab == 1 {
-			actionsPanelHeight = 8 // approx height for actions panel
-		}
+		takenHeight := CalculateTakenHeight(pageState, winMsg.Width)
 		
-		// Approximate taken height: TopNav/Status (~2) + TabBar (3) + Gap (1) + Panels + Desc/Padding (~6)
-		takenHeight := 12 + settingsPanelHeight + actionsPanelHeight
-		
-		vpHeight := winMsg.Height - takenHeight
+		vpHeight := (winMsg.Height - 5) - takenHeight
 		if vpHeight < 0 {
 			vpHeight = 0
 		}
