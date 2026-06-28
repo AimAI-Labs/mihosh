@@ -728,7 +728,11 @@ func (m *Model) onPageChange() tea.Cmd {
 	case layout.PageSub:
 		return sub.FetchSubs(m.profileSvc)
 	case layout.PageSettings:
-		return tea.Batch(settings.FetchMihomoVersion(m.client), m.configSvc.FetchMihomoConfig(m.client))
+		cmds := []tea.Cmd{settings.FetchMihomoVersion(m.client), m.configSvc.FetchMihomoConfig(m.client)}
+		if m.settingsState.SysStatus.Supported && m.settingsState.ActiveTab() == 1 {
+			cmds = append(cmds, settings.FetchSysStatusCmd())
+		}
+		return tea.Batch(cmds...)
 	}
 	return nil
 }
@@ -788,7 +792,7 @@ func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 	case layout.PageLogs:
-		m.logsState = m.logsState.HandleMouseScroll(up)
+		m.logsState = m.logsState.HandleMouseScroll(up, mainHeight)
 	case layout.PageRules:
 		m.rulesState = m.rulesState.HandleMouseScroll(up)
 	case layout.PageSub:
@@ -796,7 +800,8 @@ func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
 	case layout.PageSettings:
 		var cmd tea.Cmd
 		_, pageY, _, pageHeight, ok := m.resolveMainPageMouseHit(x, y)
-		actionsPanelBottomY := 12 + len(settings.MihomoSettingKeys)*2
+		// actionsPanelBottomY is roughly the height used by Tab bar (3) + Spacer (1) + Config Panel (8) + Spacer (1) + Actions Panel (4) + Desc/Warning (1)
+		actionsPanelBottomY := 18
 		if ok {
 			m.settingsState, cmd = m.settingsState.HandleMouseScroll(up, pageY, pageHeight, actionsPanelBottomY)
 		} else {

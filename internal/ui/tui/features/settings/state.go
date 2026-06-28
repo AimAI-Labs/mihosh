@@ -79,6 +79,11 @@ func (s State) SelectedSettingIndex() int {
 	return s.selectedSetting
 }
 
+// ActiveTab 返回当前选中的标签页索引
+func (s State) ActiveTab() int {
+	return s.activeTab
+}
+
 // IsLanguageSelected 返回当前是否选中语言设置项
 func (s State) IsLanguageSelected() bool {
 	return s.activeTab == 0 && s.selectedSetting == LanguageSettingIndex()
@@ -147,7 +152,7 @@ func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.Con
 		s.selectedSetting = 0
 		var cmd tea.Cmd
 		if s.activeTab == 1 && s.SysStatus.Supported {
-			cmd = TickSysStatusCmd()
+			cmd = FetchSysStatusCmd()
 		}
 		return s, cfg, cmd
 	}
@@ -186,7 +191,10 @@ func (s State) HandleMouseScroll(up bool, pageY, pageHeight, actionsPanelBottomY
 			} else {
 				mouseMsg.Type = tea.MouseWheelDown
 			}
-			vpHeight := pageHeight - actionsPanelBottomY - 8
+			vpHeight := pageHeight - actionsPanelBottomY - 6
+			if vpHeight < 0 {
+				vpHeight = 0
+			}
 			s.SysStatus.Viewport.Height = vpHeight
 			cmd := s.SysStatus.Update(mouseMsg)
 			return s, cmd
@@ -284,14 +292,18 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *con
 	if pageY == settingsTabBarContentY {
 		if tab, ok := resolveSettingsTabMouseTarget(pageX); ok {
 			// 切换标签页时不主动退出编辑模式，避免误触；但需要重置选中项防止越界
+			var cmd tea.Cmd
 			if s.activeTab != tab {
 				s.activeTab = tab
 				s.selectedSetting = 0
 				s.editMode = false
 				s.editValue = ""
 				s.editCursor = 0
+				if s.activeTab == 1 && s.SysStatus.Supported {
+					cmd = FetchSysStatusCmd()
+				}
 			}
-			return s, cfg, nil
+			return s, cfg, cmd
 		}
 	}
 

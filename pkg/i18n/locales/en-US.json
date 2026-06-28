@@ -184,6 +184,7 @@
   "rules.edit_toast": "Rule updated and core reloaded",
 
   "settings.panel_title": "Settings",
+  "settings.sys_status.panel_title": "Mihomo Service Status (systemctl)",
   "settings.label.secret": "secret",
   "settings.label.test_url": "Test URL",
   "settings.label.timeout": "Timeout(ms)",

@@ -184,6 +184,7 @@
   "rules.edit_toast": "已修改规则并重载核心",
 
   "settings.panel_title": "配置项",
+  "settings.sys_status.panel_title": "Mihomo 服务状态 (systemctl)",
   "settings.label.secret": "secret",
   "settings.label.test_url": "测速URL",
   "settings.label.timeout": "超时(ms)",

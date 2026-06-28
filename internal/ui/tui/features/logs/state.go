@@ -320,7 +320,7 @@ func (s State) HandleMouseLeft(pageY int, pageX int, pageWidth int, resolver *se
 }
 
 // HandleMouseScroll 鼠标滚轮处理
-func (s State) HandleMouseScroll(up bool) State {
+func (s State) HandleMouseScroll(up bool, pageHeight int) State {
 	if s.detailMode {
 		if up {
 			if s.detailScroll > 0 {
@@ -333,18 +333,42 @@ func (s State) HandleMouseScroll(up bool) State {
 	}
 
 	count := len(s.filteredLogIndices)
+	if count == 0 {
+		return s
+	}
+
+	maxLines := pageHeight - logsFixedLines
+	if maxLines < logsMinHeight {
+		maxLines = logsMinHeight
+	}
+
+	// 每次滚动 3 行，更符合常见的鼠标滚轮习惯
+	step := 3
+
 	if up {
-		if s.selectedLog > 0 {
-			s.selectedLog--
-			if s.selectedLog < s.logScrollTop {
-				s.logScrollTop = s.selectedLog
-			}
+		s.logScrollTop -= step
+		if s.logScrollTop < 0 {
+			s.logScrollTop = 0
+		}
+		// 如果 selectedLog 超出了可视范围下方，也把它移上来，保持在可视范围内
+		if s.selectedLog >= s.logScrollTop+maxLines {
+			s.selectedLog = s.logScrollTop + maxLines - 1
 		}
 	} else {
-		if s.selectedLog < count-1 {
-			s.selectedLog++
+		s.logScrollTop += step
+		maxScrollTop := count - maxLines
+		if maxScrollTop < 0 {
+			maxScrollTop = 0
+		}
+		if s.logScrollTop > maxScrollTop {
+			s.logScrollTop = maxScrollTop
+		}
+		// 如果 selectedLog 落在了上面不可见的区域，把它移下来，保持在可视范围内
+		if s.selectedLog < s.logScrollTop {
+			s.selectedLog = s.logScrollTop
 		}
 	}
+
 	return s
 }
 
