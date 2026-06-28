@@ -795,11 +795,12 @@ func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
 		m.subState = m.subState.HandleMouseScroll(up)
 	case layout.PageSettings:
 		var cmd tea.Cmd
-		_, pageY, pageWidth, _, ok := m.resolveMainPageMouseHit(x, y)
+		_, pageY, _, pageHeight, ok := m.resolveMainPageMouseHit(x, y)
+		actionsPanelBottomY := 12 + len(settings.MihomoSettingKeys)*2
 		if ok {
-			m.settingsState, cmd = m.settingsState.HandleMouseScroll(up, pageY, pageWidth, m.config)
+			m.settingsState, cmd = m.settingsState.HandleMouseScroll(up, pageY, pageHeight, actionsPanelBottomY)
 		} else {
-			m.settingsState, cmd = m.settingsState.HandleMouseScroll(up, -1, -1, m.config)
+			m.settingsState, cmd = m.settingsState.HandleMouseScroll(up, -1, pageHeight, actionsPanelBottomY)
 		}
 		if cmd != nil {
 			return m, cmd

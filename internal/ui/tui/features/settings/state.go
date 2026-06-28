@@ -176,12 +176,11 @@ func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.Con
 }
 
 // HandleMouseScroll 鼠标滚轮处理
-func (s State) HandleMouseScroll(up bool, pageY, pageWidth int, cfg *config.Config) (State, tea.Cmd) {
+func (s State) HandleMouseScroll(up bool, pageY, pageHeight, actionsPanelBottomY int) (State, tea.Cmd) {
 	// If we are in the Mihomo tab and the mouse is below the actions panel (where viewport is)
 	if s.activeTab == 1 && s.SysStatus.Supported && pageY > 0 {
-		actionsPanelBottomY := s.calculateActionsPanelBottomY(pageWidth)
-
 		if pageY > actionsPanelBottomY {
+
 			var mouseMsg tea.MouseMsg
 			if up {
 				mouseMsg.Type = tea.MouseWheelUp
@@ -219,7 +218,13 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *con
 		} else if s.mihomoLoadErr != nil && s.mihomoConfig == nil {
 			settingsPanelHeight = 5
 		} else {
-			settingsPanelHeight = len(s.activeKeys()) + 2
+			height := 0
+			pageState := s.ToPageState(cfg)
+			for i, key := range s.activeKeys() {
+				item := renderSettingItem(pageState, i, key, GetSettingLabel(key), pageWidth)
+				height += lipgloss.Height(item)
+			}
+			settingsPanelHeight = height + 2
 		}
 
 		actionsPanelTop := 4 + settingsPanelHeight + 1
@@ -635,20 +640,6 @@ func resolveMouseSettingIndex(s State, pageY int) int {
 	return settingIdx
 }
 
-func (s State) calculateActionsPanelBottomY(pageWidth int) int {
-	settingsPanelHeight := 0
-	if !s.mihomoLoaded {
-		settingsPanelHeight = 5
-	} else if s.mihomoLoadErr != nil && s.mihomoConfig == nil {
-		settingsPanelHeight = 5
-	} else {
-		settingsPanelHeight = len(s.activeKeys()) + 2
-	}
-
-	actionsPanelTop := 4 + settingsPanelHeight + 1
-	rows := LayoutActionButtons(pageWidth)
-	return actionsPanelTop + 2 + len(rows)*2
-}
 
 // resolveSettingsTabMouseTarget 解析标签栏内容行的鼠标点击目标。
 // 标签栏带圆角边框：│[tab0]│[tab1]│...，第一个标签从 settingsContainerLeft+1 开始。
