@@ -90,6 +90,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.logsState = m.logsState.UpdateMaxHScrollOffset(m.width, m.height)
+		m.settingsState = m.settingsState.SyncSysStatus(m.width, m.height, m.config, m.logsState.GetSysLogs())
 		return m, tea.ClearScreen
 
 	case tea.MouseMsg:
@@ -284,6 +285,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case messages.LogsWSMsg:
 		m.logsState = m.logsState.AppendLog(msg.LogType, msg.Payload)
+		if m.currentPage == layout.PageSettings && m.settingsState.ActiveTab() == 1 {
+			m.settingsState = m.settingsState.SyncSysStatus(m.width, m.height, m.config, m.logsState.GetSysLogs())
+		}
 		if m.wsMsgChan != nil {
 			return m, listenWSMessages(m.wsCtx, m.wsMsgChan)
 		}
@@ -395,7 +399,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.SysStatusTickMsg, messages.SysStatusResultMsg:
 		if m.currentPage == layout.PageSettings {
 			var cmd tea.Cmd
-			m.settingsState, cmd = m.settingsState.HandleMsg(msg)
+			m.settingsState, cmd = m.settingsState.HandleMsg(msg, m.width, m.height, m.config, m.logsState.GetSysLogs())
 			return m, cmd
 		}
 
@@ -696,6 +700,7 @@ func (m Model) dispatchKeyToPage(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			oldLanguage = m.config.Language
 		}
 		m.settingsState, newCfg, cmd = m.settingsState.Update(msg, m.config, m.configSvc, m.client)
+		m.settingsState = m.settingsState.SyncSysStatus(m.width, m.height, newCfg, m.logsState.GetSysLogs())
 		m.config = newCfg
 		if newCfg != nil && newCfg.Language != oldLanguage {
 			i18n.SetLanguageOverride(newCfg.Language)
@@ -732,6 +737,7 @@ func (m *Model) onPageChange() tea.Cmd {
 		if m.settingsState.SysStatus.Supported && m.settingsState.ActiveTab() == 1 {
 			cmds = append(cmds, settings.FetchSysStatusCmd())
 		}
+		m.settingsState = m.settingsState.SyncSysStatus(m.width, m.height, m.config, m.logsState.GetSysLogs())
 		return tea.Batch(cmds...)
 	}
 	return nil
@@ -874,6 +880,7 @@ func (m Model) handleSettingsMouseLeft(x, y int) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	m.settingsState, m.config, cmd = m.settingsState.HandleMouseLeft(pageX, pageY, pageWidth, pageHeight, m.config, m.configSvc, m.client)
+	m.settingsState = m.settingsState.SyncSysStatus(m.width, m.height, m.config, m.logsState.GetSysLogs())
 	if m.config != nil && m.config.Language != oldLanguage {
 		i18n.SetLanguageOverride(m.config.Language)
 		common.InitKeyBindings()

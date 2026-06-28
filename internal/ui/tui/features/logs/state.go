@@ -98,6 +98,21 @@ func (s State) ClearLogs() State {
 	return s
 }
 
+// GetSysLogs 返回用于系统状态展示的最近日志（过滤掉 debug 等级，限制最多 50 条）
+func (s State) GetSysLogs() []model.LogEntry {
+	var infoLogs []model.LogEntry
+	allLogs := s.Logs()
+	for _, l := range allLogs {
+		if l.Type == "info" {
+			infoLogs = append(infoLogs, l)
+			if len(infoLogs) >= 50 {
+				break
+			}
+		}
+	}
+	return infoLogs
+}
+
 // ToPageState 转换为渲染层所需的 PageState
 func (s State) ToPageState(width, height int) PageState {
 	return PageState{

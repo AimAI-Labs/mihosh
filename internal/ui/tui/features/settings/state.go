@@ -192,11 +192,7 @@ func (s State) HandleMouseScroll(up bool, pageY, pageHeight, actionsPanelBottomY
 			} else {
 				mouseMsg.Type = tea.MouseWheelDown
 			}
-			vpHeight := pageHeight - actionsPanelBottomY - 6
-			if vpHeight < 0 {
-				vpHeight = 0
-			}
-			s.SysStatus.Viewport.Height = vpHeight
+
 			cmd := s.SysStatus.Update(mouseMsg)
 			return s, cmd
 		}
@@ -929,8 +925,25 @@ func (s State) ClearActionStates() State {
 	return s
 }
 
-func (s State) HandleMsg(msg tea.Msg) (State, tea.Cmd) {
+func (s State) HandleMsg(msg tea.Msg, width, height int, cfg *config.Config, sysLogs []model.LogEntry) (State, tea.Cmd) {
 	cmd := s.SysStatus.Update(msg)
+	s = s.SyncSysStatus(width, height, cfg, sysLogs)
 	return s, cmd
+}
+
+// SyncSysStatus updates the SysStatus dimensions and content based on current state.
+// Should be called on resize, new log, or status change when on the Settings page and Mihomo tab.
+func (s State) SyncSysStatus(width, height int, cfg *config.Config, sysLogs []model.LogEntry) State {
+	if !s.SysStatus.Supported || s.activeTab != 1 {
+		return s
+	}
+
+	pageState := s.ToPageState(cfg, sysLogs)
+	remainingHeight := CalculateViewportHeight(pageState, width, height)
+
+	s.SysStatus.SyncDimensions(width, remainingHeight)
+	s.SysStatus.UpdateContent(sysLogs)
+
+	return s
 }
 

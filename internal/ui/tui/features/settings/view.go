@@ -8,7 +8,6 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/logs"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
@@ -123,14 +122,8 @@ func GetSettingValue(state PageState, key string) string {
 	return ""
 }
 
-// RenderSettingsPage 渲染设置页面
-func RenderSettingsPage(state PageState, width, height int) string {
-	// Toast 管理器
-	if state.Toast == nil {
-		state.Toast = common.NewToastManager()
-	}
-	state.Toast.CleanExpired()
-
+// buildSettingsLayoutBase 抽取基础布局的渲染逻辑，供高度计算和最终渲染复用
+func buildSettingsLayoutBase(state PageState, width int) (parts []string, descRow string, versionText string) {
 	// Tab Bar
 	tabs := []string{i18n.T("settings.tab.mihosh"), i18n.T("settings.tab.mihomo")}
 	tabBar := renderSettingsTabBar(tabs, state.ActiveTab, width)
@@ -207,7 +200,7 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	}
 	mihoshLink := utils.CreateHyperlink("https://github.com/AimAI-Labs/mihosh", "Mihosh "+model.Version)
 	mihomoLink := utils.CreateHyperlink("https://github.com/MetaCubeX/mihomo", "Mihomo "+mihomoVer)
-	versionText := fmt.Sprintf("%s | Built: %s | %s", mihoshLink, model.Date, mihomoLink)
+	versionText = fmt.Sprintf("%s | Built: %s | %s", mihoshLink, model.Date, mihomoLink)
 
 	// 描述行：左侧警告（如果有），右侧描述，与配置框同宽
 	rowWidth := width - 2
@@ -224,45 +217,43 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	}
 	descRowContent := warningPart + strings.Repeat(" ", gap) + descPart
 
-	descRow := lipgloss.NewStyle().
+	descRow = lipgloss.NewStyle().
 		MarginTop(1).
 		Width(rowWidth).
 		Render(descRowContent)
 
-	// 组装主要内容：Tab Bar → 空行 → 配置框 → (空行+Actions)
-	parts := []string{tabBar, "", settingsPanel}
+	parts = []string{tabBar, "", settingsPanel}
 	if actionsPanel != "" {
 		parts = append(parts, actionsPanel)
 	}
-	
-	// Measure used height to calculate viewport height
+
+	return parts, descRow, versionText
+}
+
+// CalculateViewportHeight 计算系统状态面板的剩余高度
+func CalculateViewportHeight(state PageState, width, height int) int {
+	parts, descRow, _ := buildSettingsLayoutBase(state, width)
 	usedHeight := lipgloss.Height(lipgloss.JoinVertical(lipgloss.Left, append(parts, descRow)...))
-	remainingHeight := height - usedHeight - 6
+	return height - usedHeight - 6
+}
 
-	if state.ActiveTab == 1 && state.SysStatus.Supported {
-		state.SysStatus.Viewport.Width = width - 4
-		if remainingHeight < 0 {
-			remainingHeight = 0
-		}
-		state.SysStatus.Viewport.Height = remainingHeight
+// RenderSettingsPage 渲染设置页面
+func RenderSettingsPage(state PageState, width, height int) string {
+	// Toast 管理器
+	if state.Toast == nil {
+		state.Toast = common.NewToastManager()
+	}
+	state.Toast.CleanExpired()
 
-		if state.SysStatus.Viewport.Height > 0 {
-			combined := state.SysStatus.LastOutput
-			if len(state.SysLogs) > 0 {
-				combined += "\n\n"
-				for _, lg := range state.SysLogs {
-					combined += logs.RenderLogEntry(lg, false, state.SysStatus.Viewport.Width, 0) + "\n"
-				}
-			}
-			state.SysStatus.Viewport.SetContent(combined)
+	parts, descRow, versionText := buildSettingsLayoutBase(state, width)
 
-			statusView := common.RenderTokyoPanel(
-				i18n.T("settings.sys_status.panel_title"),
-				"\n"+state.SysStatus.Viewport.View()+"\n",
-				width,
-			)
-			parts = append(parts, statusView)
-		}
+	if state.ActiveTab == 1 && state.SysStatus.Supported && state.SysStatus.Viewport.Height > 0 {
+		statusView := common.RenderTokyoPanel(
+			i18n.T("settings.sys_status.panel_title"),
+			"\n"+state.SysStatus.Viewport.View()+"\n",
+			width,
+		)
+		parts = append(parts, statusView)
 	}
 
 	parts = append(parts, descRow)

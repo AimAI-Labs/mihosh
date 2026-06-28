@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/logs"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -29,6 +31,32 @@ func NewSysStatusState() SysStatusState {
 		Supported: runtime.GOOS == "linux",
 		Viewport:  vp,
 	}
+}
+
+func (s *SysStatusState) SyncDimensions(width, remainingHeight int) {
+	if !s.Supported {
+		return
+	}
+	s.Viewport.Width = width - 4
+	if remainingHeight < 0 {
+		remainingHeight = 0
+	}
+	s.Viewport.Height = remainingHeight
+}
+
+func (s *SysStatusState) UpdateContent(sysLogs []model.LogEntry) {
+	if !s.Supported {
+		return
+	}
+	combined := s.LastOutput
+	if len(sysLogs) > 0 {
+		combined += "\n\n"
+		for _, lg := range sysLogs {
+			// logs.RenderLogEntry width parameter is usually 0 if we want it to wrap itself, but we can pass viewport width.
+			combined += logs.RenderLogEntry(lg, false, s.Viewport.Width, 0) + "\n"
+		}
+	}
+	s.Viewport.SetContent(combined)
 }
 
 func FetchSysStatusCmd() tea.Cmd {
