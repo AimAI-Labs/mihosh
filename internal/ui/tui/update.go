@@ -90,8 +90,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.logsState = m.logsState.UpdateMaxHScrollOffset(m.width, m.height)
-		m.settingsState, _ = m.settingsState.HandleMsg(msg, m.config)
-		return m, tea.ClearScreen
+		var cmd tea.Cmd
+		m.settingsState, cmd = m.settingsState.HandleMsg(msg, m.config)
+		return m, tea.Batch(tea.ClearScreen, cmd)
 
 	case tea.MouseMsg:
 		// 帮助弹窗打开时吞掉所有鼠标事件，防止穿透到底层
