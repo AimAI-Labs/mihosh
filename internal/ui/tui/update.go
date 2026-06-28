@@ -90,6 +90,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.logsState = m.logsState.UpdateMaxHScrollOffset(m.width, m.height)
+		m.settingsState, _ = m.settingsState.HandleMsg(msg)
 		return m, tea.ClearScreen
 
 	case tea.MouseMsg:

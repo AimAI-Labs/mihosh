@@ -180,13 +180,6 @@ func (s State) HandleMouseScroll(up bool, pageY, pageHeight, actionsPanelBottomY
 	// If we are in the Mihomo tab and the mouse is below the actions panel (where viewport is)
 	if s.activeTab == 1 && s.SysStatus.Supported && pageY > 0 {
 		if pageY > actionsPanelBottomY {
-			vpHeight := pageHeight - actionsPanelBottomY - 6
-			if vpHeight < 0 {
-				vpHeight = 0
-			}
-			s.SysStatus.Viewport.Height = vpHeight
-
-
 			var mouseMsg tea.MouseMsg
 			if up {
 				mouseMsg.Type = tea.MouseWheelUp
@@ -922,6 +915,26 @@ func (s State) ClearActionStates() State {
 }
 
 func (s State) HandleMsg(msg tea.Msg) (State, tea.Cmd) {
+	if winMsg, ok := msg.(tea.WindowSizeMsg); ok {
+		settingsPanelHeight := len(s.activeKeys()) + 2
+		
+		actionsPanelHeight := 0
+		if s.activeTab == 1 {
+			actionsPanelHeight = 8 // approx height for actions panel
+		}
+		
+		// Approximate taken height: TopNav/Status (~2) + TabBar (3) + Gap (1) + Panels + Desc/Padding (~6)
+		takenHeight := 12 + settingsPanelHeight + actionsPanelHeight
+		
+		vpHeight := winMsg.Height - takenHeight
+		if vpHeight < 0 {
+			vpHeight = 0
+		}
+		
+		s.SysStatus.Viewport.Width = winMsg.Width - 4
+		s.SysStatus.Viewport.Height = vpHeight
+	}
+
 	cmd := s.SysStatus.Update(msg)
 	return s, cmd
 }
