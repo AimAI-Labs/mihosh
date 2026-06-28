@@ -118,7 +118,7 @@ func TestMihoshSettingKeysAndValues(t *testing.T) {
 		t.Fatalf("expected theme setting key, got %q", MihoshSettingKeys[4])
 	}
 	state := State{}
-	if got := GetSettingValue(state.ToPageState(cfg), "auto-refresh-interval"); got != "7" {
+	if got := GetSettingValue(state.ToPageState(cfg, nil), "auto-refresh-interval"); got != "7" {
 		t.Fatalf("expected auto refresh interval value 7, got %q", got)
 	}
 }

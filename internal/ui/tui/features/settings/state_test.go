@@ -75,7 +75,7 @@ func TestToPageState(t *testing.T) {
 		editCursor:      4,
 	}
 
-	pageState := s.ToPageState(cfg)
+	pageState := s.ToPageState(cfg, nil)
 
 	if pageState.Config != cfg {
 		t.Errorf("expected Config to match")

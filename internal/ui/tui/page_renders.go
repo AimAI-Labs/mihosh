@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
@@ -44,7 +45,20 @@ func (m Model) renderConnectionsPage() string {
 // renderSettingsPage 渲染设置页面
 func (m Model) renderSettingsPage() string {
 	pageWidth, pageHeight := m.getPageSize()
-	state := m.settingsState.ToPageState(m.config)
+
+	// Filter max 50 info logs
+	var infoLogs []model.LogEntry
+	allLogs := m.logsState.Logs()
+	for _, l := range allLogs {
+		if l.Type == "info" {
+			infoLogs = append(infoLogs, l)
+			if len(infoLogs) >= 50 {
+				break
+			}
+		}
+	}
+
+	state := m.settingsState.ToPageState(m.config, infoLogs)
 	return settings.RenderSettingsPage(state, pageWidth, pageHeight)
 }
 

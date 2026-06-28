@@ -8,6 +8,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/logs"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
@@ -74,6 +75,7 @@ type PageState struct {
 	IsConfigReloading bool
 	IsGeoUpdating     bool
 	SysStatus         SysStatusState
+	SysLogs           []model.LogEntry
 }
 
 func (p PageState) activeKeys() []string {
@@ -245,6 +247,15 @@ func RenderSettingsPage(state PageState, width, height int) string {
 		state.SysStatus.Viewport.Height = remainingHeight
 
 		if state.SysStatus.Viewport.Height > 0 {
+			combined := state.SysStatus.LastOutput
+			if len(state.SysLogs) > 0 {
+				combined += "\n\n"
+				for _, lg := range state.SysLogs {
+					combined += logs.RenderLogEntry(lg, false, state.SysStatus.Viewport.Width, 0) + "\n"
+				}
+			}
+			state.SysStatus.Viewport.SetContent(combined)
+
 			statusView := common.RenderTokyoPanel(
 				i18n.T("settings.sys_status.panel_title"),
 				"\n"+state.SysStatus.Viewport.View()+"\n",

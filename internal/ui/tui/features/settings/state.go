@@ -116,7 +116,7 @@ func (s State) ApplyMihomoVersion(version string) State {
 }
 
 // ToPageState 转换为渲染层所需的 PageState
-func (s State) ToPageState(cfg *config.Config) PageState {
+func (s State) ToPageState(cfg *config.Config, sysLogs []model.LogEntry) PageState {
 	if s.toastManager == nil {
 		s.toastManager = common.NewToastManager()
 	}
@@ -138,6 +138,7 @@ func (s State) ToPageState(cfg *config.Config) PageState {
 		IsConfigReloading: s.IsConfigReloading,
 		IsGeoUpdating:     s.IsGeoUpdating,
 		SysStatus:         s.SysStatus,
+		SysLogs:           sysLogs,
 	}
 }
 
@@ -228,7 +229,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *con
 			settingsPanelHeight = 5
 		} else {
 			height := 0
-			pageState := s.ToPageState(cfg)
+			pageState := s.ToPageState(cfg, nil)
 			for i, key := range s.activeKeys() {
 				item := renderSettingItem(pageState, i, key, GetSettingLabel(key), pageWidth)
 				height += lipgloss.Height(item)
@@ -860,7 +861,7 @@ func (s State) getEditValue(cfg *config.Config, settingKey string) string {
 		}
 		return ""
 	}
-	return GetSettingValue(s.ToPageState(cfg), settingKey)
+	return GetSettingValue(s.ToPageState(cfg, nil), settingKey)
 }
 
 
