@@ -25,8 +25,8 @@ func TestSysStatusState_Update(t *testing.T) {
 	if cmd == nil {
 		t.Error("expected new tick cmd on ResultMsg")
 	}
-	if state.Viewport.View() == "" {
-		t.Error("expected viewport to be updated")
+	if state.LastOutput == "" {
+		t.Error("expected LastOutput to be updated")
 	}
 }
 

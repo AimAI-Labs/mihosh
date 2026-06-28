@@ -13,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+var activeStatusRe = regexp.MustCompile(`Active: (.*? (?:.*?\)))`)
 
 type SysStatusState struct {
 	Supported  bool
@@ -101,8 +102,7 @@ func parseSystemctlStatusCompact(output string) string {
 				loaded = parts[1]
 			}
 		} else if strings.HasPrefix(line, "Active:") {
-			re := regexp.MustCompile(`Active: (.*? (?:.*?\)))`)
-			if matches := re.FindStringSubmatch(line); len(matches) > 1 {
+			if matches := activeStatusRe.FindStringSubmatch(line); len(matches) > 1 {
 				active = matches[1]
 			} else {
 				parts := strings.SplitN(line, " ", 3)
