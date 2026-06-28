@@ -249,7 +249,7 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	if state.ActiveTab == 1 && state.SysStatus.Supported {
 		usedHeight := lipgloss.Height(lipgloss.JoinVertical(lipgloss.Left, parts...))
 		// descRow and versionRow take about 2-3 lines.
-		remainingHeight := height - usedHeight - 4
+		remainingHeight := height - usedHeight - 6
 
 		if remainingHeight > 2 {
 			state.SysStatus.Viewport.Width = width - 4

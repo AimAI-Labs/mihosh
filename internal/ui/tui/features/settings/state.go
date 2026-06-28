@@ -180,6 +180,12 @@ func (s State) HandleMouseScroll(up bool, pageY, pageHeight, actionsPanelBottomY
 	// If we are in the Mihomo tab and the mouse is below the actions panel (where viewport is)
 	if s.activeTab == 1 && s.SysStatus.Supported && pageY > 0 {
 		if pageY > actionsPanelBottomY {
+			vpHeight := pageHeight - actionsPanelBottomY - 6
+			if vpHeight < 0 {
+				vpHeight = 0
+			}
+			s.SysStatus.Viewport.Height = vpHeight
+
 
 			var mouseMsg tea.MouseMsg
 			if up {

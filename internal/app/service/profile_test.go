@@ -22,12 +22,21 @@ func newIsolatedService(t *testing.T) *ProfileService {
 	tmpHome := t.TempDir()
 	t.Setenv("HOME", tmpHome)
 	t.Setenv("USERPROFILE", tmpHome)
+	t.Setenv("APPDATA", "") // 防 Windows 下搜到真实系统的 mihomo 目录
+	t.Setenv("HOMEDRIVE", "")
+	t.Setenv("HOMEPATH", "")
 
 	// 预置一份最小 mihosh 配置文件，使 config.Load 可用。
 	dir, err := config.GetConfigDir()
 	require.NoError(t, err)
 	require.NoError(t, os.MkdirAll(dir, 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "config.yaml"), []byte("test_url: http://example.com\n"), 0644))
+
+	// 预置 mihomo 配置文件，防止 Activate 时找不到路径报错
+	mihomoDir := filepath.Join(tmpHome, ".config", "mihomo")
+	require.NoError(t, os.MkdirAll(mihomoDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(mihomoDir, "config.yaml"), []byte(""), 0644))
+
 
 	return NewProfileService(nil)
 }
