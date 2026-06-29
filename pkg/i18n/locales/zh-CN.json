@@ -132,6 +132,11 @@
   "logs.stats": "共 %d 条日志 (级别: %s)",
   "logs.search": "搜索: ",
   "logs.empty": "暂无日志",
+  "logs.detail.title": "日志详情",
+  "logs.detail.info": "基础信息",
+  "logs.detail.source": "请求来源",
+  "logs.detail.source_loading": "  正在查询来源应用...",
+  "logs.detail.raw": "原始日志",
 
   "rules.stats": "共 %d 条规则",
   "rules.stats_filtered": " (过滤自 %d 条)",

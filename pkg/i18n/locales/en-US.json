@@ -132,6 +132,11 @@
   "logs.stats": "Total %d logs (level: %s)",
   "logs.search": "Search: ",
   "logs.empty": "No logs",
+  "logs.detail.title": "Log Details",
+  "logs.detail.info": "Basic Info",
+  "logs.detail.source": "Source",
+  "logs.detail.source_loading": "  Querying source app...",
+  "logs.detail.raw": "Raw Log",
 
   "rules.stats": "Total %d rules",
   "rules.stats_filtered": " (filtered from %d)",
