@@ -89,8 +89,8 @@ func TestRenderDoctorPlainAndTable(t *testing.T) {
 			format: outputFormatPlain,
 			contains: []string{
 				"配置健康检查: warn",
-				"[ok] external_controller",
-				"[warn] secret",
+				"[OK] external_controller",
+				"[WARN] secret",
 				"not configured",
 			},
 		},
@@ -101,7 +101,7 @@ func TestRenderDoctorPlainAndTable(t *testing.T) {
 				"CHECK",
 				"STATUS",
 				"external_controller",
-				"warn",
+				"WARN",
 			},
 		},
 	} {

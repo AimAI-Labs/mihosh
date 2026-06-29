@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -44,7 +45,12 @@ var doctorCmd = &cobra.Command{
 
 		cfg, err := config.Load()
 		if err != nil {
-			return wrapConfigError(fmt.Errorf("加载配置失败: %w", err))
+			if errors.Is(err, config.ErrConfigNotFound) {
+				// 使用默认配置以便能继续测试
+				cfg = &config.Config{Timeout: 5}
+			} else {
+				return wrapConfigError(fmt.Errorf("加载配置失败: %w", err))
+			}
 		}
 
 		// 连接信息由 mihomo 配置文件自动发现
@@ -74,6 +80,7 @@ type doctorCheckResult struct {
 	Status  doctorStatus `json:"status"`
 	Message string       `json:"message"`
 	Target  string       `json:"target,omitempty"`
+	Hint    string       `json:"hint,omitempty"`
 }
 
 type doctorReport struct {
@@ -86,6 +93,8 @@ type doctorReport struct {
 
 func runDoctorChecks(cfg *config.Config, endpoint config.MihomoEndpoint) doctorReport {
 	checks := []doctorCheckResult{
+		checkMihoshConfig(),
+		checkMihomoConfig(),
 		checkExternalController(endpoint.ExternalController),
 		checkSecret(endpoint.Secret),
 		checkProxyAddress(config.MixedPortToProxyURL(endpoint.MixedPort)),
@@ -95,18 +104,38 @@ func runDoctorChecks(cfg *config.Config, endpoint config.MihomoEndpoint) doctorR
 	return buildDoctorSummary(checks)
 }
 
+func checkMihoshConfig() doctorCheckResult {
+	dir, err := config.GetConfigDir()
+	if err != nil {
+		return doctorCheckResult{Name: "mihosh_config", Status: doctorStatusFail, Message: err.Error(), Target: "-", Hint: "无法获取 Mihosh 配置目录，请检查系统权限或环境变量。"}
+	}
+	path := filepath.Join(dir, "config.yaml")
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return doctorCheckResult{Name: "mihosh_config", Status: doctorStatusWarn, Message: "not found", Target: path, Hint: "Mihosh 配置文件不存在。这通常是因为这是首次运行，请使用 `mihosh config edit` 初始化配置。"}
+	}
+	return doctorCheckResult{Name: "mihosh_config", Status: doctorStatusOK, Message: "found", Target: path}
+}
+
+func checkMihomoConfig() doctorCheckResult {
+	path, err := config.GetMihomoConfigPath()
+	if err != nil {
+		return doctorCheckResult{Name: "mihomo_config", Status: doctorStatusWarn, Message: "not found or error", Target: "-", Hint: "未能自动发现 Mihomo 的配置文件。请确保 Mihomo 已运行，或使用 `mihosh config edit` 手动指定配置目录。"}
+	}
+	return doctorCheckResult{Name: "mihomo_config", Status: doctorStatusOK, Message: "discovered", Target: path}
+}
+
 // checkExternalController 校验 external-controller 地址（原值，可能无 scheme）。
 func checkExternalController(raw string) doctorCheckResult {
 	normalized := ensureDoctorHTTPScheme(raw)
 	if err := validateDoctorHTTPURL(normalized); err != nil {
-		return doctorCheckResult{Name: "external_controller", Status: doctorStatusFail, Message: err.Error(), Target: raw}
+		return doctorCheckResult{Name: "external_controller", Status: doctorStatusFail, Message: err.Error(), Target: raw, Hint: "Mihomo API 外部控制器地址无效。请检查是否为有效的 HTTP/HTTPS URL，例如 127.0.0.1:9090。"}
 	}
 	return doctorCheckResult{Name: "external_controller", Status: doctorStatusOK, Message: "valid", Target: raw}
 }
 
 func checkSecret(secret string) doctorCheckResult {
 	if strings.TrimSpace(secret) == "" {
-		return doctorCheckResult{Name: "secret", Status: doctorStatusWarn, Message: "not configured"}
+		return doctorCheckResult{Name: "secret", Status: doctorStatusWarn, Message: "not configured", Hint: "未配置 secret。如果您在公网或局域网暴露了 Mihomo API，强烈建议在 Mihomo 配置中设置 secret 以防止未授权访问。"}
 	}
 	return doctorCheckResult{Name: "secret", Status: doctorStatusOK, Message: "configured"}
 }
@@ -115,11 +144,11 @@ func checkProxyAddress(raw string) doctorCheckResult {
 	target := raw
 	normalized, err := normalizeDoctorProxyURL(raw)
 	if err != nil {
-		return doctorCheckResult{Name: "proxy", Status: doctorStatusFail, Message: err.Error(), Target: target}
+		return doctorCheckResult{Name: "proxy", Status: doctorStatusFail, Message: err.Error(), Target: target, Hint: "混合代理地址格式不正确。请检查 Mihomo 的 mixed-port 配置。"}
 	}
 
 	if err := dialDoctorTCP(normalized.Host); err != nil {
-		return doctorCheckResult{Name: "proxy", Status: doctorStatusFail, Message: err.Error(), Target: target}
+		return doctorCheckResult{Name: "proxy", Status: doctorStatusFail, Message: err.Error(), Target: target, Hint: "无法连接到混合代理端口。请确认 Mihomo 正在运行，且 mixed-port 未被防火墙拦截。"}
 	}
 	return doctorCheckResult{Name: "proxy", Status: doctorStatusOK, Message: "reachable", Target: target}
 }
@@ -127,21 +156,21 @@ func checkProxyAddress(raw string) doctorCheckResult {
 func checkMihomoReachable(cfg *config.Config, endpoint config.MihomoEndpoint) doctorCheckResult {
 	client := api.NewClient(endpoint, cfg.Timeout)
 	if _, err := client.GetConfigs(); err != nil {
-		return doctorCheckResult{Name: "mihomo", Status: doctorStatusFail, Message: err.Error(), Target: endpoint.ExternalController}
+		return doctorCheckResult{Name: "mihomo_api", Status: doctorStatusFail, Message: err.Error(), Target: endpoint.ExternalController, Hint: "无法访问 Mihomo API。请检查 Mihomo 是否已启动，且 external-controller 配置是否正确。若配置了 secret，请确保一致。"}
 	}
-	return doctorCheckResult{Name: "mihomo", Status: doctorStatusOK, Message: "reachable", Target: endpoint.ExternalController}
+	return doctorCheckResult{Name: "mihomo_api", Status: doctorStatusOK, Message: "reachable", Target: endpoint.ExternalController}
 }
 
 func checkWebSocketAvailable(endpoint config.MihomoEndpoint) doctorCheckResult {
 	wsURL, err := buildDoctorWSURL(endpoint.ExternalController, endpoint.Secret, "traffic")
 	if err != nil {
-		return doctorCheckResult{Name: "websocket", Status: doctorStatusFail, Message: err.Error(), Target: endpoint.ExternalController}
+		return doctorCheckResult{Name: "websocket", Status: doctorStatusFail, Message: err.Error(), Target: endpoint.ExternalController, Hint: "WebSocket URL 构建失败，请检查 external-controller 地址是否合法。"}
 	}
 
 	dialer := websocket.Dialer{HandshakeTimeout: doctorProbeTimeout}
 	conn, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
-		return doctorCheckResult{Name: "websocket", Status: doctorStatusFail, Message: err.Error(), Target: endpoint.ExternalController}
+		return doctorCheckResult{Name: "websocket", Status: doctorStatusFail, Message: err.Error(), Target: endpoint.ExternalController, Hint: "WebSocket 握手失败。可能的原因：API 地址错误、网络不通或 Mihomo 版本过低不支持此端点。"}
 	}
 	conn.Close()
 	return doctorCheckResult{Name: "websocket", Status: doctorStatusOK, Message: "reachable", Target: endpoint.ExternalController}
@@ -199,23 +228,26 @@ func renderDoctorPlain(w io.Writer, report doctorReport) {
 	fmt.Fprintf(w, "配置健康检查: %s\n", report.Status)
 	fmt.Fprintf(w, "失败: %d, 警告: %d\n", report.Failed, report.Warnings)
 	for _, check := range report.Checks {
-		if check.Target == "" {
-			fmt.Fprintf(w, "[%s] %s: %s\n", check.Status, check.Name, check.Message)
-			continue
+		targetStr := ""
+		if check.Target != "" && check.Target != "-" {
+			targetStr = fmt.Sprintf(" (%s)", check.Target)
 		}
-		fmt.Fprintf(w, "[%s] %s (%s): %s\n", check.Status, check.Name, check.Target, check.Message)
+		fmt.Fprintf(w, "[%s] %s%s: %s\n", strings.ToUpper(string(check.Status)), check.Name, targetStr, check.Message)
+		if check.Hint != "" {
+			fmt.Fprintf(w, "      💡 提示: %s\n", check.Hint)
+		}
 	}
 }
 
 func renderDoctorTable(w io.Writer, report doctorReport) error {
 	tw := newTabWriter(w)
-	fmt.Fprintln(tw, "CHECK\tSTATUS\tTARGET\tMESSAGE")
+	fmt.Fprintln(tw, "CHECK\tSTATUS\tTARGET\tMESSAGE\tHINT")
 	for _, check := range report.Checks {
 		target := check.Target
 		if target == "" {
 			target = "-"
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", check.Name, check.Status, target, check.Message)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", check.Name, strings.ToUpper(string(check.Status)), target, check.Message, check.Hint)
 	}
 	return tw.Flush()
 }
