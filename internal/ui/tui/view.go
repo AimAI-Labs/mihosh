@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/help"
@@ -85,6 +87,7 @@ func (m Model) View() string {
 		groupName,
 		nodeName,
 		delay,
+		m.hasUpdate,
 	)
 
 	fullPage := lipgloss.JoinVertical(lipgloss.Left, topNav, pageContent, statusBar)
@@ -92,6 +95,11 @@ func (m Model) View() string {
 	// ── 报错弹窗叠加 ──
 	if m.showErrorPopup && m.err != nil {
 		fullPage = overlayErrorPopup(fullPage, m.width, m.height, m.err.Error())
+	}
+
+	// ── 更新弹窗叠加 ──
+	if m.showUpdateDialog && m.updateInfo != nil {
+		fullPage = overlayUpdateDialog(fullPage, m.width, m.height, m.updateInfo, m.isUpdating, m.updateError)
 	}
 
 	// ── 帮助弹窗叠加（lazygit 风格，叠加在完整页面之上）──
@@ -192,6 +200,103 @@ func overlayErrorPopup(base string, width, height int, errText string) string {
 	
 	title := i18n.T("status.err.detail")
 	popup := common.RenderBorderedPanel(title, body, popupWidth, common.TokyoRed(), common.TokyoRed())
+
+	// ── 4. 弹窗居中合并 ──
+	popupLines := strings.Split(popup, "\n")
+	popupHeight := len(popupLines)
+
+	leftOffset := (width - popupWidth) / 2
+	if leftOffset < 0 {
+		leftOffset = 0
+	}
+	topOffset := (height - popupHeight) / 2
+	if topOffset < 0 {
+		topOffset = 0
+	}
+
+	for i, pl := range popupLines {
+		y := topOffset + i
+		if y >= height {
+			break
+		}
+
+		leftPart := ansi.Cut(dimmed[y], 0, leftOffset)
+		leftW := lipgloss.Width(leftPart)
+		if leftW < leftOffset {
+			leftPart += strings.Repeat(" ", leftOffset-leftW)
+		}
+
+		rightPart := ansi.Cut(dimmed[y], leftOffset+popupWidth, width)
+		dimmed[y] = leftPart + pl + rightPart
+	}
+
+	return strings.Join(dimmed, "\n")
+}
+
+// overlayUpdateDialog 将更新弹窗完整弹窗居中叠加在 base 页面之上
+func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo, isUpdating bool, err error) string {
+	// ── 1. 暗化底层 ──
+	baseLines := strings.Split(base, "\n")
+	for len(baseLines) < height {
+		baseLines = append(baseLines, "")
+	}
+	if len(baseLines) > height {
+		baseLines = baseLines[:height]
+	}
+
+	faint := lipgloss.NewStyle().Faint(true)
+	dimmed := make([]string, height)
+	for i, l := range baseLines {
+		dimmed[i] = faint.Render(l)
+	}
+
+	// ── 2. 弹窗尺寸计算 ──
+	popupWidth := width * 60 / 100
+	if popupWidth < 40 {
+		popupWidth = 40
+	}
+	if popupWidth > 80 {
+		popupWidth = 80
+	}
+	if popupWidth > width {
+		popupWidth = width
+	}
+
+	// ── 3. 构建弹窗内容 ──
+	var body string
+	if isUpdating {
+		body = "\n" + lipgloss.NewStyle().Foreground(common.TokyoCyan()).Render("  正在下载并更新中，请稍候...") + "\n\n"
+	} else if err != nil {
+		body = "\n" + lipgloss.NewStyle().Foreground(common.TokyoRed()).Render("  更新失败: "+err.Error()) + "\n\n"
+		body += lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render("  [Esc] 关闭")
+	} else {
+		notes := info.ReleaseNotes
+		body = lipgloss.NewStyle().Foreground(common.TokyoCyan()).Render(fmt.Sprintf("最新版本: %s", info.Version)) + "\n\n"
+		body += lipgloss.NewStyle().Render(notes) + "\n\n"
+		body += lipgloss.NewStyle().Foreground(common.TokyoGreen()).Render("  [Enter] 立即更新    [Esc] 稍后更新")
+	}
+
+	contentWidth := popupWidth - 4 // border 2 + padding 2
+	wrappedBody := lipgloss.NewStyle().Width(contentWidth).Render(body)
+	bodyLines := strings.Split(wrappedBody, "\n")
+	
+	maxLines := height * 70 / 100
+	if maxLines < 8 {
+		maxLines = 8
+	}
+	if len(bodyLines) > maxLines {
+		bodyLines = bodyLines[:maxLines]
+		bodyLines = append(bodyLines, lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render("..."))
+	}
+	
+	finalBody := strings.Join(bodyLines, "\n")
+	
+	title := "发现新版本"
+	borderColor := common.TokyoCyan()
+	if err != nil {
+		borderColor = common.TokyoRed()
+	}
+	popup := common.RenderBorderedPanel(title, finalBody, popupWidth, borderColor, borderColor)
 
 	// ── 4. 弹窗居中合并 ──
 	popupLines := strings.Split(popup, "\n")

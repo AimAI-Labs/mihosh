@@ -70,7 +70,7 @@ func renderNodeInfo(mode, groupName, nodeName string, delay, width int) string {
 }
 
 // RenderStatusBar 渲染底部状态栏（含实时指标和累计流量）
-func RenderStatusBar(width int, err error, testing bool, testingTarget string, notice string, chartData *model.ChartData, uploadTotal int64, downloadTotal int64, mode string, groupName string, nodeName string, delay int) string {
+func RenderStatusBar(width int, err error, testing bool, testingTarget string, notice string, chartData *model.ChartData, uploadTotal int64, downloadTotal int64, mode string, groupName string, nodeName string, delay int, hasUpdate bool) string {
 	// ── 左侧：节点信息 + 运行状态 / 错误 ──
 	nodeInfo := renderNodeInfo(mode, groupName, nodeName, delay, width)
 
@@ -165,13 +165,18 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, n
 	divider := styles.DividerStyle().
 		Render(strings.Repeat("─", width))
 
+	var rightIcon string
+	if hasUpdate {
+		rightIcon = lipgloss.NewStyle().Foreground(common.TokyoCyan()).Blink(true).Render(" ◉")
+	}
+
 	// ── 组装状态行 ──
 	// 计算右侧空间并右对齐
-	gap := width - lipgloss.Width(leftPart) - lipgloss.Width(metricsStr) - 2
+	gap := width - lipgloss.Width(leftPart) - lipgloss.Width(metricsStr) - lipgloss.Width(rightIcon) - 2
 	if gap < 0 {
 		gap = 0
 	}
-	statusLine := leftPart + strings.Repeat(" ", gap) + metricsStr
+	statusLine := leftPart + strings.Repeat(" ", gap) + metricsStr + rightIcon
 
 	return lipgloss.JoinVertical(lipgloss.Left, divider, statusLine)
 }

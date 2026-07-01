@@ -8,6 +8,8 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/sub"
 	"time"
 
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 
@@ -73,6 +75,14 @@ func (m Model) Init() tea.Cmd {
 		autoRefreshTick(),
 		startWSStreams(m.wsClient, m.wsMsgChan),
 		listenWSMessages(m.wsCtx, m.wsMsgChan),
+		// 自动更新检测
+		func() tea.Msg {
+			info, err := service.CheckUpdate(model.Version)
+			if err != nil || info == nil {
+				return messages.UpdateCheckedMsg{Info: nil}
+			}
+			return messages.UpdateCheckedMsg{Info: info}
+		},
 		// 首次启动时自动将本地 mihomo 配置导入为本地订阅（幂等，已有则跳过）
 		func() tea.Msg {
 			p, err := m.profileSvc.AutoImportLocalSub()
@@ -110,6 +120,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+		// 更新弹窗打开时吞掉所有鼠标事件
+		if m.showUpdateDialog {
+			if isMouseLeftPress(msg) {
+				m.showUpdateDialog = false
+				m.updateError = nil
+			}
+			return m, nil
+		}
 		switch {
 		case isMouseLeftPress(msg):
 			statusBarHeight := common.StatusBarHeight
@@ -126,6 +144,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.showErrorPopup = true
 						return m, nil
 					}
+				}
+
+				if m.hasUpdate && msg.X >= m.width-5 {
+					m.showUpdateDialog = true
+					return m, nil
 				}
 
 				activeProxy, _, exists := m.nodesState.GetActiveProxyAndDelay()
@@ -201,6 +224,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// 更新弹窗拦截
+		if m.showUpdateDialog {
+			switch msg.String() {
+			case "esc", "q":
+				m.showUpdateDialog = false
+				m.updateError = nil
+				return m, nil
+			case "enter":
+				if !m.isUpdating && m.updateInfo != nil {
+					m.isUpdating = true
+					m.updateError = nil
+					url := m.updateInfo.DownloadURL
+					return m, func() tea.Msg {
+						err := service.DownloadAndApplyUpdate(url)
+						return messages.UpdateAppliedMsg{Err: err}
+					}
+				}
+				return m, nil
+			}
+			if key.Matches(msg, common.Keys.Quit) {
+				return m, tea.Quit
+			}
+			return m, nil
+		}
+
 		// 全局帮助
 		if msg.String() == "?" {
 			m.showHelp = true
@@ -228,12 +276,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, common.Keys.Refresh):
 			return m, m.refreshCurrentPage()
+
+		case msg.String() == "ctrl+u" && m.hasUpdate:
+			m.showUpdateDialog = true
+			return m, nil
 		}
 
 		// 分发到页面子状态
 		return m.dispatchKeyToPage(msg)
 
 	// ── 数据消息：分发到子状态 ──
+
+	case messages.UpdateCheckedMsg:
+		if msg.Info != nil {
+			m.updateInfo = msg.Info
+			m.hasUpdate = true
+		}
+
+	case messages.UpdateAppliedMsg:
+		if msg.Err != nil {
+			m.updateError = msg.Err
+			m.isUpdating = false
+			return m, nil
+		}
+		m.notice = i18n.T("status.update_applied")
+		if m.notice == "status.update_applied" {
+			m.notice = "Update applied, please restart."
+		}
+		m.noticeTicks = autoRefreshNoticeTicks
+		return m, tea.Quit
 
 	case messages.GroupsMsg:
 		if m.noticeTicks <= 0 {

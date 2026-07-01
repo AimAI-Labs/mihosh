@@ -77,6 +77,13 @@ type Model struct {
 	rulesState    rules.State
 	subState      sub.State
 	settingsState settings.State
+
+	// 自动更新
+	updateInfo       *model.UpdateInfo
+	hasUpdate        bool
+	showUpdateDialog bool
+	isUpdating       bool
+	updateError      error
 }
 
 // NewModel 创建新的 TUI 模型

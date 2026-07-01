@@ -274,3 +274,13 @@ type SysStatusResultMsg struct {
 	Output string
 	Err    error
 }
+
+// ========= Auto Update Messages =========
+
+type UpdateCheckedMsg struct {
+	Info *model.UpdateInfo
+}
+
+type UpdateAppliedMsg struct {
+	Err error
+}

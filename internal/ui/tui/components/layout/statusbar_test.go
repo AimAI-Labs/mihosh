@@ -11,7 +11,7 @@ import (
 func TestRenderStatusBar_TestingWithTarget(t *testing.T) {
 	initStatusBarTestI18n()
 
-	bar := RenderStatusBar(120, nil, true, "HK-01", "", nil, 0, 0, "", "", "", 0)
+	bar := RenderStatusBar(120, nil, true, "HK-01", "", nil, 0, 0, "", "", "", 0, false)
 	if !strings.Contains(bar, "正在测速: HK-01") {
 		t.Fatalf("expected testing target in status bar, got: %q", bar)
 	}
@@ -20,7 +20,7 @@ func TestRenderStatusBar_TestingWithTarget(t *testing.T) {
 func TestRenderStatusBar_TestingWithoutTarget(t *testing.T) {
 	initStatusBarTestI18n()
 
-	bar := RenderStatusBar(120, nil, true, "", "", nil, 0, 0, "", "", "", 0)
+	bar := RenderStatusBar(120, nil, true, "", "", nil, 0, 0, "", "", "", 0, false)
 	if !strings.Contains(bar, "正在测速") {
 		t.Fatalf("expected generic testing text in status bar, got: %q", bar)
 	}
@@ -29,7 +29,7 @@ func TestRenderStatusBar_TestingWithoutTarget(t *testing.T) {
 func TestRenderStatusBar_AutoRefreshNotice(t *testing.T) {
 	initStatusBarTestI18n()
 
-	bar := RenderStatusBar(120, nil, false, "", "配置已同步：检测到外部节点/模式变化", nil, 0, 0, "", "", "", 0)
+	bar := RenderStatusBar(120, nil, false, "", "配置已同步：检测到外部节点/模式变化", nil, 0, 0, "", "", "", 0, false)
 	if !strings.Contains(bar, "配置已同步：检测到外部节点/模式变化") {
 		t.Fatalf("expected auto refresh notice in status bar, got: %q", bar)
 	}
@@ -86,7 +86,7 @@ func TestRenderNodeInfo_NarrowWidth(t *testing.T) {
 func TestRenderStatusBar_WithNodeInfo(t *testing.T) {
 	initStatusBarTestI18n()
 
-	bar := RenderStatusBar(120, nil, false, "", "", nil, 0, 0, "Rule", "GLOBAL", "HK-01", 120)
+	bar := RenderStatusBar(120, nil, false, "", "", nil, 0, 0, "Rule", "GLOBAL", "HK-01", 120, false)
 	if !strings.Contains(bar, "Rule") {
 		t.Errorf("expected 'Rule' in status bar, got: %q", bar)
 	}
@@ -101,7 +101,7 @@ func TestRenderStatusBar_WithNodeInfo(t *testing.T) {
 func TestRenderStatusBar_NodeInfoWithError(t *testing.T) {
 	initStatusBarTestI18n()
 
-	bar := RenderStatusBar(120, fmt.Errorf("connection refused"), false, "", "", nil, 0, 0, "Rule", "GLOBAL", "HK-01", 120)
+	bar := RenderStatusBar(120, fmt.Errorf("connection refused"), false, "", "", nil, 0, 0, "Rule", "GLOBAL", "HK-01", 120, false)
 	if !strings.Contains(bar, "HK-01") {
 		t.Errorf("expected node info even with error, got: %q", bar)
 	}
