@@ -10,6 +10,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/minio/selfupdate"
+	"golang.org/x/mod/semver"
 )
 
 const (
@@ -50,10 +51,26 @@ func CheckUpdate(currentVersion string) (*model.UpdateInfo, error) {
 		return nil, fmt.Errorf("decode json failed: %w", err)
 	}
 
-	// Simple version compare: if tag is different and not empty
-	// (A proper semver compare could be used here, but string inequality is a good start)
-	if release.TagName == "" || release.TagName == currentVersion {
-		return nil, nil // No update
+	if release.TagName == "" {
+		return nil, nil
+	}
+
+	// 正式构建（通过 -ldflags 注入了 semver 版本号）才做版本比对；
+	// dev/unknown/空 = 本地开发构建，始终展示最新 release 以便测试。
+	isDev := currentVersion == "" || currentVersion == "dev" || currentVersion == "unknown"
+	if !isDev {
+		v1 := currentVersion
+		if !strings.HasPrefix(v1, "v") {
+			v1 = "v" + v1
+		}
+		v2 := release.TagName
+		if !strings.HasPrefix(v2, "v") {
+			v2 = "v" + v2
+		}
+		// 仅当远程版本严格大于本地版本时才提示更新
+		if !semver.IsValid(v1) || !semver.IsValid(v2) || semver.Compare(v1, v2) >= 0 {
+			return nil, nil
+		}
 	}
 
 	// Find the correct asset for the current OS and Arch
@@ -79,10 +96,13 @@ func CheckUpdate(currentVersion string) (*model.UpdateInfo, error) {
 		downloadURL = fmt.Sprintf("https://github.com/AimAI-Labs/mihosh/releases/tag/%s", release.TagName)
 	}
 
+	releaseURL := fmt.Sprintf("https://github.com/AimAI-Labs/mihosh/releases/tag/%s", release.TagName)
+
 	return &model.UpdateInfo{
-		Version:      release.TagName,
-		ReleaseNotes: release.Body,
-		DownloadURL:  downloadURL,
+		CurrentVersion: currentVersion,
+		Version:        release.TagName,
+		ReleaseURL:     releaseURL,
+		DownloadURL:    downloadURL,
 	}, nil
 }
 

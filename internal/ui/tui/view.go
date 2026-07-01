@@ -263,6 +263,8 @@ func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo,
 	}
 
 	// ── 3. 构建弹窗内容 ──
+	contentWidth := popupWidth - 4 // border 2 + padding 2
+
 	var body string
 	if isUpdating {
 		body = "\n" + lipgloss.NewStyle().Foreground(common.TokyoCyan()).Render("  正在下载并更新中，请稍候...") + "\n\n"
@@ -270,13 +272,20 @@ func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo,
 		body = "\n" + lipgloss.NewStyle().Foreground(common.TokyoRed()).Render("  更新失败: "+err.Error()) + "\n\n"
 		body += lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render("  [Esc] 关闭")
 	} else {
-		notes := info.ReleaseNotes
-		body = lipgloss.NewStyle().Foreground(common.TokyoCyan()).Render(fmt.Sprintf("最新版本: %s", info.Version)) + "\n\n"
-		body += lipgloss.NewStyle().Render(notes) + "\n\n"
-		body += lipgloss.NewStyle().Foreground(common.TokyoGreen()).Render("  [Enter] 立即更新    [Esc] 稍后更新")
-	}
+		verStr := fmt.Sprintf("%s  →  %s", info.CurrentVersion, info.Version)
+		body = lipgloss.NewStyle().Foreground(common.TokyoCyan()).Bold(true).Render(verStr) + "\n\n"
+		body += lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render("Changelog: " + info.ReleaseURL) + "\n\n"
 
-	contentWidth := popupWidth - 4 // border 2 + padding 2
+		leftBtn := lipgloss.NewStyle().Foreground(common.TokyoGreen()).Render("[Enter] 立即更新")
+		rightBtn := lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render("[Esc] 稍后更新")
+
+		halfWidth := contentWidth / 2
+		leftHalf := lipgloss.NewStyle().Width(halfWidth).Align(lipgloss.Right).Render(leftBtn + "  ")
+		rightHalf := lipgloss.NewStyle().Width(contentWidth - halfWidth).Align(lipgloss.Left).Render("  " + rightBtn)
+		buttons := lipgloss.JoinHorizontal(lipgloss.Top, leftHalf, rightHalf)
+
+		body += buttons
+	}
 	wrappedBody := lipgloss.NewStyle().Width(contentWidth).Render(body)
 	bodyLines := strings.Split(wrappedBody, "\n")
 	

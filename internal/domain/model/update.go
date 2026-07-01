@@ -2,7 +2,8 @@ package model
 
 // UpdateInfo holds information about a new release.
 type UpdateInfo struct {
-	Version      string
-	ReleaseNotes string
-	DownloadURL  string
+	CurrentVersion string
+	Version        string
+	ReleaseURL     string
+	DownloadURL    string
 }
