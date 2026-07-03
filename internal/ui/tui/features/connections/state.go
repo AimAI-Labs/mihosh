@@ -32,6 +32,7 @@ type State struct {
 	closedTimes [common.ClosedConnCap]time.Time // 新增：记录关闭时间
 	closedHead  int                             // 写入位置（下一条写入的索引）
 	closedCount int                             // 已写入的总条数（上限 ClosedConnCap）
+	cachedClosedConns []model.Connection        // 缓存的已关闭连接列表
 
 	selectedConn            int
 	connScrollTop           int
@@ -130,16 +131,24 @@ func (s State) CalculateTopN(n int, within time.Duration) []components.TopNItem 
 
 // ClosedConnections 返回历史连接（最新在前）
 func (s State) ClosedConnections() []model.Connection {
+	return s.cachedClosedConns
+}
+
+// rebuildCachedClosedConns 重建历史连接列表缓存
+func (s *State) rebuildCachedClosedConns() {
 	if s.closedCount == 0 {
-		return nil
+		s.cachedClosedConns = nil
+		return
 	}
-	result := make([]model.Connection, s.closedCount)
-	// Ring Buffer: 从最新写入位置向前读
+	if cap(s.cachedClosedConns) < s.closedCount {
+		s.cachedClosedConns = make([]model.Connection, s.closedCount)
+	} else {
+		s.cachedClosedConns = s.cachedClosedConns[:s.closedCount]
+	}
 	for i := 0; i < s.closedCount; i++ {
 		idx := (s.closedHead - 1 - i + common.ClosedConnCap) % common.ClosedConnCap
-		result[i] = s.closedConns[idx]
+		s.cachedClosedConns[i] = s.closedConns[idx]
 	}
-	return result
 }
 
 // appendClosed 向 Ring Buffer 追加一条历史连接
@@ -606,10 +615,15 @@ func (s State) ApplyWSConnections(data api.ConnectionsData) State {
 
 	// 检测已关闭的连接写入 Ring Buffer
 	if s.PrevConnIDs != nil {
+		hasClosed := false
 		for id, conn := range s.PrevConnIDs {
 			if _, exists := currentIDs[id]; !exists {
 				s.appendClosed(conn)
+				hasClosed = true
 			}
+		}
+		if hasClosed {
+			s.rebuildCachedClosedConns()
 		}
 	}
 	s.PrevConnIDs = currentIDs

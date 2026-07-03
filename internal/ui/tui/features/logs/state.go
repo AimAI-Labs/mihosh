@@ -22,6 +22,8 @@ type State struct {
 	logHead  int // 写入位置
 	logCount int // 已写入总数（上限 LogsCap）
 
+	cachedLogs []model.LogEntry // 缓存的日志列表，避免每帧分配
+
 	// 过滤日志索引（预分配容量避免动态增长）
 	filteredLogIndices []int
 	logLevel           int // 0=debug,1=info,2=warning,3=error,4=silent
@@ -60,15 +62,24 @@ func (s State) FilterMode() bool { return s.logFilterMode }
 
 // Logs 返回日志列表（最新在前，用于渲染）
 func (s State) Logs() []model.LogEntry {
+	return s.cachedLogs
+}
+
+// rebuildCachedLogs 重建日志列表缓存
+func (s *State) rebuildCachedLogs() {
 	if s.logCount == 0 {
-		return nil
+		s.cachedLogs = nil
+		return
 	}
-	result := make([]model.LogEntry, s.logCount)
+	if cap(s.cachedLogs) < s.logCount {
+		s.cachedLogs = make([]model.LogEntry, s.logCount)
+	} else {
+		s.cachedLogs = s.cachedLogs[:s.logCount]
+	}
 	for i := 0; i < s.logCount; i++ {
 		idx := (s.logHead - 1 - i + common.LogsCap) % common.LogsCap
-		result[i] = s.logBuf[idx]
+		s.cachedLogs[i] = s.logBuf[idx]
 	}
-	return result
 }
 
 // AppendLog 追加一条日志并更新过滤缓存
@@ -83,17 +94,18 @@ func (s State) AppendLog(logType, payload string) State {
 	if s.logCount < common.LogsCap {
 		s.logCount++
 	}
+	s.rebuildCachedLogs()
 	s.updateFilteredLogs()
 	return s
 }
 
-// ClearLogs 清空所有日志
 func (s State) ClearLogs() State {
 	s.logHead = 0
 	s.logCount = 0
 	s.filteredLogIndices = s.filteredLogIndices[:0] // 保留底层数组，避免重新分配
 	s.selectedLog = 0
 	s.logScrollTop = 0
+	s.rebuildCachedLogs()
 	return s
 }
 

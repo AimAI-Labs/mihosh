@@ -84,6 +84,7 @@ func TestConnsHandleMouseLeft_ClickActiveTabSwitchesView(t *testing.T) {
 		connViewMode: ConnViewHistory,
 	}
 	state.appendClosed(model.Connection{ID: "closed-1", Metadata: model.Metadata{Host: "closed.example"}})
+	state.rebuildCachedClosedConns()
 
 	const width, height = 120, 30
 	x, y, ok := findConnMousePoint(state, width, height, MouseTargetViewActive, -1)
@@ -112,6 +113,7 @@ func TestConnsHandleMouseLeft_DoubleClickHistoryConnectionEntersDetail(t *testin
 			DestinationIP: "8.8.8.8",
 		},
 	})
+	state.rebuildCachedClosedConns()
 
 	const width, height = 120, 30
 	x, y, ok := findConnMousePoint(state, width, height, MouseTargetConnection, 0)
