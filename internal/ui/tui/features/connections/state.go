@@ -2,6 +2,7 @@ package connections
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
 	"time"
 
@@ -57,9 +58,18 @@ type State struct {
 	topNModalScroll  int
 
 	doubleClickDetector common.DoubleClickDetector[MouseTarget]
+
+	connGen   uint64
+	topNCache *topNCache
 }
 
-// NewConnsState 初始化连接状态
+type topNCache struct {
+	items    []components.TopNItem
+	connGen  uint64
+	lastCalc time.Time
+}
+
+// NewState 初始化连接状态
 func NewState(proxyAddr string, siteTests []model.SiteTest) State {
 	ti := textinput.New()
 	ti.Placeholder = "filter..."
@@ -68,11 +78,36 @@ func NewState(proxyAddr string, siteTests []model.SiteTest) State {
 		proxyAddr:  proxyAddr,
 		siteTests:  siteTests,
 		connFilter: ti,
+		topNCache:  &topNCache{},
 	}
 }
 
-// CalculateTopN 计算 Top N 吞吐量
+// CalculateTopN 计算 Top N 吞吐量 (使用缓存)
 func (s State) CalculateTopN(n int, within time.Duration) []components.TopNItem {
+	var fullItems []components.TopNItem
+
+	if s.topNCache != nil {
+		now := time.Now()
+		if s.topNCache.connGen == s.connGen && now.Sub(s.topNCache.lastCalc) < time.Second {
+			fullItems = s.topNCache.items
+		} else {
+			fullItems = s.calculateTopNUncached(0, within)
+			s.topNCache.items = fullItems
+			s.topNCache.connGen = s.connGen
+			s.topNCache.lastCalc = now
+		}
+	} else {
+		fullItems = s.calculateTopNUncached(0, within)
+	}
+
+	if n > 0 && len(fullItems) > n {
+		return fullItems[:n]
+	}
+	return fullItems
+}
+
+// calculateTopNUncached 实际计算 Top N，使用 sort.Slice 优化排序
+func (s State) calculateTopNUncached(n int, within time.Duration) []components.TopNItem {
 	stats := make(map[string]int64)
 	now := time.Now()
 
@@ -114,14 +149,10 @@ func (s State) CalculateTopN(n int, within time.Duration) []components.TopNItem 
 		}
 	}
 
-	// 排序
-	for i := 0; i < len(items)-1; i++ {
-		for j := i + 1; j < len(items); j++ {
-			if items[j].TotalBytes > items[i].TotalBytes {
-				items[i], items[j] = items[j], items[i]
-			}
-		}
-	}
+	// 排序: 使用标准库 sort.Slice
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].TotalBytes > items[j].TotalBytes
+	})
 
 	if n > 0 && len(items) > n {
 		items = items[:n]
@@ -153,6 +184,7 @@ func (s *State) rebuildCachedClosedConns() {
 
 // appendClosed 向 Ring Buffer 追加一条历史连接
 func (s *State) appendClosed(conn model.Connection) {
+	s.connGen++
 	s.closedConns[s.closedHead] = conn
 	s.closedTimes[s.closedHead] = time.Now()
 	s.closedHead = (s.closedHead + 1) % common.ClosedConnCap
@@ -163,7 +195,11 @@ func (s *State) appendClosed(conn model.Connection) {
 
 // ToPageState 转换为渲染层所需的 PageState
 func (s State) ToPageState(chartData *model.ChartData, width, height int) PageState {
-	topNItems := s.CalculateTopN(connsTopNDefaultCount, 5*time.Minute)
+	var topNItems []components.TopNItem
+	if s.connViewMode == ConnViewTraffic {
+		topNItems = s.CalculateTopN(connsTopNDefaultCount, 5*time.Minute)
+	}
+
 	var topNModalItems []components.TopNItem
 	if s.topNModalMode {
 		topNModalItems = s.CalculateTopN(0, 5*time.Minute)
@@ -587,6 +623,7 @@ func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight in
 
 // ApplyWSConnections 处理 WebSocket 连接推送（含历史记录检测）
 func (s State) ApplyWSConnections(data api.ConnectionsData) State {
+	s.connGen++
 	currentIDs := make(map[string]model.Connection, len(data.Connections))
 	for _, conn := range data.Connections {
 		currentIDs[conn.ID] = model.Connection{
@@ -633,6 +670,7 @@ func (s State) ApplyWSConnections(data api.ConnectionsData) State {
 
 // ApplyConnections 应用 REST API 返回的连接数据
 func (s State) ApplyConnections(resp *model.ConnectionsResponse) State {
+	s.connGen++
 	s.Connections = resp
 	return s
 }
