@@ -252,16 +252,21 @@ func (c *WSClient) IsRunning() bool {
 // endpoint 同时作为 conns map 的 key，因此带查询参数的端点（如 "logs?level=debug"）
 // 与其他端点不会冲突。
 func connectStream[T any](c *WSClient, endpoint string, handler func(T)) {
-	wsURL := c.buildWSURL(endpoint)
-	if wsURL == "" {
-		return
-	}
-
 	for {
 		select {
 		case <-c.stopChan:
 			return
 		default:
+		}
+
+		wsURL := c.buildWSURL(endpoint)
+		if wsURL == "" {
+			select {
+			case <-c.stopChan:
+				return
+			case <-time.After(2 * time.Second):
+				continue
+			}
 		}
 
 		conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
