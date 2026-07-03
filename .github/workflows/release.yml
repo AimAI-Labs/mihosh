@@ -49,7 +49,7 @@ jobs:
           COMMIT: ${{ github.sha }}
         run: |
           DATE="$(date -u +%Y-%m-%d)"
-          LDFLAGS="-s -w -X github.com/AimAI-Labs/mihosh/internal/cli.Version=${VERSION} -X github.com/AimAI-Labs/mihosh/internal/cli.Commit=${COMMIT} -X github.com/AimAI-Labs/mihosh/internal/cli.Date=${DATE}"
+          LDFLAGS="-s -w -X github.com/AimAI-Labs/mihosh/internal/domain/model.Version=${VERSION} -X github.com/AimAI-Labs/mihosh/internal/domain/model.Commit=${COMMIT} -X github.com/AimAI-Labs/mihosh/internal/domain/model.Date=${DATE}"
           if [ "$GOOS" = "windows" ]; then
             go build -ldflags="${LDFLAGS}" -o mihosh.exe .
           else
