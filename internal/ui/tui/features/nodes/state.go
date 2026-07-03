@@ -415,7 +415,7 @@ func (s *State) updateFilteredProxies() {
 		case FilterEngineRegex:
 			matched = re.MatchString(name)
 		case FilterEngineFuzzy:
-			matched = fuzzyMatch(filter, name)
+			matched = common.FuzzyMatch(filter, name)
 		case FilterEngineSubstring:
 			fallthrough
 		default:
@@ -428,22 +428,6 @@ func (s *State) updateFilteredProxies() {
 	}
 }
 
-// fuzzyMatch checks if all characters of pattern appear in text sequentially, case-insensitive.
-func fuzzyMatch(pattern, text string) bool {
-	if pattern == "" {
-		return true
-	}
-	pattern = strings.ToLower(pattern)
-	text = strings.ToLower(text)
-
-	pIdx := 0
-	for i := 0; i < len(text) && pIdx < len(pattern); i++ {
-		if text[i] == pattern[pIdx] {
-			pIdx++
-		}
-	}
-	return pIdx == len(pattern)
-}
 
 // HandleMouseLeft 处理 nodes 页面左键单击/双击
 func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *api.Client) (State, tea.Cmd) {

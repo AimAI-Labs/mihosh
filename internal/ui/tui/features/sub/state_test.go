@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -108,10 +109,10 @@ func TestFilter_EmptyShowsAll(t *testing.T) {
 }
 
 func TestSubFuzzy(t *testing.T) {
-	assert.True(t, subFuzzy("GC", "Group C"))
-	assert.True(t, subFuzzy("gc", "Group C")) // 大小写不敏感
-	assert.False(t, subFuzzy("XYZ", "Group C"))
-	assert.True(t, subFuzzy("", "anything"))
+	assert.True(t, common.FuzzyMatch("GC", "Group C"))
+	assert.True(t, common.FuzzyMatch("gc", "Group C")) // 大小写不敏感
+	assert.False(t, common.FuzzyMatch("XYZ", "Group C"))
+	assert.True(t, common.FuzzyMatch("", "anything"))
 }
 
 func TestClampScroll(t *testing.T) {

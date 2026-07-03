@@ -9,6 +9,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -292,7 +293,7 @@ func (f addForm) pickerFiltered() []string {
 	}
 	var result []string
 	for _, c := range candidates {
-		if fuzzyMatch(f.pickerSearch, c) {
+		if common.FuzzyMatch(f.pickerSearch, c) {
 			result = append(result, c)
 		}
 	}

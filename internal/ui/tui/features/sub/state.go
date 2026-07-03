@@ -429,7 +429,7 @@ func (s *State) updateFiltered() {
 				continue
 			}
 		case FilterFuzzy:
-			if !subFuzzy(s.filter, hay) {
+			if !common.FuzzyMatch(s.filter, hay) {
 				continue
 			}
 		default:
@@ -449,18 +449,3 @@ func (s *State) updateFiltered() {
 	}
 }
 
-// subFuzzy 有序子序列匹配（与 rules.fuzzyMatch 一致）。
-func subFuzzy(pattern, text string) bool {
-	if pattern == "" {
-		return true
-	}
-	pattern = strings.ToLower(pattern)
-	text = strings.ToLower(text)
-	pIdx := 0
-	for i := 0; i < len(text) && pIdx < len(pattern); i++ {
-		if text[i] == pattern[pIdx] {
-			pIdx++
-		}
-	}
-	return pIdx == len(pattern)
-}
