@@ -24,7 +24,6 @@ const (
 	// settingsMouseRowsOffset：配置项第一行相对页面内容顶部的 Y 坐标。
 	// 布局：marginTop 空行(1) + 标签栏带边框(3 行: 上边框/内容行/下边框) + 配置面板上边框(1) = 5
 	settingsMouseRowsOffset      = 5
-	settingsDoubleClickThreshold = 350 * time.Millisecond
 	settingsContainerLeft        = 0
 	settingsRowPaddingLeft       = 1
 	settingsTabHorizontalPadding = 2
@@ -38,8 +37,7 @@ type State struct {
 	editValue       string
 	editCursor      int
 
-	lastMouseSetting int
-	lastMouseAt      time.Time
+	doubleClickDetector common.DoubleClickDetector[struct{}]
 
 	// Toast 管理器
 	toastManager *common.ToastManager
@@ -416,7 +414,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *con
 	}
 
 	now := time.Now()
-	if s.isMouseDoubleClick(settingIdx, now) {
+	if s.doubleClickDetector.IsDoubleClick(struct{}{}, settingIdx, now) {
 		s.editMode = true
 		s.editValue = s.getEditValue(cfg, s.activeKeys()[settingIdx])
 		s.editCursor = len([]rune(s.editValue))
@@ -676,16 +674,6 @@ func resolveSettingsTabMouseTarget(pageX int) (int, bool) {
 	return 0, false
 }
 
-func (s *State) isMouseDoubleClick(settingIdx int, now time.Time) bool {
-	isDoubleClick := s.lastMouseSetting == settingIdx &&
-		!s.lastMouseAt.IsZero() &&
-		now.Sub(s.lastMouseAt) <= settingsDoubleClickThreshold
-
-	s.lastMouseSetting = settingIdx
-	s.lastMouseAt = now
-
-	return isDoubleClick
-}
 
 func nextLanguage(lang string) string {
 	langs := []string{"auto", "zh-CN", "en-US"}

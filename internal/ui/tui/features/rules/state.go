@@ -14,7 +14,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-const rulesDoubleClickThreshold = 350 * time.Millisecond
 
 // FilterEngine 规则搜索匹配引擎
 type FilterEngine int
@@ -41,17 +40,13 @@ type State struct {
 	availableTypes   []string // 可用规则类型列表（从规则中提取）
 	typeFilterCursor int      // 光标位置（在availableTypes中的索引）
 
-	// 鼠标双击检测（用于类型筛选弹窗内双击切换选中）
-	lastTypeFilterClickIdx int       // 上次点击的类型项索引
-	lastTypeFilterClickAt  time.Time // 上次点击时间
+	typeFilterDC common.DoubleClickDetector[struct{}]
 
 	// 鼠标双击检测（用于策略选择二级弹窗内双击选中）
-	lastProxyPickerClickIdx int
-	lastProxyPickerClickAt  time.Time
+	proxyPickerDC common.DoubleClickDetector[struct{}]
 
 	// 鼠标双击检测（用于规则列表项双击打开编辑）
-	lastMouseIndex int
-	lastMouseAt    time.Time
+	ruleListDC common.DoubleClickDetector[struct{}]
 
 	// 添加自定义规则弹窗状态
 	showAddForm bool    // 是否显示添加规则弹窗
@@ -717,7 +712,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *
 			}
 			form := s.addForm
 			now := time.Now()
-			isDouble := s.isProxyPickerDoubleClick(idx, now)
+			isDouble := s.proxyPickerDC.IsDoubleClick(struct{}{}, idx, now)
 			form.pickerCursor = idx
 			if isDouble {
 				filtered := form.pickerFiltered()
@@ -801,7 +796,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *
 			}
 			form := s.addForm
 			now := time.Now()
-			isDouble := s.isProxyPickerDoubleClick(idx, now)
+			isDouble := s.proxyPickerDC.IsDoubleClick(struct{}{}, idx, now)
 			form.pickerCursor = idx
 			if isDouble {
 				filtered := form.pickerFiltered()
@@ -868,8 +863,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *
 			// 点击边框外：确认并关闭（保留已勾选的过滤）
 			s.confirmAndClose()
 			// 重置双击状态，避免下次打开误触发
-			s.lastTypeFilterClickIdx = 0
-			s.lastTypeFilterClickAt = time.Time{}
+			s.typeFilterDC = common.DoubleClickDetector[struct{}]{}
 			return s, nil
 		}
 
@@ -880,7 +874,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *
 		}
 
 		now := time.Now()
-		isDouble := s.isTypeFilterDoubleClick(idx, now)
+		isDouble := s.typeFilterDC.IsDoubleClick(struct{}{}, idx, now)
 
 		// 单击：移动光标到该项
 		s.typeFilterCursor = idx
@@ -906,7 +900,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *
 	}
 
 	now := time.Now()
-	isDouble := s.isMouseDoubleClick(idx, now)
+	isDouble := s.ruleListDC.IsDoubleClick(struct{}{}, idx, now)
 
 	// 单击：选中规则
 	s.selectedRule = idx
@@ -933,35 +927,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *
 	return s, nil
 }
 
-// isTypeFilterDoubleClick 检测类型筛选弹窗内的双击（与 nodes/settings 模式一致）。
-func (s *State) isTypeFilterDoubleClick(idx int, now time.Time) bool {
-	isDouble := idx == s.lastTypeFilterClickIdx &&
-		!s.lastTypeFilterClickAt.IsZero() &&
-		now.Sub(s.lastTypeFilterClickAt) <= rulesDoubleClickThreshold
-	s.lastTypeFilterClickIdx = idx
-	s.lastTypeFilterClickAt = now
-	return isDouble
-}
 
-// isProxyPickerDoubleClick 检测策略选择弹窗内的双击。
-func (s *State) isProxyPickerDoubleClick(idx int, now time.Time) bool {
-	isDouble := idx == s.lastProxyPickerClickIdx &&
-		!s.lastProxyPickerClickAt.IsZero() &&
-		now.Sub(s.lastProxyPickerClickAt) <= rulesDoubleClickThreshold
-	s.lastProxyPickerClickIdx = idx
-	s.lastProxyPickerClickAt = now
-	return isDouble
-}
-
-// isMouseDoubleClick 检测规则列表项的双击。
-func (s *State) isMouseDoubleClick(idx int, now time.Time) bool {
-	isDouble := idx == s.lastMouseIndex &&
-		!s.lastMouseAt.IsZero() &&
-		now.Sub(s.lastMouseAt) <= rulesDoubleClickThreshold
-	s.lastMouseIndex = idx
-	s.lastMouseAt = now
-	return isDouble
-}
 
 // applyEditFormUpdate 将更新后的 addForm 应用到 State，保留其他字段不变。
 func (s State) applyEditFormUpdate(form addForm) (State, tea.Cmd) {

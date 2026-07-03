@@ -41,8 +41,7 @@ type State struct {
 	detailScroll        int
 
 	// 鼠标双击检测
-	lastClickIndex int
-	lastClickAt    time.Time
+	doubleClickDetector common.DoubleClickDetector[struct{}]
 }
 
 // NewState 初始化日志状态
@@ -319,13 +318,7 @@ func (s State) HandleMouseLeft(pageY int, pageX int, pageWidth int, resolver *se
 
 	// 双击检测
 	now := time.Now()
-	const doubleClickThreshold = 350 * time.Millisecond
-	isDoubleClick := clickedIndex == s.lastClickIndex &&
-		!s.lastClickAt.IsZero() &&
-		now.Sub(s.lastClickAt) <= doubleClickThreshold
-
-	s.lastClickIndex = clickedIndex
-	s.lastClickAt = now
+	isDoubleClick := s.doubleClickDetector.IsDoubleClick(struct{}{}, clickedIndex, now)
 
 	if isDoubleClick {
 		return s.openLogDetail(resolver)

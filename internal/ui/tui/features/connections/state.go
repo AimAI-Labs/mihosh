@@ -19,7 +19,6 @@ const (
 	ConnViewActive  = 1 // 活跃连接
 	ConnViewHistory = 2 // 历史连接
 
-	connsDoubleClickThreshold = 350 * time.Millisecond
 	connsChartDoubleClickMax  = 650 * time.Millisecond
 	connsTopNDefaultCount     = 5
 )
@@ -56,9 +55,7 @@ type State struct {
 	topNModalMode    bool
 	topNModalScroll  int
 
-	lastMouseTarget MouseTarget
-	lastMouseIndex  int
-	lastMouseAt     time.Time
+	doubleClickDetector common.DoubleClickDetector[MouseTarget]
 }
 
 // NewConnsState 初始化连接状态
@@ -373,7 +370,7 @@ func (s State) HandleMouseLeft(
 		} else {
 			now := time.Now()
 			// 在详情页区域双击则退出
-			if s.isMouseDoubleClick(ConnectionsMouseTargetNone, 0, now) {
+			if s.doubleClickDetector.IsDoubleClick(ConnectionsMouseTargetNone, 0, now) {
 				s.closeConnectionDetail()
 			}
 			return s, nil
@@ -386,7 +383,7 @@ func (s State) HandleMouseLeft(
 		now := time.Now()
 
 		if hit.Target == MouseTargetTopNModalItem {
-			if s.isMouseDoubleClick(MouseTargetTopNModalItem, hit.Index, now) {
+			if s.doubleClickDetector.IsDoubleClick(MouseTargetTopNModalItem, hit.Index, now) {
 				items := s.CalculateTopN(0, 5*time.Minute)
 				if hit.Index >= 0 && hit.Index < len(items) {
 					item := items[hit.Index]
@@ -430,7 +427,7 @@ func (s State) HandleMouseLeft(
 
 	switch hit.Target {
 	case MouseTargetChart, MouseTargetTopN:
-		if s.isMouseDoubleClickWithThreshold(hit.Target, 0, now, connsChartDoubleClickMax) {
+		if s.doubleClickDetector.IsDoubleClickWithThreshold(hit.Target, 0, now, connsChartDoubleClickMax) {
 			s.topNModalMode = true
 			s.topNModalScroll = 0
 		}
@@ -475,7 +472,7 @@ func (s State) HandleMouseLeft(
 				s.connScrollTop = s.selectedConn
 			}
 		}
-		if !s.isMouseDoubleClick(MouseTargetConnection, hit.Index, now) {
+		if !s.doubleClickDetector.IsDoubleClick(MouseTargetConnection, hit.Index, now) {
 			return s, nil
 		}
 		return s.openSelectedConnectionDetail()
@@ -485,7 +482,7 @@ func (s State) HandleMouseLeft(
 			return s, nil
 		}
 		s.selectedSiteTest = hit.Index
-		if !s.isMouseDoubleClick(MouseTargetSiteTest, hit.Index, now) {
+		if !s.doubleClickDetector.IsDoubleClick(MouseTargetSiteTest, hit.Index, now) {
 			return s, nil
 		}
 		return s.triggerSiteTestByIndex(hit.Index, timeout)
@@ -577,22 +574,7 @@ func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight in
 	return s, nil
 }
 
-func (s *State) isMouseDoubleClick(target MouseTarget, idx int, now time.Time) bool {
-	return s.isMouseDoubleClickWithThreshold(target, idx, now, connsDoubleClickThreshold)
-}
 
-func (s *State) isMouseDoubleClickWithThreshold(target MouseTarget, idx int, now time.Time, threshold time.Duration) bool {
-	isDoubleClick := target == s.lastMouseTarget &&
-		idx == s.lastMouseIndex &&
-		!s.lastMouseAt.IsZero() &&
-		now.Sub(s.lastMouseAt) <= threshold
-
-	s.lastMouseTarget = target
-	s.lastMouseIndex = idx
-	s.lastMouseAt = now
-
-	return isDoubleClick
-}
 
 // ApplyWSConnections 处理 WebSocket 连接推送（含历史记录检测）
 func (s State) ApplyWSConnections(data api.ConnectionsData) State {

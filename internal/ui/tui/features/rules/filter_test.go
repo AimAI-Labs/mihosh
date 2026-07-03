@@ -3,10 +3,10 @@ package rules
 import (
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -228,7 +228,7 @@ func TestTypeFilterMouseDoubleClickToggles(t *testing.T) {
 
 	// Simulate a pause longer than the threshold so the next click starts fresh.
 	// This makes the following two clicks a *new* double-click that toggles OFF.
-	s.lastTypeFilterClickAt = time.Time{}
+	s.typeFilterDC = common.DoubleClickDetector[struct{}]{}
 
 	// Third click — starts a new double-click window, only moves cursor (still selected)
 	s, _ = s.HandleMouseLeft(left+3, top+2, pageW, pageH, nilClient)

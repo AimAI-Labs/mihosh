@@ -26,8 +26,6 @@ const (
 	ModeDeleteConf = 4
 )
 
-const subDoubleClickThreshold = 350 * time.Millisecond
-
 // State 订阅页完整状态。
 type State struct {
 	subs         []profile.Profile
@@ -48,9 +46,8 @@ type State struct {
 	showDeleteConf bool
 	deleteUID      string // 待删除订阅 UID
 
-	// 鼠标双击检测
-	lastMouseIdx int
-	lastMouseAt  time.Time
+	// 鼠标双击
+	doubleClickDetector common.DoubleClickDetector[struct{}]
 
 	updatingUID string // 当前正在更新的订阅 UID
 }
@@ -368,11 +365,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, svc *ser
 	}
 
 	now := time.Now()
-	isDouble := idx == s.lastMouseIdx &&
-		!s.lastMouseAt.IsZero() &&
-		now.Sub(s.lastMouseAt) <= subDoubleClickThreshold
-	s.lastMouseIdx = idx
-	s.lastMouseAt = now
+	isDouble := s.doubleClickDetector.IsDoubleClick(struct{}{}, idx, now)
 
 	s.selected = idx
 	s.clampScroll()

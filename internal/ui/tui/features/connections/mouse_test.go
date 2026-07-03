@@ -506,12 +506,12 @@ func TestConnsChartDoubleClickThreshold_Allows500msGap(t *testing.T) {
 	var state State
 	base := time.Unix(1000, 0)
 
-	if state.isMouseDoubleClickWithThreshold(MouseTargetChart, 0, base, connsChartDoubleClickMax) {
+	if state.doubleClickDetector.IsDoubleClickWithThreshold(MouseTargetChart, 0, base, connsChartDoubleClickMax) {
 		t.Fatalf("first click should not be treated as double click")
 	}
 
 	second := base.Add(500 * time.Millisecond)
-	if !state.isMouseDoubleClickWithThreshold(MouseTargetChart, 0, second, connsChartDoubleClickMax) {
+	if !state.doubleClickDetector.IsDoubleClickWithThreshold(MouseTargetChart, 0, second, connsChartDoubleClickMax) {
 		t.Fatalf("expected chart second click within 500ms to be treated as double click")
 	}
 }

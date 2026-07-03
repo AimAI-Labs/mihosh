@@ -50,7 +50,6 @@ type nodesMouseFocus int
 const (
 	nodesMouseFocusProxy nodesMouseFocus = iota
 	nodesMouseFocusGroup
-	nodesDoubleClickThreshold = 350 * time.Millisecond
 )
 
 // State 节点页面完整状态
@@ -88,9 +87,7 @@ type State struct {
 	FilteredProxyIndices []int // 过滤结果的索引缓存（对应 CurrentProxies 的下标）
 	// 鼠标
 	MouseFocus      nodesMouseFocus
-	LastMouseTarget MouseTarget
-	LastMouseIndex  int
-	LastMouseAt     time.Time
+	doubleClickDetector common.DoubleClickDetector[MouseTarget]
 }
 
 // appendTestResult 向 Ring Buffer 追加一条测速结果记录
@@ -468,7 +465,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *
 		}
 		s.MouseFocus = nodesMouseFocusGroup
 		s.applyGroupSelection(hit.Index)
-		s.isMouseDoubleClick(MouseTargetGroup, hit.Index, now)
+		s.doubleClickDetector.IsDoubleClick(MouseTargetGroup, hit.Index, now)
 		return s, nil
 
 	case MouseTargetProxy:
@@ -482,7 +479,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *
 			s.ProxyScrollTop = s.SelectedProxy
 		}
 
-		if !s.isMouseDoubleClick(MouseTargetProxy, hit.Index, now) {
+		if !s.doubleClickDetector.IsDoubleClick(MouseTargetProxy, hit.Index, now) {
 			return s, nil
 		}
 		if len(s.GroupNames) == 0 || s.SelectedGroup < 0 || s.SelectedGroup >= len(s.GroupNames) {
@@ -527,18 +524,7 @@ func (s *State) applyGroupSelection(groupIdx int) {
 	}
 }
 
-func (s *State) isMouseDoubleClick(target MouseTarget, idx int, now time.Time) bool {
-	isDoubleClick := target == s.LastMouseTarget &&
-		idx == s.LastMouseIndex &&
-		!s.LastMouseAt.IsZero() &&
-		now.Sub(s.LastMouseAt) <= nodesDoubleClickThreshold
 
-	s.LastMouseTarget = target
-	s.LastMouseIndex = idx
-	s.LastMouseAt = now
-
-	return isDoubleClick
-}
 
 // HandleMouseScroll 处理鼠标滚轮（弹窗打开时控制弹窗滚动，否则根据鼠标位置或焦点控制列表滚动）
 func (s State) HandleMouseScroll(up bool, pageX, pageY, pageWidth, pageHeight int) State {
