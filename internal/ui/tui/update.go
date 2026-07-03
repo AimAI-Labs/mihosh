@@ -514,14 +514,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.showErrorPopup = false // 收到新错误时不要自动弹出，除非用户主动点击，如果当前开着弹窗则关掉。或者也可以保持不管。保险起见设为 false。
 		m.notice = ""
 		m.noticeTicks = 0
-		m.nodesState.Testing = false
-		m.nodesState.TestingTarget = ""
-		m.nodesState.TestAllActive = false
-		m.nodesState.TestAllPending = nil
-		m.nodesState.TestAllRunning = nil
-		m.nodesState.TestAllTotal = 0
-		m.nodesState.TestAllDone = 0
-		m.nodesState.TestPending = 0
+		m.nodesState = m.nodesState.ResetTesting()
 
 	
 	case messages.CoreActionDoneMsg:

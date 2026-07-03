@@ -716,6 +716,19 @@ func (s State) ApplyTestAllDone(results map[string]int) State {
 	return s
 }
 
+// ResetTesting 清空测速状态
+func (s State) ResetTesting() State {
+	s.Testing = false
+	s.TestingTarget = ""
+	s.TestAllActive = false
+	s.TestAllPending = nil
+	s.TestAllRunning = nil
+	s.TestAllTotal = 0
+	s.TestAllDone = 0
+	s.TestPending = 0
+	return s
+}
+
 // launchBatchTests 启动/补位批量测速任务（受并发上限控制）
 func (s State) LaunchBatchTests(client *api.Client, testURL string, timeout int) (State, tea.Cmd) {
 	if !s.TestAllActive || s.TestAllTotal == 0 {
