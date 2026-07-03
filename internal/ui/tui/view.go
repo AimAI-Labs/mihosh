@@ -155,22 +155,7 @@ func clampToHeight(content string, h int) string {
 
 // overlayErrorPopup 将报错信息完整弹窗居中叠加在 base 页面之上
 func overlayErrorPopup(base string, width, height int, errText string) string {
-	// ── 1. 暗化底层 ──
-	baseLines := strings.Split(base, "\n")
-	for len(baseLines) < height {
-		baseLines = append(baseLines, "")
-	}
-	if len(baseLines) > height {
-		baseLines = baseLines[:height]
-	}
-
-	faint := lipgloss.NewStyle().Faint(true)
-	dimmed := make([]string, height)
-	for i, l := range baseLines {
-		dimmed[i] = faint.Render(l)
-	}
-
-	// ── 2. 弹窗尺寸计算 ──
+	// ── 1. 弹窗尺寸计算 ──
 	popupWidth := width * 60 / 100
 	if popupWidth < 40 {
 		popupWidth = 40
@@ -182,7 +167,7 @@ func overlayErrorPopup(base string, width, height int, errText string) string {
 		popupWidth = width
 	}
 
-	// ── 3. 内容换行与截断 ──
+	// ── 2. 内容换行与截断 ──
 	contentWidth := popupWidth - 4 // border 2 + padding 2
 	wrappedErr := lipgloss.NewStyle().Width(contentWidth).Render(errText)
 	errLines := strings.Split(wrappedErr, "\n")
@@ -201,56 +186,13 @@ func overlayErrorPopup(base string, width, height int, errText string) string {
 	title := i18n.T("status.err.detail")
 	popup := common.RenderBorderedPanel(title, body, popupWidth, common.TokyoRed(), common.TokyoRed())
 
-	// ── 4. 弹窗居中合并 ──
-	popupLines := strings.Split(popup, "\n")
-	popupHeight := len(popupLines)
-
-	leftOffset := (width - popupWidth) / 2
-	if leftOffset < 0 {
-		leftOffset = 0
-	}
-	topOffset := (height - popupHeight) / 2
-	if topOffset < 0 {
-		topOffset = 0
-	}
-
-	for i, pl := range popupLines {
-		y := topOffset + i
-		if y >= height {
-			break
-		}
-
-		leftPart := ansi.Cut(dimmed[y], 0, leftOffset)
-		leftW := lipgloss.Width(leftPart)
-		if leftW < leftOffset {
-			leftPart += strings.Repeat(" ", leftOffset-leftW)
-		}
-
-		rightPart := ansi.Cut(dimmed[y], leftOffset+popupWidth, width)
-		dimmed[y] = leftPart + pl + rightPart
-	}
-
-	return strings.Join(dimmed, "\n")
+	// ── 3. 弹窗居中合并 ──
+	return overlayPopup(base, popup, width, height, popupWidth)
 }
 
 // overlayUpdateDialog 将更新弹窗完整弹窗居中叠加在 base 页面之上
 func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo, isUpdating bool, err error) string {
-	// ── 1. 暗化底层 ──
-	baseLines := strings.Split(base, "\n")
-	for len(baseLines) < height {
-		baseLines = append(baseLines, "")
-	}
-	if len(baseLines) > height {
-		baseLines = baseLines[:height]
-	}
-
-	faint := lipgloss.NewStyle().Faint(true)
-	dimmed := make([]string, height)
-	for i, l := range baseLines {
-		dimmed[i] = faint.Render(l)
-	}
-
-	// ── 2. 弹窗尺寸计算 ──
+	// ── 1. 弹窗尺寸计算 ──
 	popupWidth := width * 60 / 100
 	if popupWidth < 40 {
 		popupWidth = 40
@@ -262,7 +204,7 @@ func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo,
 		popupWidth = width
 	}
 
-	// ── 3. 构建弹窗内容 ──
+	// ── 2. 构建弹窗内容 ──
 	contentWidth := popupWidth - 4 // border 2 + padding 2
 
 	var body string
@@ -307,7 +249,28 @@ func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo,
 	}
 	popup := common.RenderBorderedPanel(title, finalBody, popupWidth, borderColor, borderColor)
 
-	// ── 4. 弹窗居中合并 ──
+	// ── 3. 弹窗居中合并 ──
+	return overlayPopup(base, popup, width, height, popupWidth)
+}
+
+// overlayPopup 将已渲染的 popup 弹窗居中叠加在暗化的 base 页面之上
+func overlayPopup(base, popup string, width, height, popupWidth int) string {
+	// ── 1. 暗化底层 ──
+	baseLines := strings.Split(base, "\n")
+	for len(baseLines) < height {
+		baseLines = append(baseLines, "")
+	}
+	if len(baseLines) > height {
+		baseLines = baseLines[:height]
+	}
+
+	faint := lipgloss.NewStyle().Faint(true)
+	dimmed := make([]string, height)
+	for i, l := range baseLines {
+		dimmed[i] = faint.Render(l)
+	}
+
+	// ── 2. 弹窗居中合并 ──
 	popupLines := strings.Split(popup, "\n")
 	popupHeight := len(popupLines)
 
