@@ -156,6 +156,20 @@ type LogsTickMsg time.Time
 
 type AutoRefreshTickMsg time.Time
 
+// AutoRefreshResult carries the data fetched during an auto-refresh cycle.
+type AutoRefreshResult struct {
+	Groups       map[string]model.Group
+	OrderedNames []string
+	Proxies      map[string]model.Proxy
+	Mode         string
+}
+
+// AutoRefreshMsg is sent after a periodic auto-refresh fetch completes.
+type AutoRefreshMsg struct {
+	Result  AutoRefreshResult
+	Changed bool
+}
+
 type MihomoVersionMsg struct {
 	Version string
 }

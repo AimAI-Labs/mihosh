@@ -498,7 +498,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, autoRefreshTick()
 
-	case autoRefreshMsg:
+	case messages.AutoRefreshMsg:
 		m.nodesState = m.nodesState.ApplyGroups(msg.Result.Groups, msg.Result.OrderedNames)
 		m.nodesState = m.nodesState.ApplyProxies(msg.Result.Proxies)
 		m.nodesState = m.nodesState.ApplyConfigMode(msg.Result.Mode)

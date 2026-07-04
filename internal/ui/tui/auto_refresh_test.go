@@ -12,7 +12,7 @@ import (
 
 func TestDetectAutoRefreshChangeDetectsModeChange(t *testing.T) {
 	state := nodes.State{Mode: "rule"}
-	result := autoRefreshResult{Mode: "global"}
+	result := messages.AutoRefreshResult{Mode: "global"}
 
 	if !detectAutoRefreshChange(state, result) {
 		t.Fatalf("expected mode change to be detected")
@@ -25,7 +25,7 @@ func TestDetectAutoRefreshChangeDetectsSelectedProxyChange(t *testing.T) {
 			"Proxy": {Name: "Proxy", Now: "HK-01", All: []string{"HK-01", "JP-01"}},
 		},
 	}
-	result := autoRefreshResult{
+	result := messages.AutoRefreshResult{
 		Groups: map[string]model.Group{
 			"Proxy": {Name: "Proxy", Now: "JP-01", All: []string{"HK-01", "JP-01"}},
 		},
@@ -44,7 +44,7 @@ func TestDetectAutoRefreshChangeIgnoresUnchangedData(t *testing.T) {
 		},
 		GroupNames: []string{"Proxy"},
 	}
-	result := autoRefreshResult{
+	result := messages.AutoRefreshResult{
 		Mode: "rule",
 		Groups: map[string]model.Group{
 			"Proxy": {Name: "Proxy", Now: "HK-01", All: []string{"HK-01", "JP-01"}},
@@ -62,7 +62,7 @@ func TestAutoRefreshMessageShowsSyncedCheckmarkAfterSuccessfulRefresh(t *testing
 		config: &config.Config{AutoRefreshInterval: 5},
 	}
 
-	next, _ := model.Update(autoRefreshMsg{Changed: false})
+	next, _ := model.Update(messages.AutoRefreshMsg{Changed: false})
 	got := next.(Model)
 
 	if !got.autoRefreshSynced {
@@ -81,7 +81,7 @@ func TestAutoRefreshNoticeExpiresOnTicks(t *testing.T) {
 		config: &config.Config{AutoRefreshInterval: 5},
 	}
 
-	next, _ := model.Update(autoRefreshMsg{Changed: true})
+	next, _ := model.Update(messages.AutoRefreshMsg{Changed: true})
 	got := next.(Model)
 	if got.notice == "" {
 		t.Fatalf("expected changed refresh to set notice")

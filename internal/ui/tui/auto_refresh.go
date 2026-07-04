@@ -10,18 +10,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type autoRefreshResult struct {
-	Groups       map[string]model.Group
-	OrderedNames []string
-	Proxies      map[string]model.Proxy
-	Mode         string
-}
-
-type autoRefreshMsg struct {
-	Result  autoRefreshResult
-	Changed bool
-}
-
 func fetchAutoRefresh(client *api.Client, current nodes.State) tea.Cmd {
 	return func() tea.Msg {
 		proxies, err := client.GetProxies()
@@ -33,13 +21,13 @@ func fetchAutoRefresh(client *api.Client, current nodes.State) tea.Cmd {
 			return messages.ErrMsg{Err: err}
 		}
 		groups, orderedNames := groupsFromProxies(proxies)
-		result := autoRefreshResult{
+		result := messages.AutoRefreshResult{
 			Groups:       groups,
 			OrderedNames: orderedNames,
 			Proxies:      proxies,
 			Mode:         configs.Mode,
 		}
-		return autoRefreshMsg{Result: result, Changed: detectAutoRefreshChange(current, result)}
+		return messages.AutoRefreshMsg{Result: result, Changed: detectAutoRefreshChange(current, result)}
 	}
 }
 
@@ -80,7 +68,7 @@ func groupsFromProxies(proxies map[string]model.Proxy) (map[string]model.Group, 
 	return groups, orderedNames
 }
 
-func detectAutoRefreshChange(current nodes.State, result autoRefreshResult) bool {
+func detectAutoRefreshChange(current nodes.State, result messages.AutoRefreshResult) bool {
 	if current.Mode != "" && result.Mode != "" && current.Mode != result.Mode {
 		return true
 	}
