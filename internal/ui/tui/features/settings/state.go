@@ -141,7 +141,16 @@ func (s State) ToPageState(cfg *config.Config, sysLogs []model.LogEntry) PageSta
 }
 
 // Update 处理设置页面按键，返回：(新状态, 更新后的cfg, cmd)
-func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, tea.Cmd) {
+func (s State) Update(msg tea.Msg, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, tea.Cmd) {
+	switch msg := msg.(type) {
+	case messages.PageMouseScrollMsg:
+		// actionsPanelBottomY is roughly the height used by Tab bar (3) + Spacer (1) + Config Panel (8) + Spacer (1) + Actions Panel (4) + Desc/Warning (1)
+		newState, cmd := s.HandleMouseScroll(msg.Up, msg.Y, msg.Height, 18)
+		return newState, cfg, cmd
+	case messages.PageMouseClickMsg:
+		newState, newCfg, cmd := s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height, cfg, configSvc, client)
+		return newState, newCfg, cmd
+	case tea.KeyMsg:
 	if s.editMode {
 		return s.handleEditMode(msg, cfg, configSvc, client)
 	}
@@ -174,6 +183,7 @@ func (s State) Update(msg tea.KeyMsg, cfg *config.Config, configSvc *service.Con
 		s.editMode = true
 		s.editValue = s.getEditValue(cfg, s.activeKeys()[s.selectedSetting])
 		s.editCursor = len([]rune(s.editValue))
+	}
 	}
 
 	return s, cfg, nil

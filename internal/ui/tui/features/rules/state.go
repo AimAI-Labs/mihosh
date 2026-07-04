@@ -1,10 +1,10 @@
 package rules
 
 import (
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
-
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -99,7 +99,13 @@ func (s State) SetConfigPath(path string) State {
 }
 
 // Update 处理规则页面按键
-func (s State) Update(msg tea.KeyMsg, client *api.Client) (State, tea.Cmd) {
+func (s State) Update(msg tea.Msg, client *api.Client) (State, tea.Cmd) {
+	switch msg := msg.(type) {
+	case messages.PageMouseScrollMsg:
+		return s.HandleMouseScroll(msg.Up), nil
+	case messages.PageMouseClickMsg:
+		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height, client)
+	case tea.KeyMsg:
 	// 编辑规则弹窗优先拦截（吞掉所有按键）
 	if s.showEditForm {
 		return s.handleEditFormMode(msg)
@@ -177,6 +183,7 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client) (State, tea.Cmd) {
 		}
 	}
 
+	}
 	return s, nil
 }
 

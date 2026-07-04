@@ -47,9 +47,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		pw, ph := m.getPageSize()
-		m.logsState = m.logsState.UpdateMaxHScrollOffset(pw, ph)
 		m.settingsState = m.settingsState.SyncSysStatus(pw, ph, m.config, m.logsState.GetSysLogs())
-		return m, tea.ClearScreen
+		resizeMsg := messages.PageResizeMsg{Width: pw, Height: ph}
+		newModel, cmd := m.dispatchToPage(resizeMsg)
+		m = newModel.(Model)
+		return m, tea.Batch(tea.ClearScreen, cmd)
 
 	case tea.MouseMsg:
 		return m.handleGlobalMouse(msg)

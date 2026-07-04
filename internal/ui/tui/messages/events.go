@@ -298,3 +298,28 @@ type UpdateCheckedMsg struct {
 type UpdateAppliedMsg struct {
 	Err error
 }
+
+// ========= UI Events =========
+
+// PageResizeMsg 页面尺寸变化消息
+type PageResizeMsg struct {
+	Width  int
+	Height int
+}
+
+// PageMouseClickMsg 统一派发给子页面的鼠标点击事件
+type PageMouseClickMsg struct {
+	X      int // 页面内相对X坐标
+	Y      int // 页面内相对Y坐标
+	Width  int // 页面总宽度
+	Height int // 页面总高度
+}
+
+// PageMouseScrollMsg 统一派发给子页面的鼠标滚轮事件
+type PageMouseScrollMsg struct {
+	Up     bool
+	X      int // 页面内相对X坐标，若无法解析为 -1
+	Y      int // 页面内相对Y坐标，若无法解析为 -1
+	Width  int // 页面总宽度
+	Height int // 页面总高度
+}

@@ -14,6 +14,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -118,7 +119,13 @@ func (s State) ApplySubs(subs []profile.Profile, active string) State {
 }
 
 // Update 处理按键，分派到当前激活的子模式。
-func (s State) Update(msg tea.KeyMsg, svc *service.ProfileService) (State, tea.Cmd) {
+func (s State) Update(msg tea.Msg, svc *service.ProfileService) (State, tea.Cmd) {
+	switch msg := msg.(type) {
+	case messages.PageMouseScrollMsg:
+		return s.HandleMouseScroll(msg.Up), nil
+	case messages.PageMouseClickMsg:
+		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height, svc)
+	case tea.KeyMsg:
 	// 弹窗优先拦截
 	if s.showDeleteConf {
 		return s.handleDeleteConfirm(msg, svc)
@@ -171,6 +178,7 @@ func (s State) Update(msg tea.KeyMsg, svc *service.ProfileService) (State, tea.C
 			s.scrollTop = 0
 			s.updateFiltered()
 		}
+	}
 	}
 	return s, nil
 }

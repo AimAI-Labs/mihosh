@@ -8,6 +8,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -149,9 +150,15 @@ func (s State) ToPageState(chartData *model.ChartData, width, height int) PageSt
 	}
 }
 
-// Update 处理连接页面按键
-func (s State) Update(msg tea.KeyMsg, client *api.Client, timeout int) (State, tea.Cmd) {
-	// 详情模式
+// Update 处理连接页面按键和鼠标事件
+func (s State) Update(msg tea.Msg, client *api.Client, timeout int, chartData *model.ChartData) (State, tea.Cmd) {
+	switch msg := msg.(type) {
+	case messages.PageMouseScrollMsg:
+		return s.HandleMouseScroll(msg.Up, msg.X, msg.Y, msg.Width, msg.Height)
+	case messages.PageMouseClickMsg:
+		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height, chartData, timeout)
+	case tea.KeyMsg:
+		// 继续处理 KeyMsg
 	if s.connDetailMode {
 		switch {
 		case key.Matches(msg, common.Keys.Escape), key.Matches(msg, common.Keys.Enter), msg.String() == "q":
@@ -302,6 +309,8 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client, timeout int) (State, t
 			s.selectedConn = 0
 			s.connScrollTop = 0
 		}
+	}
+
 	}
 
 	return s, nil

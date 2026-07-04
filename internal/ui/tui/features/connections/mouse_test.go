@@ -484,7 +484,7 @@ func TestConnsDetailInputTakesPriorityOverTopNModal(t *testing.T) {
 		connDetailJSONLineCount: 40,
 	}
 
-	next, cmd := state.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}, nil, 3000)
+	next, cmd := state.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}, nil, 3000, nil)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd while scrolling detail, got non-nil")
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -146,8 +147,17 @@ func (s State) ToPageState(width, height int) PageState {
 	}
 }
 
-// Update 处理日志页面按键
-func (s State) Update(msg tea.KeyMsg, resolver *service.IPResolver) (State, tea.Cmd) {
+// Update 处理日志页面按键和消息
+func (s State) Update(msg tea.Msg, resolver *service.IPResolver) (State, tea.Cmd) {
+	switch msg := msg.(type) {
+	case messages.PageResizeMsg:
+		return s.UpdateMaxHScrollOffset(msg.Width, msg.Height), nil
+	case messages.PageMouseScrollMsg:
+		return s.HandleMouseScroll(msg.Up, msg.Height), nil
+	case messages.PageMouseClickMsg:
+		return s.HandleMouseLeft(msg.Y, msg.X, msg.Width, resolver)
+	case tea.KeyMsg:
+		// 继续处理按键
 	// 详情模式拦截所有按键
 	if s.detailMode {
 		return s.handleDetailMode(msg)
@@ -221,6 +231,7 @@ func (s State) Update(msg tea.KeyMsg, resolver *service.IPResolver) (State, tea.
 		}
 	}
 
+	}
 	return s, nil
 }
 

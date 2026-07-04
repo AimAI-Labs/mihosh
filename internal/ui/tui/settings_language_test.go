@@ -7,6 +7,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/viper"
@@ -40,14 +41,14 @@ func TestSettingsLanguageSaveAppliesI18nImmediately(t *testing.T) {
 	}
 
 	for i := 0; i < 2; i++ {
-		next, _ := model.dispatchKeyToPage(keyMsg("down"))
+		next, _ := model.dispatchToPage(keyMsg("down"))
 		model = next.(Model)
 	}
-	next, _ := model.dispatchKeyToPage(keyMsg("enter"))
+	next, _ := model.dispatchToPage(keyMsg("enter"))
 	model = next.(Model)
-	next, _ = model.dispatchKeyToPage(keyMsg("right"))
+	next, _ = model.dispatchToPage(keyMsg("right"))
 	model = next.(Model)
-	next, _ = model.dispatchKeyToPage(keyMsg("enter"))
+	next, _ = model.dispatchToPage(keyMsg("enter"))
 	model = next.(Model)
 
 	if model.config.Language != "en-US" {
@@ -92,7 +93,8 @@ func TestSettingsLanguageMouseClickAppliesI18nImmediately(t *testing.T) {
 	const rawX = pageX
 	const rawY = pageY + layout.TopNavHeight
 
-	next, cmd := model.handleSettingsMouseLeft(rawX, rawY)
+	msg := messages.PageMouseClickMsg{X: pageX, Y: pageY, Width: model.width, Height: model.height - layout.TopNavHeight}
+	next, cmd := model.dispatchToPage(msg)
 	if cmd == nil {
 		t.Fatalf("expected clear screen cmd after language mouse change")
 	}
@@ -139,7 +141,8 @@ func TestSettingsThemeMouseClickClearsScreen(t *testing.T) {
 	const rawX = pageX
 	const rawY = pageY + layout.TopNavHeight
 
-	next, cmd := model.handleSettingsMouseLeft(rawX, rawY)
+	msg := messages.PageMouseClickMsg{X: pageX, Y: pageY, Width: model.width, Height: model.height - layout.TopNavHeight}
+	next, cmd := model.dispatchToPage(msg)
 	if cmd == nil {
 		nextModel := next.(Model)
 		gotTheme := "<nil>"

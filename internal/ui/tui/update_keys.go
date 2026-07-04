@@ -73,7 +73,7 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// 输入捕获模式：当前页面正在编辑/过滤时，优先分发按键到页面，
 	// 避免全局快捷键（如 q/r/a/t/s/c）拦截输入字符。
 	if m.isInputCapturing() {
-		return m.dispatchKeyToPage(msg)
+		return m.dispatchToPage(msg)
 	}
 
 	// 全局快捷键
@@ -98,22 +98,22 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// 分发到页面子状态
-	return m.dispatchKeyToPage(msg)
+	return m.dispatchToPage(msg)
 
 	// ── 数据消息：分发到子状态 ──
 
 	return m, nil
 }
 
-// dispatchKeyToPage 将按键分发到当前页面子状态
-func (m Model) dispatchKeyToPage(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+// dispatchToPage 将消息分发到当前页面子状态
+func (m Model) dispatchToPage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch m.currentPage {
 	case layout.PageNodes:
 		m.nodesState, cmd = m.nodesState.Update(msg, m.client, m.proxySvc, m.testURL, m.timeout)
 
 	case layout.PageConnections:
-		m.connsState, cmd = m.connsState.Update(msg, m.client, m.timeout)
+		m.connsState, cmd = m.connsState.Update(msg, m.client, m.timeout, m.chartData)
 
 	case layout.PageLogs:
 		m.logsState, cmd = m.logsState.Update(msg, m.ipResolver)

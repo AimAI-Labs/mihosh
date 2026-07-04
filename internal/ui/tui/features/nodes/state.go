@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
-
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -189,13 +189,19 @@ func (s State) ToPageState(width, height int) PageState {
 }
 
 // Update 处理节点页面按键
-func (s State) Update(msg tea.KeyMsg, client *api.Client, proxySvc *service.ProxyService, testURL string, timeout int) (State, tea.Cmd) {
+func (s State) Update(msg tea.Msg, client *api.Client, proxySvc *service.ProxyService, testURL string, timeout int) (State, tea.Cmd) {
 	_ = proxySvc // 保留签名以兼容调用方（批量测速由页面状态控制并发）
 
-	// 搜索输入模式：拦截所有按键用于输入
-	if s.NodeFilterMode {
-		return s.handleNodeFilterMode(msg)
-	}
+	switch msg := msg.(type) {
+	case messages.PageMouseScrollMsg:
+		return s.HandleMouseScroll(msg.Up, msg.X, msg.Y, msg.Width, msg.Height), nil
+	case messages.PageMouseClickMsg:
+		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height, client)
+	case tea.KeyMsg:
+		// 搜索输入模式：拦截所有按键用于输入
+		if s.NodeFilterMode {
+			return s.handleNodeFilterMode(msg)
+		}
 
 	// 测速结果弹窗打开时，↑/↓ 控制弹窗滚动，f/Esc 关闭弹窗
 	if s.ShowTestDetail {
@@ -321,6 +327,7 @@ func (s State) Update(msg tea.KeyMsg, client *api.Client, proxySvc *service.Prox
 			s.ProxyScrollTop = 0
 			s.updateFilteredProxies()
 		}
+	}
 	}
 
 	return s, nil
