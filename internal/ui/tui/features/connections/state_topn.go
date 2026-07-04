@@ -97,5 +97,5 @@ func (s State) TopNModalMode() bool { return s.topNModalMode }
 
 func (s *State) closeTopNModal() {
 	s.topNModalMode = false
-	s.topNModalScroll = 0
+	s.topNModalPanel.Reset()
 }

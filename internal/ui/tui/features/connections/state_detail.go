@@ -22,6 +22,8 @@ func (s State) openSelectedConnectionDetail() (State, tea.Cmd) {
 	s.connDetailMode = true
 	s.connIPInfo = nil
 	s.connDetailJSONLineCount = countConnJSONLines(&snapshot)
+	s.connDetailRightPanel.SetMaxScroll(s.connDetailJSONLineCount - 5)
+	s.connDetailLeftPanel.SetMaxScroll(50)
 	return s, FetchIPInfo(conn.Metadata.DestinationIP)
 }
 
@@ -29,31 +31,24 @@ func (s *State) closeConnectionDetail() {
 	s.connDetailMode = false
 	s.connDetailSnapshot = nil
 	s.connIPInfo = nil
-	s.connDetailLeftScroll = 0
-	s.connDetailRightScroll = 0
+	s.connDetailLeftPanel.Reset()
+	s.connDetailRightPanel.Reset()
 	s.connDetailFocusPanel = 0
 	s.connDetailJSONLineCount = 0
 }
 
 // clampRightScroll 约束右侧(JSON)滚动偏移上限
 func (s *State) clampRightScroll() {
-	if s.connDetailJSONLineCount > 0 {
-		maxScroll := s.connDetailJSONLineCount - 5 // 5 = 最小可视行数
-		if maxScroll < 0 {
-			maxScroll = 0
-		}
-		if s.connDetailRightScroll > maxScroll {
-			s.connDetailRightScroll = maxScroll
-		}
+	maxScroll := s.connDetailJSONLineCount - 5
+	if maxScroll < 0 {
+		maxScroll = 0
 	}
+	s.connDetailRightPanel.SetMaxScroll(maxScroll)
 }
 
 // clampLeftScroll 约束左侧滚动偏移上限（左侧内容行数有限，使用静态上限）
 func (s *State) clampLeftScroll() {
-	const maxLeftScroll = 50
-	if s.connDetailLeftScroll > maxLeftScroll {
-		s.connDetailLeftScroll = maxLeftScroll
-	}
+	s.connDetailLeftPanel.SetMaxScroll(50)
 }
 
 // countConnJSONLines 计算连接JSON的行数

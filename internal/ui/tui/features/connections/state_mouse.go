@@ -49,8 +49,8 @@ func (s State) HandleMouseLeft(
 						// 不要关闭 topNModalMode，详情渲染优先级更高
 						s.connDetailMode = true
 						s.connDetailSnapshot = conn
-						s.connDetailLeftScroll = 0
-						s.connDetailRightScroll = 0
+						s.connDetailLeftPanel.Reset()
+						s.connDetailRightPanel.Reset()
 						s.connDetailFocusPanel = 0
 						s.connIPInfo = nil
 						s.connDetailJSONLineCount = countConnJSONLines(conn)
@@ -63,7 +63,7 @@ func (s State) HandleMouseLeft(
 
 		// 点击在弹窗外则关闭
 		items := s.CalculateTopN(0, 5*time.Minute)
-		left, top, right, bottom := components.ResolveTopNModalBounds(items, pageWidth, pageHeight, s.topNModalScroll)
+		left, top, right, bottom := components.ResolveTopNModalBounds(items, pageWidth, pageHeight, s.topNModalPanel.ScrollTop)
 		insideModal := pageX >= left && pageX < right && pageY >= top && pageY < bottom
 		if !insideModal {
 			s.closeTopNModal()
@@ -71,7 +71,7 @@ func (s State) HandleMouseLeft(
 		return s, nil
 	}
 
-	if s.connFilterMode {
+	if s.filterList.FilterMode() {
 		return s, nil
 	}
 
@@ -86,7 +86,7 @@ func (s State) HandleMouseLeft(
 	case MouseTargetChart, MouseTargetTopN:
 		if s.doubleClickDetector.IsDoubleClickWithThreshold(hit.Target, 0, now, connsChartDoubleClickMax) {
 			s.topNModalMode = true
-			s.topNModalScroll = 0
+			s.topNModalPanel.Reset()
 		}
 		return s, nil
 
@@ -122,12 +122,9 @@ func (s State) HandleMouseLeft(
 		if hit.Index < 0 {
 			return s, nil
 		}
-		if s.selectedConn != hit.Index {
-			s.selectedConn = hit.Index
-			s.inlineDetailScroll = 0
-			if s.selectedConn < s.connScrollTop {
-				s.connScrollTop = s.selectedConn
-			}
+		if s.filterList.Cursor != hit.Index {
+			s.filterList.SetCursor(hit.Index)
+			s.inlineDetailPanel.Reset()
 		}
 		if !s.doubleClickDetector.IsDoubleClick(MouseTargetConnection, hit.Index, now) {
 			return s, nil
@@ -164,20 +161,16 @@ func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight in
 
 		if up {
 			if isRightSide {
-				if s.connDetailRightScroll > 0 {
-					s.connDetailRightScroll--
-				}
+				s.connDetailRightPanel.HandleMouseScroll(up)
 			} else {
-				if s.connDetailLeftScroll > 0 {
-					s.connDetailLeftScroll--
-				}
+				s.connDetailLeftPanel.HandleMouseScroll(up)
 			}
 		} else {
 			if isRightSide {
-				s.connDetailRightScroll++
+				s.connDetailRightPanel.HandleMouseScroll(up)
 				s.clampRightScroll()
 			} else {
-				s.connDetailLeftScroll++
+				s.connDetailLeftPanel.HandleMouseScroll(up)
 				s.clampLeftScroll()
 			}
 		}
@@ -193,40 +186,26 @@ func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight in
 	}
 
 	if s.topNModalMode {
-		if up {
-			if s.topNModalScroll > 0 {
-				s.topNModalScroll--
-			}
-		} else {
-			s.topNModalScroll++
-		}
+		s.topNModalPanel.HandleMouseScroll(up)
 		return s, nil
 	}
 
 	if s.inlineDetailFocused {
-		if up {
-			if s.inlineDetailScroll > 0 {
-				s.inlineDetailScroll--
-			}
-		} else {
-			s.inlineDetailScroll++
-		}
+		s.inlineDetailPanel.HandleMouseScroll(up)
 		return s, nil
 	}
 
 	count := s.filteredConnCount()
+	s.filterList.SetItemCount(count)
 	if up {
-		if s.selectedConn > 0 {
-			s.selectedConn--
-			if s.selectedConn < s.connScrollTop {
-				s.connScrollTop = s.selectedConn
-			}
-			s.inlineDetailScroll = 0
+		if s.filterList.Cursor > 0 {
+			s.filterList.SetCursor(s.filterList.Cursor - 1)
+			s.inlineDetailPanel.Reset()
 		}
 	} else {
-		if s.selectedConn < count-1 {
-			s.selectedConn++
-			s.inlineDetailScroll = 0
+		if s.filterList.Cursor < count-1 {
+			s.filterList.SetCursor(s.filterList.Cursor + 1)
+			s.inlineDetailPanel.Reset()
 		}
 	}
 

@@ -79,24 +79,20 @@ func (s State) ApplySiteTestResult(name string, delay int, err error) State {
 
 // ApplyConnectionClosed 处理单连接关闭后的索引调整
 func (s State) ApplyConnectionClosed() State {
-	if s.selectedConn > 0 {
-		s.selectedConn--
+	if s.filterList.Cursor > 0 {
+		// 临时借用 SetCursor 只更新值，实际限制由随后的 SetItemCount 保证
+		s.filterList.Cursor-- 
 	}
 	// 确保选中索引不超过连接数量上限
 	connCount := s.filteredConnCount()
-	if connCount > 0 && s.selectedConn >= connCount {
-		s.selectedConn = connCount - 1
-	}
-	if s.selectedConn < 0 {
-		s.selectedConn = 0
-	}
+	s.filterList.SetItemCount(connCount)
 	return s
 }
 
 // ApplyAllConnectionsClosed 所有连接关闭后重置状态
 func (s State) ApplyAllConnectionsClosed() State {
-	s.selectedConn = 0
-	s.connScrollTop = 0
+	s.filterList.SetCursor(0)
+	s.filterList.ScrollTop = 0
 	return s
 }
 

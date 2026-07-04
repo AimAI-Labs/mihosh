@@ -10,7 +10,6 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -34,27 +33,24 @@ type State struct {
 	closedCount       int                             // 已写入的总条数（上限 ClosedConnCap）
 	cachedClosedConns []model.Connection              // 缓存的已关闭连接列表
 
-	selectedConn            int
-	connScrollTop           int
-	connFilterMode          bool
-	connFilter              textinput.Model
+	filterList common.FilterList
 	connDetailMode          bool
 	connDetailSnapshot      *model.Connection
 	connIPInfo              *model.IPInfo
-	connDetailLeftScroll    int
-	connDetailRightScroll   int
+	connDetailLeftPanel     common.ScrollablePanel
+	connDetailRightPanel    common.ScrollablePanel
 	connDetailFocusPanel    int  // 0=左侧(基础+地理), 1=右侧(JSON)
 	connDetailJSONLineCount int  // JSON行数缓存，用于滚动上限约束
 	connViewMode            int  // 0=流量监控, 1=活跃, 2=历史
 	inlineDetailMode        bool // 新增：内联详情模式
 	inlineDetailFocused     bool
-	inlineDetailScroll      int
+	inlineDetailPanel       common.ScrollablePanel
 
 	siteTests        []model.SiteTest
 	selectedSiteTest int
 	proxyAddr        string
 	topNModalMode    bool
-	topNModalScroll  int
+	topNModalPanel   common.ScrollablePanel
 
 	doubleClickDetector common.DoubleClickDetector[MouseTarget]
 
@@ -68,13 +64,11 @@ type State struct {
 
 // NewState 初始化连接状态
 func NewState(proxyAddr string, siteTests []model.SiteTest, client *api.Client, timeout int, chartData *model.ChartData) State {
-	ti := textinput.New()
-	ti.Placeholder = "filter..."
-	ti.CharLimit = 100
+	fl := common.NewFilterList()
 	return State{
 		proxyAddr:  proxyAddr,
 		siteTests:  siteTests,
-		connFilter: ti,
+		filterList: fl,
 		topNCache:  &topNCache{},
 		client:     client,
 		timeout:    timeout,
@@ -131,16 +125,16 @@ func (s State) ToPageState(chartData *model.ChartData, width, height int) PageSt
 		Connections:        s.Connections,
 		Width:              width,
 		Height:             height,
-		SelectedIndex:      s.selectedConn,
-		ScrollTop:          s.connScrollTop,
-		FilterText:         s.connFilter.Value(),
-		FilterInput:        s.connFilter.View(),
-		FilterMode:         s.connFilterMode,
+		SelectedIndex:      s.filterList.Cursor,
+		ScrollTop:          s.filterList.ScrollTop,
+		FilterText:         s.filterList.FilterValue(),
+		FilterInput:        s.filterList.FilterView(),
+		FilterMode:         s.filterList.FilterMode(),
 		DetailMode:         s.connDetailMode,
 		SelectedConnection: s.connDetailSnapshot,
 		IPInfo:             s.connIPInfo,
-		DetailLeftScroll:   s.connDetailLeftScroll,
-		DetailRightScroll:  s.connDetailRightScroll,
+		DetailLeftScroll:   s.connDetailLeftPanel.ScrollTop,
+		DetailRightScroll:  s.connDetailRightPanel.ScrollTop,
 		DetailFocusPanel:   s.connDetailFocusPanel,
 		ChartData:          chartData,
 		ViewMode:           s.connViewMode,
@@ -150,10 +144,10 @@ func (s State) ToPageState(chartData *model.ChartData, width, height int) PageSt
 		TopNItems:          topNItems,
 		TopNModalMode:      s.topNModalMode,
 		TopNModalItems:     topNModalItems,
-		TopNModalScroll:    s.topNModalScroll,
+		TopNModalScroll:    s.topNModalPanel.ScrollTop,
 		InlineMode:         s.inlineDetailMode,
 		InlineFocused:      s.inlineDetailFocused,
-		InlineScroll:       s.inlineDetailScroll,
+		InlineScroll:       s.inlineDetailPanel.ScrollTop,
 	}
 }
 
@@ -170,32 +164,25 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		switch {
 		case key.Matches(msg, common.Keys.Escape), key.Matches(msg, common.Keys.Enter), msg.String() == "q":
 			s.closeConnectionDetail()
+			return s, nil
 		case key.Matches(msg, common.Keys.Left), msg.String() == "h":
 			if s.connDetailFocusPanel > 0 {
 				s.connDetailFocusPanel--
 			}
+			return s, nil
 		case key.Matches(msg, common.Keys.Right), msg.String() == "l":
 			if s.connDetailFocusPanel < 1 {
 				s.connDetailFocusPanel++
 			}
-		case key.Matches(msg, common.Keys.Up), msg.String() == "k":
-			if s.connDetailFocusPanel == 0 {
-				if s.connDetailLeftScroll > 0 {
-					s.connDetailLeftScroll--
-				}
-			} else {
-				if s.connDetailRightScroll > 0 {
-					s.connDetailRightScroll--
-				}
-			}
-		case key.Matches(msg, common.Keys.Down), msg.String() == "j":
-			if s.connDetailFocusPanel == 0 {
-				s.connDetailLeftScroll++
-				s.clampLeftScroll()
-			} else {
-				s.connDetailRightScroll++
-				s.clampRightScroll()
-			}
+			return s, nil
+		}
+
+		if s.connDetailFocusPanel == 0 {
+			s.connDetailLeftPanel.Update(msg)
+			s.clampLeftScroll() // apply specific static limits if needed
+		} else {
+			s.connDetailRightPanel.Update(msg)
+			s.clampRightScroll() // apply specific json limit if needed
 		}
 		return s, nil
 	}
@@ -204,19 +191,18 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		switch {
 		case key.Matches(msg, common.Keys.Escape), key.Matches(msg, common.Keys.Enter), msg.String() == "q":
 			s.closeTopNModal()
-		case key.Matches(msg, common.Keys.Up), msg.String() == "k":
-			if s.topNModalScroll > 0 {
-				s.topNModalScroll--
-			}
-		case key.Matches(msg, common.Keys.Down), msg.String() == "j":
-			s.topNModalScroll++
+			return s, nil
 		}
+		s.topNModalPanel.Update(msg)
 		return s, nil
 	}
 
 	// 过滤输入模式
-	if s.connFilterMode {
-		return s.handleConnFilterMode(msg)
+	if s.filterList.FilterMode() {
+		s.filterList.SetItemCount(s.filteredConnCount())
+		_, cmd := s.filterList.Update(msg)
+		s.filterList.SetItemCount(s.filteredConnCount()) // Update again after filter string changes
+		return s, cmd
 	}
 
 	// tab 切换键（所有 viewMode 通用）
@@ -258,28 +244,20 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 
 	case key.Matches(msg, common.Keys.Up):
 		if s.inlineDetailFocused {
-			if s.inlineDetailScroll > 0 {
-				s.inlineDetailScroll--
-			}
+			s.inlineDetailPanel.Update(msg)
 		} else {
-			if s.selectedConn > 0 {
-				s.selectedConn--
-				if s.selectedConn < s.connScrollTop {
-					s.connScrollTop = s.selectedConn
-				}
-				s.inlineDetailScroll = 0 // 切换连接时重置内联详情滚动
-			}
+			s.filterList.SetItemCount(s.filteredConnCount())
+			s.filterList.Update(msg)
+			s.inlineDetailPanel.Reset()
 		}
 
 	case key.Matches(msg, common.Keys.Down):
 		if s.inlineDetailFocused {
-			s.inlineDetailScroll++
+			s.inlineDetailPanel.Update(msg)
 		} else {
-			connCount := s.filteredConnCount()
-			if s.selectedConn < connCount-1 {
-				s.selectedConn++
-			}
-			s.inlineDetailScroll = 0
+			s.filterList.SetItemCount(s.filteredConnCount())
+			s.filterList.Update(msg)
+			s.inlineDetailPanel.Reset()
 		}
 
 	case key.Matches(msg, common.Keys.Enter):
@@ -305,16 +283,13 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		}
 
 	case msg.String() == "/":
-		s.connFilterMode = true
-		s.connFilter.Focus()
+		s.filterList.Update(msg)
 
 	case key.Matches(msg, common.Keys.Escape):
 		if s.inlineDetailFocused {
 			s.inlineDetailFocused = false
-		} else if s.connFilter.Value() != "" {
-			s.connFilter.Reset()
-			s.selectedConn = 0
-			s.connScrollTop = 0
+		} else if s.filterList.FilterValue() != "" {
+			s.filterList.ResetFilter()
 		}
 	}
 
@@ -327,7 +302,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 func (s State) ViewMode() int { return s.connViewMode }
 
 // FilterMode 返回是否处于过滤模式
-func (s State) FilterMode() bool { return s.connFilterMode }
+func (s State) FilterMode() bool { return s.filterList.FilterMode() }
 
 func (s State) triggerSiteTestByIndex(idx int, timeout int) (State, tea.Cmd) {
 	if idx < 0 || idx >= len(s.siteTests) {
@@ -343,8 +318,8 @@ func (s *State) setConnViewMode(mode int) {
 		mode = ConnViewTraffic
 	}
 	s.connViewMode = mode
-	s.selectedConn = 0
-	s.connScrollTop = 0
+	s.filterList.SetCursor(0)
+	s.filterList.ScrollTop = 0
 }
 
 // selectedConnection 获取当前选中的连接
@@ -366,18 +341,18 @@ func (s State) selectedConnection() *model.Connection {
 		conns = closed
 	}
 
-	if s.connFilter.Value() == "" {
-		if s.selectedConn >= 0 && s.selectedConn < len(conns) {
-			return &conns[s.selectedConn]
+	if s.filterList.FilterValue() == "" {
+		if s.filterList.Cursor >= 0 && s.filterList.Cursor < len(conns) {
+			return &conns[s.filterList.Cursor]
 		}
 		return nil
 	}
 
-	filter := strings.ToLower(s.connFilter.Value())
+	filter := strings.ToLower(s.filterList.FilterValue())
 	idx := 0
 	for i := range conns {
 		if connMatchesFilter(conns[i], filter) {
-			if idx == s.selectedConn {
+			if idx == s.filterList.Cursor {
 				return &conns[i]
 			}
 			idx++
