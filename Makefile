@@ -1,4 +1,7 @@
 BINARY ?= mihosh
+VERSION ?= dev
+COMMIT ?= unknown
+DATE ?= unknown
 LDFLAGS = -ldflags "-s -w -X github.com/AimAI-Labs/mihosh/internal/domain/model.Version=$(VERSION) -X github.com/AimAI-Labs/mihosh/internal/domain/model.Commit=$(COMMIT) -X github.com/AimAI-Labs/mihosh/internal/domain/model.Date=$(DATE)"
 
 .PHONY: fmt vet test build check clean
