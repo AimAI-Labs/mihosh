@@ -23,7 +23,7 @@ func (m Model) Init() tea.Cmd {
 		nodes.FetchProxies(m.client),
 		nodes.FetchConfigMode(m.client),
 		autoRefreshTick(),
-		startWSStreams(m.wsClient, m.wsMsgChan),
+		startWSStreams(m.wsCtx, m.wsClient, m.wsMsgChan),
 		listenWSMessages(m.wsCtx, m.wsMsgChan),
 		// 自动更新检测
 		func() tea.Msg {
@@ -89,6 +89,21 @@ func (m *Model) onPageChange() tea.Cmd {
 	return nil
 }
 
+// onPageLeave 页面离开处理
+func (m *Model) onPageLeave() {
+	switch m.currentPage {
+	case layout.PageConnections:
+		m.connsState.CancelTest()
+	}
+}
+
+// onAppQuit 应用退出前清理
+func (m *Model) onAppQuit() {
+	m.connsState.CancelTest()
+	if m.wsCancel != nil {
+		m.wsCancel()
+	}
+}
 // refreshCurrentPage 刷新当前页面
 func (m *Model) refreshCurrentPage() tea.Cmd {
 	switch m.currentPage {

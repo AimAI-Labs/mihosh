@@ -1,6 +1,7 @@
 package connections
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -76,7 +77,7 @@ func FetchIPInfo(ip string) tea.Cmd {
 }
 
 // TestSiteDelay 测试单个网站延迟（通过代理）
-func TestSiteDelay(proxyAddr string, siteName string, siteURL string, timeout int) tea.Cmd {
+func TestSiteDelay(ctx context.Context, proxyAddr string, siteName string, siteURL string, timeout int) tea.Cmd {
 	return func() tea.Msg {
 		// 创建带代理的HTTP客户端
 		client := &http.Client{
@@ -94,7 +95,7 @@ func TestSiteDelay(proxyAddr string, siteName string, siteURL string, timeout in
 		}
 
 		start := time.Now()
-		req, err := http.NewRequest("GET", siteURL, nil)
+		req, err := http.NewRequestWithContext(ctx, "GET", siteURL, nil)
 		if err != nil {
 			return messages.SiteTestMsg{Name: siteName, Delay: 0, Err: err}
 		}
@@ -162,11 +163,11 @@ func ConvertToConnectionsResponse(data api.ConnectionsData) *model.ConnectionsRe
 }
 
 // TestAllSites 批量测试所有网站
-func TestAllSites(proxyAddr string, sites []model.SiteTest, timeout int) tea.Cmd {
+func TestAllSites(ctx context.Context, proxyAddr string, sites []model.SiteTest, timeout int) tea.Cmd {
 	return func() tea.Msg {
 		var cmds []tea.Cmd
 		for _, site := range sites {
-			cmds = append(cmds, TestSiteDelay(proxyAddr, site.Name, site.URL, timeout))
+			cmds = append(cmds, TestSiteDelay(ctx, proxyAddr, site.Name, site.URL, timeout))
 		}
 		return tea.Batch(cmds...)()
 	}

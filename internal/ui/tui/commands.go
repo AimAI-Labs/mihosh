@@ -29,7 +29,7 @@ func fetchConnectionsAndMemory(client *api.Client) tea.Cmd {
 }
 
 // startWSStreams 启动WebSocket流
-func startWSStreams(wsClient *api.WSClient, msgChan chan interface{}) tea.Cmd {
+func startWSStreams(ctx context.Context, wsClient *api.WSClient, msgChan chan interface{}) tea.Cmd {
 	return func() tea.Msg {
 		if wsClient == nil {
 			return nil
@@ -72,7 +72,7 @@ func startWSStreams(wsClient *api.WSClient, msgChan chan interface{}) tea.Cmd {
 		})
 
 		// 启动WebSocket连接
-		wsClient.Start()
+		wsClient.Start(ctx)
 		return nil
 	}
 }

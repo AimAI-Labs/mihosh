@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -77,7 +78,7 @@ func TestWSClient_StartStopAndHandlers(t *testing.T) {
 		}
 	})
 
-	err := client.Start()
+	err := client.Start(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to start client: %v", err)
 	}
@@ -131,7 +132,7 @@ func TestWSClient_Reconnection(t *testing.T) {
 	// Need to manually set isRunning for test to avoid immediate exit in connectStream loop
 	client.runningMu.Lock()
 	client.isRunning = true
-	client.stopChan = make(chan struct{})
+	client.ctx, client.cancel = context.WithCancel(context.Background())
 	client.runningMu.Unlock()
 
 	time.Sleep(2500 * time.Millisecond) // enough time for initial connection + 1s delay + second connection
@@ -175,7 +176,7 @@ func TestWSClient_UpdateEndpoint(t *testing.T) {
 	defer ts2.Close()
 
 	client := NewWSClient(ts1.URL, "secret1")
-	client.Start()
+	client.Start(context.Background())
 	
 	// give it a moment to connect
 	time.Sleep(100 * time.Millisecond)

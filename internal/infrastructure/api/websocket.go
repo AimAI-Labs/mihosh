@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/url"
 	"strings"
@@ -86,7 +87,8 @@ type WSClient struct {
 	logsHandler        func(LogData)
 
 	logLevel  string // 日志级别过滤
-	stopChan  chan struct{}
+	ctx       context.Context
+	cancel    context.CancelFunc
 	isRunning bool
 	runningMu sync.Mutex
 }
@@ -94,10 +96,9 @@ type WSClient struct {
 // NewWSClient 创建WebSocket客户端
 func NewWSClient(baseURL, secret string) *WSClient {
 	return &WSClient{
-		baseURL:  baseURL,
-		secret:   secret,
-		conns:    make(map[string]*websocket.Conn),
-		stopChan: make(chan struct{}),
+		baseURL: baseURL,
+		secret:  secret,
+		conns:   make(map[string]*websocket.Conn),
 	}
 }
 
@@ -183,14 +184,14 @@ func (c *WSClient) setConn(key string, conn *websocket.Conn) {
 }
 
 // Start 启动WebSocket连接
-func (c *WSClient) Start() error {
+func (c *WSClient) Start(ctx context.Context) error {
 	c.runningMu.Lock()
 	if c.isRunning {
 		c.runningMu.Unlock()
 		return nil
 	}
 	c.isRunning = true
-	c.stopChan = make(chan struct{})
+	c.ctx, c.cancel = context.WithCancel(ctx)
 	c.runningMu.Unlock()
 
 	level := c.logLevel
@@ -230,7 +231,9 @@ func (c *WSClient) Stop() {
 		return
 	}
 	c.isRunning = false
-	close(c.stopChan)
+	if c.cancel != nil {
+		c.cancel()
+	}
 	c.runningMu.Unlock()
 
 	c.connsMu.Lock()
@@ -254,7 +257,7 @@ func (c *WSClient) IsRunning() bool {
 func connectStream[T any](c *WSClient, endpoint string, handler func(T)) {
 	for {
 		select {
-		case <-c.stopChan:
+		case <-c.ctx.Done():
 			return
 		default:
 		}
@@ -262,7 +265,7 @@ func connectStream[T any](c *WSClient, endpoint string, handler func(T)) {
 		wsURL := c.buildWSURL(endpoint)
 		if wsURL == "" {
 			select {
-			case <-c.stopChan:
+			case <-c.ctx.Done():
 				return
 			case <-time.After(2 * time.Second):
 				continue
@@ -272,7 +275,7 @@ func connectStream[T any](c *WSClient, endpoint string, handler func(T)) {
 		conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 		if err != nil {
 			select {
-			case <-c.stopChan:
+			case <-c.ctx.Done():
 				return
 			case <-time.After(2 * time.Second):
 				continue
@@ -284,7 +287,7 @@ func connectStream[T any](c *WSClient, endpoint string, handler func(T)) {
 		// 读取消息，直到连接断开或收到停止信号
 		for {
 			select {
-			case <-c.stopChan:
+			case <-c.ctx.Done():
 				conn.Close()
 				c.setConn(endpoint, nil)
 				return
@@ -307,7 +310,7 @@ func connectStream[T any](c *WSClient, endpoint string, handler func(T)) {
 
 		// 断线后等待重连，期间响应停止信号
 		select {
-		case <-c.stopChan:
+		case <-c.ctx.Done():
 			return
 		case <-time.After(1 * time.Second):
 		}

@@ -21,6 +21,7 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if key.Matches(msg, common.Keys.Quit) {
+			m.onAppQuit()
 			return m, tea.Quit
 		}
 		return m, nil
@@ -34,6 +35,7 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if key.Matches(msg, common.Keys.Quit) {
+			m.onAppQuit()
 			return m, tea.Quit
 		}
 		return m, nil
@@ -59,6 +61,7 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if key.Matches(msg, common.Keys.Quit) {
+			m.onAppQuit()
 			return m, tea.Quit
 		}
 		return m, nil
@@ -79,13 +82,16 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// 全局快捷键
 	switch {
 	case key.Matches(msg, common.Keys.Quit):
+		m.onAppQuit()
 		return m, tea.Quit
 
 	case key.Matches(msg, common.Keys.NextPage):
+		m.onPageLeave()
 		m.currentPage = (m.currentPage + 1) % layout.PageCount
 		return m, m.onPageChange()
 
 	case key.Matches(msg, common.Keys.PrevPage):
+		m.onPageLeave()
 		m.currentPage = (m.currentPage + layout.PageCount - 1) % layout.PageCount
 		return m, m.onPageChange()
 

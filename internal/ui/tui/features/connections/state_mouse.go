@@ -139,8 +139,7 @@ func (s State) HandleMouseLeft(
 		s.selectedSiteTest = idx
 		if s.doubleClickDetector.IsDoubleClick(MouseTargetSiteTest, idx, now) {
 			s.selectedSiteTest = idx
-			s.siteTests[idx].Testing = true
-			return s, TestSiteDelay(s.proxyAddr, s.siteTests[idx].Name, s.siteTests[idx].URL, timeout)
+			return s.triggerSiteTestByIndex(idx, timeout)
 		}
 	}
 

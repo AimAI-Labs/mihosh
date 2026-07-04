@@ -1,6 +1,7 @@
 package connections
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -60,6 +61,9 @@ type State struct {
 	client    *api.Client
 	timeout   int
 	chartData *model.ChartData
+	
+	testCtx    context.Context
+	testCancel context.CancelFunc
 }
 
 // NewState 初始化连接状态
@@ -106,6 +110,14 @@ func (s *State) appendClosed(conn model.Connection) {
 	s.closedHead = (s.closedHead + 1) % common.ClosedConnCap
 	if s.closedCount < common.ClosedConnCap {
 		s.closedCount++
+	}
+}
+
+// CancelTest 取消当前正在进行的测试
+func (s *State) CancelTest() {
+	if s.testCancel != nil {
+		s.testCancel()
+		s.testCancel = nil
 	}
 }
 
@@ -207,6 +219,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 
 	// tab 切换键（所有 viewMode 通用）
 	if msg.String() == "h" {
+		s.CancelTest()
 		s.setConnViewMode((s.connViewMode + 1) % 3)
 		return s, nil
 	}
@@ -221,7 +234,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 				for i := range s.siteTests {
 					s.siteTests[i].Testing = true
 				}
-				return s, TestAllSites(s.proxyAddr, s.siteTests, s.timeout)
+				s.CancelTest()
+				s.testCtx, s.testCancel = context.WithCancel(context.Background())
+				return s, TestAllSites(s.testCtx, s.proxyAddr, s.siteTests, s.timeout)
 			}
 		case key.Matches(msg, common.Keys.Left):
 			if s.selectedSiteTest > 0 {
@@ -308,9 +323,11 @@ func (s State) triggerSiteTestByIndex(idx int, timeout int) (State, tea.Cmd) {
 	if idx < 0 || idx >= len(s.siteTests) {
 		return s, nil
 	}
+	s.CancelTest()
+	s.testCtx, s.testCancel = context.WithCancel(context.Background())
 	site := s.siteTests[idx]
 	s.siteTests[idx].Testing = true
-	return s, TestSiteDelay(s.proxyAddr, site.Name, site.URL, timeout)
+	return s, TestSiteDelay(s.testCtx, s.proxyAddr, site.Name, site.URL, timeout)
 }
 
 func (s *State) setConnViewMode(mode int) {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -56,9 +57,10 @@ func TestConnsHandleMouseLeft_ClickHistoryTabSwitchesView(t *testing.T) {
 	state := State{
 		Connections:   &model.ConnectionsResponse{},
 		connViewMode:  ConnViewActive,
-		selectedConn:  5,
-		connScrollTop: 3,
 	}
+	state.filterList = common.NewFilterList()
+	state.filterList.SetCursor(5)
+	state.filterList.ScrollTop = 3
 
 	const width, height = 120, 30
 	x, y, ok := findConnMousePoint(state, width, height, MouseTargetViewHistory, -1)
@@ -73,8 +75,8 @@ func TestConnsHandleMouseLeft_ClickHistoryTabSwitchesView(t *testing.T) {
 	if next.connViewMode != ConnViewHistory {
 		t.Fatalf("expected history view mode, got %d", next.connViewMode)
 	}
-	if next.selectedConn != 0 || next.connScrollTop != 0 {
-		t.Fatalf("expected selection reset after tab switch, got selected=%d scrollTop=%d", next.selectedConn, next.connScrollTop)
+	if next.filterList.Cursor != 0 || next.filterList.ScrollTop != 0 {
+		t.Fatalf("expected selection reset after tab switch, got selected=%d scrollTop=%d", next.filterList.Cursor, next.filterList.ScrollTop)
 	}
 }
 
@@ -391,11 +393,11 @@ func TestConnsHandleMouseLeft_ClickTabClosesDetail(t *testing.T) {
 				DestinationIP: "1.1.1.1",
 			},
 		},
-		connIPInfo:            &model.IPInfo{Country: "TW"},
-		connDetailLeftScroll:  2,
-		connDetailRightScroll: 3,
-		connDetailFocusPanel:  1,
 	}
+	state.connIPInfo = &model.IPInfo{Country: "TW"}
+	state.connDetailLeftPanel.ScrollTop = 2
+	state.connDetailRightPanel.ScrollTop = 3
+	state.connDetailFocusPanel = 1
 
 	const width, height = 120, 30
 	// 找到模式切换栏的某个按钮（例如历史记录按钮）
@@ -417,8 +419,8 @@ func TestConnsHandleMouseLeft_ClickTabClosesDetail(t *testing.T) {
 	if next.connIPInfo != nil {
 		t.Fatalf("expected ip info cleared after close")
 	}
-	if next.connDetailLeftScroll != 0 || next.connDetailRightScroll != 0 {
-		t.Fatalf("expected detail scroll reset after close, got left=%d right=%d", next.connDetailLeftScroll, next.connDetailRightScroll)
+	if next.connDetailLeftPanel.ScrollTop != 0 || next.connDetailRightPanel.ScrollTop != 0 {
+		t.Fatalf("expected detail scroll reset after close, got left=%d right=%d", next.connDetailLeftPanel.ScrollTop, next.connDetailRightPanel.ScrollTop)
 	}
 	if next.connDetailFocusPanel != 0 {
 		t.Fatalf("expected detail focus reset after close, got %d", next.connDetailFocusPanel)
@@ -483,24 +485,25 @@ func TestConnsDetailInputTakesPriorityOverTopNModal(t *testing.T) {
 		connDetailFocusPanel:    1,
 		connDetailJSONLineCount: 40,
 	}
+	state.connDetailRightPanel.MaxScroll = 40
 
 	next, cmd := state.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	if cmd != nil {
 		t.Fatalf("expected nil cmd while scrolling detail, got non-nil")
 	}
-	if next.connDetailRightScroll != 1 {
-		t.Fatalf("expected right detail scroll to advance, got %d", next.connDetailRightScroll)
+	if next.connDetailRightPanel.ScrollTop != 1 {
+		t.Fatalf("expected right detail scroll to advance, got %d", next.connDetailRightPanel.ScrollTop)
 	}
-	if next.topNModalScroll != 0 {
-		t.Fatalf("expected hidden topN modal scroll unchanged, got %d", next.topNModalScroll)
+	if next.topNModalPanel.ScrollTop != 0 {
+		t.Fatalf("expected hidden topN modal scroll unchanged, got %d", next.topNModalPanel.ScrollTop)
 	}
 
 	next, _ = next.HandleMouseScroll(false, 90, 10, 120, 30)
-	if next.connDetailRightScroll != 2 {
-		t.Fatalf("expected mouse wheel to advance right detail scroll, got %d", next.connDetailRightScroll)
+	if next.connDetailRightPanel.ScrollTop != 2 {
+		t.Fatalf("expected mouse wheel to advance right detail scroll, got %d", next.connDetailRightPanel.ScrollTop)
 	}
-	if next.topNModalScroll != 0 {
-		t.Fatalf("expected hidden topN modal scroll unchanged after mouse wheel, got %d", next.topNModalScroll)
+	if next.topNModalPanel.ScrollTop != 0 {
+		t.Fatalf("expected hidden topN modal scroll unchanged after mouse wheel, got %d", next.topNModalPanel.ScrollTop)
 	}
 }
 
