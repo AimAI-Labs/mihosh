@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -81,13 +82,13 @@ func renderCommandError(err error) string {
 
 	switch inferErrorKind(err) {
 	case commandErrorParameter:
-		return fmt.Sprintf("%s %s\n%s", errorStyle.Render("参数错误:"), detail, hintStyle.Render("使用 --help 查看命令帮助。"))
+		return fmt.Sprintf("%s %s\n%s", errorStyle.Render(i18n.T("cli.errors.param_error")), detail, hintStyle.Render(i18n.T("cli.errors.param_hint")))
 	case commandErrorConfig:
-		return fmt.Sprintf("%s %s\n%s", errorStyle.Render("配置错误:"), detail, hintStyle.Render("使用 `mihosh config edit` 编辑配置。"))
+		return fmt.Sprintf("%s %s\n%s", errorStyle.Render(i18n.T("cli.errors.config_error")), detail, hintStyle.Render(i18n.T("cli.errors.config_hint")))
 	case commandErrorNetwork:
-		return fmt.Sprintf("%s %s\n%s", errorStyle.Render("网络错误:"), detail, hintStyle.Render("请检查 API 地址、密钥和网络连通性。"))
+		return fmt.Sprintf("%s %s\n%s", errorStyle.Render(i18n.T("cli.errors.network_error")), detail, hintStyle.Render(i18n.T("cli.errors.network_hint")))
 	default:
-		return fmt.Sprintf("%s %s", errorStyle.Render("执行失败:"), detail)
+		return fmt.Sprintf("%s %s", errorStyle.Render(i18n.T("cli.errors.general_error")), detail)
 	}
 }
 

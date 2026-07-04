@@ -11,13 +11,18 @@ import (
 	"sync"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/spf13/viper"
 )
 
 var mu sync.Mutex
 
+type errConfigNotFound struct{}
+
+func (errConfigNotFound) Error() string { return i18n.T("config.loader.err_not_found") }
+
 // ErrConfigNotFound 配置文件不存在
-var ErrConfigNotFound = errors.New("配置文件不存在")
+var ErrConfigNotFound = errConfigNotFound{}
 
 var systemctlStatusRunner = func() ([]byte, error) {
 	return exec.Command("systemctl", "status", "mihomo").CombinedOutput()
@@ -55,17 +60,17 @@ func GetMihomoConfigPath() (string, error) {
 func GetMihomoConfigPathFromProcess() (string, error) {
 	output, err := systemctlStatusRunner()
 	if err != nil {
-		return "", fmt.Errorf("无法获取 mihomo 服务状态: %w", err)
+		return "", fmt.Errorf(i18n.T("config.loader.err_systemctl_status"), err)
 	}
 
 	cmdLine := parseSystemctlStatus(string(output))
 	if cmdLine == "" {
-		return "", errors.New("无法从 systemctl status 输出中解析 mihomo 命令行")
+		return "", errors.New(i18n.T("config.loader.err_parse_cmd"))
 	}
 
 	configDir := extractConfigDirFromCommandLine(cmdLine)
 	if configDir == "" {
-		return "", errors.New("无法从命令行中提取配置目录（未找到 -d 标志）")
+		return "", errors.New(i18n.T("config.loader.err_extract_dir"))
 	}
 
 	if configFile := findConfigFileInDirectory(configDir); configFile != "" {
@@ -221,14 +226,7 @@ func searchFallbackDirectories() string {
 }
 
 func buildMihomoConfigPathNotFoundError() error {
-	return errors.New(
-		"未找到 mihomo 配置文件，请手动指定。\n" +
-			"降级处理：\n" +
-			"1. 运行 `sudo systemctl status mihomo`\n" +
-			"2. 查找 `-d` 后面的目录参数\n" +
-			"3. 在该目录下确认 `config.yaml` 或 `config.yml`\n" +
-			"4. 使用 `mihosh config edit --path <配置文件或目录>` 手动指定",
-	)
+	return errors.New(i18n.T("config.loader.err_manual_hint"))
 }
 
 // Load 加载配置文件

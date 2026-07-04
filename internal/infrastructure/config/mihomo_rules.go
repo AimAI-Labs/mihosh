@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"gopkg.in/yaml.v3"
 )
 
@@ -25,12 +26,12 @@ const mihomoRulesKey = "rules"
 // 写入采用「临时文件 + Rename」原子替换，避免半写损坏用户配置。
 func InsertRule(configPath, rule string, index int) error {
 	if rule == "" {
-		return fmt.Errorf("规则内容不能为空")
+		return fmt.Errorf("%s", i18n.T("config.rules.err_empty_rule"))
 	}
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return fmt.Errorf("读取配置文件失败: %w", err)
+		return fmt.Errorf(i18n.T("config.rules.err_read_config"), err)
 	}
 
 	var doc yaml.Node
@@ -43,12 +44,12 @@ func InsertRule(configPath, rule string, index int) error {
 			},
 		}
 	} else if err := yaml.Unmarshal(data, &doc); err != nil {
-		return fmt.Errorf("解析配置文件失败: %w", err)
+		return fmt.Errorf(i18n.T("config.rules.err_parse_config"), err)
 	}
 
 	root := mappingRoot(&doc)
 	if root == nil {
-		return fmt.Errorf("配置文件顶层不是 mapping，无法写入 rules")
+		return fmt.Errorf("%s", i18n.T("config.rules.err_not_mapping"))
 	}
 
 	seq := findRulesSequence(root)
@@ -69,7 +70,7 @@ func InsertRule(configPath, rule string, index int) error {
 
 	out, err := marshalYAML(&doc)
 	if err != nil {
-		return fmt.Errorf("序列化配置文件失败: %w", err)
+		return fmt.Errorf(i18n.T("config.rules.err_serialize"), err)
 	}
 
 	return atomicWriteFile(configPath, out, 0644)
@@ -88,7 +89,7 @@ func InsertRule(configPath, rule string, index int) error {
 func DeleteRule(configPath, ruleType, payload, proxy string, noResolve bool) error {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return fmt.Errorf("读取配置文件失败: %w", err)
+		return fmt.Errorf(i18n.T("config.rules.err_read_config"), err)
 	}
 	if len(bytesTrimSpace(data)) == 0 {
 		return errRuleNotFound
@@ -96,7 +97,7 @@ func DeleteRule(configPath, ruleType, payload, proxy string, noResolve bool) err
 
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return fmt.Errorf("解析配置文件失败: %w", err)
+		return fmt.Errorf(i18n.T("config.rules.err_parse_config"), err)
 	}
 	root := mappingRoot(&doc)
 	if root == nil {
@@ -133,7 +134,7 @@ func DeleteRule(configPath, ruleType, payload, proxy string, noResolve bool) err
 
 	out, err := marshalYAML(&doc)
 	if err != nil {
-		return fmt.Errorf("序列化配置文件失败: %w", err)
+		return fmt.Errorf(i18n.T("config.rules.err_serialize"), err)
 	}
 	return atomicWriteFile(configPath, out, 0644)
 }
@@ -149,12 +150,12 @@ func DeleteRule(configPath, ruleType, payload, proxy string, noResolve bool) err
 // 注释安全：使用 yaml.Node 操作并原子写回。
 func ReplaceRule(configPath, oldType, oldPayload, oldProxy string, oldNoResolve bool, newRule string, newIndex int) error {
 	if newRule == "" {
-		return fmt.Errorf("规则内容不能为空")
+		return fmt.Errorf("%s", i18n.T("config.rules.err_empty_rule"))
 	}
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return fmt.Errorf("读取配置文件失败: %w", err)
+		return fmt.Errorf(i18n.T("config.rules.err_read_config"), err)
 	}
 	if len(bytesTrimSpace(data)) == 0 {
 		return errRuleNotFound
@@ -162,7 +163,7 @@ func ReplaceRule(configPath, oldType, oldPayload, oldProxy string, oldNoResolve 
 
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return fmt.Errorf("解析配置文件失败: %w", err)
+		return fmt.Errorf(i18n.T("config.rules.err_parse_config"), err)
 	}
 	root := mappingRoot(&doc)
 	if root == nil {
@@ -218,14 +219,18 @@ func ReplaceRule(configPath, oldType, oldPayload, oldProxy string, oldNoResolve 
 
 	out, err := marshalYAML(&doc)
 	if err != nil {
-		return fmt.Errorf("序列化配置文件失败: %w", err)
+		return fmt.Errorf(i18n.T("config.rules.err_serialize"), err)
 	}
 	return atomicWriteFile(configPath, out, 0644)
 }
 
+type errRuleNotFoundType struct{}
+
+func (errRuleNotFoundType) Error() string { return i18n.T("config.rules.err_rule_not_found") }
+
 // errRuleNotFound 表示目标规则未出现在配置文件的 rules 列表中。
 // 常见原因：规则由 rule-provider 注入，无法通过编辑配置文件删除。
-var errRuleNotFound = fmt.Errorf("规则未在配置文件中找到（可能来自 rule-provider）")
+var errRuleNotFound = errRuleNotFoundType{}
 
 // canonicalRuleLine 按 parseRuleLine 期望的形状构造规则行，使目标行与配置行
 // 走同一规范化路径。MATCH 无 payload，输出 "MATCH,PROXY"。
@@ -247,7 +252,7 @@ func canonicalRuleLine(ruleType, payload, proxy string, noResolve bool) string {
 func CountRules(configPath string) (int, error) {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return 0, fmt.Errorf("读取配置文件失败: %w", err)
+		return 0, fmt.Errorf(i18n.T("config.rules.err_read_config"), err)
 	}
 	if len(bytesTrimSpace(data)) == 0 {
 		return 0, nil
@@ -255,7 +260,7 @@ func CountRules(configPath string) (int, error) {
 
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return 0, fmt.Errorf("解析配置文件失败: %w", err)
+		return 0, fmt.Errorf(i18n.T("config.rules.err_parse_config"), err)
 	}
 	root := mappingRoot(&doc)
 	if root == nil {
@@ -466,27 +471,27 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 	dir := filepath.Dir(path)
 	tmp, err := os.CreateTemp(dir, ".mihosh-config-*")
 	if err != nil {
-		return fmt.Errorf("创建临时文件失败: %w", err)
+		return fmt.Errorf(i18n.T("config.file.err_create_temp"), err)
 	}
 	tmpName := tmp.Name()
 	defer os.Remove(tmpName) // Rename 成功后已不存在，忽略错误
 
 	if _, err := tmp.Write(data); err != nil {
 		tmp.Close()
-		return fmt.Errorf("写入临时文件失败: %w", err)
+		return fmt.Errorf(i18n.T("config.file.err_write_temp"), err)
 	}
 	if err := tmp.Sync(); err != nil {
 		tmp.Close()
-		return fmt.Errorf("同步临时文件失败: %w", err)
+		return fmt.Errorf(i18n.T("config.file.err_sync_temp"), err)
 	}
 	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("关闭临时文件失败: %w", err)
+		return fmt.Errorf(i18n.T("config.file.err_close_temp"), err)
 	}
 	if err := os.Chmod(tmpName, perm); err != nil {
-		return fmt.Errorf("设置临时文件权限失败: %w", err)
+		return fmt.Errorf(i18n.T("config.file.err_chmod_temp"), err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {
-		return fmt.Errorf("替换配置文件失败: %w", err)
+		return fmt.Errorf(i18n.T("config.file.err_replace"), err)
 	}
 	return nil
 }

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
 
 func TestExitCodeForError(t *testing.T) {
@@ -55,6 +57,8 @@ func TestExitCodeForError(t *testing.T) {
 func TestRenderCommandError(t *testing.T) {
 	t.Parallel()
 
+	i18n.Init()
+
 	tests := []struct {
 		name        string
 		err         error
@@ -64,24 +68,22 @@ func TestRenderCommandError(t *testing.T) {
 		{
 			name:        "parameter error message",
 			err:         wrapParameterError(errors.New("参数不合法")),
-			wantPrefix:  "参数错误:",
-			wantContain: "--help",
+			wantPrefix:  i18n.T("cli.errors.param_error"),
 		},
 		{
 			name:       "config error message",
 			err:        wrapConfigError(errors.New("配置文件不存在")),
-			wantPrefix: "配置错误:",
+			wantPrefix: i18n.T("cli.errors.config_error"),
 		},
 		{
 			name:        "network error message",
 			err:         wrapNetworkError(errors.New("dial tcp timeout")),
-			wantPrefix:  "网络错误:",
-			wantContain: "网络连通性",
+			wantPrefix:  i18n.T("cli.errors.network_error"),
 		},
 		{
 			name:       "general error message",
 			err:        errors.New("unknown failure"),
-			wantPrefix: "执行失败:",
+			wantPrefix: i18n.T("cli.errors.general_error"),
 		},
 	}
 

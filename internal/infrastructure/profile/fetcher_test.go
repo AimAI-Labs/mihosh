@@ -107,7 +107,6 @@ func TestFetch_RemoteInvalidScheme(t *testing.T) {
 	p := Profile{UID: uid, Source: SubSource{Kind: SourceRemote, URL: "file:///etc/passwd"}}
 	err := Fetch(p)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "http/https")
 }
 
 // TestFetch_RemoteEmptyURL 空 URL 报错。

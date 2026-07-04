@@ -9,6 +9,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/spf13/cobra"
 )
 
@@ -16,13 +17,6 @@ var listOutput string
 
 var listCmd = &cobra.Command{
 	Use:   "list [--output json|table|plain]",
-	Short: "列出所有策略组和节点（支持多种输出格式）",
-	Long: `列出所有策略组及其节点。
-
-可通过 --output 选择输出格式：
-  plain  人类可读文本（默认）
-  table  表格输出
-  json   结构化 JSON 输出`,
 	Example: `  mihosh list
   mihosh list --output table
   mihosh list --output json`,
@@ -34,7 +28,7 @@ var listCmd = &cobra.Command{
 
 		cfg, err := config.Load()
 		if err != nil {
-			return wrapConfigError(fmt.Errorf("加载配置失败: %w", err))
+			return wrapConfigError(fmt.Errorf(i18n.T("cli.list.err_load_config")+": %w", err))
 		}
 
 		client := loadClient(cfg)
@@ -42,23 +36,23 @@ var listCmd = &cobra.Command{
 
 		groups, orderedNames, err := proxySvc.GetGroups()
 		if err != nil {
-			return wrapNetworkError(fmt.Errorf("获取策略组失败: %w", err))
+			return wrapNetworkError(fmt.Errorf(i18n.T("cli.list.err_get_groups")+": %w", err))
 		}
 
 		proxiesMap, err := proxySvc.GetProxies()
 		if err != nil {
-			return wrapNetworkError(fmt.Errorf("获取代理失败: %w", err))
+			return wrapNetworkError(fmt.Errorf(i18n.T("cli.list.err_get_proxies")+": %w", err))
 		}
 
 		if err := renderGroupList(os.Stdout, groups, orderedNames, proxiesMap, format); err != nil {
-			return fmt.Errorf("渲染输出失败: %w", err)
+			return fmt.Errorf(i18n.T("cli.list.err_render")+": %w", err)
 		}
 		return nil
 	},
 }
 
 func init() {
-	listCmd.Flags().StringVar(&listOutput, "output", string(outputFormatPlain), "输出格式: json|table|plain")
+	listCmd.Flags().StringVar(&listOutput, "output", string(outputFormatPlain), "")
 }
 
 func renderGroupList(w io.Writer, groups map[string]model.Group, orderedNames []string, proxiesMap map[string]model.Proxy, format outputFormat) error {
@@ -71,7 +65,7 @@ func renderGroupList(w io.Writer, groups map[string]model.Group, orderedNames []
 		renderGroupListPlain(w, groups, orderedNames, proxiesMap)
 		return nil
 	default:
-		return fmt.Errorf("不支持的输出格式: %s", format)
+		return fmt.Errorf(i18n.T("cli.list.unsupported_format"), format)
 	}
 }
 
@@ -157,10 +151,10 @@ func renderGroupListTable(w io.Writer, groups map[string]model.Group, orderedNam
 }
 
 func renderGroupListPlain(w io.Writer, groups map[string]model.Group, orderedNames []string, proxiesMap map[string]model.Proxy) {
-	fmt.Fprintln(w, "策略组列表:")
+	fmt.Fprintln(w, i18n.T("cli.list.label_groups"))
 	for _, groupName := range resolveGroupOrder(groups, orderedNames) {
 		group := groups[groupName]
-		fmt.Fprintf(w, "\n[%s] %s (当前: %s)\n", group.Type, group.Name, group.Now)
+		fmt.Fprintf(w, "\n[%s] %s (%s: %s)\n", group.Type, group.Name, i18n.T("cli.list.label_current"), group.Now)
 		for _, proxyName := range group.All {
 			proxy, ok := proxiesMap[proxyName]
 			delay := ""

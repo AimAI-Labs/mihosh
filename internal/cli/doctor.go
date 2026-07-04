@@ -14,6 +14,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/gorilla/websocket"
 	"github.com/spf13/cobra"
 )
@@ -24,16 +25,6 @@ var doctorOutput string
 
 var doctorCmd = &cobra.Command{
 	Use:   "doctor [--output json|table|plain]",
-	Short: "检查 Mihosh 配置和 Mihomo 连接健康状态",
-	Long: `检查 Mihosh 配置和 Mihomo 连接健康状态。
-
-连接信息（external-controller/secret/mixed-port）自动从 mihomo 配置文件发现。
-检查项包括：external-controller、secret、代理端口（mixed-port 派生）、Mihomo REST API 可达性、WebSocket 可用性。
-
-可通过 --output 选择输出格式：
-  plain  人类可读文本（默认）
-  table  表格输出
-  json   结构化 JSON 输出`,
 	Example: `  mihosh doctor
   mihosh doctor --output table
   mihosh doctor --output json`,
@@ -49,7 +40,7 @@ var doctorCmd = &cobra.Command{
 				// 使用默认配置以便能继续测试
 				cfg = &config.Config{Timeout: 5}
 			} else {
-				return wrapConfigError(fmt.Errorf("加载配置失败: %w", err))
+				return wrapConfigError(fmt.Errorf(i18n.T("cli.doctor.err_load_config")+": %w", err))
 			}
 		}
 
@@ -57,14 +48,14 @@ var doctorCmd = &cobra.Command{
 		endpoint := config.ResolveMihomoEndpoint()
 		report := runDoctorChecks(cfg, endpoint)
 		if err := renderDoctorReport(os.Stdout, report, format); err != nil {
-			return fmt.Errorf("渲染输出失败: %w", err)
+			return fmt.Errorf(i18n.T("cli.doctor.err_render")+": %w", err)
 		}
 		return doctorErrorForReport(report)
 	},
 }
 
 func init() {
-	doctorCmd.Flags().StringVar(&doctorOutput, "output", string(outputFormatPlain), "输出格式: json|table|plain")
+	doctorCmd.Flags().StringVar(&doctorOutput, "output", string(outputFormatPlain), "")
 }
 
 type doctorStatus string
@@ -220,13 +211,13 @@ func renderDoctorReport(w io.Writer, report doctorReport, format outputFormat) e
 		renderDoctorPlain(w, report)
 		return nil
 	default:
-		return fmt.Errorf("不支持的输出格式: %s", format)
+		return fmt.Errorf(i18n.T("cli.doctor.unsupported_format"), format)
 	}
 }
 
 func renderDoctorPlain(w io.Writer, report doctorReport) {
-	fmt.Fprintf(w, "配置健康检查: %s\n", report.Status)
-	fmt.Fprintf(w, "失败: %d, 警告: %d\n", report.Failed, report.Warnings)
+	fmt.Fprintf(w, "%s: %s\n", i18n.T("cli.doctor.label_health"), report.Status)
+	fmt.Fprintln(w, i18n.Tf("cli.doctor.label_fail_warn", report.Failed, report.Warnings))
 	for _, check := range report.Checks {
 		targetStr := ""
 		if check.Target != "" && check.Target != "-" {
@@ -234,7 +225,7 @@ func renderDoctorPlain(w io.Writer, report doctorReport) {
 		}
 		fmt.Fprintf(w, "[%s] %s%s: %s\n", strings.ToUpper(string(check.Status)), check.Name, targetStr, check.Message)
 		if check.Hint != "" {
-			fmt.Fprintf(w, "      💡 提示: %s\n", check.Hint)
+			fmt.Fprintf(w, "      %s: %s\n", i18n.T("cli.doctor.label_hint"), check.Hint)
 		}
 	}
 }
@@ -256,7 +247,7 @@ func doctorErrorForReport(report doctorReport) error {
 	if report.Failed == 0 {
 		return nil
 	}
-	return wrapNetworkError(fmt.Errorf("健康检查失败: %d 项失败", report.Failed))
+	return wrapNetworkError(fmt.Errorf("%s", i18n.Tf("cli.doctor.err_health_fail", report.Failed)))
 }
 
 func validateDoctorHTTPURL(raw string) error {

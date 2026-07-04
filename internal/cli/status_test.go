@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -93,6 +94,8 @@ func TestRenderStatusPlainAndTable(t *testing.T) {
 		},
 	}
 
+	i18n.Init()
+
 	for _, tt := range []struct {
 		name     string
 		format   outputFormat
@@ -102,11 +105,11 @@ func TestRenderStatusPlainAndTable(t *testing.T) {
 			name:   "plain",
 			format: outputFormatPlain,
 			contains: []string{
-				"模式: direct",
-				"活跃连接数: 3",
-				"上传速率: 1.0 KB/s",
-				"下载速率: 2.0 KB/s",
-				"内存: 4.0 KB / 8.0 KB",
+				i18n.T("cli.status.label_mode") + ": direct",
+				i18n.T("cli.status.label_active_conns") + ": 3",
+				i18n.T("cli.status.label_upload_speed") + ": 1.0 KB/s",
+				i18n.T("cli.status.label_download_speed") + ": 2.0 KB/s",
+				i18n.T("cli.status.label_memory") + ": 4.0 KB / 8.0 KB",
 				"GLOBAL: Proxy -> HK",
 			},
 		},

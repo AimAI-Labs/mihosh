@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -79,6 +80,8 @@ func TestRenderDoctorPlainAndTable(t *testing.T) {
 		},
 	}
 
+	i18n.Init()
+
 	for _, tt := range []struct {
 		name     string
 		format   outputFormat
@@ -88,7 +91,7 @@ func TestRenderDoctorPlainAndTable(t *testing.T) {
 			name:   "plain",
 			format: outputFormatPlain,
 			contains: []string{
-				"配置健康检查: warn",
+				i18n.T("cli.doctor.label_health") + ": warn",
 				"[OK] external_controller",
 				"[WARN] secret",
 				"not configured",

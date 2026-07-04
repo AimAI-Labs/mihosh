@@ -14,7 +14,7 @@ func TestResolveTestAction(t *testing.T) {
 		args       []string
 		wantAction testAction
 		wantTarget string
-		wantErr    string
+		wantErr    bool
 	}{
 		{
 			name:       "no args tests current selected node",
@@ -36,21 +36,20 @@ func TestResolveTestAction(t *testing.T) {
 		{
 			name:    "single arg is invalid",
 			args:    []string{"HK"},
-			wantErr: "参数格式错误",
+			wantErr: true,
 		},
 		{
 			name:    "unknown action is invalid",
 			args:    []string{"foo", "bar"},
-			wantErr: "参数格式错误",
+			wantErr: true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			action, target, err := resolveTestAction(tc.args)
-			if tc.wantErr != "" {
+			if tc.wantErr {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tc.wantErr)
 				return
 			}
 

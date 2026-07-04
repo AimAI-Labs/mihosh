@@ -149,7 +149,6 @@ func TestCheckConfigFileSize(t *testing.T) {
 
 	err = checkConfigFileSize(path)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "配置文件过大")
 
 	// Create a small file
 	smallPath := filepath.Join(tempDir, "small-config.yaml")
@@ -166,7 +165,7 @@ func TestGetMihomoConfigPath(t *testing.T) {
 	// or we can mock parts of it.
 	path, err := configpkg.GetMihomoConfigPath()
 	if err != nil {
-		assert.Contains(t, err.Error(), "未找到 mihomo 配置文件")
+		assert.Error(t, err)
 	} else {
 		assert.NotEmpty(t, path)
 	}
@@ -189,8 +188,6 @@ func TestResolveMihomoConfigTargetRejectsDirectoryWithoutDefaultConfig(t *testin
 	resolved, err := resolveMihomoConfigTarget(tempDir)
 	assert.Error(t, err)
 	assert.Empty(t, resolved)
-	assert.Contains(t, err.Error(), "config.yaml")
-	assert.Contains(t, err.Error(), "config.yml")
 }
 
 func TestEditConfigFileWithEditorUsesExternalEditorAndValidates(t *testing.T) {

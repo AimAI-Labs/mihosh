@@ -7,6 +7,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/spf13/cobra"
 )
@@ -15,13 +16,6 @@ var statusOutput string
 
 var statusCmd = &cobra.Command{
 	Use:   "status [--output json|table|plain]",
-	Short: "查看 Mihomo 当前状态（支持多种输出格式）",
-	Long: `查看当前模式、活动连接数、上下行速率、内存和关键策略组选中节点。
-
-可通过 --output 选择输出格式：
-  plain  人类可读文本（默认）
-  table  表格输出
-  json   结构化 JSON 输出`,
 	Example: `  mihosh status
   mihosh status --output json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -32,41 +26,41 @@ var statusCmd = &cobra.Command{
 
 		cfg, err := config.Load()
 		if err != nil {
-			return wrapConfigError(fmt.Errorf("加载配置失败: %w", err))
+			return wrapConfigError(fmt.Errorf(i18n.T("cli.status.err_load_config")+": %w", err))
 		}
 
 		client := loadClient(cfg)
 
 		configs, err := client.GetConfigs()
 		if err != nil {
-			return wrapNetworkError(fmt.Errorf("获取配置状态失败: %w", err))
+			return wrapNetworkError(fmt.Errorf(i18n.T("cli.status.err_get_configs")+": %w", err))
 		}
 
 		conns, err := client.GetConnections()
 		if err != nil {
-			return wrapNetworkError(fmt.Errorf("获取连接失败: %w", err))
+			return wrapNetworkError(fmt.Errorf(i18n.T("cli.status.err_get_conns")+": %w", err))
 		}
 
 		mem, err := client.GetMemory()
 		if err != nil {
-			return wrapNetworkError(fmt.Errorf("获取内存失败: %w", err))
+			return wrapNetworkError(fmt.Errorf(i18n.T("cli.status.err_get_memory")+": %w", err))
 		}
 
 		proxies, err := client.GetProxies()
 		if err != nil {
-			return wrapNetworkError(fmt.Errorf("获取代理失败: %w", err))
+			return wrapNetworkError(fmt.Errorf(i18n.T("cli.status.err_get_proxies")+": %w", err))
 		}
 
 		snapshot := buildStatusSnapshot(configs.Mode, *conns, *mem, proxies)
 		if err := renderStatus(os.Stdout, snapshot, format); err != nil {
-			return fmt.Errorf("渲染输出失败: %w", err)
+			return fmt.Errorf(i18n.T("cli.status.err_render")+": %w", err)
 		}
 		return nil
 	},
 }
 
 func init() {
-	statusCmd.Flags().StringVar(&statusOutput, "output", string(outputFormatPlain), "输出格式: json|table|plain")
+	statusCmd.Flags().StringVar(&statusOutput, "output", string(outputFormatPlain), "")
 }
 
 type statusSelectedGroup struct {
@@ -134,7 +128,7 @@ func renderStatus(w io.Writer, snapshot statusSnapshot, format outputFormat) err
 		renderStatusPlain(w, snapshot)
 		return nil
 	default:
-		return fmt.Errorf("不支持的输出格式: %s", format)
+		return fmt.Errorf(i18n.T("cli.status.unsupported_format"), format)
 	}
 }
 
@@ -153,16 +147,16 @@ func renderStatusTable(w io.Writer, snapshot statusSnapshot) error {
 }
 
 func renderStatusPlain(w io.Writer, snapshot statusSnapshot) {
-	fmt.Fprintf(w, "模式: %s\n", snapshot.Mode)
-	fmt.Fprintf(w, "活跃连接数: %d\n", snapshot.ActiveConnections)
-	fmt.Fprintf(w, "上传速率: %s/s\n", utils.FormatBytes(snapshot.UploadSpeed))
-	fmt.Fprintf(w, "下载速率: %s/s\n", utils.FormatBytes(snapshot.DownloadSpeed))
-	fmt.Fprintf(w, "内存: %s / %s\n", utils.FormatBytes(snapshot.MemoryInuse), utils.FormatBytes(snapshot.MemoryOSLimit))
+	fmt.Fprintf(w, "%s: %s\n", i18n.T("cli.status.label_mode"), snapshot.Mode)
+	fmt.Fprintf(w, "%s: %d\n", i18n.T("cli.status.label_active_conns"), snapshot.ActiveConnections)
+	fmt.Fprintf(w, "%s: %s/s\n", i18n.T("cli.status.label_upload_speed"), utils.FormatBytes(snapshot.UploadSpeed))
+	fmt.Fprintf(w, "%s: %s/s\n", i18n.T("cli.status.label_download_speed"), utils.FormatBytes(snapshot.DownloadSpeed))
+	fmt.Fprintf(w, "%s: %s / %s\n", i18n.T("cli.status.label_memory"), utils.FormatBytes(snapshot.MemoryInuse), utils.FormatBytes(snapshot.MemoryOSLimit))
 	if len(snapshot.SelectedGroups) == 0 {
 		return
 	}
 
-	fmt.Fprintln(w, "关键策略组:")
+	fmt.Fprintln(w, i18n.T("cli.status.label_selected_groups"))
 	for _, group := range snapshot.SelectedGroups {
 		fmt.Fprintf(w, "  %s: %s\n", group.Name, formatSelectedGroupValue(group))
 	}

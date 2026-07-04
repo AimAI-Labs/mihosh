@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"gopkg.in/yaml.v3"
 )
 
@@ -72,49 +73,49 @@ func fetchBytes(src SubSource) ([]byte, error) {
 
 // fetchRemote 拉取远程 URL。
 func fetchRemote(url string) ([]byte, error) {
-	url = strings.TrimSpace(url)
-	if url == "" {
-		return nil, fmt.Errorf("订阅 URL 不能为空")
+	subURL := strings.TrimSpace(url)
+	if subURL == "" {
+		return nil, fmt.Errorf("%s", i18n.T("profile.fetcher.err_empty_url"))
 	}
-	lower := strings.ToLower(url)
-	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
+
+	if !strings.HasPrefix(subURL, "http://") && !strings.HasPrefix(subURL, "https://") {
 		// 禁止 file:// 等其它协议，防止与 local 混淆绕过。
-		return nil, fmt.Errorf("仅支持 http/https 协议的订阅 URL")
+		return nil, fmt.Errorf("%s", i18n.T("profile.fetcher.err_only_http"))
 	}
 
 	client := &http.Client{Timeout: fetchTimeout}
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(http.MethodGet, subURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造请求失败: %w", err)
+		return nil, fmt.Errorf(i18n.T("profile.fetcher.err_build_req"), err)
 	}
 	req.Header.Set("User-Agent", fetchUserAgent)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("拉取订阅失败: %w", err)
+		return nil, fmt.Errorf(i18n.T("profile.fetcher.err_fetch"), err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("订阅服务器返回非成功状态码: %d", resp.StatusCode)
+		return nil, fmt.Errorf(i18n.T("profile.fetcher.err_status_code"), resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("读取订阅响应失败: %w", err)
+		return nil, fmt.Errorf(i18n.T("profile.fetcher.err_read_resp"), err)
 	}
-	return data, nil
+	return body, nil
 }
 
 // fetchLocal 读取本地文件。
 func fetchLocal(path string) ([]byte, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
-		return nil, fmt.Errorf("本地配置路径不能为空")
+		return nil, fmt.Errorf("%s", i18n.T("profile.fetcher.err_empty_local"))
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("读取本地配置失败: %w", err)
+		return nil, fmt.Errorf(i18n.T("profile.fetcher.err_read_local"), err)
 	}
 	return data, nil
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/spf13/cobra"
 )
@@ -16,13 +17,6 @@ var connectionsOutput string
 
 var connectionsCmd = &cobra.Command{
 	Use:   "connections [--output json|table|plain]",
-	Short: "查看当前连接（支持多种输出格式）",
-	Long: `查看当前活跃连接和流量统计。
-
-可通过 --output 选择输出格式：
-  plain  人类可读文本（默认）
-  table  表格输出
-  json   结构化 JSON 输出`,
 	Example: `  mihosh connections
   mihosh connections --output table
   mihosh connections --output json`,
@@ -34,7 +28,7 @@ var connectionsCmd = &cobra.Command{
 
 		cfg, err := config.Load()
 		if err != nil {
-			return wrapConfigError(fmt.Errorf("加载配置失败: %w", err))
+			return wrapConfigError(fmt.Errorf(i18n.T("cli.connections.err_load_config")+": %w", err))
 		}
 
 		client := loadClient(cfg)
@@ -42,18 +36,18 @@ var connectionsCmd = &cobra.Command{
 
 		conns, err := connSvc.GetConnections()
 		if err != nil {
-			return wrapNetworkError(fmt.Errorf("获取连接失败: %w", err))
+			return wrapNetworkError(fmt.Errorf(i18n.T("cli.connections.err_get_conns")+": %w", err))
 		}
 
 		if err := renderConnections(os.Stdout, *conns, format); err != nil {
-			return fmt.Errorf("渲染输出失败: %w", err)
+			return fmt.Errorf(i18n.T("cli.connections.err_render")+": %w", err)
 		}
 		return nil
 	},
 }
 
 func init() {
-	connectionsCmd.Flags().StringVar(&connectionsOutput, "output", string(outputFormatPlain), "输出格式: json|table|plain")
+	connectionsCmd.Flags().StringVar(&connectionsOutput, "output", string(outputFormatPlain), "")
 }
 
 func renderConnections(w io.Writer, conns model.ConnectionsResponse, format outputFormat) error {
@@ -66,7 +60,7 @@ func renderConnections(w io.Writer, conns model.ConnectionsResponse, format outp
 		renderConnectionsPlain(w, conns)
 		return nil
 	default:
-		return fmt.Errorf("不支持的输出格式: %s", format)
+		return fmt.Errorf(i18n.T("cli.connections.unsupported_format"), format)
 	}
 }
 
@@ -138,10 +132,10 @@ func renderConnectionsTable(w io.Writer, conns model.ConnectionsResponse) error 
 }
 
 func renderConnectionsPlain(w io.Writer, conns model.ConnectionsResponse) {
-	fmt.Fprintf(w, "活跃连接数: %d\n", len(conns.Connections))
-	fmt.Fprintf(w, "上传总量: %s\n", utils.FormatBytes(conns.UploadTotal))
-	fmt.Fprintf(w, "下载总量: %s\n", utils.FormatBytes(conns.DownloadTotal))
-	fmt.Fprintln(w, "\n连接列表:")
+	fmt.Fprintf(w, "%s: %d\n", i18n.T("cli.connections.label_active"), len(conns.Connections))
+	fmt.Fprintf(w, "%s: %s\n", i18n.T("cli.connections.label_upload"), utils.FormatBytes(conns.UploadTotal))
+	fmt.Fprintf(w, "%s: %s\n", i18n.T("cli.connections.label_download"), utils.FormatBytes(conns.DownloadTotal))
+	fmt.Fprintf(w, "\n%s\n", i18n.T("cli.connections.label_list"))
 
 	for _, conn := range conns.Connections {
 		chain := "DIRECT"

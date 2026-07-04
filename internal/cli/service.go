@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/spf13/cobra"
 )
 
@@ -28,14 +29,12 @@ func newServiceCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "service",
-		Short: "管理 mihomo systemd 服务",
-		Long:  "管理 mihomo systemd 服务，并通过 journalctl 查看日志。仅支持 Linux systemd 系统。",
 	}
-	cmd.PersistentFlags().StringVar(&opts.unit, "unit", defaultSystemdUnit, "systemd unit 名称")
+	cmd.PersistentFlags().StringVar(&opts.unit, "unit", defaultSystemdUnit, "")
 
-	cmd.AddCommand(newServiceActionCommand("status", "查看服务状态", false, &opts))
+	cmd.AddCommand(newServiceActionCommand("status", "", false, &opts))
 	for _, action := range []string{"start", "stop", "restart", "enable", "disable"} {
-		cmd.AddCommand(newServiceActionCommand(action, serviceActionShort(action), true, &opts))
+		cmd.AddCommand(newServiceActionCommand(action, "", true, &opts))
 	}
 	cmd.AddCommand(newServiceLogsCommand(&opts))
 
@@ -61,13 +60,13 @@ func newServiceActionCommand(action, short string, sudo bool, opts *serviceOptio
 			unit := normalizeSystemdUnit(opts.unit)
 			if sudo {
 				if err := runSystemCommandFn("sudo", "systemctl", action, unit); err != nil {
-					return wrapGeneralError(fmt.Errorf("执行 sudo systemctl %s 失败: %w", action, err))
+					return wrapGeneralError(fmt.Errorf(i18n.Tf("cli.service.err_systemctl", action)+": %w", err))
 				}
 				return nil
 			}
 
 			if err := runSystemCommandFn("systemctl", action, unit, "--no-pager"); err != nil {
-				return wrapGeneralError(fmt.Errorf("执行 systemctl 失败: %w", err))
+				return wrapGeneralError(fmt.Errorf(i18n.T("cli.service.err_systemctl_status")+": %w", err))
 			}
 			return nil
 		},
@@ -77,14 +76,13 @@ func newServiceActionCommand(action, short string, sudo bool, opts *serviceOptio
 func newServiceLogsCommand(opts *serviceOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logs",
-		Short: "查看服务日志",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := ensureLinuxSystemd(); err != nil {
 				return err
 			}
 			if opts.lines <= 0 {
-				return wrapParameterError(fmt.Errorf("--lines 必须大于 0"))
+				return wrapParameterError(fmt.Errorf("%s", i18n.T("cli.service.logs.err_lines")))
 			}
 
 			unit := normalizeSystemdUnit(opts.unit)
@@ -96,13 +94,13 @@ func newServiceLogsCommand(opts *serviceOptions) *cobra.Command {
 			}
 
 			if err := runSystemCommandFn("journalctl", journalArgs...); err != nil {
-				return wrapGeneralError(fmt.Errorf("执行 journalctl 失败: %w", err))
+				return wrapGeneralError(fmt.Errorf(i18n.T("cli.service.err_journalctl")+": %w", err))
 			}
 			return nil
 		},
 	}
-	cmd.Flags().IntVarP(&opts.lines, "lines", "n", 200, "显示最近 N 行日志")
-	cmd.Flags().BoolVarP(&opts.follow, "follow", "f", false, "持续跟随日志输出")
+	cmd.Flags().IntVarP(&opts.lines, "lines", "n", 200, "")
+	cmd.Flags().BoolVarP(&opts.follow, "follow", "f", false, "")
 	return cmd
 }
 
@@ -119,7 +117,7 @@ func normalizeSystemdUnit(unit string) string {
 
 func ensureLinuxSystemd() error {
 	if !isLinuxSystemdFn() {
-		return wrapGeneralError(fmt.Errorf("service 命令仅支持 Linux systemd 系统"))
+		return wrapGeneralError(fmt.Errorf("%s", i18n.T("cli.service.err_linux_only")))
 	}
 	return nil
 }
@@ -132,19 +130,4 @@ func runSystemCommand(name string, args ...string) error {
 	return cmd.Run()
 }
 
-func serviceActionShort(action string) string {
-	switch action {
-	case "start":
-		return "启动服务"
-	case "stop":
-		return "停止服务"
-	case "restart":
-		return "重启服务"
-	case "enable":
-		return "设置服务开机自启"
-	case "disable":
-		return "取消服务开机自启"
-	default:
-		return action
-	}
-}
+// serviceActionShort is no longer used since strings are localized directly in root.go

@@ -13,8 +13,6 @@ var versionOutput string
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "显示版本信息",
-	Long:  `显示 mihosh 的版本号、提交哈希和构建日期。`,
 	Example: `  mihosh version
   mihosh version --output json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -27,7 +25,7 @@ var versionCmd = &cobra.Command{
 }
 
 func init() {
-	versionCmd.Flags().StringVar(&versionOutput, "output", string(outputFormatPlain), "输出格式: json|plain")
+	versionCmd.Flags().StringVar(&versionOutput, "output", string(outputFormatPlain), "")
 }
 
 func renderVersion(w io.Writer, format outputFormat) error {

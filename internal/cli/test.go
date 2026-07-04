@@ -9,6 +9,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/mattn/go-runewidth"
 	"github.com/spf13/cobra"
 )
@@ -28,13 +29,6 @@ var (
 
 var testCmd = &cobra.Command{
 	Use:   "test [node <节点名> | group <策略组名>] [--output json|table|plain]",
-	Short: "测试节点功能（支持多种输出格式）",
-	Long: `测试当前节点、指定节点或指定策略组。
-
-可通过 --output 选择输出格式：
-  plain  人类可读文本（默认）
-  table  表格输出
-  json   结构化 JSON 输出`,
 	Example: `  mihosh test
   mihosh test --output json
   mihosh test node HK --output table
@@ -54,7 +48,7 @@ var testCmd = &cobra.Command{
 
 		cfg, err := config.Load()
 		if err != nil {
-			return wrapConfigError(fmt.Errorf("加载配置失败: %w", err))
+			return wrapConfigError(fmt.Errorf(i18n.T("cli.test.err_load_config")+": %w", err))
 		}
 
 		client := loadClient(cfg)
@@ -75,7 +69,6 @@ var testCmd = &cobra.Command{
 
 var testGroupCmd = &cobra.Command{
 	Use:    "test-group <group> [--output json|table|plain]",
-	Short:  "[兼容] 测试指定策略组里的所有节点",
 	Hidden: true,
 	Args:   cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -86,7 +79,7 @@ var testGroupCmd = &cobra.Command{
 
 		cfg, err := config.Load()
 		if err != nil {
-			return wrapConfigError(fmt.Errorf("加载配置失败: %w", err))
+			return wrapConfigError(fmt.Errorf(i18n.T("cli.test.err_load_config")+": %w", err))
 		}
 
 		client := loadClient(cfg)
@@ -101,8 +94,8 @@ var testGroupCmd = &cobra.Command{
 }
 
 func init() {
-	testCmd.Flags().StringVar(&testOutput, "output", string(outputFormatPlain), "输出格式: json|table|plain")
-	testGroupCmd.Flags().StringVar(&testGroupOutput, "output", string(outputFormatPlain), "输出格式: json|table|plain")
+	testCmd.Flags().StringVar(&testOutput, "output", string(outputFormatPlain), "")
+	testGroupCmd.Flags().StringVar(&testGroupOutput, "output", string(outputFormatPlain), "")
 }
 
 func resolveTestAction(args []string) (testAction, string, error) {
@@ -119,7 +112,7 @@ func resolveTestAction(args []string) (testAction, string, error) {
 		}
 	}
 
-	return "", "", fmt.Errorf("参数格式错误。请使用：mihosh test | mihosh test node <节点名> | mihosh test group <策略组名>")
+	return "", "", fmt.Errorf("%s", i18n.T("cli.test.err_format"))
 }
 
 func runTestAction(w io.Writer, proxySvc *service.ProxyService, proxyAddress string, action testAction, target string, format outputFormat) error {
@@ -127,7 +120,7 @@ func runTestAction(w io.Writer, proxySvc *service.ProxyService, proxyAddress str
 	case actionCurrent:
 		node, found, err := currentSelectedNode(proxySvc)
 		if err != nil {
-			return fmt.Errorf("获取当前选中节点失败: %w", err)
+			return fmt.Errorf(i18n.T("cli.test.err_get_current")+": %w", err)
 		}
 		if !found {
 			return renderNoCurrentTestOutput(w, format)
@@ -136,17 +129,17 @@ func runTestAction(w io.Writer, proxySvc *service.ProxyService, proxyAddress str
 		// 先验证当前选中节点可测速，再保留原本的链路/IP信息输出格式。
 		_, err = proxySvc.TestProxyDelay(node)
 		if err != nil {
-			return fmt.Errorf("测速失败: %w", err)
+			return fmt.Errorf(i18n.T("cli.test.err_test_delay")+": %w", err)
 		}
 
 		chain, err := proxySvc.GetNodeChain()
 		if err != nil {
-			return fmt.Errorf("获取节点链路失败: %w", err)
+			return fmt.Errorf(i18n.T("cli.test.err_get_chain")+": %w", err)
 		}
 
 		ipInfo, err := proxySvc.GetIPInfo(proxyAddress)
 		if err != nil {
-			return fmt.Errorf("获取 IP 信息失败: %w", err)
+			return fmt.Errorf(i18n.T("cli.test.err_get_ip")+": %w", err)
 		}
 
 		return renderCurrentTestOutput(w, node, chain, ipInfo, format)
@@ -154,18 +147,18 @@ func runTestAction(w io.Writer, proxySvc *service.ProxyService, proxyAddress str
 	case actionNode:
 		delay, err := proxySvc.TestProxyDelay(target)
 		if err != nil {
-			return fmt.Errorf("测速失败: %w", err)
+			return fmt.Errorf(i18n.T("cli.test.err_test_delay")+": %w", err)
 		}
 		return renderNodeTestOutput(w, target, delay, format)
 
 	case actionGroup:
 		if err := proxySvc.TestGroupDelay(target); err != nil {
-			return fmt.Errorf("批量测速失败: %w", err)
+			return fmt.Errorf(i18n.T("cli.test.err_test_group")+": %w", err)
 		}
 		return renderGroupTestOutput(w, target, format)
 	}
 
-	return fmt.Errorf("不支持的测试动作: %s", action)
+	return fmt.Errorf(i18n.T("cli.test.err_unsupported_action"), action)
 }
 
 func renderNoCurrentTestOutput(w io.Writer, format outputFormat) error {
@@ -182,10 +175,10 @@ func renderNoCurrentTestOutput(w io.Writer, format outputFormat) error {
 		fmt.Fprintln(tw, "FOUND\tfalse")
 		return tw.Flush()
 	case outputFormatPlain:
-		fmt.Fprintln(w, "未检测到当前选中的节点")
+		fmt.Fprintln(w, i18n.T("cli.test.no_current_node"))
 		return nil
 	default:
-		return fmt.Errorf("不支持的输出格式: %s", format)
+		return fmt.Errorf(i18n.T("cli.test.unsupported_format"), format)
 	}
 }
 
@@ -213,24 +206,24 @@ func renderCurrentTestOutput(w io.Writer, node string, chain []string, ipInfo *m
 		return tw.Flush()
 	case outputFormatPlain:
 		const contentWidth = 50
-		labels := []string{"节点", "节点链路", "节点 IP", "国家/地区", "城市", "ASN", "组织"}
+		labels := []string{i18n.T("cli.test.label_node"), i18n.T("cli.test.label_chain"), i18n.T("cli.test.label_ip"), i18n.T("cli.test.label_country"), i18n.T("cli.test.label_city"), i18n.T("cli.test.label_asn"), i18n.T("cli.test.label_org")}
 		labelWidth := maxDisplayWidth(labels)
 		if labelWidth < 8 {
 			labelWidth = 8
 		}
 
 		fmt.Fprintln(w, "┌"+strings.Repeat("─", contentWidth+2)+"┐")
-		fmt.Fprintln(w, boxLine("节点", node, labelWidth, contentWidth))
-		fmt.Fprintln(w, boxLine("节点链路", strings.Join(chain, " -> "), labelWidth, contentWidth))
-		fmt.Fprintln(w, boxLine("节点 IP", ipInfo.IP, labelWidth, contentWidth))
-		fmt.Fprintln(w, boxLine("国家/地区", fmt.Sprintf("%s (%s)", ipInfo.Country, ipInfo.CountryCode), labelWidth, contentWidth))
-		fmt.Fprintln(w, boxLine("城市", ipInfo.City, labelWidth, contentWidth))
-		fmt.Fprintln(w, boxLine("ASN", ipInfo.AS, labelWidth, contentWidth))
-		fmt.Fprintln(w, boxLine("组织", ipInfo.Org, labelWidth, contentWidth))
+		fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_node"), node, labelWidth, contentWidth))
+		fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_chain"), strings.Join(chain, " -> "), labelWidth, contentWidth))
+		fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_ip"), ipInfo.IP, labelWidth, contentWidth))
+		fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_country"), fmt.Sprintf("%s (%s)", ipInfo.Country, ipInfo.CountryCode), labelWidth, contentWidth))
+		fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_city"), ipInfo.City, labelWidth, contentWidth))
+		fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_asn"), ipInfo.AS, labelWidth, contentWidth))
+		fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_org"), ipInfo.Org, labelWidth, contentWidth))
 		fmt.Fprintln(w, "└"+strings.Repeat("─", contentWidth+2)+"┘")
 		return nil
 	default:
-		return fmt.Errorf("不支持的输出格式: %s", format)
+		return fmt.Errorf(i18n.T("cli.test.unsupported_format"), format)
 	}
 }
 
@@ -250,10 +243,10 @@ func renderNodeTestOutput(w io.Writer, node string, delay int, format outputForm
 		fmt.Fprintf(tw, "DELAY_MS\t%d\n", delay)
 		return tw.Flush()
 	case outputFormatPlain:
-		fmt.Fprintf(w, "✓ 节点 '%s' 延迟: %dms\n", node, delay)
+		fmt.Fprintln(w, i18n.Tf("cli.test.success_node", node, delay))
 		return nil
 	default:
-		return fmt.Errorf("不支持的输出格式: %s", format)
+		return fmt.Errorf(i18n.T("cli.test.unsupported_format"), format)
 	}
 }
 
@@ -273,10 +266,10 @@ func renderGroupTestOutput(w io.Writer, group string, format outputFormat) error
 		fmt.Fprintln(tw, "STATUS\tcompleted")
 		return tw.Flush()
 	case outputFormatPlain:
-		fmt.Fprintf(w, "✓ 策略组 '%s' 测速完成\n", group)
+		fmt.Fprintln(w, i18n.Tf("cli.test.success_group", group))
 		return nil
 	default:
-		return fmt.Errorf("不支持的输出格式: %s", format)
+		return fmt.Errorf(i18n.T("cli.test.unsupported_format"), format)
 	}
 }
 

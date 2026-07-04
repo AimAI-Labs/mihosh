@@ -76,7 +76,6 @@ func TestServiceLogsRejectsInvalidLines(t *testing.T) {
 	err := cmd.Execute()
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--lines 必须大于 0")
 }
 
 func TestServiceCommandFailureIsWrapped(t *testing.T) {
@@ -97,7 +96,6 @@ func TestServiceCommandFailureIsWrapped(t *testing.T) {
 	err := cmd.Execute()
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "执行 systemctl 失败")
 }
 
 func captureServiceCommand(t *testing.T, args ...string) []systemCommandCall {

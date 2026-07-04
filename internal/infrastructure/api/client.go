@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
 
 // Client mihomo API 客户端
@@ -103,7 +104,7 @@ func (c *Client) doRawRequest(method, path string, body interface{}) (*http.Resp
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		return nil, fmt.Errorf("API 请求失败: %s - %s", resp.Status, string(bodyBytes))
+		return nil, fmt.Errorf("%s", i18n.Tf("api.client.err_request_failed", resp.Status, string(bodyBytes)))
 	}
 
 	return resp, nil

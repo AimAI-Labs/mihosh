@@ -78,36 +78,12 @@ func proxyHintStyle() lipgloss.Style {
 
 var proxyOnCmd = &cobra.Command{
 	Use:   "on",
-	Short: "在当前终端开启代理",
-	Long: `输出在当前终端开启代理所需的 bash/zsh 语句（写到 stdout）。
-
-子进程无法直接修改父 Shell 的环境变量，因此请用 eval 执行输出：
-
-  eval "$(mihosh on)"
-
-默认代理地址由 mihomo 配置文件的 mixed-port 派生（http://127.0.0.1:<mixed-port>），
-如需修改请在 mihomo 配置中调整 mixed-port。
-设置的环境变量：HTTP_PROXY / HTTPS_PROXY / ALL_PROXY（大小写各一组）+ no_proxy。
-若当前终端已开启代理，会给出友好提示。
-
-仅支持 bash / zsh（Linux 与 macOS）。`,
 	Example: `  eval "$(mihosh on)"`,
 	RunE:    runProxyOn,
 }
 
 var proxyOffCmd = &cobra.Command{
 	Use:   "off",
-	Short: "在当前终端关闭代理",
-	Long: `输出在当前终端关闭代理所需的 bash/zsh 语句（写到 stdout）。
-
-子进程无法直接修改父 Shell 的环境变量，因此请用 eval 执行输出：
-
-  eval "$(mihosh off)"
-
-会清除 HTTP_PROXY / HTTPS_PROXY / ALL_PROXY / no_proxy（大小写各一组）。
-若当前终端未开启代理，会给出友好提示。
-
-仅支持 bash / zsh（Linux 与 macOS）。`,
 	Example: `  eval "$(mihosh off)"`,
 	RunE:    runProxyOff,
 }
@@ -117,7 +93,7 @@ func runProxyOn(cmd *cobra.Command, args []string) error {
 	// 先确保配置目录存在（首次运行）：on 是"开关"型命令，不应因缺配置卡住。
 	if _, err := config.Load(); err != nil {
 		if !errors.Is(err, config.ErrConfigNotFound) {
-			return wrapConfigError(fmt.Errorf(i18n.T("cli.root.err_load_config")+": %w", err))
+			return wrapConfigError(fmt.Errorf(i18n.T("cli.proxy.err_load_config")+": %w", err))
 		}
 	}
 
