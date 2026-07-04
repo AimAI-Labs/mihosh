@@ -453,9 +453,9 @@ func TestAddForm_PickerTabSwitch(t *testing.T) {
 func TestAddForm_PickerEscClosesKeepsSelection(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
 	s, _ = s.Update(keyMsg('n'), nil)
-	s, _ = s.Update(pressTab(), nil) // → proxy
+	s, _ = s.Update(pressTab(), nil)        // → proxy
 	s, _ = s.Update(pressKey("enter"), nil) // open picker
-	s, _ = s.Update(pressKey("esc"), nil) // close picker
+	s, _ = s.Update(pressKey("esc"), nil)   // close picker
 	if s.addForm.isProxyPickerOpen() {
 		t.Fatal("expected picker closed after Esc")
 	}

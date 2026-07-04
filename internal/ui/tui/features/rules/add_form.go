@@ -107,8 +107,8 @@ type addForm struct {
 	noResolve bool
 
 	// 编辑模式：isEdit=true 时表示修改已有规则
-	isEdit      bool       // 是否为编辑模式
-	editOrigin  editOrigin // 原始规则信息（仅编辑模式有意义）
+	isEdit     bool       // 是否为编辑模式
+	editOrigin editOrigin // 原始规则信息（仅编辑模式有意义）
 
 	errMsg string // 行内校验/写入错误
 }
@@ -201,8 +201,6 @@ func newFormWithRule(configPath string, rule model.Rule, origIndex int, isEdit b
 	form.focusCurrent()
 	return form
 }
-
-
 
 // indexOfPreset 在 ruleTypePresets 中查找（不区分大小写）；未命中返回 0。
 func indexOfPreset(name string) int {
