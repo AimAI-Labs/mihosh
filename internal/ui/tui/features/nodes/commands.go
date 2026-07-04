@@ -1,10 +1,10 @@
 package nodes
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/app/service" // Need for testAllProxies
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
-	"github.com/AimAI-Labs/mihosh/internal/app/service" // Need for testAllProxies
 	tea "github.com/charmbracelet/bubbletea"
 )
 

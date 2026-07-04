@@ -38,16 +38,16 @@ type HelpContext struct {
 
 	// 节点页子状态
 	NodesTestDetail bool // 测速结果详情弹窗
-	NodesFilterMode    bool // 搜索输入
+	NodesFilterMode bool // 搜索输入
 
 	// 日志页子状态
 	LogsDetail bool // 日志详情弹窗
 	LogsFilter bool // 过滤输入
 
 	// 规则页子状态
-	RulesTypeFilter     bool // 类型筛选弹窗
-	RulesFilter         bool // 过滤输入
-	RulesDeleteConfirm  bool // 删除确认弹窗
+	RulesTypeFilter    bool // 类型筛选弹窗
+	RulesFilter        bool // 过滤输入
+	RulesDeleteConfirm bool // 删除确认弹窗
 	RulesEditForm      bool // 编辑规则弹窗
 
 	// 订阅页子状态
@@ -284,7 +284,7 @@ func buildRulesSections(ctx HelpContext) []section {
 			},
 		}}
 	}
-	
+
 	if ctx.RulesEditForm {
 		return []section{
 			{

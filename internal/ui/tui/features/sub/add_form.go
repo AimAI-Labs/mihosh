@@ -68,9 +68,9 @@ func (f addForm) currentKind() profile.SourceKind {
 	return profile.SourceLocal
 }
 
-func (f addForm) isNameField() bool   { return f.fieldCursor == addFieldName }
-func (f addForm) isKindField() bool   { return f.fieldCursor == addFieldKind }
-func (f addForm) isSrcField() bool    { return f.fieldCursor == addFieldSrc }
+func (f addForm) isNameField() bool { return f.fieldCursor == addFieldName }
+func (f addForm) isKindField() bool { return f.fieldCursor == addFieldKind }
+func (f addForm) isSrcField() bool  { return f.fieldCursor == addFieldSrc }
 
 // cycleField 按方向循环切换字段。
 func (f *addForm) cycleField(dir int) {

@@ -12,10 +12,10 @@ import (
 )
 
 const (
-	logsFixedLines     = 10 // 级别栏(3) + 间距(1) + 搜索框(1) + 间距(1) + 统计(1) + 间隔(1) + 底部(2)
-	logsMinHeight      = 5
-	logsDefaultPadding = 20
-	logsLevelWidth     = 8
+	logsFixedLines       = 10 // 级别栏(3) + 间距(1) + 搜索框(1) + 间距(1) + 统计(1) + 间隔(1) + 底部(2)
+	logsMinHeight        = 5
+	logsDefaultPadding   = 20
+	logsLevelWidth       = 8
 	logsModeSwitchHeight = 3 // 级别栏边框高度
 )
 
@@ -116,7 +116,6 @@ func RenderLogsPage(state PageState) string {
 	}
 
 	return renderLogsInlineHelp(base, state)
-
 
 }
 

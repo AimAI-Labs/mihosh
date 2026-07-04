@@ -197,7 +197,7 @@ func renderConnectionListTab(state PageState, content []string) string {
 		if detailHeight < 5 {
 			detailHeight = 5
 		}
-		
+
 		maxDisplay -= detailHeight
 		if maxDisplay < 3 {
 			maxDisplay = 3

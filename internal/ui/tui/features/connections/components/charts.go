@@ -212,13 +212,20 @@ func invertSparkline(view string) string {
 	mapped := strings.Join(lines, "\n")
 	return strings.Map(func(r rune) rune {
 		switch r {
-		case '\u2581': return '\u2594' //  
-		case '\u2582': return '\u2594' // ▂
-		case '\u2583': return '\u2580' // ▃
-		case '\u2584': return '\u2580' // ▄
-		case '\u2585': return '\u2580' // ▅
-		case '\u2586': return '\u2588' // ▆
-		case '\u2587': return '\u2588' // ▇
+		case '\u2581':
+			return '\u2594' //
+		case '\u2582':
+			return '\u2594' // ▂
+		case '\u2583':
+			return '\u2580' // ▃
+		case '\u2584':
+			return '\u2580' // ▄
+		case '\u2585':
+			return '\u2580' // ▅
+		case '\u2586':
+			return '\u2588' // ▆
+		case '\u2587':
+			return '\u2588' // ▇
 		}
 		return r
 	}, mapped)

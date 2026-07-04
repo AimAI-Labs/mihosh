@@ -1,12 +1,13 @@
 package nodes
 
 import (
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"fmt"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
@@ -37,10 +38,10 @@ const (
 type ProxySortOrder int
 
 const (
-	SortOrderOriginal ProxySortOrder = iota // 默认顺序
-	SortOrderNameAsc                        // A-Z 升序
-	SortOrderDelayAsc                       // 延迟升序
-	SortOrderAvailable                      // 可用性过滤
+	SortOrderOriginal  ProxySortOrder = iota // 默认顺序
+	SortOrderNameAsc                         // A-Z 升序
+	SortOrderDelayAsc                        // 延迟升序
+	SortOrderAvailable                       // 可用性过滤
 )
 
 var sortOrderLabels = []string{"默认顺序", "按名称排序", "按延迟排序", "仅可用节点"}
@@ -72,10 +73,10 @@ type State struct {
 	TestAllTotal   int
 	TestAllDone    int
 	// Ring Buffer for test results (success + failure)
-	TestResultsArr [testResultCap]TestResultEntry
-	resultHead     int // 写入位置
-	resultCount    int // 已写入总数（上限 testResultCap）
-	ShowTestDetail bool
+	TestResultsArr  [testResultCap]TestResultEntry
+	resultHead      int // 写入位置
+	resultCount     int // 已写入总数（上限 testResultCap）
+	ShowTestDetail  bool
 	DetailScrollTop int
 	// 排序
 	ProxySortOrder  ProxySortOrder
@@ -86,7 +87,7 @@ type State struct {
 	FilterEngine         FilterEngine
 	FilteredProxyIndices []int // 过滤结果的索引缓存（对应 CurrentProxies 的下标）
 	// 鼠标
-	MouseFocus      nodesMouseFocus
+	MouseFocus          nodesMouseFocus
 	doubleClickDetector common.DoubleClickDetector[MouseTarget]
 }
 
@@ -425,7 +426,6 @@ func (s *State) updateFilteredProxies() {
 	}
 }
 
-
 // HandleMouseLeft 处理 nodes 页面左键单击/双击
 func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *api.Client) (State, tea.Cmd) {
 	if s.ShowTestDetail {
@@ -523,8 +523,6 @@ func (s *State) applyGroupSelection(groupIdx int) {
 		s.GroupScrollTop = s.SelectedGroup
 	}
 }
-
-
 
 // HandleMouseScroll 处理鼠标滚轮（弹窗打开时控制弹窗滚动，否则根据鼠标位置或焦点控制列表滚动）
 func (s State) HandleMouseScroll(up bool, pageX, pageY, pageWidth, pageHeight int) State {

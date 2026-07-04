@@ -50,8 +50,8 @@ func TestNodesState_ApplyTestDone_AdvancesBatchTarget(t *testing.T) {
 
 func TestNodesState_DetailModalSupportsHomeAndEnd(t *testing.T) {
 	state := State{
-		ShowTestDetail: true,
-		DetailScrollTop:  5,
+		ShowTestDetail:  true,
+		DetailScrollTop: 5,
 	}
 
 	homeMsg := tea.KeyMsg{Type: tea.KeyHome}

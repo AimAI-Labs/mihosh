@@ -208,7 +208,7 @@ func TestHandleMouseLeft_ClickLogLevelRowSets(t *testing.T) {
 	}
 	configSvc := service.NewConfigService()
 
-	// "warning" is the second tab. 
+	// "warning" is the second tab.
 	// info tab width = 4 + 4 = 8. + 1 (separator) = 9
 	warningTabX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth + 9 + 1
 	next, _, cmd := state.HandleMouseLeft(warningTabX, logLevelRowY, 100, 30, &config.Config{}, configSvc, nil)

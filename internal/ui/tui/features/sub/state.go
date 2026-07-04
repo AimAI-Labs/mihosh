@@ -441,4 +441,3 @@ func (s *State) updateFiltered() {
 		s.filteredIdx = append(s.filteredIdx, i)
 	}
 }
-

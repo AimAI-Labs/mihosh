@@ -403,7 +403,7 @@ func TestConnsHandleMouseLeft_ClickTabClosesDetail(t *testing.T) {
 	if !ok {
 		t.Fatalf("failed to locate history tab mouse point")
 	}
-	
+
 	next, cmd := state.HandleMouseLeft(x, y, width, height, nil, 3000)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd when closing detail by tab click")

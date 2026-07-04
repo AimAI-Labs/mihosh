@@ -64,11 +64,11 @@ type PageState struct {
 
 	MihomoVersion string
 
-	ActiveTab      int
-	MihomoConfig   *model.MihomoConfig
-	MihomoLoaded   bool
-	MihomoLoadErr  error
-	MihomoFromFile bool // API 不可达时从 YAML 降级读取
+	ActiveTab         int
+	MihomoConfig      *model.MihomoConfig
+	MihomoLoaded      bool
+	MihomoLoadErr     error
+	MihomoFromFile    bool // API 不可达时从 YAML 降级读取
 	IsCoreUpgrading   bool
 	IsCoreRestarting  bool
 	IsConfigReloading bool
@@ -185,7 +185,7 @@ func buildSettingsLayoutBase(state PageState, width int) (parts []string, descRo
 			}
 			rowStrings = append(rowStrings, lipgloss.JoinHorizontal(lipgloss.Left, rowNodes...))
 		}
-		
+
 		actionsBody := "\n" + strings.Join(rowStrings, "\n\n") + "\n"
 		actionsPanel = lipgloss.NewStyle().MarginTop(1).Render(common.RenderTokyoPanel(i18n.T("settings.action.panel_title"), actionsBody, width))
 	}
@@ -673,4 +673,3 @@ func overlayToast(page, toast string, width int) string {
 
 	return strings.Join(pageLines, "\n")
 }
-

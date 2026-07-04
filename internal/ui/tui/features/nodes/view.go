@@ -20,27 +20,27 @@ const (
 
 // PageState 节点页面状态（由 Model 传入）
 type PageState struct {
-	Mode              string
-	Groups            map[string]model.Group
-	Proxies           map[string]model.Proxy
-	GroupNames        []string
-	SelectedGroup     int
-	SelectedProxy     int
-	CurrentProxies    []string
-	Testing           bool
-	TestingTarget     string
-	TestResults       []TestResultEntry
-	ShowTestDetail    bool     // 是否显示测速结果弹窗
-	DetailScrollTop   int      // 测速结果弹窗滚动偏移
-	SortOrderLabels   []string // 排序选项文本
-	CurrentSortOrder  int      // 当前排序模式
-	Width             int
-	Height            int    // 终端高度
-	GroupScrollTop    int    // 策略组列表滚动偏移
-	ProxyScrollTop    int    // 节点列表滚动偏移
-	FilterText        string // 节点搜索关键词
-	FilterMode        bool   // 是否处于搜索输入模式
-	FilterEngine      FilterEngine
+	Mode             string
+	Groups           map[string]model.Group
+	Proxies          map[string]model.Proxy
+	GroupNames       []string
+	SelectedGroup    int
+	SelectedProxy    int
+	CurrentProxies   []string
+	Testing          bool
+	TestingTarget    string
+	TestResults      []TestResultEntry
+	ShowTestDetail   bool     // 是否显示测速结果弹窗
+	DetailScrollTop  int      // 测速结果弹窗滚动偏移
+	SortOrderLabels  []string // 排序选项文本
+	CurrentSortOrder int      // 当前排序模式
+	Width            int
+	Height           int    // 终端高度
+	GroupScrollTop   int    // 策略组列表滚动偏移
+	ProxyScrollTop   int    // 节点列表滚动偏移
+	FilterText       string // 节点搜索关键词
+	FilterMode       bool   // 是否处于搜索输入模式
+	FilterEngine     FilterEngine
 }
 
 // displayWidth 委托给 common.DisplayWidth
@@ -178,8 +178,6 @@ func clampToLines(content string, h int) string {
 	}
 	return strings.Join(lines, "\n")
 }
-
-
 
 // buildTestResultModal 构建测速结果详情弹窗字符串
 func buildTestResultModal(state PageState) string {

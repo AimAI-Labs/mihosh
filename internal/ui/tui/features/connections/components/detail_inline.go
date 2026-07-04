@@ -29,7 +29,7 @@ func RenderConnectionDetailInline(conn *model.Connection, width, height int, foc
 	if len(conn.Chains) > 0 {
 		chain = strings.Join(conn.Chains, " → ")
 	}
-	
+
 	outbound := "DIRECT"
 	if len(conn.Chains) > 0 {
 		outbound = conn.Chains[0]
@@ -56,7 +56,7 @@ func RenderConnectionDetailInline(conn *model.Connection, width, height int, foc
 			return baseStyle.Foreground(common.TokyoForeground()).Width(width - 4 - 12 - 3)
 		}).
 		Rows(topRows...)
-	
+
 	topContent := topTable.Render()
 
 	// 2. 抽离所有连接都有的公共字段（按照逻辑分组排序）
@@ -105,14 +105,14 @@ func RenderConnectionDetailInline(conn *model.Connection, width, height int, foc
 	for i := 0; i < cols; i++ {
 		colRows = append(colRows, [][]string{})
 	}
-	
+
 	// 分配公共字段（手动指定语义化的分组，确保在三列时地址信息独占第三列）
 	var commonRowsPerCol int
 	if cols == 3 {
-		colRows[0] = append(colRows[0], commonRows[0:4]...) // 基础信息：Network, Type, Rule, Outbound
-		colRows[1] = append(colRows[1], commonRows[4:7]...) // 流量速度：Duration, Traffic, Speed
+		colRows[0] = append(colRows[0], commonRows[0:4]...)  // 基础信息：Network, Type, Rule, Outbound
+		colRows[1] = append(colRows[1], commonRows[4:7]...)  // 流量速度：Duration, Traffic, Speed
 		colRows[2] = append(colRows[2], commonRows[7:11]...) // 地址信息：SrcIP, SrcPort, DstIP, DstPort
-		commonRowsPerCol = 4 // 三列时的最大行数
+		commonRowsPerCol = 4                                 // 三列时的最大行数
 	} else if cols == 2 {
 		colRows[0] = append(colRows[0], commonRows[0:6]...)
 		colRows[1] = append(colRows[1], commonRows[6:11]...)
@@ -144,7 +144,7 @@ func RenderConnectionDetailInline(conn *model.Connection, width, height int, foc
 	// 渲染多列表格并水平拼接
 	var renderedCols []string
 	colW := (width - 4) / cols
-	
+
 	for i := 0; i < cols; i++ {
 		// 计算每一列的 key 和 val 宽度
 		contentWidth := colW
@@ -167,7 +167,7 @@ func RenderConnectionDetailInline(conn *model.Connection, width, height int, foc
 				return baseStyle.Foreground(common.TokyoForeground()).Width(valW)
 			}).
 			Rows(colRows[i]...)
-		
+
 		renderedCols = append(renderedCols, t.Render())
 	}
 
@@ -182,7 +182,7 @@ func RenderConnectionDetailInline(conn *model.Connection, width, height int, foc
 
 	// 处理滚动
 	fullLines := strings.Split(fullBody, "\n")
-	
+
 	maxScroll := len(fullLines) - targetRows
 	if maxScroll < 0 {
 		maxScroll = 0
@@ -203,9 +203,9 @@ func RenderConnectionDetailInline(conn *model.Connection, width, height int, foc
 	} else {
 		visibleLines = fullLines[scrollOffset : scrollOffset+targetRows]
 	}
-	
+
 	body := strings.Join(visibleLines, "\n")
-	
+
 	borderColor := common.TokyoMuted()
 	if focused {
 		borderColor = common.TokyoBlue()
@@ -213,6 +213,6 @@ func RenderConnectionDetailInline(conn *model.Connection, width, height int, foc
 
 	// 最后加上整体边框（标题：Connection Detail）
 	content := common.RenderBorderedPanel(i18n.T("conns.detail.title"), body, width, borderColor, common.TokyoBlue())
-	
+
 	return content
 }

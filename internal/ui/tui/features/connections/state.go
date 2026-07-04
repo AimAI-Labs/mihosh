@@ -20,8 +20,8 @@ const (
 	ConnViewActive  = 1 // 活跃连接
 	ConnViewHistory = 2 // 历史连接
 
-	connsChartDoubleClickMax  = 650 * time.Millisecond
-	connsTopNDefaultCount     = 5
+	connsChartDoubleClickMax = 650 * time.Millisecond
+	connsTopNDefaultCount    = 5
 )
 
 // State 连接页面完整状态
@@ -29,11 +29,11 @@ type State struct {
 	Connections *model.ConnectionsResponse
 	PrevConnIDs map[string]model.Connection
 	// Ring Buffer for closed connections
-	closedConns [common.ClosedConnCap]model.Connection
-	closedTimes [common.ClosedConnCap]time.Time // 新增：记录关闭时间
-	closedHead  int                             // 写入位置（下一条写入的索引）
-	closedCount int                             // 已写入的总条数（上限 ClosedConnCap）
-	cachedClosedConns []model.Connection        // 缓存的已关闭连接列表
+	closedConns       [common.ClosedConnCap]model.Connection
+	closedTimes       [common.ClosedConnCap]time.Time // 新增：记录关闭时间
+	closedHead        int                             // 写入位置（下一条写入的索引）
+	closedCount       int                             // 已写入的总条数（上限 ClosedConnCap）
+	cachedClosedConns []model.Connection              // 缓存的已关闭连接列表
 
 	selectedConn            int
 	connScrollTop           int
@@ -44,9 +44,9 @@ type State struct {
 	connIPInfo              *model.IPInfo
 	connDetailLeftScroll    int
 	connDetailRightScroll   int
-	connDetailFocusPanel    int // 0=左侧(基础+地理), 1=右侧(JSON)
-	connDetailJSONLineCount int // JSON行数缓存，用于滚动上限约束
-	connViewMode            int // 0=流量监控, 1=活跃, 2=历史
+	connDetailFocusPanel    int  // 0=左侧(基础+地理), 1=右侧(JSON)
+	connDetailJSONLineCount int  // JSON行数缓存，用于滚动上限约束
+	connViewMode            int  // 0=流量监控, 1=活跃, 2=历史
 	inlineDetailMode        bool // 新增：内联详情模式
 	inlineDetailFocused     bool
 	inlineDetailScroll      int
@@ -498,7 +498,7 @@ func (s State) HandleMouseLeft(
 			s.inlineDetailFocused = false
 		}
 		return s, nil
-		
+
 	case MouseTargetInlineDetail:
 		s.inlineDetailFocused = true
 		return s, nil
@@ -618,8 +618,6 @@ func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight in
 
 	return s, nil
 }
-
-
 
 // ApplyWSConnections 处理 WebSocket 连接推送（含历史记录检测）
 func (s State) ApplyWSConnections(data api.ConnectionsData) State {

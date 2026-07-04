@@ -1,8 +1,9 @@
 package tui
 
 import (
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
 	"context"
+
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 
@@ -101,7 +102,3 @@ func listenWSMessages(ctx context.Context, msgChan chan interface{}) tea.Cmd {
 		}
 	}
 }
-
-
-
-

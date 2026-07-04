@@ -20,12 +20,12 @@ func TestRenderLogsPage_LongLogLine_NoTruncationOverflow(t *testing.T) {
 		FilteredLogIndices: []int{0},
 		LogLevel:           0,
 		FilterText:         "",
-		FilterMode:        false,
+		FilterMode:         false,
 		SelectedLog:        0,
 		ScrollTop:          0,
 		HScrollOffset:      0,
-		Width:             80,
-		Height:            24,
+		Width:              80,
+		Height:             24,
 	}
 
 	result := RenderLogsPage(state)
@@ -54,12 +54,12 @@ func TestRenderLogsPage_WithHorizontalScroll(t *testing.T) {
 		FilteredLogIndices: []int{0},
 		LogLevel:           0,
 		FilterText:         "",
-		FilterMode:        false,
+		FilterMode:         false,
 		SelectedLog:        0,
 		ScrollTop:          0,
 		HScrollOffset:      50,
-		Width:             80,
-		Height:            24,
+		Width:              80,
+		Height:             24,
 	}
 
 	result := RenderLogsPage(state)
@@ -138,12 +138,12 @@ func TestRenderLogsPage_VariousWindowSizes_ContentWidth(t *testing.T) {
 			FilteredLogIndices: []int{0, 1},
 			LogLevel:           0,
 			FilterText:         "",
-			FilterMode:        false,
+			FilterMode:         false,
 			SelectedLog:        0,
 			ScrollTop:          0,
 			HScrollOffset:      0,
-			Width:             width,
-			Height:            24,
+			Width:              width,
+			Height:             24,
 		}
 
 		result := RenderLogsPage(state)

@@ -46,11 +46,11 @@ type State struct {
 	mihomoVersion string
 	versionLoaded bool
 
-	activeTab      int // 0=Mihosh, 1=Mihomo
-	mihomoConfig   *model.MihomoConfig
-	mihomoLoaded   bool
-	mihomoLoadErr  error
-	mihomoFromFile bool // API 不可达时从 YAML 文件降级读取
+	activeTab         int // 0=Mihosh, 1=Mihomo
+	mihomoConfig      *model.MihomoConfig
+	mihomoLoaded      bool
+	mihomoLoadErr     error
+	mihomoFromFile    bool // API 不可达时从 YAML 文件降级读取
 	IsCoreUpgrading   bool
 	IsCoreRestarting  bool
 	IsConfigReloading bool
@@ -119,18 +119,18 @@ func (s State) ToPageState(cfg *config.Config, sysLogs []model.LogEntry) PageSta
 		s.toastManager = common.NewToastManager()
 	}
 	return PageState{
-		Config:          cfg,
-		SelectedSetting: s.selectedSetting,
-		EditMode:        s.editMode,
-		EditValue:       s.editValue,
-		EditCursor:      s.editCursor,
-		Toast:           s.toastManager,
-		MihomoVersion:   s.mihomoVersion,
-		ActiveTab:       s.activeTab,
-		MihomoConfig:    s.mihomoConfig,
-		MihomoLoaded:    s.mihomoLoaded,
-		MihomoLoadErr:   s.mihomoLoadErr,
-		MihomoFromFile:  s.mihomoFromFile,
+		Config:            cfg,
+		SelectedSetting:   s.selectedSetting,
+		EditMode:          s.editMode,
+		EditValue:         s.editValue,
+		EditCursor:        s.editCursor,
+		Toast:             s.toastManager,
+		MihomoVersion:     s.mihomoVersion,
+		ActiveTab:         s.activeTab,
+		MihomoConfig:      s.mihomoConfig,
+		MihomoLoaded:      s.mihomoLoaded,
+		MihomoLoadErr:     s.mihomoLoadErr,
+		MihomoFromFile:    s.mihomoFromFile,
 		IsCoreUpgrading:   s.IsCoreUpgrading,
 		IsCoreRestarting:  s.IsCoreRestarting,
 		IsConfigReloading: s.IsConfigReloading,
@@ -233,9 +233,9 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *con
 
 		actionsPanelTop := 4 + settingsPanelHeight + 1
 		rows := LayoutActionButtons(pageWidth)
-		
+
 		for i := 0; i < len(rows); i++ {
-			if pageY == actionsPanelTop + 2 + i*2 {
+			if pageY == actionsPanelTop+2+i*2 {
 				row := rows[i]
 				cur := 2 // Left border "│ " occupies 2 chars
 				for _, btn := range row {
@@ -648,7 +648,6 @@ func resolveMouseSettingIndex(s State, pageY int) int {
 	return settingIdx
 }
 
-
 // resolveSettingsTabMouseTarget 解析标签栏内容行的鼠标点击目标。
 // 标签栏带圆角边框：│[tab0]│[tab1]│...，第一个标签从 settingsContainerLeft+1 开始。
 // 返回 (tabIndex, true) 表示命中某个标签；否则返回 (0, false)。
@@ -673,7 +672,6 @@ func resolveSettingsTabMouseTarget(pageX int) (int, bool) {
 
 	return 0, false
 }
-
 
 func nextLanguage(lang string) string {
 	langs := []string{"auto", "zh-CN", "en-US"}
@@ -848,7 +846,6 @@ func (s State) getEditValue(cfg *config.Config, settingKey string) string {
 	return GetSettingValue(s.ToPageState(cfg, nil), settingKey)
 }
 
-
 // Core Actions
 func UpgradeCoreCmd(client *api.Client, channel string) tea.Cmd {
 	return func() tea.Msg {
@@ -934,4 +931,3 @@ func (s State) SyncSysStatus(width, height int, cfg *config.Config, sysLogs []mo
 
 	return s
 }
-

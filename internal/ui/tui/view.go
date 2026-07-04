@@ -123,14 +123,14 @@ func (m Model) buildHelpContext() help.HelpContext {
 		NodesFilterMode:    m.nodesState.NodeFilterMode,
 		LogsDetail:         m.logsState.DetailMode(),
 		LogsFilter:         m.logsState.FilterMode(),
-		RulesTypeFilter:     m.rulesState.ShowTypeFilter(),
-		RulesFilter:         m.rulesState.FilterMode(),
-		RulesDeleteConfirm:  m.rulesState.ShowDeleteConfirm(),
-		RulesEditForm:       m.rulesState.ShowEditForm(),
-		SubMode:             m.subState.Mode(),
-		SettingsEdit:        m.settingsState.IsEditing(),
-		SettingsLanguage:    m.settingsState.IsLanguageSelected(),
-		SettingsTheme:       m.settingsState.IsThemeSelected(),
+		RulesTypeFilter:    m.rulesState.ShowTypeFilter(),
+		RulesFilter:        m.rulesState.FilterMode(),
+		RulesDeleteConfirm: m.rulesState.ShowDeleteConfirm(),
+		RulesEditForm:      m.rulesState.ShowEditForm(),
+		SubMode:            m.subState.Mode(),
+		SettingsEdit:       m.settingsState.IsEditing(),
+		SettingsLanguage:   m.settingsState.IsLanguageSelected(),
+		SettingsTheme:      m.settingsState.IsThemeSelected(),
 	}
 }
 
@@ -171,7 +171,7 @@ func overlayErrorPopup(base string, width, height int, errText string) string {
 	contentWidth := popupWidth - 4 // border 2 + padding 2
 	wrappedErr := lipgloss.NewStyle().Width(contentWidth).Render(errText)
 	errLines := strings.Split(wrappedErr, "\n")
-	
+
 	maxLines := height * 60 / 100
 	if maxLines < 5 {
 		maxLines = 5
@@ -180,9 +180,9 @@ func overlayErrorPopup(base string, width, height int, errText string) string {
 		errLines = errLines[:maxLines]
 		errLines = append(errLines, lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render("..."))
 	}
-	
+
 	body := strings.Join(errLines, "\n")
-	
+
 	title := i18n.T("status.err.detail")
 	popup := common.RenderBorderedPanel(title, body, popupWidth, common.TokyoRed(), common.TokyoRed())
 
@@ -216,7 +216,7 @@ func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo,
 	} else {
 		verStr := fmt.Sprintf("%s  →  %s", info.CurrentVersion, info.Version)
 		body = lipgloss.NewStyle().Foreground(common.TokyoCyan()).Bold(true).Render(verStr) + "\n\n"
-		body += lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render("Changelog: " + info.ReleaseURL) + "\n\n"
+		body += lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render("Changelog: "+info.ReleaseURL) + "\n\n"
 
 		leftBtn := lipgloss.NewStyle().Foreground(common.TokyoGreen()).Render("[Enter] 立即更新")
 		rightBtn := lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render("[Esc] 稍后更新")
@@ -230,7 +230,7 @@ func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo,
 	}
 	wrappedBody := lipgloss.NewStyle().Width(contentWidth).Render(body)
 	bodyLines := strings.Split(wrappedBody, "\n")
-	
+
 	maxLines := height * 70 / 100
 	if maxLines < 8 {
 		maxLines = 8
@@ -239,9 +239,9 @@ func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo,
 		bodyLines = bodyLines[:maxLines]
 		bodyLines = append(bodyLines, lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render("..."))
 	}
-	
+
 	finalBody := strings.Join(bodyLines, "\n")
-	
+
 	title := "发现新版本"
 	borderColor := common.TokyoCyan()
 	if err != nil {
@@ -301,4 +301,3 @@ func overlayPopup(base, popup string, width, height, popupWidth int) string {
 
 	return strings.Join(dimmed, "\n")
 }
-

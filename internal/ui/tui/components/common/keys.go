@@ -7,23 +7,23 @@ import (
 
 // KeyMap 快捷键定义
 type KeyMap struct {
-	Up        key.Binding
-	Down      key.Binding
-	Left      key.Binding
-	Right     key.Binding
-	Enter     key.Binding
-	Test      key.Binding
-	TestAll   key.Binding
-	Quit      key.Binding
-	Refresh   key.Binding
-	NextPage  key.Binding
-	PrevPage  key.Binding
-	Escape    key.Binding
-	Save      key.Binding
-	Backspace key.Binding
-	Delete    key.Binding
-	Home      key.Binding
-	End       key.Binding
+	Up           key.Binding
+	Down         key.Binding
+	Left         key.Binding
+	Right        key.Binding
+	Enter        key.Binding
+	Test         key.Binding
+	TestAll      key.Binding
+	Quit         key.Binding
+	Refresh      key.Binding
+	NextPage     key.Binding
+	PrevPage     key.Binding
+	Escape       key.Binding
+	Save         key.Binding
+	Backspace    key.Binding
+	Delete       key.Binding
+	Home         key.Binding
+	End          key.Binding
 	Clear        key.Binding
 	LogLevelDown key.Binding
 	LogLevelUp   key.Binding

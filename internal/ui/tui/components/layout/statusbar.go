@@ -126,7 +126,7 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, n
 		} else if strings.Contains(errText, "timeout") {
 			friendlyErr = i18n.T("status.err.timeout")
 		}
-		
+
 		// 截断长度需减去节点信息宽度和右侧指标宽度，以及图标等占用的边距
 		maxErrLen := width - nodeInfoWidth - metricsWidth - 6
 		if maxErrLen < 5 {
@@ -158,8 +158,6 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, n
 	if status != "" {
 		leftPart = nodeInfo + " " + status
 	}
-
-
 
 	// ── 分隔线 ──
 	divider := styles.DividerStyle().

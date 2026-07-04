@@ -21,7 +21,6 @@ func parseHexColor(s string) (lipgloss.Color, bool) {
 	return lipgloss.Color(""), false
 }
 
-
 const (
 	nodesGroupMinLines      = 3
 	nodesProxyMinLines      = 5
@@ -500,7 +499,7 @@ func RenderProxyListComponentWidth(state PageState, proxyMaxLines, width int) st
 		}
 
 		line := namePart + "  " + delayStr + "  " + status
-		
+
 		if i == state.SelectedProxy {
 			line = tokyoSelectedStyle(contentWidth).Render(line)
 		} else {

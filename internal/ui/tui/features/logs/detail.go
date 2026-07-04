@@ -142,4 +142,3 @@ func renderLogDetailPopup(
 	body := strings.Join(output, "\n")
 	return common.RenderTokyoPanel(i18n.T("logs.detail.title"), body, popupWidth)
 }
-

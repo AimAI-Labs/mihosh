@@ -184,7 +184,7 @@ func renderList(state PageState, maxLines int) string {
 			continue
 		}
 		p := state.Subs[subIdx]
-		lines = append(lines, renderSubEntry(p, i+1, subIdx==0, p.UID == state.ActiveUID, p.UID == state.UpdatingUID, i == state.Selected, listWidth))
+		lines = append(lines, renderSubEntry(p, i+1, subIdx == 0, p.UID == state.ActiveUID, p.UID == state.UpdatingUID, i == state.Selected, listWidth))
 	}
 	listStr := strings.Join(lines, "\n")
 
@@ -531,14 +531,14 @@ func renderFieldRow(label, value string, focused bool, innerWidth int) string {
 	if focused {
 		labelStyle = lipgloss.NewStyle().Foreground(common.TokyoCyan())
 	}
-	
+
 	// 使用 JoinHorizontal 确保多行 value（如 textarea）时，label 只在第一行对齐
 	row := lipgloss.JoinHorizontal(lipgloss.Top, labelStyle.Render(label), " ", value)
 
 	if !focused {
 		return row
 	}
-	
+
 	// 聚焦时使用 Lipgloss 的 Width 属性和 Padding 自动处理多行背景铺满
 	return lipgloss.NewStyle().
 		Background(common.TokyoSelected()).

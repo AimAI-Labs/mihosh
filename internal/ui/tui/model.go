@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/logs"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
@@ -9,8 +10,8 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/sub"
 
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
@@ -32,11 +33,11 @@ func newRulesState() rules.State {
 // Model TUI 主模型（仅保留全局共享状态）
 type Model struct {
 	// 基础设施
-	client    *api.Client
-	config    *config.Config
-	proxySvc  *service.ProxyService
-	configSvc *service.ConfigService
-	connSvc   *service.ConnectionService
+	client     *api.Client
+	config     *config.Config
+	proxySvc   *service.ProxyService
+	configSvc  *service.ConfigService
+	connSvc    *service.ConnectionService
 	profileSvc *service.ProfileService
 
 	// 路由与布局

@@ -159,10 +159,10 @@ func (m *ToastManager) Add(msg string, toastType ToastType, duration time.Durati
 	if !m.shouldShowToast(msg) {
 		return
 	}
-	
+
 	// 记录该消息已显示
 	m.recordToast(msg)
-	
+
 	m.toasts = append(m.toasts, NewToast(msg, toastType, duration))
 }
 
@@ -200,7 +200,7 @@ func (m *ToastManager) CleanExpired() {
 		}
 	}
 	m.toasts = valid
-	
+
 	// 清理过期的限流记录（保留最近 10 秒的记录）
 	now := time.Now()
 	for msg, lastTime := range m.lastShown {

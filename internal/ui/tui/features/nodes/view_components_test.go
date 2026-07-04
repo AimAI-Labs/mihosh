@@ -192,4 +192,3 @@ func TestParseHexColor(t *testing.T) {
 		}
 	}
 }
-

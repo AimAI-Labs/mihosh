@@ -317,7 +317,7 @@ func resolveSiteTestMouseHit(state PageState, pageX int, siteSectionY int) int {
 
 	relativeY := siteSectionY - connectionsSiteCardsTopLine
 	rowIdx := relativeY / connectionsSiteCardHeight
-	
+
 	rows := (numCards + cols - 1) / cols
 	if rowIdx >= rows {
 		return -1
@@ -427,7 +427,7 @@ func calcConnectionsMaxDisplay(state PageState) (int, int) {
 		if detailHeight < 5 {
 			detailHeight = 5
 		}
-		
+
 		maxDisplay -= detailHeight
 		if maxDisplay < 3 {
 			maxDisplay = 3

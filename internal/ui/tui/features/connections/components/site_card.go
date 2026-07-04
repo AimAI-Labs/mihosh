@@ -65,9 +65,9 @@ func RenderSiteCard(site model.SiteTest, selected bool, width int) string {
 	// 卡片边框样式 — Tokyo Night
 	var borderColor lipgloss.Color
 	if selected {
-		borderColor = styles.Primary()   // #7AA2F7 蓝
+		borderColor = styles.Primary() // #7AA2F7 蓝
 	} else {
-		borderColor = styles.Border()    // #414868 暗边框
+		borderColor = styles.Border() // #414868 暗边框
 	}
 
 	cardStyle := lipgloss.NewStyle().
@@ -101,23 +101,23 @@ func RenderSiteCard(site model.SiteTest, selected bool, width int) string {
 	switch {
 	case site.Testing:
 		delayStr = "⟳"
-		delayColor = styles.Warning()  // #E0AF68 黄
+		delayColor = styles.Warning() // #E0AF68 黄
 	case site.Error != "":
 		delayStr = "✗"
-		delayColor = styles.Danger()   // #F7768E 红
+		delayColor = styles.Danger() // #F7768E 红
 	case site.Delay > 0:
 		delayStr = fmt.Sprintf("%dms", site.Delay)
 		switch {
 		case site.Delay < 300:
-			delayColor = styles.Success()  // #9ECE6A 绿
+			delayColor = styles.Success() // #9ECE6A 绿
 		case site.Delay < 800:
-			delayColor = styles.Warning()  // #E0AF68 黄
+			delayColor = styles.Warning() // #E0AF68 黄
 		default:
-			delayColor = styles.Danger()   // #F7768E 红
+			delayColor = styles.Danger() // #F7768E 红
 		}
 	default:
 		delayStr = "—"
-		delayColor = styles.Border()   // #414868 暗灰
+		delayColor = styles.Border() // #414868 暗灰
 	}
 
 	delayStyle := lipgloss.NewStyle().
