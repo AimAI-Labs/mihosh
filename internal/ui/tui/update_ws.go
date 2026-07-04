@@ -216,7 +216,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// 如果是批量测速，需要补位
 		if m.nodesState.TestAllActive {
 			var batchCmd tea.Cmd
-			m.nodesState, batchCmd = m.nodesState.LaunchBatchTests(m.client, m.testURL, m.timeout)
+			m.nodesState, batchCmd = m.nodesState.LaunchBatchTests()
 			return m, batchCmd
 		}
 		return m, nodes.FetchProxies(m.client)

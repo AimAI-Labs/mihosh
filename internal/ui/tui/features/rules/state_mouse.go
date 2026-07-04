@@ -6,7 +6,6 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -54,7 +53,7 @@ func (s State) HandleMouseScroll(up bool) State {
 
 // HandleMouseLeft 处理规则页面鼠标左键事件。
 // 弹窗打开时：点击弹窗外则确认并关闭；点击列表项则移动光标，双击切换选中。
-func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *api.Client) (State, tea.Cmd) {
+func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, tea.Cmd) {
 	// 添加规则弹窗打开时
 	if s.showAddForm {
 		// 策略选择二级弹窗优先处理

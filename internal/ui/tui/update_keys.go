@@ -110,19 +110,19 @@ func (m Model) dispatchToPage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch m.currentPage {
 	case layout.PageNodes:
-		m.nodesState, cmd = m.nodesState.Update(msg, m.client, m.proxySvc, m.testURL, m.timeout)
+		m.nodesState, cmd = m.nodesState.Update(msg)
 
 	case layout.PageConnections:
-		m.connsState, cmd = m.connsState.Update(msg, m.client, m.timeout, m.chartData)
+		m.connsState, cmd = m.connsState.Update(msg)
 
 	case layout.PageLogs:
-		m.logsState, cmd = m.logsState.Update(msg, m.ipResolver)
+		m.logsState, cmd = m.logsState.Update(msg)
 
 	case layout.PageRules:
-		m.rulesState, cmd = m.rulesState.Update(msg, m.client)
+		m.rulesState, cmd = m.rulesState.Update(msg)
 
 	case layout.PageSub:
-		m.subState, cmd = m.subState.Update(msg, m.profileSvc)
+		m.subState, cmd = m.subState.Update(msg)
 
 	case layout.PageSettings:
 		var newCfg = m.config
@@ -130,7 +130,9 @@ func (m Model) dispatchToPage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.config != nil {
 			oldLanguage = m.config.Language
 		}
-		m.settingsState, newCfg, cmd = m.settingsState.Update(msg, m.config, m.configSvc, m.client)
+		m.settingsState.Config = m.config
+		m.settingsState, cmd = m.settingsState.Update(msg)
+		newCfg = m.settingsState.Config
 		pw, ph := m.getPageSize()
 		m.settingsState = m.settingsState.SyncSysStatus(pw, ph, newCfg, m.logsState.GetSysLogs())
 		m.config = newCfg

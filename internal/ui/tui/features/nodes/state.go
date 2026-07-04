@@ -53,9 +53,23 @@ const (
 	nodesMouseFocusGroup
 )
 
+// NewState 初始化节点状态
+func NewState(client *api.Client, proxySvc *service.ProxyService, testURL string, timeout int) State {
+	return State{
+		client:   client,
+		proxySvc: proxySvc,
+		testURL:  testURL,
+		timeout:  timeout,
+	}
+}
+
 // State 节点页面完整状态
 type State struct {
-	Mode           string // 运行模式 "Rule", "Global", "Direct", in mihomo API lowercase.
+	client     *api.Client
+	proxySvc   *service.ProxyService
+	testURL    string
+	timeout    int
+	Mode       string // 运行模式 "Rule", "Global", "Direct", in mihomo API lowercase.
 	Groups         map[string]model.Group
 	Proxies        map[string]model.Proxy
 	GroupNames     []string
@@ -189,14 +203,13 @@ func (s State) ToPageState(width, height int) PageState {
 }
 
 // Update 处理节点页面按键
-func (s State) Update(msg tea.Msg, client *api.Client, proxySvc *service.ProxyService, testURL string, timeout int) (State, tea.Cmd) {
-	_ = proxySvc // 保留签名以兼容调用方（批量测速由页面状态控制并发）
+func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case messages.PageMouseScrollMsg:
 		return s.HandleMouseScroll(msg.Up, msg.X, msg.Y, msg.Width, msg.Height), nil
 	case messages.PageMouseClickMsg:
-		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height, client)
+		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
 	case tea.KeyMsg:
 		// 搜索输入模式：拦截所有按键用于输入
 		if s.NodeFilterMode {
@@ -268,14 +281,14 @@ func (s State) Update(msg tea.Msg, client *api.Client, proxySvc *service.ProxySe
 			len(display) > 0 && s.SelectedProxy < len(display) {
 			groupName := s.GroupNames[s.SelectedGroup]
 			proxyName := display[s.SelectedProxy]
-			return s, SelectProxy(client, groupName, proxyName)
+			return s, SelectProxy(s.client, groupName, proxyName)
 		}
 
 	case key.Matches(msg, common.Keys.Test):
 		if len(display) > 0 && s.SelectedProxy < len(display) {
 			proxyName := display[s.SelectedProxy]
 			s = s.StartSingleTest(proxyName)
-			return s, TestProxy(client, proxyName, testURL, timeout)
+			return s, TestProxy(s.client, proxyName, s.testURL, s.timeout)
 		}
 
 	case key.Matches(msg, common.Keys.TestAll):
@@ -288,7 +301,7 @@ func (s State) Update(msg tea.Msg, client *api.Client, proxySvc *service.ProxySe
 			s.TestAllRunning = nil
 			s.TestAllTotal = len(s.CurrentProxies)
 			s.TestAllDone = 0
-			return s.LaunchBatchTests(client, testURL, timeout)
+			return s.LaunchBatchTests()
 		}
 
 	case msg.String() == "f":
@@ -308,7 +321,7 @@ func (s State) Update(msg tea.Msg, client *api.Client, proxySvc *service.ProxySe
 			currentIdx = 0
 		}
 		nextMode := modes[(currentIdx+1)%len(modes)]
-		return s, UpdateConfigMode(client, nextMode)
+		return s, UpdateConfigMode(s.client, nextMode)
 
 	case msg.String() == "s":
 		s.ProxySortOrder = (s.ProxySortOrder + 1) % ProxySortOrder(len(sortOrderLabels))
@@ -434,7 +447,7 @@ func (s *State) updateFilteredProxies() {
 }
 
 // HandleMouseLeft 处理 nodes 页面左键单击/双击
-func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *api.Client) (State, tea.Cmd) {
+func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, tea.Cmd) {
 	if s.ShowTestDetail {
 		pageState := s.ToPageState(pageWidth, pageHeight)
 		modal := buildTestResultModal(pageState)
@@ -494,13 +507,13 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, client *
 		}
 		groupName := s.GroupNames[s.SelectedGroup]
 		proxyName := display[s.SelectedProxy]
-		return s, SelectProxy(client, groupName, proxyName)
+		return s, SelectProxy(s.client, groupName, proxyName)
 
 	case MouseTargetMode:
 		modes := []string{"rule", "global", "direct"}
 		if hit.Index >= 0 && hit.Index < len(modes) {
 			mode := modes[hit.Index]
-			return s, UpdateConfigMode(client, mode)
+			return s, UpdateConfigMode(s.client, mode)
 		}
 		return s, nil
 	}
@@ -705,7 +718,7 @@ func (s State) ResetTesting() State {
 }
 
 // launchBatchTests 启动/补位批量测速任务（受并发上限控制）
-func (s State) LaunchBatchTests(client *api.Client, testURL string, timeout int) (State, tea.Cmd) {
+func (s State) LaunchBatchTests() (State, tea.Cmd) {
 	if !s.TestAllActive || s.TestAllTotal == 0 {
 		return s, nil
 	}
@@ -721,7 +734,7 @@ func (s State) LaunchBatchTests(client *api.Client, testURL string, timeout int)
 		name := s.TestAllPending[0]
 		s.TestAllPending = s.TestAllPending[1:]
 		s.TestAllRunning = append(s.TestAllRunning, name)
-		cmds = append(cmds, TestProxy(client, name, testURL, timeout))
+		cmds = append(cmds, TestProxy(s.client, name, s.testURL, s.timeout))
 	}
 
 	s.Testing = true

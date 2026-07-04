@@ -14,7 +14,7 @@ func TestNodesState_TestAllStartsWithFirstProxyTarget(t *testing.T) {
 		CurrentProxies: []string{"HK-01", "JP-01"},
 	}
 
-	next, _ := state.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}}, nil, nil, "", 0)
+	next, _ := state.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
 
 	if !next.Testing {
 		t.Fatalf("expected Testing=true after pressing a")
@@ -55,13 +55,13 @@ func TestNodesState_DetailModalSupportsHomeAndEnd(t *testing.T) {
 	}
 
 	homeMsg := tea.KeyMsg{Type: tea.KeyHome}
-	state, _ = state.Update(homeMsg, nil, nil, "", 0)
+	state, _ = state.Update(homeMsg)
 	if state.DetailScrollTop != 0 {
 		t.Fatalf("expected home to jump top, got %d", state.DetailScrollTop)
 	}
 
 	endMsg := tea.KeyMsg{Type: tea.KeyEnd}
-	state, _ = state.Update(endMsg, nil, nil, "", 0)
+	state, _ = state.Update(endMsg)
 	if state.DetailScrollTop <= 0 {
 		t.Fatalf("expected end to move scroll near bottom, got %d", state.DetailScrollTop)
 	}
@@ -73,19 +73,19 @@ func TestNodesState_FilterEngineToggle(t *testing.T) {
 	}
 
 	// Toggle Regex
-	state, _ = state.Update(tea.KeyMsg{Type: tea.KeyCtrlR}, nil, nil, "", 0)
+	state, _ = state.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
 	if state.FilterEngine != FilterEngineRegex {
 		t.Fatalf("expected FilterEngineRegex after Ctrl+R, got %v", state.FilterEngine)
 	}
 
 	// Toggle Fuzzy
-	state, _ = state.Update(tea.KeyMsg{Type: tea.KeyCtrlF}, nil, nil, "", 0)
+	state, _ = state.Update(tea.KeyMsg{Type: tea.KeyCtrlF})
 	if state.FilterEngine != FilterEngineFuzzy {
 		t.Fatalf("expected FilterEngineFuzzy after Ctrl+F, got %v", state.FilterEngine)
 	}
 
 	// Toggle Back to Substring
-	state, _ = state.Update(tea.KeyMsg{Type: tea.KeyCtrlF}, nil, nil, "", 0)
+	state, _ = state.Update(tea.KeyMsg{Type: tea.KeyCtrlF})
 	if state.FilterEngine != FilterEngineSubstring {
 		t.Fatalf("expected FilterEngineSubstring after second Ctrl+F, got %v", state.FilterEngine)
 	}

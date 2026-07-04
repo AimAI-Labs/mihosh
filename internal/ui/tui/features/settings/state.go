@@ -57,13 +57,19 @@ type State struct {
 	IsGeoUpdating     bool
 
 	SysStatus SysStatusState
+
+	configSvc *service.ConfigService
+	client    *api.Client
+	Config    *config.Config
 }
 
 // NewState 创建新的设置页面状态
-func NewState() State {
+func NewState(configSvc *service.ConfigService, client *api.Client) State {
 	return State{
 		SysStatus:    NewSysStatusState(),
 		toastManager: common.NewToastManager(),
+		configSvc:    configSvc,
+		client:       client,
 	}
 }
 
@@ -140,53 +146,53 @@ func (s State) ToPageState(cfg *config.Config, sysLogs []model.LogEntry) PageSta
 	}
 }
 
-// Update 处理设置页面按键，返回：(新状态, 更新后的cfg, cmd)
-func (s State) Update(msg tea.Msg, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, tea.Cmd) {
+// Update 处理设置页面按键，返回：(新状态, 更新后的s.Config, cmd)
+func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.PageMouseScrollMsg:
 		// actionsPanelBottomY is roughly the height used by Tab bar (3) + Spacer (1) + Config Panel (8) + Spacer (1) + Actions Panel (4) + Desc/Warning (1)
 		newState, cmd := s.HandleMouseScroll(msg.Up, msg.Y, msg.Height, 18)
-		return newState, cfg, cmd
+		return newState, cmd
 	case messages.PageMouseClickMsg:
-		newState, newCfg, cmd := s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height, cfg, configSvc, client)
-		return newState, newCfg, cmd
+		newState, cmd := s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
+		return newState, cmd
 	case tea.KeyMsg:
-	if s.editMode {
-		return s.handleEditMode(msg, cfg, configSvc, client)
-	}
-
-	if msg.String() == "h" || msg.String() == "l" || msg.String() == "tab" {
-		s.activeTab = 1 - s.activeTab
-		s.selectedSetting = 0
-		var cmd tea.Cmd
-		if s.activeTab == 1 && s.SysStatus.Supported {
-			cmd = FetchSysStatusCmd()
+		if s.editMode {
+			return s.handleEditMode(msg)
 		}
-		return s, cfg, cmd
-	}
 
-	if msg.String() == "r" {
-		s.mihomoLoaded = false
-		return s, cfg, tea.Batch(FetchMihomoVersion(client), configSvc.FetchMihomoConfig(client))
-	}
-
-	switch {
-	case key.Matches(msg, common.Keys.Up):
-		if s.selectedSetting > 0 {
-			s.selectedSetting--
+		if msg.String() == "h" || msg.String() == "l" || msg.String() == "tab" {
+			s.activeTab = 1 - s.activeTab
+			s.selectedSetting = 0
+			var cmd tea.Cmd
+			if s.activeTab == 1 && s.SysStatus.Supported {
+				cmd = FetchSysStatusCmd()
+			}
+			return s, cmd
 		}
-	case key.Matches(msg, common.Keys.Down):
-		if s.selectedSetting < len(s.activeKeys())-1 {
-			s.selectedSetting++
+
+		if msg.String() == "r" {
+			s.mihomoLoaded = false
+			return s, tea.Batch(FetchMihomoVersion(s.client), s.configSvc.FetchMihomoConfig(s.client))
 		}
-	case key.Matches(msg, common.Keys.Enter):
-		s.editMode = true
-		s.editValue = s.getEditValue(cfg, s.activeKeys()[s.selectedSetting])
-		s.editCursor = len([]rune(s.editValue))
-	}
+
+		switch {
+		case key.Matches(msg, common.Keys.Up):
+			if s.selectedSetting > 0 {
+				s.selectedSetting--
+			}
+		case key.Matches(msg, common.Keys.Down):
+			if s.selectedSetting < len(s.activeKeys())-1 {
+				s.selectedSetting++
+			}
+		case key.Matches(msg, common.Keys.Enter):
+			s.editMode = true
+			s.editValue = s.getEditValue(s.Config, s.activeKeys()[s.selectedSetting])
+			s.editCursor = len([]rune(s.editValue))
+		}
 	}
 
-	return s, cfg, nil
+	return s, nil
 }
 
 // HandleMouseScroll 鼠标滚轮处理
@@ -223,7 +229,7 @@ func (s State) HandleMouseScroll(up bool, pageY, pageHeight, actionsPanelBottomY
 }
 
 // HandleMouseLeft 处理 settings 页面左键单击/双击
-func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, tea.Cmd) {
+func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, tea.Cmd) {
 	// 检查是否点击了底部核心操作按钮
 	if s.activeTab == 1 {
 		settingsPanelHeight := 0
@@ -233,7 +239,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *con
 			settingsPanelHeight = 5
 		} else {
 			height := 0
-			pageState := s.ToPageState(cfg, nil)
+			pageState := s.ToPageState(s.Config, nil)
 			for i, key := range s.activeKeys() {
 				item := renderSettingItem(pageState, i, key, GetSettingLabel(key), pageWidth)
 				height += lipgloss.Height(item)
@@ -254,39 +260,39 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *con
 						case "upgrade_auto":
 							if !s.IsCoreUpgrading {
 								s.IsCoreUpgrading = true
-								return s, cfg, UpgradeCoreCmd(client, "")
+								return s, UpgradeCoreCmd(s.client, "")
 							}
 						case "upgrade_release":
 							if !s.IsCoreUpgrading {
 								s.IsCoreUpgrading = true
-								return s, cfg, UpgradeCoreCmd(client, "release")
+								return s, UpgradeCoreCmd(s.client, "release")
 							}
 						case "upgrade_alpha":
 							if !s.IsCoreUpgrading {
 								s.IsCoreUpgrading = true
-								return s, cfg, UpgradeCoreCmd(client, "alpha")
+								return s, UpgradeCoreCmd(s.client, "alpha")
 							}
 						case "restart":
 							if !s.IsCoreRestarting {
 								s.IsCoreRestarting = true
-								return s, cfg, RestartCoreCmd(client)
+								return s, RestartCoreCmd(s.client)
 							}
 						case "reload":
 							if !s.IsConfigReloading {
 								s.IsConfigReloading = true
-								return s, cfg, ReloadConfigsCmd(client)
+								return s, ReloadConfigsCmd(s.client)
 							}
 						case "update_geo":
 							if !s.IsGeoUpdating {
 								s.IsGeoUpdating = true
-								return s, cfg, UpdateGeoDataCmd(client)
+								return s, UpdateGeoDataCmd(s.client)
 							}
 						case "flush_dns":
-							return s, cfg, FlushDNSCacheCmd(client)
+							return s, FlushDNSCacheCmd(s.client)
 						case "flush_fakeip":
-							return s, cfg, FlushFakeIPCmd(client)
+							return s, FlushFakeIPCmd(s.client)
 						}
-						return s, cfg, nil
+						return s, nil
 					}
 					cur += btn.Width
 				}
@@ -308,7 +314,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *con
 					cmd = FetchSysStatusCmd()
 				}
 			}
-			return s, cfg, cmd
+			return s, cmd
 		}
 	}
 
@@ -317,29 +323,31 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *con
 	if s.editMode {
 		if s.activeTab == 0 && s.selectedSetting == LanguageSettingIndex() {
 			if lang, ok := resolveLanguageMouseTarget(pageX); ok {
-				if err := configSvc.SetConfigValue(s.activeKeys()[s.selectedSetting], lang); err == nil {
-					newCfg, _ := configSvc.LoadConfig()
+				if err := s.configSvc.SetConfigValue(s.activeKeys()[s.selectedSetting], lang); err == nil {
+					newCfg, _ := s.configSvc.LoadConfig()
+					s.Config = newCfg
 					s.editMode = false
 					s.editValue = ""
 					s.editCursor = 0
-					return s, newCfg, noticeCmd(i18n.T("settings.toast.save_success_lang"))
+					return s, noticeCmd(i18n.T("settings.toast.save_success_lang"))
 				}
 				s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
-				return s, cfg, nil
+				return s, nil
 			}
 		}
 		if s.activeTab == 0 && s.selectedSetting == ThemeSettingIndex() {
 			if t, ok := resolveThemeMouseTarget(pageX); ok {
-				if err := configSvc.SetConfigValue("theme", t); err == nil {
-					newCfg, _ := configSvc.LoadConfig()
+				if err := s.configSvc.SetConfigValue("theme", t); err == nil {
+					newCfg, _ := s.configSvc.LoadConfig()
+					s.Config = newCfg
 					theme.SetTheme(t)
 					s.editMode = false
 					s.editValue = ""
 					s.editCursor = 0
-					return s, newCfg, noticeCmd(i18n.T("settings.toast.save_success_theme"))
+					return s, noticeCmd(i18n.T("settings.toast.save_success_theme"))
 				}
 				s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
-				return s, cfg, nil
+				return s, nil
 			}
 		}
 
@@ -352,9 +360,9 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *con
 					s.editValue = ""
 					s.editCursor = 0
 					if boolVal != s.mihomoConfig.AllowLan {
-						return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "allow-lan", boolVal), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+						return s, tea.Batch(s.configSvc.SaveMihomoConfigField(s.client, "allow-lan", boolVal), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 					}
-					return s, cfg, nil
+					return s, nil
 				}
 			}
 			if settingKey == "log-level" {
@@ -363,9 +371,9 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *con
 					s.editValue = ""
 					s.editCursor = 0
 					if level != s.mihomoConfig.LogLevel {
-						return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "log-level", level), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+						return s, tea.Batch(s.configSvc.SaveMihomoConfigField(s.client, "log-level", level), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 					}
-					return s, cfg, nil
+					return s, nil
 				}
 			}
 		}
@@ -376,29 +384,31 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *con
 			s.editValue = ""
 			s.editCursor = 0
 		}
-		return s, cfg, nil
+		return s, nil
 	}
 
 	if settingIdx < 0 || settingIdx >= len(s.activeKeys()) {
-		return s, cfg, nil
+		return s, nil
 	}
 
 	s.selectedSetting = settingIdx
 	if s.activeTab == 0 && settingIdx == LanguageSettingIndex() {
 		if lang, ok := resolveLanguageMouseTarget(pageX); ok {
-			if err := configSvc.SetConfigValue(s.activeKeys()[settingIdx], lang); err == nil {
-				newCfg, _ := configSvc.LoadConfig()
-				return s, newCfg, noticeCmd(i18n.T("settings.toast.save_success_lang"))
+			if err := s.configSvc.SetConfigValue(s.activeKeys()[settingIdx], lang); err == nil {
+				newCfg, _ := s.configSvc.LoadConfig()
+				s.Config = newCfg
+				return s, noticeCmd(i18n.T("settings.toast.save_success_lang"))
 			}
 			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
 		}
 	}
 	if s.activeTab == 0 && settingIdx == ThemeSettingIndex() {
 		if t, ok := resolveThemeMouseTarget(pageX); ok {
-			if err := configSvc.SetConfigValue("theme", t); err == nil {
-				newCfg, _ := configSvc.LoadConfig()
+			if err := s.configSvc.SetConfigValue("theme", t); err == nil {
+				newCfg, _ := s.configSvc.LoadConfig()
+				s.Config = newCfg
 				theme.SetTheme(t)
-				return s, newCfg, noticeCmd(i18n.T("settings.toast.save_success_theme"))
+				return s, noticeCmd(i18n.T("settings.toast.save_success_theme"))
 			}
 			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
 		}
@@ -410,14 +420,14 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *con
 			if val, ok := resolveEnumMouseTarget(pageX, []string{"true", "false"}); ok {
 				boolVal := val == "true"
 				if boolVal != s.mihomoConfig.AllowLan {
-					return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "allow-lan", boolVal), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+					return s, tea.Batch(s.configSvc.SaveMihomoConfigField(s.client, "allow-lan", boolVal), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 				}
 			}
 		}
 		if settingKey == "log-level" {
 			if level, ok := resolveEnumMouseTarget(pageX, []string{"info", "warning", "error", "debug", "silent"}); ok {
 				if level != s.mihomoConfig.LogLevel {
-					return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "log-level", level), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+					return s, tea.Batch(s.configSvc.SaveMihomoConfigField(s.client, "log-level", level), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 				}
 			}
 		}
@@ -426,15 +436,15 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, cfg *con
 	now := time.Now()
 	if s.doubleClickDetector.IsDoubleClick(struct{}{}, settingIdx, now) {
 		s.editMode = true
-		s.editValue = s.getEditValue(cfg, s.activeKeys()[settingIdx])
+		s.editValue = s.getEditValue(s.Config, s.activeKeys()[settingIdx])
 		s.editCursor = len([]rune(s.editValue))
 	}
 
-	return s, cfg, nil
+	return s, nil
 }
 
 // handleEditMode 处理编辑模式按键
-func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *service.ConfigService, client *api.Client) (State, *config.Config, tea.Cmd) {
+func (s State) handleEditMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	if s.activeTab == 1 {
 		keys := s.activeKeys()
 		settingKey := keys[s.selectedSetting]
@@ -448,7 +458,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 				val := s.editValue == "true"
 				s.editMode = false
 				s.editValue = ""
-				return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "allow-lan", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+				return s, tea.Batch(s.configSvc.SaveMihomoConfigField(s.client, "allow-lan", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 			case msg.String() == "left", msg.String() == "right", msg.String() == "tab":
 				if s.editValue == "true" {
 					s.editValue = "false"
@@ -456,7 +466,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 					s.editValue = "true"
 				}
 			}
-			return s, cfg, nil
+			return s, nil
 		}
 		// log-level tab toggle
 		if settingKey == "log-level" {
@@ -468,7 +478,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 				val := s.editValue
 				s.editMode = false
 				s.editValue = ""
-				return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, "log-level", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+				return s, tea.Batch(s.configSvc.SaveMihomoConfigField(s.client, "log-level", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 			case msg.String() == "left":
 				matched := false
 				for i, l := range levels {
@@ -494,7 +504,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 					s.editValue = levels[0]
 				}
 			}
-			return s, cfg, nil
+			return s, nil
 		}
 	}
 
@@ -505,11 +515,12 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 			s.editValue = ""
 		case key.Matches(msg, common.Keys.Enter):
 			settingKey := s.activeKeys()[s.selectedSetting]
-			if err := configSvc.SetConfigValue(settingKey, s.editValue); err == nil {
-				newCfg, _ := configSvc.LoadConfig()
+			if err := s.configSvc.SetConfigValue(settingKey, s.editValue); err == nil {
+				newCfg, _ := s.configSvc.LoadConfig()
+				s.Config = newCfg
 				s.editMode = false
 				s.editValue = ""
-				return s, newCfg, noticeCmd(i18n.T("settings.toast.save_success_lang"))
+				return s, noticeCmd(i18n.T("settings.toast.save_success_lang"))
 			}
 			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
 		case msg.String() == "left":
@@ -517,7 +528,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 		case msg.String() == "right", msg.String() == "tab":
 			s.editValue = nextLanguage(s.editValue)
 		}
-		return s, cfg, nil
+		return s, nil
 	}
 
 	if s.activeTab == 0 && s.selectedSetting == ThemeSettingIndex() { // 主题设置采用 tab 切换，切换后热生效
@@ -527,21 +538,22 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 			s.editValue = ""
 		case key.Matches(msg, common.Keys.Enter):
 			newTheme := s.editValue
-			if err := configSvc.SetConfigValue("theme", newTheme); err != nil {
+			if err := s.configSvc.SetConfigValue("theme", newTheme); err != nil {
 				s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
-				return s, cfg, nil
+				return s, nil
 			}
-			newCfg, _ := configSvc.LoadConfig()
+			newCfg, _ := s.configSvc.LoadConfig()
+			s.Config = newCfg
 			theme.SetTheme(newTheme)
 			s.editMode = false
 			s.editValue = ""
-			return s, newCfg, tea.Batch(func() tea.Msg { return messages.ThemeChangedMsg{} }, noticeCmd(i18n.T("settings.toast.save_success_theme")))
+			return s, tea.Batch(func() tea.Msg { return messages.ThemeChangedMsg{} }, noticeCmd(i18n.T("settings.toast.save_success_theme")))
 		case msg.String() == "left":
 			s.editValue = prevTheme(s.editValue)
 		case msg.String() == "right", msg.String() == "tab":
 			s.editValue = nextTheme(s.editValue)
 		}
-		return s, cfg, nil
+		return s, nil
 	}
 
 	switch {
@@ -560,26 +572,27 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 					val = port
 				} else {
 					s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
-					return s, cfg, nil
+					return s, nil
 				}
 			}
 			s.editMode = false
 			s.editValue = ""
 			s.editCursor = 0
-			return s, cfg, tea.Batch(configSvc.SaveMihomoConfigField(client, settingKey, val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+			return s, tea.Batch(s.configSvc.SaveMihomoConfigField(s.client, settingKey, val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 		}
 
-		if err := configSvc.SetConfigValue(settingKey, s.editValue); err != nil {
+		if err := s.configSvc.SetConfigValue(settingKey, s.editValue); err != nil {
 			// 保存失败：保持编辑模式，显示错误提示
 			s.showToast(i18n.Tf("settings.toast.save_failed_with_err", err.Error()), common.ToastError)
-			return s, cfg, nil
+			return s, nil
 		}
-		newCfg, _ := configSvc.LoadConfig()
+		newCfg, _ := s.configSvc.LoadConfig()
+		s.Config = newCfg
 		s.editMode = false
 		s.editValue = ""
 		s.editCursor = 0
 		s.showToast(i18n.T("settings.toast.save_success"), common.ToastSuccess)
-		return s, newCfg, nil
+		return s, nil
 
 	case msg.String() == "left":
 		if s.editCursor > 0 {
@@ -632,7 +645,7 @@ func (s State) handleEditMode(msg tea.KeyMsg, cfg *config.Config, configSvc *ser
 		}
 	}
 
-	return s, cfg, nil
+	return s, nil
 }
 
 // showToast 显示 Toast 提示
@@ -853,7 +866,7 @@ func (s State) getEditValue(cfg *config.Config, settingKey string) string {
 		}
 		return ""
 	}
-	return GetSettingValue(s.ToPageState(cfg, nil), settingKey)
+	return GetSettingValue(s.ToPageState(s.Config, nil), settingKey)
 }
 
 // Core Actions
@@ -922,7 +935,7 @@ func (s State) ClearActionStates() State {
 
 func (s State) HandleMsg(msg tea.Msg, width, height int, cfg *config.Config, sysLogs []model.LogEntry) (State, tea.Cmd) {
 	cmd := s.SysStatus.Update(msg)
-	s = s.SyncSysStatus(width, height, cfg, sysLogs)
+	s = s.SyncSysStatus(width, height, s.Config, sysLogs)
 	return s, cmd
 }
 
@@ -933,7 +946,7 @@ func (s State) SyncSysStatus(width, height int, cfg *config.Config, sysLogs []mo
 		return s
 	}
 
-	pageState := s.ToPageState(cfg, sysLogs)
+	pageState := s.ToPageState(s.Config, sysLogs)
 	remainingHeight := CalculateViewportHeight(pageState, width, height)
 
 	s.SysStatus.SyncDimensions(width, remainingHeight)

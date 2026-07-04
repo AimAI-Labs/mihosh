@@ -125,7 +125,7 @@ func TestClampScroll(t *testing.T) {
 
 func TestActivateSelected_NoSelection(t *testing.T) {
 	s := State{}.ApplySubs([]profile.Profile{}, "")
-	_, cmd := s.activateSelected(nil)
+	s, cmd := s.activateSelected()
 	assert.Nil(t, cmd, "空列表激活应无命令")
 }
 
@@ -147,14 +147,14 @@ func TestUpdate_MKeyOpensMergeEditor(t *testing.T) {
 	// 按 m 应返回非 nil 命令（tea.ExecProcess 启动外部编辑器）。
 	s := State{}.ApplySubs(sampleSubs(), "")
 	s.selected = 0
-	_, cmd := s.Update(newRuneKey("m"), nil)
+	_, cmd := s.Update(newRuneKey("m"))
 	require.NotNil(t, cmd, "m 应发出打开外部编辑器的命令")
 }
 
 func TestOpenMergeExternalEditor_NoSelection(t *testing.T) {
 	// 无论列表是否为空，都可以打开全局覆写配置。
 	s := State{}.ApplySubs(nil, "")
-	_, cmd := s.openMergeExternalEditor(nil)
+	s, cmd := s.openMergeExternalEditor()
 	assert.NotNil(t, cmd, "空列表也应该发出编辑器命令")
 }
 
@@ -162,7 +162,7 @@ func TestOpenEditForm_PrefillsCurrentSub(t *testing.T) {
 	s := State{}.ApplySubs(sampleSubs(), "")
 	s.selected = 1 // 选中 b2（local）
 
-	s, _ = s.openEditForm(nil)
+	s, _ = s.openEditForm()
 	require.True(t, s.showEditForm)
 	assert.Equal(t, "b2", s.editUID)
 	// 名称与来源应预填
@@ -173,7 +173,7 @@ func TestOpenEditForm_PrefillsCurrentSub(t *testing.T) {
 
 func TestOpenEditForm_EmptyList(t *testing.T) {
 	s := State{}.ApplySubs(nil, "")
-	s, _ = s.openEditForm(nil)
+	s, _ = s.openEditForm()
 	assert.False(t, s.showEditForm, "空列表不应打开编辑表单")
 }
 
@@ -181,7 +181,7 @@ func TestUpdate_EKeyOpensEditForm(t *testing.T) {
 	// 按 e 应打开编辑表单
 	s := State{}.ApplySubs(sampleSubs(), "")
 	s.selected = 0
-	s, _ = s.Update(newRuneKey("e"), nil)
+	s, _ = s.Update(newRuneKey("e"))
 	assert.True(t, s.showEditForm, "e 应触发编辑表单")
 	assert.Equal(t, "a1", s.editUID)
 }
@@ -189,7 +189,7 @@ func TestUpdate_EKeyOpensEditForm(t *testing.T) {
 func TestHandleEditFormSubmit_DispatchesEditCmd(t *testing.T) {
 	s := State{}.ApplySubs(sampleSubs(), "")
 	s.selected = 1
-	s, _ = s.openEditForm(nil)
+	s, _ = s.openEditForm()
 
 	// 修改名称后按 Enter 提交
 	form := s.editForm
@@ -197,7 +197,7 @@ func TestHandleEditFormSubmit_DispatchesEditCmd(t *testing.T) {
 	form.srcField.SetValue("https://new.io/sub")
 	s.editForm = form
 
-	s, cmd := s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeyEnter}, nil)
+	s, cmd := s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeyEnter})
 	require.NotNil(t, cmd)
 	assert.False(t, s.showEditForm, "提交后表单应关闭")
 	assert.Empty(t, s.editUID)
@@ -206,9 +206,9 @@ func TestHandleEditFormSubmit_DispatchesEditCmd(t *testing.T) {
 func TestHandleEditFormCancel_ClosesForm(t *testing.T) {
 	s := State{}.ApplySubs(sampleSubs(), "")
 	s.selected = 0
-	s, _ = s.openEditForm(nil)
+	s, _ = s.openEditForm()
 
-	s, cmd := s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeyEsc}, nil)
+	s, cmd := s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeyEsc})
 	assert.Nil(t, cmd)
 	assert.False(t, s.showEditForm, "Esc 应关闭编辑表单")
 	assert.Empty(t, s.editUID)

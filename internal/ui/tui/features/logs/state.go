@@ -45,13 +45,16 @@ type State struct {
 
 	// 鼠标双击检测
 	doubleClickDetector common.DoubleClickDetector[struct{}]
+
+	resolver *service.IPResolver
 }
 
 // NewState 初始化日志状态
-func NewState() State {
+func NewState(resolver *service.IPResolver) State {
 	return State{
 		logLevel:           1, // 默认 info
 		filteredLogIndices: make([]int, 0, filteredLogIndexCap),
+		resolver:           resolver,
 	}
 }
 
@@ -148,14 +151,14 @@ func (s State) ToPageState(width, height int) PageState {
 }
 
 // Update 处理日志页面按键和消息
-func (s State) Update(msg tea.Msg, resolver *service.IPResolver) (State, tea.Cmd) {
+func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.PageResizeMsg:
 		return s.UpdateMaxHScrollOffset(msg.Width, msg.Height), nil
 	case messages.PageMouseScrollMsg:
 		return s.HandleMouseScroll(msg.Up, msg.Height), nil
 	case messages.PageMouseClickMsg:
-		return s.HandleMouseLeft(msg.Y, msg.X, msg.Width, resolver)
+		return s.HandleMouseLeft(msg.Y, msg.X, msg.Width)
 	case tea.KeyMsg:
 		// 继续处理按键
 	// 详情模式拦截所有按键
@@ -169,7 +172,7 @@ func (s State) Update(msg tea.Msg, resolver *service.IPResolver) (State, tea.Cmd
 
 	switch {
 	case key.Matches(msg, common.Keys.Enter):
-		return s.openLogDetail(resolver)
+		return s.openLogDetail()
 
 	case key.Matches(msg, common.Keys.Up):
 		if s.selectedLog > 0 {
@@ -256,7 +259,7 @@ func (s State) handleDetailMode(msg tea.KeyMsg) (State, tea.Cmd) {
 }
 
 // openLogDetail 打开选中日志的详情弹窗
-func (s State) openLogDetail(resolver *service.IPResolver) (State, tea.Cmd) {
+func (s State) openLogDetail() (State, tea.Cmd) {
 	entry := s.selectedLogEntry()
 	if entry == nil {
 		return s, nil
@@ -275,7 +278,7 @@ func (s State) openLogDetail(resolver *service.IPResolver) (State, tea.Cmd) {
 	// 如果源IP是内网IP，异步查询应用来源
 	if parsed.SourceIP != "" && service.IsPrivateIP(parsed.SourceIP) {
 		s.detailSourcePrivate = true
-		return s, ResolveLogSourceIP(resolver, parsed.SourceIP)
+		return s, ResolveLogSourceIP(s.resolver, parsed.SourceIP)
 	}
 
 	return s, nil
@@ -304,7 +307,7 @@ func (s State) ApplyIPResolved(ip string, resolved *model.ResolvedIP) State {
 }
 
 // HandleMouseLeft 处理日志页面鼠标左键（含双击检测和级别栏点击）
-func (s State) HandleMouseLeft(pageY int, pageX int, pageWidth int, resolver *service.IPResolver) (State, tea.Cmd) {
+func (s State) HandleMouseLeft(pageY int, pageX int, pageWidth int) (State, tea.Cmd) {
 	if s.detailMode {
 		// 详情模式下点击关闭弹窗
 		s.detailMode = false
@@ -344,7 +347,7 @@ func (s State) HandleMouseLeft(pageY int, pageX int, pageWidth int, resolver *se
 	isDoubleClick := s.doubleClickDetector.IsDoubleClick(struct{}{}, clickedIndex, now)
 
 	if isDoubleClick {
-		return s.openLogDetail(resolver)
+		return s.openLogDetail()
 	}
 
 	return s, nil

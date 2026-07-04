@@ -58,6 +58,14 @@ type State struct {
 
 	ColorAdjustLight float64 // 0.2-0.4 建议明度增加比例
 	ColorAdjustDark  float64 // 0.15-0.25 建议明度降低比例
+	client           *api.Client
+}
+
+// NewState 初始化规则状态
+func NewState(client *api.Client) State {
+	return State{
+		client: client,
+	}
 }
 
 // ToPageState 转换为渲染层所需的 PageState
@@ -99,12 +107,12 @@ func (s State) SetConfigPath(path string) State {
 }
 
 // Update 处理规则页面按键
-func (s State) Update(msg tea.Msg, client *api.Client) (State, tea.Cmd) {
+func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.PageMouseScrollMsg:
 		return s.HandleMouseScroll(msg.Up), nil
 	case messages.PageMouseClickMsg:
-		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height, client)
+		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
 	case tea.KeyMsg:
 	// 编辑规则弹窗优先拦截（吞掉所有按键）
 	if s.showEditForm {
@@ -171,7 +179,7 @@ func (s State) Update(msg tea.Msg, client *api.Client) (State, tea.Cmd) {
 		return s.openConfigEditor()
 
 	case key.Matches(msg, common.Keys.Refresh):
-		return s, FetchRules(client)
+		return s, FetchRules(s.client)
 
 	case key.Matches(msg, common.Keys.Escape):
 		if s.ruleFilter != "" || len(s.selectedTypes) > 0 {

@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -16,7 +15,7 @@ import (
 )
 
 // openRawExternalEditor 在外部编辑器中以“安全沙盒模式”打开指定的订阅 raw.yaml 文件。
-func (s State) openRawExternalEditor(svc *service.ProfileService) (State, tea.Cmd) {
+func (s State) openRawExternalEditor() (State, tea.Cmd) {
 	if len(s.filteredIdx) == 0 || s.selected < 0 || s.selected >= len(s.filteredIdx) {
 		return s, nil
 	}

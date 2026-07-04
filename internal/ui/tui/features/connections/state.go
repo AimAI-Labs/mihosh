@@ -60,10 +60,14 @@ type State struct {
 
 	connGen   uint64
 	topNCache *topNCache
+
+	client    *api.Client
+	timeout   int
+	chartData *model.ChartData
 }
 
 // NewState 初始化连接状态
-func NewState(proxyAddr string, siteTests []model.SiteTest) State {
+func NewState(proxyAddr string, siteTests []model.SiteTest, client *api.Client, timeout int, chartData *model.ChartData) State {
 	ti := textinput.New()
 	ti.Placeholder = "filter..."
 	ti.CharLimit = 100
@@ -72,6 +76,9 @@ func NewState(proxyAddr string, siteTests []model.SiteTest) State {
 		siteTests:  siteTests,
 		connFilter: ti,
 		topNCache:  &topNCache{},
+		client:     client,
+		timeout:    timeout,
+		chartData:  chartData,
 	}
 }
 
@@ -151,12 +158,12 @@ func (s State) ToPageState(chartData *model.ChartData, width, height int) PageSt
 }
 
 // Update 处理连接页面按键和鼠标事件
-func (s State) Update(msg tea.Msg, client *api.Client, timeout int, chartData *model.ChartData) (State, tea.Cmd) {
+func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.PageMouseScrollMsg:
 		return s.HandleMouseScroll(msg.Up, msg.X, msg.Y, msg.Width, msg.Height)
 	case messages.PageMouseClickMsg:
-		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height, chartData, timeout)
+		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
 	case tea.KeyMsg:
 		// 继续处理 KeyMsg
 	if s.connDetailMode {
@@ -222,13 +229,13 @@ func (s State) Update(msg tea.Msg, client *api.Client, timeout int, chartData *m
 	if s.connViewMode == ConnViewTraffic {
 		switch {
 		case msg.String() == "s":
-			return s.triggerSiteTestByIndex(s.selectedSiteTest, timeout)
+			return s.triggerSiteTestByIndex(s.selectedSiteTest, s.timeout)
 		case msg.String() == "S":
 			if len(s.siteTests) > 0 {
 				for i := range s.siteTests {
 					s.siteTests[i].Testing = true
 				}
-				return s, TestAllSites(s.proxyAddr, s.siteTests, timeout)
+				return s, TestAllSites(s.proxyAddr, s.siteTests, s.timeout)
 			}
 		case key.Matches(msg, common.Keys.Left):
 			if s.selectedSiteTest > 0 {
@@ -283,8 +290,8 @@ func (s State) Update(msg tea.Msg, client *api.Client, timeout int, chartData *m
 			conn := s.selectedConnection()
 			if conn != nil {
 				return s, tea.Batch(
-					CloseConnection(client, conn.ID),
-					FetchConnections(client),
+					CloseConnection(s.client, conn.ID),
+					FetchConnections(s.client),
 				)
 			}
 		}
@@ -292,8 +299,8 @@ func (s State) Update(msg tea.Msg, client *api.Client, timeout int, chartData *m
 	case msg.String() == "X":
 		if s.connViewMode == ConnViewActive {
 			return s, tea.Batch(
-				CloseAllConnections(client),
-				FetchConnections(client),
+				CloseAllConnections(s.client),
+				FetchConnections(s.client),
 			)
 		}
 

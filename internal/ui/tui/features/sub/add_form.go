@@ -12,7 +12,6 @@ package sub
 import (
 	"strings"
 
-	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -131,7 +130,7 @@ func (f addForm) buildSource() profile.SubSource {
 }
 
 // handleUpdate 处理表单内的按键（弹窗激活时由 state 分派到此）。
-func (s State) handleAddFormUpdate(msg tea.KeyMsg, svc *service.ProfileService) (State, tea.Cmd) {
+func (s State) handleAddFormUpdate(msg tea.KeyMsg) (State, tea.Cmd) {
 	form := s.addForm
 	next, submit, cmd, closed := updateFormFields(msg, form)
 	if closed {
@@ -146,7 +145,7 @@ func (s State) handleAddFormUpdate(msg tea.KeyMsg, svc *service.ProfileService) 
 		src := next.buildSource()
 		s.showAddForm = false
 		s.addForm = newAddForm()
-		return s, AddSubCmd(svc, name, src)
+		return s, AddSubCmd(s.svc, name, src)
 	}
 	s.addForm = next
 	return s, cmd

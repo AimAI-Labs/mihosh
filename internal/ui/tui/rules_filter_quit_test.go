@@ -15,7 +15,7 @@ func TestRuleFilterModeDoesNotQuitOnQ(t *testing.T) {
 	rulesState := newRulesStateWithRules()
 
 	// 进入过滤模式
-	rulesState, _ = rulesState.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")}, nil)
+	rulesState, _ = rulesState.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
 	if !rulesState.FilterMode() {
 		t.Fatalf("expected rules page to enter filter mode after pressing '/'")
 	}

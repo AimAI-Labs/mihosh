@@ -34,7 +34,7 @@ func pressShiftTab() tea.KeyMsg {
 // TestAddForm_OpenWithN 验证按 n 打开添加规则弹窗。
 func TestAddForm_OpenWithN(t *testing.T) {
 	s := State{}
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 	if !s.ShowAddForm() {
 		t.Fatal("expected add form open after pressing 'n'")
 	}
@@ -48,16 +48,16 @@ func TestAddForm_OpenWithN(t *testing.T) {
 func TestAddForm_EscClosesAndResets(t *testing.T) {
 	s := State{}
 	// 打开表单
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 	// 输入一些字符到 payload 字段
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")}, nil)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
 	// Esc 关闭
-	s, _ = s.Update(pressKey("esc"), nil)
+	s, _ = s.Update(pressKey("esc"))
 	if s.ShowAddForm() {
 		t.Fatal("expected add form closed after Esc")
 	}
 	// 再次打开应为干净表单
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 	if s.addForm.fields[addFieldPayload].Value() != "" {
 		t.Fatalf("expected reset payload field, got %q", s.addForm.fields[addFieldPayload].Value())
 	}
@@ -67,29 +67,29 @@ func TestAddForm_EscClosesAndResets(t *testing.T) {
 // 字段顺序：type(0) → payload(1) → proxy(2) → index(3) → noResolve(4, 仅 IP 类)。
 func TestAddForm_TabCyclesFields(t *testing.T) {
 	s := State{}
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 
 	// 初始焦点 payload
 	if s.addForm.fieldCursor != addFieldPayload {
 		t.Fatalf("expected initial cursor at payload(%d), got %d", addFieldPayload, s.addForm.fieldCursor)
 	}
 	// Tab → proxy
-	s, _ = s.Update(pressTab(), nil)
+	s, _ = s.Update(pressTab())
 	if s.addForm.fieldCursor != addFieldProxy {
 		t.Fatalf("expected cursor at proxy after Tab, got %d", s.addForm.fieldCursor)
 	}
 	// Tab → index
-	s, _ = s.Update(pressTab(), nil)
+	s, _ = s.Update(pressTab())
 	if s.addForm.fieldCursor != addFieldIndex {
 		t.Fatalf("expected cursor at index after 2x Tab, got %d", s.addForm.fieldCursor)
 	}
 	// Tab → type（非 IP 类型跳过 noResolve）
-	s, _ = s.Update(pressTab(), nil)
+	s, _ = s.Update(pressTab())
 	if s.addForm.fieldCursor != addFieldType {
 		t.Fatalf("expected cursor at type after 3x Tab, got %d", s.addForm.fieldCursor)
 	}
 	// Tab → 回到 payload（循环）
-	s, _ = s.Update(pressTab(), nil)
+	s, _ = s.Update(pressTab())
 	if s.addForm.fieldCursor != addFieldPayload {
 		t.Fatalf("expected cursor back at payload after 4x Tab, got %d", s.addForm.fieldCursor)
 	}
@@ -99,24 +99,24 @@ func TestAddForm_TabCyclesFields(t *testing.T) {
 // ←/→ 仅在类型行聚焦时切类型；payload/index 聚焦时 ←/→ 移动光标。
 func TestAddForm_LeftRightCyclesType(t *testing.T) {
 	s := State{}
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 	initialType := s.addForm.currentType()
 
 	// 聚焦到 type 行（默认 payload，Shift+Tab 上行一格即到 type）
-	s, _ = s.Update(pressShiftTab(), nil)
+	s, _ = s.Update(pressShiftTab())
 	if !s.addForm.isTypeField() {
 		t.Fatalf("expected focus on type field, got %d", s.addForm.fieldCursor)
 	}
 
 	// → → 下一类型
-	s, _ = s.Update(pressKey("right"), nil)
+	s, _ = s.Update(pressKey("right"))
 	nextType := s.addForm.currentType()
 	if nextType == initialType {
 		t.Fatal("expected type to change after Right")
 	}
 
 	// ← → 回到初始类型
-	s, _ = s.Update(pressKey("left"), nil)
+	s, _ = s.Update(pressKey("left"))
 	if s.addForm.currentType() != initialType {
 		t.Fatalf("expected type back to %s after Left, got %s", initialType, s.addForm.currentType())
 	}
@@ -125,34 +125,34 @@ func TestAddForm_LeftRightCyclesType(t *testing.T) {
 // TestAddForm_UpDownCyclesField 验证 ↑/↓ 在字段间切换（字段为垂直堆叠）。
 func TestAddForm_UpDownCyclesField(t *testing.T) {
 	s := State{}
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 
 	// 初始焦点 payload
 	if s.addForm.fieldCursor != addFieldPayload {
 		t.Fatalf("expected initial cursor at payload(%d), got %d", addFieldPayload, s.addForm.fieldCursor)
 	}
 	// ↓ → proxy
-	s, _ = s.Update(pressKey("down"), nil)
+	s, _ = s.Update(pressKey("down"))
 	if s.addForm.fieldCursor != addFieldProxy {
 		t.Fatalf("expected cursor at proxy after Down, got %d", s.addForm.fieldCursor)
 	}
 	// ↓ → index
-	s, _ = s.Update(pressKey("down"), nil)
+	s, _ = s.Update(pressKey("down"))
 	if s.addForm.fieldCursor != addFieldIndex {
 		t.Fatalf("expected cursor at index after 2x Down, got %d", s.addForm.fieldCursor)
 	}
 	// ↑ → 回到 proxy
-	s, _ = s.Update(pressKey("up"), nil)
+	s, _ = s.Update(pressKey("up"))
 	if s.addForm.fieldCursor != addFieldProxy {
 		t.Fatalf("expected cursor back at proxy after Up, got %d", s.addForm.fieldCursor)
 	}
 	// ↑ → 回到 payload
-	s, _ = s.Update(pressKey("up"), nil)
+	s, _ = s.Update(pressKey("up"))
 	if s.addForm.fieldCursor != addFieldPayload {
 		t.Fatalf("expected cursor back at payload after 2x Up, got %d", s.addForm.fieldCursor)
 	}
 	// ↑ → type（payload 上一格即类型行）
-	s, _ = s.Update(pressKey("up"), nil)
+	s, _ = s.Update(pressKey("up"))
 	if s.addForm.fieldCursor != addFieldType {
 		t.Fatalf("expected cursor at type after 3x Up, got %d", s.addForm.fieldCursor)
 	}
@@ -161,9 +161,9 @@ func TestAddForm_UpDownCyclesField(t *testing.T) {
 // TestAddForm_EnterValidationFailsOnEmpty 验证空 payload/proxy 时 Enter 校验失败、不关闭。
 func TestAddForm_EnterValidationFailsOnEmpty(t *testing.T) {
 	s := State{}
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 	// 空表单按 Enter → 校验失败
-	s, _ = s.Update(pressKey("enter"), nil)
+	s, _ = s.Update(pressKey("enter"))
 	if !s.ShowAddForm() {
 		t.Fatal("expected form to remain open on validation failure")
 	}
@@ -175,12 +175,12 @@ func TestAddForm_EnterValidationFailsOnEmpty(t *testing.T) {
 // TestAddForm_EnterSucceedsWithValidInput 验证合法输入后 Enter 关闭并返回写盘命令。
 func TestAddForm_EnterSucceedsWithValidInput(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 	// 输入 payload（当前焦点在 payload）
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("example.com")}, nil)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("example.com")})
 	// proxy 为只读选择器，默认即 DIRECT，无需输入
 	// Enter → 提交
-	s, cmd := s.Update(pressKey("enter"), nil)
+	s, cmd := s.Update(pressKey("enter"))
 	if s.ShowAddForm() {
 		t.Fatal("expected form closed on successful submit")
 	}
@@ -192,10 +192,10 @@ func TestAddForm_EnterSucceedsWithValidInput(t *testing.T) {
 // TestAddForm_MatchTypeSkipsPayload 验证 MATCH 类型不要求 payload。
 func TestAddForm_MatchTypeSkipsPayload(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 
 	// 聚焦到 type 行后，←/→ 才切换类型
-	s, _ = s.Update(pressShiftTab(), nil)
+	s, _ = s.Update(pressShiftTab())
 	if !s.addForm.isTypeField() {
 		t.Fatalf("expected focus on type field, got %d", s.addForm.fieldCursor)
 	}
@@ -205,14 +205,14 @@ func TestAddForm_MatchTypeSkipsPayload(t *testing.T) {
 		if s.addForm.isMatchType() {
 			break
 		}
-		s, _ = s.Update(pressKey("right"), nil)
+		s, _ = s.Update(pressKey("right"))
 	}
 	if !s.addForm.isMatchType() {
 		t.Fatal("expected to reach MATCH type by cycling Right")
 	}
 
 	// proxy 为只读选择器，默认即 DIRECT，无需 payload 即可提交
-	s, cmd := s.Update(pressKey("enter"), nil)
+	s, cmd := s.Update(pressKey("enter"))
 	if s.ShowAddForm() {
 		t.Fatal("expected MATCH rule to submit without payload")
 	}
@@ -224,15 +224,15 @@ func TestAddForm_MatchTypeSkipsPayload(t *testing.T) {
 // TestAddForm_IndexValidationRejectsNonNumeric 验证位置字段非数字时校验失败。
 func TestAddForm_IndexValidationRejectsNonNumeric(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 	// payload
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a.com")}, nil)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a.com")})
 	// index = "abc"（proxy 为只读选择器，跳过）
-	s, _ = s.Update(pressTab(), nil) // → proxy
-	s, _ = s.Update(pressTab(), nil) // → index
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("abc")}, nil)
+	s, _ = s.Update(pressTab()) // → proxy
+	s, _ = s.Update(pressTab()) // → index
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("abc")})
 	// Enter → 校验失败
-	s, _ = s.Update(pressKey("enter"), nil)
+	s, _ = s.Update(pressKey("enter"))
 	if !s.ShowAddForm() {
 		t.Fatal("expected form open when index is non-numeric")
 	}
@@ -414,14 +414,14 @@ func TestAddForm_DefaultProxyIsDirect(t *testing.T) {
 // TestAddForm_ProxyFieldEnterOpensPicker 验证策略行聚焦时 Enter 打开二级弹窗。
 func TestAddForm_ProxyFieldEnterOpensPicker(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 	// Tab 到 proxy 字段
-	s, _ = s.Update(pressTab(), nil)
+	s, _ = s.Update(pressTab())
 	if !s.addForm.isProxyField() {
 		t.Fatal("expected focus on proxy field")
 	}
 	// Enter 打开二级弹窗
-	s, _ = s.Update(pressKey("enter"), nil)
+	s, _ = s.Update(pressKey("enter"))
 	if !s.addForm.isProxyPickerOpen() {
 		t.Fatal("expected proxy picker to open after Enter on proxy field")
 	}
@@ -430,20 +430,20 @@ func TestAddForm_ProxyFieldEnterOpensPicker(t *testing.T) {
 // TestAddForm_PickerTabSwitch 验证 Tab 键在策略弹窗内切分类。
 func TestAddForm_PickerTabSwitch(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 	// Tab → proxy, Enter → picker
-	s, _ = s.Update(pressTab(), nil)
-	s, _ = s.Update(pressKey("enter"), nil)
+	s, _ = s.Update(pressTab())
+	s, _ = s.Update(pressKey("enter"))
 	if s.addForm.pickerTab != addPickerTabGroup {
 		t.Fatalf("expected initial tab=group(0), got %d", s.addForm.pickerTab)
 	}
 	// Tab → 切到节点
-	s, _ = s.Update(pressTab(), nil)
+	s, _ = s.Update(pressTab())
 	if s.addForm.pickerTab != addPickerTabNode {
 		t.Fatalf("expected tab=node(1) after Tab, got %d", s.addForm.pickerTab)
 	}
 	// Shift+Tab → 回到策略组
-	s, _ = s.Update(pressShiftTab(), nil)
+	s, _ = s.Update(pressShiftTab())
 	if s.addForm.pickerTab != addPickerTabGroup {
 		t.Fatalf("expected tab=group(0) after Shift+Tab, got %d", s.addForm.pickerTab)
 	}
@@ -452,10 +452,10 @@ func TestAddForm_PickerTabSwitch(t *testing.T) {
 // TestAddForm_PickerEscClosesKeepsSelection 验证 Esc 关闭弹窗保留已选策略。
 func TestAddForm_PickerEscClosesKeepsSelection(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
-	s, _ = s.Update(pressTab(), nil)        // → proxy
-	s, _ = s.Update(pressKey("enter"), nil) // open picker
-	s, _ = s.Update(pressKey("esc"), nil)   // close picker
+	s, _ = s.Update(keyMsg('n'))
+	s, _ = s.Update(pressTab())        // → proxy
+	s, _ = s.Update(pressKey("enter")) // open picker
+	s, _ = s.Update(pressKey("esc"))   // close picker
 	if s.addForm.isProxyPickerOpen() {
 		t.Fatal("expected picker closed after Esc")
 	}
@@ -467,20 +467,20 @@ func TestAddForm_PickerEscClosesKeepsSelection(t *testing.T) {
 // TestAddForm_PickerUpDownMovesCursor 验证 ↑/↓ 在过滤列表中移动。
 func TestAddForm_PickerUpDownMovesCursor(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
-	s, _ = s.Update(pressTab(), nil)
-	s, _ = s.Update(pressKey("enter"), nil) // open picker
+	s, _ = s.Update(keyMsg('n'))
+	s, _ = s.Update(pressTab())
+	s, _ = s.Update(pressKey("enter")) // open picker
 	// 初始光标 0
 	if s.addForm.pickerCursor != 0 {
 		t.Fatalf("expected initial picker cursor 0, got %d", s.addForm.pickerCursor)
 	}
 	// ↓ → 1
-	s, _ = s.Update(pressKey("down"), nil)
+	s, _ = s.Update(pressKey("down"))
 	if s.addForm.pickerCursor != 1 {
 		t.Fatalf("expected picker cursor 1 after Down, got %d", s.addForm.pickerCursor)
 	}
 	// ↑ → 0
-	s, _ = s.Update(pressKey("up"), nil)
+	s, _ = s.Update(pressKey("up"))
 	if s.addForm.pickerCursor != 0 {
 		t.Fatalf("expected picker cursor 0 after Up, got %d", s.addForm.pickerCursor)
 	}
@@ -489,13 +489,13 @@ func TestAddForm_PickerUpDownMovesCursor(t *testing.T) {
 // TestAddForm_PickerEnterSelects 验证 Enter 选中当前项并回填。
 func TestAddForm_PickerEnterSelects(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
-	s, _ = s.Update(pressTab(), nil)
-	s, _ = s.Update(pressKey("enter"), nil) // open picker
+	s, _ = s.Update(keyMsg('n'))
+	s, _ = s.Update(pressTab())
+	s, _ = s.Update(pressKey("enter")) // open picker
 	// ↓ 移动到 REJECT (index 1)
-	s, _ = s.Update(pressKey("down"), nil)
+	s, _ = s.Update(pressKey("down"))
 	// Enter 选中
-	s, _ = s.Update(pressKey("enter"), nil)
+	s, _ = s.Update(pressKey("enter"))
 	if s.addForm.isProxyPickerOpen() {
 		t.Fatal("expected picker closed after Enter selection")
 	}
@@ -507,11 +507,11 @@ func TestAddForm_PickerEnterSelects(t *testing.T) {
 // TestAddForm_PickerFuzzySearch 验证模糊搜索过滤列表。
 func TestAddForm_PickerFuzzySearch(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
-	s, _ = s.Update(pressTab(), nil)
-	s, _ = s.Update(pressKey("enter"), nil) // open picker
+	s, _ = s.Update(keyMsg('n'))
+	s, _ = s.Update(pressTab())
+	s, _ = s.Update(pressKey("enter")) // open picker
 	// 输入 "rej" 应过滤出 REJECT
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("rej")}, nil)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("rej")})
 	filtered := s.addForm.pickerFiltered()
 	if len(filtered) != 1 || filtered[0] != "REJECT" {
 		t.Fatalf("expected [REJECT] after typing 'rej', got %v", filtered)
@@ -521,12 +521,12 @@ func TestAddForm_PickerFuzzySearch(t *testing.T) {
 // TestAddForm_PickerBackspace 验证 Backspace 删除搜索字符。
 func TestAddForm_PickerBackspace(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
-	s, _ = s.Update(pressTab(), nil)
-	s, _ = s.Update(pressKey("enter"), nil) // open picker
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("rej")}, nil)
+	s, _ = s.Update(keyMsg('n'))
+	s, _ = s.Update(pressTab())
+	s, _ = s.Update(pressKey("enter")) // open picker
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("rej")})
 	// Backspace
-	s, _ = s.Update(pressKey("backspace"), nil)
+	s, _ = s.Update(pressKey("backspace"))
 	if s.addForm.pickerSearch != "re" {
 		t.Fatalf("expected search 're' after backspace, got %q", s.addForm.pickerSearch)
 	}
@@ -535,19 +535,19 @@ func TestAddForm_PickerBackspace(t *testing.T) {
 // TestAddForm_LeftRightDoesNotChangeProxy 验证策略行聚焦时 ←/→ 不再切换策略。
 func TestAddForm_LeftRightDoesNotChangeProxy(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 	// Tab 到 proxy 字段
-	s, _ = s.Update(pressTab(), nil)
+	s, _ = s.Update(pressTab())
 	if !s.addForm.isProxyField() {
 		t.Fatal("expected focus on proxy field")
 	}
 	proxyBefore := s.addForm.currentProxy()
 	// ←/→ 不应改变策略
-	s, _ = s.Update(pressKey("right"), nil)
+	s, _ = s.Update(pressKey("right"))
 	if s.addForm.currentProxy() != proxyBefore {
 		t.Fatalf("proxy should not change on Right, was %s now %s", proxyBefore, s.addForm.currentProxy())
 	}
-	s, _ = s.Update(pressKey("left"), nil)
+	s, _ = s.Update(pressKey("left"))
 	if s.addForm.currentProxy() != proxyBefore {
 		t.Fatalf("proxy should not change on Left, was %s now %s", proxyBefore, s.addForm.currentProxy())
 	}
@@ -557,7 +557,7 @@ func TestAddForm_LeftRightDoesNotChangeProxy(t *testing.T) {
 // 不再切换类型（改为移动光标），仅类型行聚焦时才切类型。
 func TestAddForm_LeftRightDoesNotCycleTypeWhenPayloadFocused(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 	// 焦点在 payload（默认）
 	if !s.addForm.isTypeField() && s.addForm.fieldCursor != addFieldPayload {
 		t.Fatalf("expected focus on payload, got %d", s.addForm.fieldCursor)
@@ -565,11 +565,11 @@ func TestAddForm_LeftRightDoesNotCycleTypeWhenPayloadFocused(t *testing.T) {
 	typeBefore := s.addForm.currentType()
 
 	// payload 聚焦时 ←/→ 不应改变类型
-	s, _ = s.Update(pressKey("right"), nil)
+	s, _ = s.Update(pressKey("right"))
 	if s.addForm.currentType() != typeBefore {
 		t.Fatalf("type should not change when payload focused, was %s now %s", typeBefore, s.addForm.currentType())
 	}
-	s, _ = s.Update(pressKey("left"), nil)
+	s, _ = s.Update(pressKey("left"))
 	if s.addForm.currentType() != typeBefore {
 		t.Fatalf("type should not change when payload focused, was %s now %s", typeBefore, s.addForm.currentType())
 	}
@@ -578,13 +578,13 @@ func TestAddForm_LeftRightDoesNotCycleTypeWhenPayloadFocused(t *testing.T) {
 // TestAddForm_ProxyFieldIgnoresTextInput 验证策略行为只读选择器，键入文本不影响其值。
 func TestAddForm_ProxyFieldIgnoresTextInput(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 	// Tab 到 proxy
-	s, _ = s.Update(pressTab(), nil)
+	s, _ = s.Update(pressTab())
 	proxyBefore := s.addForm.currentProxy()
 
 	// 键入文本应被吞掉
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("PROXY")}, nil)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("PROXY")})
 	if s.addForm.currentProxy() != proxyBefore {
 		t.Fatalf("proxy changed via text input on read-only field: %s -> %s",
 			proxyBefore, s.addForm.currentProxy())
@@ -595,24 +595,24 @@ func TestAddForm_ProxyFieldIgnoresTextInput(t *testing.T) {
 // 而非（已移除的）proxy 文本输入。
 func TestAddForm_ProxySelectorSubmitsCurrentProxy(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 	// payload
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("example.com")}, nil)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("example.com")})
 	// Tab → proxy, Enter 打开 picker
-	s, _ = s.Update(pressTab(), nil)
-	s, _ = s.Update(pressKey("enter"), nil)
+	s, _ = s.Update(pressTab())
+	s, _ = s.Update(pressKey("enter"))
 	// ↓ 移动到 REJECT，Enter 选中
-	s, _ = s.Update(pressKey("down"), nil)
-	s, _ = s.Update(pressKey("enter"), nil)
+	s, _ = s.Update(pressKey("down"))
+	s, _ = s.Update(pressKey("enter"))
 	chosenProxy := s.addForm.currentProxy()
 	if chosenProxy != "REJECT" {
 		t.Fatalf("expected REJECT after picker selection, got %s", chosenProxy)
 	}
 
 	// 提交；回到 payload 焦点后提交。
-	s, _ = s.Update(pressTab(), nil) // → index
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("1")}, nil)
-	s, _ = s.Update(pressKey("enter"), nil)
+	s, _ = s.Update(pressTab()) // → index
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("1")})
+	s, _ = s.Update(pressKey("enter"))
 	if s.ShowAddForm() {
 		t.Fatal("expected successful submit")
 	}
@@ -715,9 +715,9 @@ func TestPickerFiltered_DirectRejectSearchable(t *testing.T) {
 // 而非切换类型（这是本次修复的核心目标）。
 func TestAddForm_LeftRightMovesCursorInPayload(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 	// 输入 "abc"，光标默认在末尾（pos=3）
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("abc")}, nil)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("abc")})
 	payload := s.addForm.fields[addFieldPayload]
 	if got := payload.Position(); got != 3 {
 		t.Fatalf("expected cursor at end (pos=3) after typing 'abc', got %d", got)
@@ -725,7 +725,7 @@ func TestAddForm_LeftRightMovesCursorInPayload(t *testing.T) {
 	typeBefore := s.addForm.currentType()
 
 	// ← 光标左移一位，类型不变
-	s, _ = s.Update(pressKey("left"), nil)
+	s, _ = s.Update(pressKey("left"))
 	if got := s.addForm.fields[addFieldPayload].Position(); got != 2 {
 		t.Fatalf("expected cursor pos=2 after Left, got %d", got)
 	}
@@ -733,7 +733,7 @@ func TestAddForm_LeftRightMovesCursorInPayload(t *testing.T) {
 		t.Fatalf("type should not change on Left in payload, was %s now %s", typeBefore, s.addForm.currentType())
 	}
 	// → 光标右移回末尾
-	s, _ = s.Update(pressKey("right"), nil)
+	s, _ = s.Update(pressKey("right"))
 	if got := s.addForm.fields[addFieldPayload].Position(); got != 3 {
 		t.Fatalf("expected cursor pos=3 after Right, got %d", got)
 	}
@@ -742,20 +742,20 @@ func TestAddForm_LeftRightMovesCursorInPayload(t *testing.T) {
 // TestAddForm_LeftRightMovesCursorInIndex 验证 index 字段聚焦时 ←/→ 同样移动光标。
 func TestAddForm_LeftRightMovesCursorInIndex(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 	// Tab 到 index：payload→proxy→index（两次 Tab）
-	s, _ = s.Update(pressTab(), nil) // → proxy
-	s, _ = s.Update(pressTab(), nil) // → index
+	s, _ = s.Update(pressTab()) // → proxy
+	s, _ = s.Update(pressTab()) // → index
 	if s.addForm.fieldCursor != addFieldIndex {
 		t.Fatalf("expected focus on index, got %d", s.addForm.fieldCursor)
 	}
 	// 输入 "12"，光标在末尾
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("12")}, nil)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("12")})
 	if got := s.addForm.fields[addFieldIndex].Position(); got != 2 {
 		t.Fatalf("expected cursor pos=2 after typing '12', got %d", got)
 	}
 	// ← 左移
-	s, _ = s.Update(pressKey("left"), nil)
+	s, _ = s.Update(pressKey("left"))
 	if got := s.addForm.fields[addFieldIndex].Position(); got != 1 {
 		t.Fatalf("expected cursor pos=1 after Left, got %d", got)
 	}
@@ -764,7 +764,7 @@ func TestAddForm_LeftRightMovesCursorInIndex(t *testing.T) {
 // TestAddForm_DefaultFocusIsPayload 验证打开表单后默认焦点在 payload（最常用操作）。
 func TestAddForm_DefaultFocusIsPayload(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 	if s.addForm.fieldCursor != addFieldPayload {
 		t.Fatalf("expected default focus on payload(%d), got %d", addFieldPayload, s.addForm.fieldCursor)
 	}
@@ -776,15 +776,15 @@ func TestAddForm_DefaultFocusIsPayload(t *testing.T) {
 // TestAddForm_TypeFieldIgnoresTextInput 验证类型行为只读选择器，键入文本不影响类型值。
 func TestAddForm_TypeFieldIgnoresTextInput(t *testing.T) {
 	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
-	s, _ = s.Update(keyMsg('n'), nil)
+	s, _ = s.Update(keyMsg('n'))
 	// 聚焦到 type 行
-	s, _ = s.Update(pressShiftTab(), nil)
+	s, _ = s.Update(pressShiftTab())
 	if !s.addForm.isTypeField() {
 		t.Fatalf("expected focus on type field, got %d", s.addForm.fieldCursor)
 	}
 	typeBefore := s.addForm.currentType()
 	// 键入文本应被吞掉，类型不变
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("XYZ")}, nil)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("XYZ")})
 	if s.addForm.currentType() != typeBefore {
 		t.Fatalf("type changed via text input on read-only field: %s -> %s", typeBefore, s.addForm.currentType())
 	}

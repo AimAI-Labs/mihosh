@@ -3,20 +3,17 @@ package connections
 import (
 	"time"
 
-	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 // HandleMouseLeft 处理 connections 页面左键单击/双击
 func (s State) HandleMouseLeft(
-	pageX int,
-	pageY int,
-	pageWidth int,
-	pageHeight int,
-	chartData *model.ChartData,
-	timeout int,
+	pageX, pageY, pageWidth, pageHeight int,
 ) (State, tea.Cmd) {
+	chartData := s.chartData
+	timeout := s.timeout
+
 	if s.connDetailMode {
 		if s.connDetailSnapshot == nil {
 			s.closeConnectionDetail()
@@ -138,14 +135,16 @@ func (s State) HandleMouseLeft(
 		return s.openSelectedConnectionDetail()
 
 	case MouseTargetSiteTest:
-		if hit.Index < 0 || hit.Index >= len(s.siteTests) {
+		idx := hit.Index
+		if idx < 0 || idx >= len(s.siteTests) {
 			return s, nil
 		}
-		s.selectedSiteTest = hit.Index
-		if !s.doubleClickDetector.IsDoubleClick(MouseTargetSiteTest, hit.Index, now) {
-			return s, nil
+		s.selectedSiteTest = idx
+		if s.doubleClickDetector.IsDoubleClick(MouseTargetSiteTest, idx, now) {
+			s.selectedSiteTest = idx
+			s.siteTests[idx].Testing = true
+			return s, TestSiteDelay(s.proxyAddr, s.siteTests[idx].Name, s.siteTests[idx].URL, timeout)
 		}
-		return s.triggerSiteTestByIndex(hit.Index, timeout)
 	}
 
 	return s, nil

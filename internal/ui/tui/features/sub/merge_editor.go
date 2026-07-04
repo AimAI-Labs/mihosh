@@ -10,7 +10,6 @@ import (
 	"errors"
 	"os/exec"
 
-	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
@@ -18,7 +17,7 @@ import (
 )
 
 // openMergeExternalEditor 在外部编辑器中打开全局 merge.yaml。
-func (s State) openMergeExternalEditor(svc *service.ProfileService) (State, tea.Cmd) {
+func (s State) openMergeExternalEditor() (State, tea.Cmd) {
 	mergePath, err := profile.MergePath()
 	if err != nil {
 		return s, mergeEditError(err)

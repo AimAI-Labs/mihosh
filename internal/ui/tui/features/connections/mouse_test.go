@@ -32,7 +32,7 @@ func TestConnsHandleMouseLeft_DoubleClickConnectionEntersDetail(t *testing.T) {
 		t.Fatalf("failed to locate first connection row mouse point")
 	}
 
-	next, cmd := state.HandleMouseLeft(x, y, width, height, nil, 3000)
+	next, cmd := state.HandleMouseLeft(x, y, width, height)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd on first click, got non-nil")
 	}
@@ -40,7 +40,7 @@ func TestConnsHandleMouseLeft_DoubleClickConnectionEntersDetail(t *testing.T) {
 		t.Fatalf("expected detail mode disabled on first click")
 	}
 
-	next, cmd = next.HandleMouseLeft(x, y, width, height, nil, 3000)
+	next, cmd = next.HandleMouseLeft(x, y, width, height)
 	if cmd == nil {
 		t.Fatalf("expected non-nil cmd on connection double click")
 	}
@@ -66,7 +66,7 @@ func TestConnsHandleMouseLeft_ClickHistoryTabSwitchesView(t *testing.T) {
 		t.Fatalf("failed to locate history tab mouse point")
 	}
 
-	next, cmd := state.HandleMouseLeft(x, y, width, height, nil, 3000)
+	next, cmd := state.HandleMouseLeft(x, y, width, height)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd when switching view tab")
 	}
@@ -92,7 +92,7 @@ func TestConnsHandleMouseLeft_ClickActiveTabSwitchesView(t *testing.T) {
 		t.Fatalf("failed to locate active tab mouse point")
 	}
 
-	next, cmd := state.HandleMouseLeft(x, y, width, height, nil, 3000)
+	next, cmd := state.HandleMouseLeft(x, y, width, height)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd when switching view tab")
 	}
@@ -121,7 +121,7 @@ func TestConnsHandleMouseLeft_DoubleClickHistoryConnectionEntersDetail(t *testin
 		t.Fatalf("failed to locate first history connection row mouse point")
 	}
 
-	next, cmd := state.HandleMouseLeft(x, y, width, height, nil, 3000)
+	next, cmd := state.HandleMouseLeft(x, y, width, height)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd on first history click, got non-nil")
 	}
@@ -129,7 +129,7 @@ func TestConnsHandleMouseLeft_DoubleClickHistoryConnectionEntersDetail(t *testin
 		t.Fatalf("expected detail mode disabled on first history click")
 	}
 
-	next, cmd = next.HandleMouseLeft(x, y, width, height, nil, 3000)
+	next, cmd = next.HandleMouseLeft(x, y, width, height)
 	if cmd == nil {
 		t.Fatalf("expected non-nil cmd on history connection double click")
 	}
@@ -159,7 +159,7 @@ func TestConnsHandleMouseLeft_DoubleClickSiteTestTriggersSiteProbe(t *testing.T)
 		t.Fatalf("failed to locate second site-test card mouse point")
 	}
 
-	next, cmd := state.HandleMouseLeft(x, y, width, height, nil, 3000)
+	next, cmd := state.HandleMouseLeft(x, y, width, height)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd on first site click, got non-nil")
 	}
@@ -170,7 +170,7 @@ func TestConnsHandleMouseLeft_DoubleClickSiteTestTriggersSiteProbe(t *testing.T)
 		t.Fatalf("expected selected site not testing on first click")
 	}
 
-	next, cmd = next.HandleMouseLeft(x, y, width, height, nil, 3000)
+	next, cmd = next.HandleMouseLeft(x, y, width, height)
 	if cmd == nil {
 		t.Fatalf("expected non-nil cmd on site card double click")
 	}
@@ -232,11 +232,11 @@ func TestConnsHandleMouseLeft_DoubleClickChartOpensTopNModal(t *testing.T) {
 	if !ok {
 		t.Fatalf("failed to locate chart area mouse point")
 	}
-	next, cmd := state.HandleMouseLeft(chartX, chartY, width, height, chart, 3000)
+	next, cmd := state.HandleMouseLeft(chartX, chartY, width, height)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd on first chart click, got non-nil")
 	}
-	next, cmd = next.HandleMouseLeft(chartX, chartY, width, height, chart, 3000)
+	next, cmd = next.HandleMouseLeft(chartX, chartY, width, height)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd on chart double click, got non-nil")
 	}
@@ -271,11 +271,11 @@ func TestConnsHandleMouseLeft_DoubleClickTopNOpensTopNModal(t *testing.T) {
 		t.Fatalf("failed to locate TopN section mouse point")
 	}
 
-	next, cmd := state.HandleMouseLeft(x, y, width, height, nil, 3000)
+	next, cmd := state.HandleMouseLeft(x, y, width, height)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd on first topN click")
 	}
-	next, cmd = next.HandleMouseLeft(x, y, width, height, nil, 3000)
+	next, cmd = next.HandleMouseLeft(x, y, width, height)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd on topN double click")
 	}
@@ -309,7 +309,7 @@ func TestConnsHandleMouseLeft_DoubleClickTopNModalItemEntersDetail(t *testing.T)
 		t.Fatalf("failed to locate TopN modal item mouse point")
 	}
 
-	next, cmd := state.HandleMouseLeft(x, y, width, height, nil, 3000)
+	next, cmd := state.HandleMouseLeft(x, y, width, height)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd on first click")
 	}
@@ -317,7 +317,7 @@ func TestConnsHandleMouseLeft_DoubleClickTopNModalItemEntersDetail(t *testing.T)
 		t.Fatalf("expected topN modal still open after first click")
 	}
 
-	next, cmd = next.HandleMouseLeft(x, y, width, height, nil, 3000)
+	next, cmd = next.HandleMouseLeft(x, y, width, height)
 	if cmd == nil {
 		t.Fatalf("expected non-nil cmd on double click (fetch ip info)")
 	}
@@ -333,8 +333,8 @@ func TestConnsHandleMouseLeft_DoubleClickTopNModalItemEntersDetail(t *testing.T)
 
 	// 模拟双击详情页面区域以关闭它
 	// 双击 (10, 10)
-	next, cmd = next.HandleMouseLeft(10, 10, width, height, nil, 3000)
-	next, cmd = next.HandleMouseLeft(10, 10, width, height, nil, 3000)
+	next, cmd = next.HandleMouseLeft(10, 10, width, height)
+	next, cmd = next.HandleMouseLeft(10, 10, width, height)
 	if next.connDetailMode {
 		t.Fatalf("expected detail mode closed after double click")
 	}
@@ -372,7 +372,7 @@ func TestConnsHandleMouseLeft_ClickOutsideTopNModalCloses(t *testing.T) {
 		clickY = top
 	}
 
-	next, cmd := state.HandleMouseLeft(clickX, clickY, width, height, nil, 3000)
+	next, cmd := state.HandleMouseLeft(clickX, clickY, width, height)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd when closing topN modal by outside click")
 	}
@@ -404,7 +404,7 @@ func TestConnsHandleMouseLeft_ClickTabClosesDetail(t *testing.T) {
 		t.Fatalf("failed to locate history tab mouse point")
 	}
 
-	next, cmd := state.HandleMouseLeft(x, y, width, height, nil, 3000)
+	next, cmd := state.HandleMouseLeft(x, y, width, height)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd when closing detail by tab click")
 	}
@@ -442,7 +442,7 @@ func TestConnsHandleMouseLeft_DoubleClickDetailClosesModal(t *testing.T) {
 	clickX := 10
 	clickY := 10
 
-	next, cmd := state.HandleMouseLeft(clickX, clickY, width, height, nil, 3000)
+	next, cmd := state.HandleMouseLeft(clickX, clickY, width, height)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd when clicking inside detail")
 	}
@@ -454,7 +454,7 @@ func TestConnsHandleMouseLeft_DoubleClickDetailClosesModal(t *testing.T) {
 	}
 
 	// 双击退出
-	next, cmd = next.HandleMouseLeft(clickX, clickY, width, height, nil, 3000)
+	next, cmd = next.HandleMouseLeft(clickX, clickY, width, height)
 	if cmd != nil {
 		t.Fatalf("expected nil cmd on double click")
 	}
@@ -484,7 +484,7 @@ func TestConnsDetailInputTakesPriorityOverTopNModal(t *testing.T) {
 		connDetailJSONLineCount: 40,
 	}
 
-	next, cmd := state.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}, nil, 3000, nil)
+	next, cmd := state.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	if cmd != nil {
 		t.Fatalf("expected nil cmd while scrolling detail, got non-nil")
 	}

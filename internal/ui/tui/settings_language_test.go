@@ -8,6 +8,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/viper"
@@ -35,9 +36,10 @@ func TestSettingsLanguageSaveAppliesI18nImmediately(t *testing.T) {
 	i18n.SetLanguageOverride("zh-CN")
 
 	model := Model{
-		currentPage: layout.PageSettings,
-		config:      &cfg,
-		configSvc:   service.NewConfigService(),
+		currentPage:   layout.PageSettings,
+		config:        &cfg,
+		configSvc:     service.NewConfigService(),
+		settingsState: settings.NewState(service.NewConfigService(), nil),
 	}
 
 	for i := 0; i < 2; i++ {
@@ -81,11 +83,12 @@ func TestSettingsLanguageMouseClickAppliesI18nImmediately(t *testing.T) {
 	i18n.SetLanguageOverride("zh-CN")
 
 	model := Model{
-		currentPage: layout.PageSettings,
-		config:      &cfg,
-		configSvc:   service.NewConfigService(),
-		width:       120,
-		height:      30,
+		currentPage:   layout.PageSettings,
+		config:        &cfg,
+		configSvc:     service.NewConfigService(),
+		settingsState: settings.NewState(service.NewConfigService(), nil),
+		width:         120,
+		height:        30,
 	}
 
 	const pageX = 48 // originally 42, shifted by 4 due to label width increase, +2 to be safe
@@ -129,11 +132,12 @@ func TestSettingsThemeMouseClickClearsScreen(t *testing.T) {
 	theme.SetTheme("tokyo-night")
 
 	model := Model{
-		currentPage: layout.PageSettings,
-		config:      &cfg,
-		configSvc:   service.NewConfigService(),
-		width:       120,
-		height:      30,
+		currentPage:   layout.PageSettings,
+		config:        &cfg,
+		configSvc:     service.NewConfigService(),
+		settingsState: settings.NewState(service.NewConfigService(), nil),
+		width:         120,
+		height:        30,
 	}
 
 	const pageX = 48 // originally 40, shifted by 4 due to label width increase, +4 to be safe

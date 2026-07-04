@@ -17,7 +17,7 @@ func TestHandleMouseLeft_SingleClickSelectsSetting(t *testing.T) {
 	}
 	configSvc := service.NewConfigService()
 
-	next, _, _ := state.HandleMouseLeft(0, 6, 100, 30, cfg, configSvc, nil)
+	state.Config = cfg; state.configSvc = configSvc; next, _ := state.HandleMouseLeft(0, 6, 100, 30)
 	if next.selectedSetting != 1 {
 		t.Fatalf("expected selectedSetting=1, got %d", next.selectedSetting)
 	}
@@ -34,12 +34,12 @@ func TestHandleMouseLeft_DoubleClickEntersEditMode(t *testing.T) {
 	configSvc := service.NewConfigService()
 
 	const timeoutRowY = 6 // timeout index=1, offset=5
-	next, _, _ := state.HandleMouseLeft(0, timeoutRowY, 100, 30, cfg, configSvc, nil)
+	state.Config = cfg; state.configSvc = configSvc; next, _ := state.HandleMouseLeft(0, timeoutRowY, 100, 30)
 	if next.editMode {
 		t.Fatalf("expected editMode=false on first click")
 	}
 
-	next, _, _ = next.HandleMouseLeft(0, timeoutRowY, 100, 30, cfg, configSvc, nil)
+	next.Config = cfg; next.configSvc = configSvc; next, _ = next.HandleMouseLeft(0, timeoutRowY, 100, 30)
 	if !next.editMode {
 		t.Fatalf("expected editMode=true after double click")
 	}
@@ -74,16 +74,16 @@ func TestHandleMouseLeft_ClickLanguageTabSavesImmediately(t *testing.T) {
 
 	const languageRowY = 7 // language index=2, offset=5
 	zhCNTabX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth + settingsTabDisplayWidth("auto") + 1
-	next, newCfg, _ := state.HandleMouseLeft(zhCNTabX, languageRowY, 100, 30, &cfg, configSvc, nil)
+	state.Config = &cfg; state.configSvc = configSvc; next, _ := state.HandleMouseLeft(zhCNTabX, languageRowY, 100, 30)
 
 	if next.selectedSetting != 2 {
 		t.Fatalf("expected language row selected, got %d", next.selectedSetting)
 	}
-	if newCfg == nil {
+	if next.Config == nil {
 		t.Fatalf("expected config reload after language click")
 	}
-	if newCfg.Language != "zh-CN" {
-		t.Fatalf("expected language zh-CN, got %q", newCfg.Language)
+	if next.Config.Language != "zh-CN" {
+		t.Fatalf("expected language zh-CN, got %q", next.Config.Language)
 	}
 	if next.editMode {
 		t.Fatalf("expected language click to save directly without entering edit mode")
@@ -134,7 +134,7 @@ func TestHandleMouseLeft_ClickOutsideClosesEdit(t *testing.T) {
 	configSvc := service.NewConfigService()
 
 	// 点击无效行 (pageY = 0, yOffset=2，所以 idx = -2)
-	next, _, _ := state.HandleMouseLeft(0, 0, 100, 30, cfg, configSvc, nil)
+	state.Config = cfg; state.configSvc = configSvc; next, _ := state.HandleMouseLeft(0, 0, 100, 30)
 	if next.editMode {
 		t.Fatalf("expected editMode to be false after clicking outside")
 	}
@@ -152,7 +152,7 @@ func TestHandleMouseLeft_ClickInvalidRowDoesNothing(t *testing.T) {
 	configSvc := service.NewConfigService()
 
 	// 键盘模式或非编辑模式下，点击无效的行应该直接返回原状态，不改变选中状态
-	next, _, _ := state.HandleMouseLeft(0, 0, 100, 30, cfg, configSvc, nil)
+	state.Config = cfg; state.configSvc = configSvc; next, _ := state.HandleMouseLeft(0, 0, 100, 30)
 	if next.selectedSetting != 2 {
 		t.Fatalf("expected selectedSetting to remain 2, got %d", next.selectedSetting)
 	}
@@ -168,11 +168,11 @@ func TestHandleMouseLeft_LanguageClickSaveFailure(t *testing.T) {
 	configSvc := service.NewConfigService()
 
 	// 点击非 Tab 区域的 X 坐标 (如 X = 0)，pageY=7 对应语言行 (index=2, offset=5)
-	next, newCfg, _ := state.HandleMouseLeft(0, 7, 100, 30, cfg, configSvc, nil)
+	state.Config = cfg; state.configSvc = configSvc; next, _ := state.HandleMouseLeft(0, 7, 100, 30)
 	if !next.editMode {
 		t.Fatalf("expected editMode to remain true when clicking language row but missing tabs")
 	}
-	if newCfg != cfg {
+	if next.Config != cfg {
 		t.Fatalf("expected config to be unchanged")
 	}
 }
@@ -187,7 +187,7 @@ func TestHandleMouseLeft_ClickAllowLanRowToggles(t *testing.T) {
 	configSvc := service.NewConfigService()
 
 	trueTabX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth + 1
-	next, _, cmd := state.HandleMouseLeft(trueTabX, allowLanRowY, 100, 30, &config.Config{}, configSvc, nil)
+	state.Config = &config.Config{}; state.configSvc = configSvc; next, cmd := state.HandleMouseLeft(trueTabX, allowLanRowY, 100, 30)
 	if next.selectedSetting != 3 {
 		t.Fatalf("expected allow-lan row selected, got %d", next.selectedSetting)
 	}
@@ -211,7 +211,7 @@ func TestHandleMouseLeft_ClickLogLevelRowSets(t *testing.T) {
 	// "warning" is the second tab.
 	// info tab width = 4 + 4 = 8. + 1 (separator) = 9
 	warningTabX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth + 9 + 1
-	next, _, cmd := state.HandleMouseLeft(warningTabX, logLevelRowY, 100, 30, &config.Config{}, configSvc, nil)
+	state.Config = &config.Config{}; state.configSvc = configSvc; next, cmd := state.HandleMouseLeft(warningTabX, logLevelRowY, 100, 30)
 	if next.selectedSetting != 4 {
 		t.Fatalf("expected log-level row selected, got %d", next.selectedSetting)
 	}
@@ -235,7 +235,7 @@ func TestHandleMouseLeft_EditModeAllowLanClickToggles(t *testing.T) {
 	configSvc := service.NewConfigService()
 
 	trueTabX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth + 1
-	next, _, cmd := state.HandleMouseLeft(trueTabX, allowLanRowY, 100, 30, &config.Config{}, configSvc, nil)
+	state.Config = &config.Config{}; state.configSvc = configSvc; next, cmd := state.HandleMouseLeft(trueTabX, allowLanRowY, 100, 30)
 	if next.editMode {
 		t.Fatalf("expected editMode to exit after clicking allow-lan row")
 	}

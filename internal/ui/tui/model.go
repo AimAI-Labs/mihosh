@@ -111,6 +111,8 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 	wsCtx, wsCancel := context.WithCancel(context.Background())
 	ipResolver := service.NewIPResolver()
 
+	chartData := model.NewChartData(common.ChartPoints)
+
 	return Model{
 		client:               client,
 		config:               cfg,
@@ -121,18 +123,18 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 		testURL:              testURL,
 		timeout:              timeout,
 		currentPage:          layout.PageNodes,
-		chartData:            model.NewChartData(common.ChartPoints),
+		chartData:            chartData,
 		wsClient:             wsClient,
 		wsMsgChan:            make(chan interface{}, common.WSMsgChanCap),
 		wsCtx:                wsCtx,
 		wsCancel:             wsCancel,
 		ipResolver:           ipResolver,
 		nodesState:           nodes.State{},
-		connsState:           connections.NewState(config.MixedPortToProxyURL(endpoint.MixedPort), model.DefaultSiteTests()),
-		logsState:            logs.NewState(),
+		connsState:           connections.NewState(config.MixedPortToProxyURL(endpoint.MixedPort), model.DefaultSiteTests(), client, timeout, chartData),
+		logsState:            logs.NewState(ipResolver),
 		rulesState:           newRulesState(),
-		subState:             sub.State{},
-		settingsState:        settings.NewState(),
+		subState:             sub.NewState(profileSvc),
+		settingsState:        settings.NewState(configSvc, client),
 		autoRefreshRemaining: cfg.AutoRefreshInterval,
 	}
 }

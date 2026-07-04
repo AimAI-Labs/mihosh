@@ -53,11 +53,11 @@ func TestState_HScrollOffset_RightKeyBoundary(t *testing.T) {
 		maxHScrollOffset: 50,
 	}
 	rightMsg := tea.KeyMsg{Type: tea.KeyRight}
-	s, _ = s.Update(rightMsg, nil)
+	s, _ = s.Update(rightMsg)
 	if s.logHScrollOffset != 50 {
 		t.Fatalf("expected logHScrollOffset=50 (reached max), got %d", s.logHScrollOffset)
 	}
-	s, _ = s.Update(rightMsg, nil)
+	s, _ = s.Update(rightMsg)
 	if s.logHScrollOffset != 50 {
 		t.Fatalf("expected logHScrollOffset stays at 50 (at boundary, no-op), got %d", s.logHScrollOffset)
 	}
@@ -69,7 +69,7 @@ func TestState_HScrollOffset_LeftKeyBoundary(t *testing.T) {
 		maxHScrollOffset: 50,
 	}
 	leftMsg := tea.KeyMsg{Type: tea.KeyLeft}
-	s, _ = s.Update(leftMsg, nil)
+	s, _ = s.Update(leftMsg)
 	if s.logHScrollOffset != 0 {
 		t.Fatalf("expected logHScrollOffset stays at 0, got %d", s.logHScrollOffset)
 	}
@@ -81,11 +81,11 @@ func TestState_HScrollOffset_RightKeyIncrements(t *testing.T) {
 		maxHScrollOffset: 50,
 	}
 	rightMsg := tea.KeyMsg{Type: tea.KeyRight}
-	s, _ = s.Update(rightMsg, nil)
+	s, _ = s.Update(rightMsg)
 	if s.logHScrollOffset != 10 {
 		t.Fatalf("expected logHScrollOffset=10 after one right key, got %d", s.logHScrollOffset)
 	}
-	s, _ = s.Update(rightMsg, nil)
+	s, _ = s.Update(rightMsg)
 	if s.logHScrollOffset != 20 {
 		t.Fatalf("expected logHScrollOffset=20 after two right keys, got %d", s.logHScrollOffset)
 	}
@@ -97,11 +97,11 @@ func TestState_HScrollOffset_LeftKeyDecrements(t *testing.T) {
 		maxHScrollOffset: 50,
 	}
 	leftMsg := tea.KeyMsg{Type: tea.KeyLeft}
-	s, _ = s.Update(leftMsg, nil)
+	s, _ = s.Update(leftMsg)
 	if s.logHScrollOffset != 20 {
 		t.Fatalf("expected logHScrollOffset=20 after left key, got %d", s.logHScrollOffset)
 	}
-	s, _ = s.Update(leftMsg, nil)
+	s, _ = s.Update(leftMsg)
 	if s.logHScrollOffset != 10 {
 		t.Fatalf("expected logHScrollOffset=10 after two left keys, got %d", s.logHScrollOffset)
 	}
@@ -124,22 +124,22 @@ func TestState_HScrollOffset_ReachesMaxThenStops(t *testing.T) {
 		maxHScrollOffset: 50,
 	}
 	rightMsg := tea.KeyMsg{Type: tea.KeyRight}
-	s, _ = s.Update(rightMsg, nil)
+	s, _ = s.Update(rightMsg)
 	if s.logHScrollOffset != 50 {
 		t.Fatalf("expected logHScrollOffset=50 (reached max), got %d", s.logHScrollOffset)
 	}
-	s, _ = s.Update(rightMsg, nil)
+	s, _ = s.Update(rightMsg)
 	if s.logHScrollOffset != 50 {
 		t.Fatalf("expected logHScrollOffset stays at 50, got %d", s.logHScrollOffset)
 	}
-	s, _ = s.Update(rightMsg, nil)
+	s, _ = s.Update(rightMsg)
 	if s.logHScrollOffset != 50 {
 		t.Fatalf("expected logHScrollOffset still 50 after extra right presses, got %d", s.logHScrollOffset)
 	}
 }
 
 func TestState_RingBufferBasicOperation(t *testing.T) {
-	s := NewState()
+	s := NewState(nil)
 	for i := 0; i < common.LogsCap+5; i++ {
 		s = s.AppendLog("info", "log entry")
 	}
@@ -153,7 +153,7 @@ func TestState_RingBufferBasicOperation(t *testing.T) {
 }
 
 func TestState_FilteredLogsLevel(t *testing.T) {
-	s := NewState()
+	s := NewState(nil)
 	s = s.AppendLog("debug", "debug log")
 	s = s.AppendLog("info", "info log")
 	s = s.AppendLog("warning", "warning log")
@@ -166,7 +166,7 @@ func TestState_FilteredLogsLevel(t *testing.T) {
 }
 
 func TestState_ClearLogs(t *testing.T) {
-	s := NewState()
+	s := NewState(nil)
 	s = s.AppendLog("info", "log1")
 	s = s.AppendLog("info", "log2")
 	s = s.ClearLogs()

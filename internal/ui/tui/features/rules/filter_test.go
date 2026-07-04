@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -48,19 +47,19 @@ func TestTypeFilterAppliesToRules(t *testing.T) {
 	s = s.ApplyRules(rules)
 
 	// Press 't' to open type filter overlay
-	s, _ = s.Update(keyMsg('t'), nil)
+	s, _ = s.Update(keyMsg('t'))
 	if !s.showTypeFilter {
 		t.Fatalf("type filter overlay should be open after pressing 't'")
 	}
 
 	// Press Space to select first type
-	s, _ = s.Update(keyMsg(' '), nil)
+	s, _ = s.Update(keyMsg(' '))
 	if len(s.selectedTypes) != 1 {
 		t.Fatalf("expected 1 selected type, got %v", s.selectedTypes)
 	}
 
 	// Press Enter to confirm
-	s, _ = s.Update(pressKey("enter"), nil)
+	s, _ = s.Update(pressKey("enter"))
 	if s.showTypeFilter {
 		t.Fatal("overlay should be closed after Enter")
 	}
@@ -83,7 +82,7 @@ func TestTypeFilterRenderReflectsSelection(t *testing.T) {
 	s = s.ApplyRules(rules)
 
 	// Open overlay
-	s, _ = s.Update(keyMsg('t'), nil)
+	s, _ = s.Update(keyMsg('t'))
 
 	// Find the DOMAIN type index in availableTypes and navigate to it
 	targetIdx := 0
@@ -94,12 +93,12 @@ func TestTypeFilterRenderReflectsSelection(t *testing.T) {
 		}
 	}
 	for s.typeFilterCursor < targetIdx {
-		s, _ = s.Update(pressKey("down"), nil)
+		s, _ = s.Update(pressKey("down"))
 	}
 	// Select it
-	s, _ = s.Update(keyMsg(' '), nil)
+	s, _ = s.Update(keyMsg(' '))
 	// Confirm
-	s, _ = s.Update(pressKey("enter"), nil)
+	s, _ = s.Update(pressKey("enter"))
 
 	pageState := s.ToPageState(120, 30)
 	rendered := RenderRulesPage(pageState)
@@ -131,9 +130,9 @@ func TestTypeFilterEscClearsSelection(t *testing.T) {
 	s = s.ApplyRules(rules)
 
 	// Open overlay, select a type, then press Esc
-	s, _ = s.Update(keyMsg('t'), nil)
-	s, _ = s.Update(keyMsg(' '), nil)
-	s, _ = s.Update(pressKey("esc"), nil)
+	s, _ = s.Update(keyMsg('t'))
+	s, _ = s.Update(keyMsg(' '))
+	s, _ = s.Update(pressKey("esc"))
 
 	if s.showTypeFilter {
 		t.Fatal("overlay should be closed after Esc")
@@ -161,16 +160,16 @@ func TestTypeFilterReopenPreservesSelection(t *testing.T) {
 	s = s.ApplyRules(rules)
 
 	// Open, select DOMAIN, confirm
-	s, _ = s.Update(keyMsg('t'), nil)
-	s, _ = s.Update(keyMsg(' '), nil)
-	s, _ = s.Update(pressKey("enter"), nil)
+	s, _ = s.Update(keyMsg('t'))
+	s, _ = s.Update(keyMsg(' '))
+	s, _ = s.Update(pressKey("enter"))
 
 	if len(s.selectedTypes) != 1 {
 		t.Fatalf("expected 1 selected type, got %v", s.selectedTypes)
 	}
 
 	// Reopen 't' — selection should be preserved so the user can add more types
-	s, _ = s.Update(keyMsg('t'), nil)
+	s, _ = s.Update(keyMsg('t'))
 	if len(s.selectedTypes) != 1 {
 		t.Fatalf("reopening 't' should preserve selection, got %v", s.selectedTypes)
 	}
@@ -196,7 +195,7 @@ func TestTypeFilterMouseDoubleClickToggles(t *testing.T) {
 	s = s.ApplyRules(rules)
 
 	// Open overlay
-	s, _ = s.Update(keyMsg('t'), nil)
+	s, _ = s.Update(keyMsg('t'))
 	if !s.showTypeFilter {
 		t.Fatal("overlay should be open after pressing 't'")
 	}
@@ -210,9 +209,8 @@ func TestTypeFilterMouseDoubleClickToggles(t *testing.T) {
 		t.Fatalf("expected first list item index 0, got %d", firstItemY)
 	}
 
-	var nilClient *api.Client
 	// First click — should move cursor but NOT select
-	s, _ = s.HandleMouseLeft(left+3, top+2, pageW, pageH, nilClient)
+	s, _ = s.HandleMouseLeft(left+3, top+2, pageW, pageH)
 	if s.typeFilterCursor != 0 {
 		t.Fatalf("cursor should be 0 after first click, got %d", s.typeFilterCursor)
 	}
@@ -221,7 +219,7 @@ func TestTypeFilterMouseDoubleClickToggles(t *testing.T) {
 	}
 
 	// Second click (immediately, within threshold) — should toggle selection ON
-	s, _ = s.HandleMouseLeft(left+3, top+2, pageW, pageH, nilClient)
+	s, _ = s.HandleMouseLeft(left+3, top+2, pageW, pageH)
 	if len(s.selectedTypes) != 1 {
 		t.Fatalf("double click should select the type, got %v", s.selectedTypes)
 	}
@@ -231,13 +229,13 @@ func TestTypeFilterMouseDoubleClickToggles(t *testing.T) {
 	s.typeFilterDC = common.DoubleClickDetector[struct{}]{}
 
 	// Third click — starts a new double-click window, only moves cursor (still selected)
-	s, _ = s.HandleMouseLeft(left+3, top+2, pageW, pageH, nilClient)
+	s, _ = s.HandleMouseLeft(left+3, top+2, pageW, pageH)
 	if len(s.selectedTypes) != 1 {
 		t.Fatalf("single click should NOT toggle selection, got %v", s.selectedTypes)
 	}
 
 	// Fourth click — completes the new double-click, toggles selection OFF
-	s, _ = s.HandleMouseLeft(left+3, top+2, pageW, pageH, nilClient)
+	s, _ = s.HandleMouseLeft(left+3, top+2, pageW, pageH)
 	if len(s.selectedTypes) != 0 {
 		t.Fatalf("second double-click should deselect, got %v", s.selectedTypes)
 	}
@@ -262,8 +260,8 @@ func TestTypeFilterMouseOutsideClosesAndKeepsFilter(t *testing.T) {
 	s = s.ApplyRules(rules)
 
 	// Open overlay and select the first type via keyboard
-	s, _ = s.Update(keyMsg('t'), nil)
-	s, _ = s.Update(keyMsg(' '), nil)
+	s, _ = s.Update(keyMsg('t'))
+	s, _ = s.Update(keyMsg(' '))
 	if len(s.selectedTypes) != 1 {
 		t.Fatalf("expected 1 selected type after Space, got %v", s.selectedTypes)
 	}
@@ -279,8 +277,7 @@ func TestTypeFilterMouseOutsideClosesAndKeepsFilter(t *testing.T) {
 		outsideY = top - 1
 	}
 
-	var nilClient *api.Client
-	s, _ = s.HandleMouseLeft(outsideX, outsideY, pageW, pageH, nilClient)
+	s, _ = s.HandleMouseLeft(outsideX, outsideY, pageW, pageH)
 
 	if s.showTypeFilter {
 		t.Fatal("overlay should be closed after clicking outside")

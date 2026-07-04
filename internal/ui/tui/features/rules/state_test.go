@@ -24,7 +24,7 @@ func TestRulesState_FilterEngineToggle(t *testing.T) {
 	s = s.ApplyRules(sampleRulesForFilter())
 
 	// 进入过滤输入模式
-	s, _ = s.Update(keyMsg('/'), nil)
+	s, _ = s.Update(keyMsg('/'))
 	if !s.ruleFilterMode {
 		t.Fatal("expected filter mode after pressing '/'")
 	}
@@ -33,32 +33,32 @@ func TestRulesState_FilterEngineToggle(t *testing.T) {
 	}
 
 	// Ctrl+R → Regex
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyCtrlR}, nil)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
 	if s.FilterEngine != FilterEngineRegex {
 		t.Fatalf("expected Regex after Ctrl+R, got %d", s.FilterEngine)
 	}
 
 	// Ctrl+R 再次 → Substring
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyCtrlR}, nil)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
 	if s.FilterEngine != FilterEngineSubstring {
 		t.Fatalf("expected Substring after second Ctrl+R, got %d", s.FilterEngine)
 	}
 
 	// Ctrl+F → Fuzzy
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyCtrlF}, nil)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyCtrlF})
 	if s.FilterEngine != FilterEngineFuzzy {
 		t.Fatalf("expected Fuzzy after Ctrl+F, got %d", s.FilterEngine)
 	}
 
 	// Ctrl+F 再次 → Substring
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyCtrlF}, nil)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyCtrlF})
 	if s.FilterEngine != FilterEngineSubstring {
 		t.Fatalf("expected Substring after second Ctrl+F, got %d", s.FilterEngine)
 	}
 
 	// 可以从一个非普通引擎直接切到另一个：Regex → Ctrl+F → Fuzzy
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyCtrlR}, nil) // → Regex
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyCtrlF}, nil) // → Fuzzy
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyCtrlR}) // → Regex
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyCtrlF}) // → Fuzzy
 	if s.FilterEngine != FilterEngineFuzzy {
 		t.Fatalf("expected Fuzzy after Regex→Ctrl+F, got %d", s.FilterEngine)
 	}
@@ -174,10 +174,10 @@ func TestRulesState_UpdateFilteredRules_NoResolve(t *testing.T) {
 func TestRulesState_FilterInputAcceptsMultibyte(t *testing.T) {
 	s := State{}
 	s = s.ApplyRules(sampleRulesForFilter())
-	s, _ = s.Update(keyMsg('/'), nil)
+	s, _ = s.Update(keyMsg('/'))
 
 	// 输入一个中文字符（多字节）
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'搜'}}, nil)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'搜'}})
 	if s.ruleFilter != "搜" {
 		t.Fatalf("expected filter text '搜', got %q", s.ruleFilter)
 	}

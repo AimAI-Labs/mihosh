@@ -51,6 +51,15 @@ type State struct {
 	doubleClickDetector common.DoubleClickDetector[struct{}]
 
 	updatingUID string // 当前正在更新的订阅 UID
+
+	svc *service.ProfileService
+}
+
+// NewState 初始化订阅配置状态
+func NewState(svc *service.ProfileService) State {
+	return State{
+		svc: svc,
+	}
 }
 
 // FilterEngine 订阅搜索匹配引擎（与 rules 页一致语义）。
@@ -119,25 +128,25 @@ func (s State) ApplySubs(subs []profile.Profile, active string) State {
 }
 
 // Update 处理按键，分派到当前激活的子模式。
-func (s State) Update(msg tea.Msg, svc *service.ProfileService) (State, tea.Cmd) {
+func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.PageMouseScrollMsg:
 		return s.HandleMouseScroll(msg.Up), nil
 	case messages.PageMouseClickMsg:
-		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height, svc)
+		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
 	case tea.KeyMsg:
 	// 弹窗优先拦截
 	if s.showDeleteConf {
-		return s.handleDeleteConfirm(msg, svc)
+		return s.handleDeleteConfirm(msg)
 	}
 	if s.showAddForm {
-		return s.handleAddFormUpdate(msg, svc)
+		return s.handleAddFormUpdate(msg)
 	}
 	if s.showEditForm {
-		return s.handleEditFormUpdate(msg, svc)
+		return s.handleEditFormUpdate(msg)
 	}
 	if s.filterMode {
-		return s.handleFilterMode(msg, svc)
+		return s.handleFilterMode(msg)
 	}
 
 	switch {
@@ -152,15 +161,15 @@ func (s State) Update(msg tea.Msg, svc *service.ProfileService) (State, tea.Cmd)
 			s.clampScroll()
 		}
 	case msg.String() == "enter":
-		return s.activateSelected(svc)
+		return s.activateSelected()
 	case msg.String() == "u":
-		return s.updateSelected(svc)
+		return s.updateSelected()
 	case msg.String() == "m":
-		return s.openMergeExternalEditor(svc)
+		return s.openMergeExternalEditor()
 	case msg.String() == "c":
-		return s.openRawExternalEditor(svc)
+		return s.openRawExternalEditor()
 	case msg.String() == "e":
-		return s.openEditForm(svc)
+		return s.openEditForm()
 	case msg.String() == "n":
 		s.showAddForm = true
 		s.addForm = newAddForm()
@@ -170,7 +179,7 @@ func (s State) Update(msg tea.Msg, svc *service.ProfileService) (State, tea.Cmd)
 		s.filterMode = true
 		s.filter = ""
 	case key.Matches(msg, common.Keys.Refresh):
-		return s, FetchSubs(svc)
+		return s, FetchSubs(s.svc)
 	case key.Matches(msg, common.Keys.Escape):
 		if s.filter != "" {
 			s.filter = ""
@@ -184,7 +193,7 @@ func (s State) Update(msg tea.Msg, svc *service.ProfileService) (State, tea.Cmd)
 }
 
 // handleFilterMode 搜索输入模式。
-func (s State) handleFilterMode(msg tea.KeyMsg, svc *service.ProfileService) (State, tea.Cmd) {
+func (s State) handleFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	switch {
 	case msg.Type == tea.KeyCtrlR:
 		if s.filterEngine == FilterRegex {
@@ -232,13 +241,13 @@ func (s State) handleFilterMode(msg tea.KeyMsg, svc *service.ProfileService) (St
 }
 
 // handleDeleteConfirm 删除确认弹窗。
-func (s State) handleDeleteConfirm(msg tea.KeyMsg, svc *service.ProfileService) (State, tea.Cmd) {
+func (s State) handleDeleteConfirm(msg tea.KeyMsg) (State, tea.Cmd) {
 	switch {
 	case key.Matches(msg, common.Keys.Enter), msg.String() == "y":
 		uid := s.deleteUID
 		s.showDeleteConf = false
 		s.deleteUID = ""
-		return s, DeleteSubCmd(svc, uid)
+		return s, DeleteSubCmd(s.svc, uid)
 	case key.Matches(msg, common.Keys.Escape), msg.String() == "n":
 		s.showDeleteConf = false
 		s.deleteUID = ""
@@ -258,22 +267,22 @@ func (s State) openDeleteConfirm() (State, tea.Cmd) {
 }
 
 // activateSelected 激活当前选中订阅。
-func (s State) activateSelected(svc *service.ProfileService) (State, tea.Cmd) {
+func (s State) activateSelected() (State, tea.Cmd) {
 	if len(s.filteredIdx) == 0 || s.selected < 0 || s.selected >= len(s.filteredIdx) {
 		return s, nil
 	}
 	uid := s.subs[s.filteredIdx[s.selected]].UID
-	return s, ActivateSubCmd(svc, uid)
+	return s, ActivateSubCmd(s.svc, uid)
 }
 
 // updateSelected 拉取当前选中订阅。
-func (s State) updateSelected(svc *service.ProfileService) (State, tea.Cmd) {
+func (s State) updateSelected() (State, tea.Cmd) {
 	if len(s.filteredIdx) == 0 || s.selected < 0 || s.selected >= len(s.filteredIdx) {
 		return s, nil
 	}
 	uid := s.subs[s.filteredIdx[s.selected]].UID
 	s.updatingUID = uid
-	return s, UpdateSubCmd(svc, uid)
+	return s, UpdateSubCmd(s.svc, uid)
 }
 
 // SetUpdating 标记指定的订阅为正在更新。
@@ -289,7 +298,7 @@ func (s State) ClearUpdating() State {
 }
 
 // openEditForm 打开当前选中订阅的编辑表单（预填名称 + 来源）。
-func (s State) openEditForm(svc *service.ProfileService) (State, tea.Cmd) {
+func (s State) openEditForm() (State, tea.Cmd) {
 	if len(s.filteredIdx) == 0 || s.selected < 0 || s.selected >= len(s.filteredIdx) {
 		return s, nil
 	}
@@ -307,7 +316,7 @@ func (s State) openEditForm(svc *service.ProfileService) (State, tea.Cmd) {
 }
 
 // handleEditFormUpdate 处理编辑表单按键（与添加表单逻辑共用）。
-func (s State) handleEditFormUpdate(msg tea.KeyMsg, svc *service.ProfileService) (State, tea.Cmd) {
+func (s State) handleEditFormUpdate(msg tea.KeyMsg) (State, tea.Cmd) {
 	form := s.editForm
 	next, submit, cmd, closed := updateFormFields(msg, form)
 	if closed {
@@ -324,7 +333,7 @@ func (s State) handleEditFormUpdate(msg tea.KeyMsg, svc *service.ProfileService)
 		s.showEditForm = false
 		s.editUID = ""
 		s.editForm = newAddForm()
-		return s, EditSubCmd(svc, uid, name, src)
+		return s, EditSubCmd(s.svc, uid, name, src)
 	}
 	s.editForm = next
 	return s, cmd
@@ -347,7 +356,7 @@ func (s State) HandleMouseScroll(up bool) State {
 }
 
 // HandleMouseLeft 处理列表单击/双击。
-func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, svc *service.ProfileService) (State, tea.Cmd) {
+func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, tea.Cmd) {
 	// 弹窗激活时点击弹窗外 → 取消关闭（删除确认/添加表单）
 	if s.showDeleteConf || s.showAddForm || s.showEditForm {
 		// 简化处理：点击任意位置不自动关闭破坏性弹窗（需 Esc/Enter），
@@ -380,7 +389,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int, svc *ser
 
 	if isDouble {
 		// 双击激活
-		return s.activateSelected(svc)
+		return s.activateSelected()
 	}
 	return s, nil
 }
