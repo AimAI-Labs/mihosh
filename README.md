@@ -29,6 +29,7 @@ A full-featured terminal UI (TUI) management tool for mihomo, allowing you to el
 | 📊 **Connections** | Traffic, Active, and History tabs, traffic/memory charts, close connections |
 | 📝 **Logs** | Live log streaming, level/keyword filtering, detailed JSON view with mouse scroll |
 | 📋 **Rules** | View proxy rules with multi-keyword search and optimized scrollbar |
+| 🔗 **Subscriptions**| Manage remote proxy subscriptions and rulesets, merge and auto-update |
 | ⚙️ **Settings** | Modify configuration directly in the UI, view version info |
 | ❓ **Help** | Built-in keyboard shortcuts reference (non-blocking overlay) |
 
@@ -78,6 +79,9 @@ This opens the interactive TUI. Press `5` or `Tab` to switch to the Help page fo
 ```yaml
 test_url: http://www.gstatic.com/generate_204
 timeout: 5000
+language: auto
+auto_refresh_interval: 5
+theme: tokyo-night
 ```
 
 ### CLI Configuration Commands
@@ -85,6 +89,8 @@ timeout: 5000
 ```bash
 mihosh config set test-url http://www.gstatic.com/generate_204
 mihosh config set timeout 5000
+mihosh config set theme catppuccin
+mihosh config set language en-US
 mihosh config show --output table
 ```
 
@@ -103,6 +109,12 @@ mihosh test group <group>            # Test all nodes in a group
 mihosh connections                   # View connections
 mihosh connections --output json     # View connections in JSON
 mihosh config show --output table    # Show config in table format
+mihosh status                        # View Mihomo core status
+mihosh mode global                   # Switch proxy mode
+mihosh on                            # Enable system proxy
+mihosh off                           # Disable system proxy
+mihosh doctor                        # Check configuration health
+mihosh service status                # Manage systemd service
 ```
 
 ## FAQ
@@ -116,17 +128,17 @@ mihosh config show --output table    # Show config in table format
 ## Development
 
 ```bash
-go mod download  # Install dependencies
-make check       # Format, vet, test, and build
+mise exec go -- go mod download  # Install dependencies
+mise exec go -- make check       # Format, vet, test, and build
 ```
 
 If `make` is not available on your system, run the equivalent commands manually:
 
 ```bash
-go fmt ./...
-go vet ./...
-go test ./...
-go build .
+mise exec go -- go fmt ./...
+mise exec go -- go vet ./...
+mise exec go -- go test ./...
+mise exec go -- go build .
 ```
 
 Pull requests are validated by GitHub Actions for formatting, module verification,

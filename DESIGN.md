@@ -2,7 +2,9 @@
 
 ## 概述
 
-Mihosh 是一款基于 Clash 的终端代理管理工具，采用 **Tokyo Night** 暗色主题作为全局视觉语言。本文档定义了项目的颜色体系、组件样式、布局规则和交互模式，作为 UI 开发的统一参考。
+Mihosh 是一款基于 Mihomo 的终端代理管理工具。项目内置多主题引擎（默认 **Tokyo Night** 暗色主题，另支持 Catppuccin、Gruvbox、Nord、Dracula）。本文档以 Tokyo Night 为示例定义颜色体系、组件样式、布局规则和交互模式，作为 UI 开发的统一参考。
+
+> 注意：所有颜色均通过 `theme.Current()` 获取语义色，禁止硬编码具体色值。下表中的具体色值仅为 Tokyo Night 主题示例。
 
 ## 颜色体系
 
@@ -38,13 +40,48 @@ Tokyo Night 源自 [Tokyo Night VS Code 主题](https://github.com/enkia/tokyo-n
 
 ```go
 func GetDelayColor(delay int) lipgloss.Color {
+    t := theme.Current()
     switch {
-    case delay == 0:   return "#565f89"  // TokyoMuted — 未测试
-    case delay < 100:  return "#9ECE6A"  // TokyoGreen — 快
-    case delay < 300:  return "#E0AF68"  // TokyoYellow — 中
-    default:           return "#F7768E"  // TokyoRed — 慢
+    case delay == 0:   return t.Muted     // 未测试
+    case delay < 100:  return t.Success   // 快
+    case delay < 300:  return t.Warning   // 中
+    default:           return t.Danger    // 慢
     }
 }
+```
+
+### 多主题支持
+
+通过 `internal/ui/theme` 包实现多主题切换。每个主题定义了统一的语义色集合：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `Foreground` | 前景 | 主要文字 |
+| `Muted` | 前景 | 灰色/禁用/辅助信息 |
+| `Dim` | 前景 | 比 Muted 更暗的文字 |
+| `Bright` | 前景 | 最亮文字 |
+| `Background` | 背景 | 面板/页面底色 |
+| `Surface` | 背景 | 浮层、卡片底色 |
+| `Overlay` | 背景 | 叠加层 |
+| `Selected` | 背景 | 列表选中行背景 |
+| `Primary` | 强调 | 主强调色/边框/标题 |
+| `Secondary` | 强调 | 辅助强调色 |
+| `Success` | 语义 | 成功/在线/低延迟 |
+| `Warning` | 语义 | 警告/测试中/中等延迟 |
+| `Danger` | 语义 | 错误/离线/高延迟 |
+| `Info` | 语义 | 选中态指示器/高亮 |
+| `Border` | 扩展 | 边框/分隔线 |
+| `Active` | 扩展 | 活跃状态指示 |
+| `Orange` | 扩展 | 橙色强调 |
+| `Purple` | 扩展 | 紫色强调/图表下载 |
+
+可用主题：`tokyo-night`（默认）、`catppuccin`、`gruvbox`、`nord`、`dracula`。
+
+切换 API：
+```go
+theme.SetTheme("catppuccin") // 切换主题
+t := theme.Current()          // 获取当前主题
+theme.Names()                 // 所有可用主题名
 ```
 
 ## 组件规范
@@ -114,7 +151,7 @@ func GetDelayColor(delay int) lipgloss.Color {
 
 ```
 ╭──────────────────────────────────────────────────╮
-│ 节点管理 │ 连接监控 │ 日志 │ 规则 │ 设置        │
+│ 节点管理 │ 连接监控 │ 日志 │ 规则 │ 订阅 │ 设置 │
 ╰──────────────────────────────────────────────────╯
 ```
 
@@ -261,25 +298,76 @@ func GetDelayColor(delay int) lipgloss.Color {
 ```
 internal/ui/
 ├── styles/
-│   └── styles.go              # 全局调色板与通用样式
-├── tui/
-│   ├── components/
-│   │   ├── common/
-│   │   │   ├── colors.go      # 基础颜色常量
-│   │   │   ├── styles.go      # 通用样式预设
-│   │   │   ├── constants.go   # 布局常量与符号
-│   │   │   ├── tokyo_panel.go # Tokyo 面板组件 + 颜色常量
-│   │   │   ├── footer.go      # 页脚组件
-│   │   │   └── sparkline.go   # 图表组件
-│   │   └── layout/
-│   │       ├── top_nav.go     # 顶部导航栏
-│   │       └── statusbar.go   # 底部状态栏
-│   ├── features/
-│   │   ├── nodes/             # 节点管理页面
-│   │   ├── connections/       # 连接监控页面
-│   │   ├── settings/          # 设置页面
-│   │   ├── logs/              # 日志页面
-│   │   └── rules/             # 规则页面
-│   ├── view.go                # 主视图组装
-│   └── page_renders.go        # 页面渲染入口
+│   └── styles.go                # 全局调色板与通用样式
+├── theme/
+│   ├── theme.go                 # 主题引擎（Current/SetTheme/Names）
+│   └── builtin.go               # 内置主题定义（tokyo-night/catppuccin/gruvbox/nord/dracula）
+└── tui/
+    ├── model.go                 # 主 Model 定义
+    ├── view.go                  # 主视图组装
+    ├── update.go                # Update 路由分发
+    ├── update_keys.go           # 键盘事件处理
+    ├── update_mouse.go          # 鼠标事件处理（含 resolveMainPageMouseHit）
+    ├── update_ws.go             # WebSocket 状态派发
+    ├── commands.go              # tea.Cmd 工厂函数
+    ├── auto_refresh.go          # 自动刷新逻辑
+    ├── page_renders.go          # 页面渲染入口
+    ├── components/
+    │   ├── common/
+    │   │   ├── colors.go            # 基础颜色常量
+    │   │   ├── styles.go            # 通用样式预设
+    │   │   ├── constants.go         # 布局常量与符号
+    │   │   ├── keys.go              # 快捷键绑定
+    │   │   ├── tokyo_panel.go       # Tokyo 面板组件
+    │   │   ├── footer.go            # 页脚组件
+    │   │   ├── sparkline.go         # 图表组件
+    │   │   ├── scrollbar.go         # 滚动条组件
+    │   │   ├── filter.go            # 过滤器工具函数
+    │   │   ├── filter_list.go       # 可复用过滤列表组件
+    │   │   ├── double_click.go      # 双击检测器
+    │   │   ├── clamp_scroll.go      # 滚动边界限制
+    │   │   ├── inline_help.go       # 内联帮助提示
+    │   │   └── toast.go             # Toast 通知组件
+    │   └── layout/
+    │       ├── top_nav.go           # 顶部导航栏（含 PageType 定义）
+    │       └── statusbar.go         # 底部状态栏
+    ├── messages/
+    │   └── events.go                # 集中定义所有 TUI 消息
+    └── features/
+        ├── nodes/                   # 节点管理页面
+        │   ├── state.go
+        │   ├── commands.go
+        │   ├── view.go
+        │   └── view_components.go
+        ├── connections/             # 连接监控页面
+        │   ├── state.go / state_apply.go / state_detail.go / state_filter.go / state_mouse.go / state_topn.go
+        │   ├── commands.go
+        │   ├── view.go / view_components.go
+        │   └── components/              # 连接页子组件（charts / detail / topn / site_card）
+        ├── logs/                    # 日志页面
+        │   ├── state.go
+        │   ├── commands.go
+        │   ├── view.go
+        │   ├── detail.go
+        │   └── parse.go
+        ├── rules/                   # 规则页面（已拆分）
+        │   ├── state.go / state_confirm.go / state_filter.go / state_form.go / state_mouse.go
+        │   ├── commands.go / editor.go
+        │   ├── view.go / view_list.go / view_filter.go / view_add_form.go / view_proxy_picker.go
+        │   ├── view_colors.go / view_confirm.go / edit_form_view.go
+        │   └── add_form.go
+        ├── sub/                     # 订阅管理页面
+        │   ├── state.go
+        │   ├── commands.go
+        │   ├── view.go
+        │   ├── add_form.go
+        │   ├── merge_editor.go / raw_editor.go
+        │   └── *_test.go
+        ├── settings/                # 设置页面
+        │   ├── state.go
+        │   ├── view.go
+        │   ├── actions_layout.go
+        │   └── sys_status.go
+        └── help/                    # 帮助页面（快捷键参考）
+            └── view.go
 ```
