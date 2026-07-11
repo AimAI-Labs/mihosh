@@ -48,6 +48,8 @@ docs/fumadocs/.claude/
 docs/fumadocs/agent/
 docs/fumadocs/node_modules/
 docs/fumadocs/skills/
+docs/fumadocs/out/
+
 
 docs/fumadocs/*.tsbuildinfo
 
