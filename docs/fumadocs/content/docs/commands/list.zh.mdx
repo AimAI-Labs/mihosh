@@ -1,0 +1,49 @@
+---
+title: mihosh list
+description: 列出所有代理组和节点信息。
+---
+
+`mihosh list` 命令用于列出当前配置中的所有代理组及其节点信息。
+
+## 用法
+
+```bash
+mihosh list [flags]
+```
+
+## 选项
+
+| 选项 | 简写 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--output` | `-o` | `text` | 输出格式，支持 `text`、`json`、`table` |
+
+## 示例
+
+### 默认文本输出
+
+```bash
+mihosh list
+```
+
+### 以表格形式输出
+
+```bash
+mihosh list -o table
+```
+
+### 以 JSON 格式输出
+
+适合与其他工具（如 `jq`）配合使用：
+
+```bash
+mihosh list -o json
+
+# 配合 jq 筛选特定代理组
+mihosh list -o json | jq '.[] | select(.name == "Proxy")'
+```
+
+### 使用自定义配置
+
+```bash
+mihosh list -c ~/.config/mihosh/custom.toml
+```

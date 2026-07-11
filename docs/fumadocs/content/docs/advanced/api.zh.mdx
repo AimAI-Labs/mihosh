@@ -1,0 +1,46 @@
+---
+title: Mihomo API 参考
+description: Mihosh 交互的 RESTful API 列表
+---
+
+Mihosh 作为 Mihomo 的客户端，依赖其 RESTful API 进行交互。以下是 Mihosh 用到的关键端点。
+
+> **注意**：所有 HTTP 和 WS 请求都需要在 Header 中携带 `Authorization: Bearer <secret>`。
+
+## 代理相关
+
+| 路径 | 方法 | 描述 |
+| --- | --- | --- |
+| `/proxies` | GET | 获取所有代理组和节点 |
+| `/proxies/:group` | GET | 获取特定代理组信息 |
+| `/proxies/:group` | PUT | 选择代理节点 |
+| `/proxies/:group/delay` | GET | 测试节点延迟 |
+| `/group/:group/delay` | GET | 测试组内所有节点 |
+
+## 连接与配置
+
+| 路径 | 方法 | 描述 |
+| --- | --- | --- |
+| `/connections` | GET | 获取连接列表 |
+| `/connections` | DELETE | 关闭所有连接 |
+| `/connections/:id` | DELETE | 关闭指定连接 |
+| `/configs` | GET | 获取当前配置 |
+| `/configs` | PATCH | 更新配置 (如模式切换) |
+| `/version` | GET | 获取 Mihomo 版本 |
+
+## 规则
+
+| 路径 | 方法 | 描述 |
+| --- | --- | --- |
+| `/rules` | GET | 获取规则列表 |
+| `/providers/rules` | GET | 获取规则提供者列表 |
+| `/providers/rules/:name` | PUT | 更新指定规则提供者 |
+
+## 实时数据 (WebSocket)
+
+| 路径 | 方法 | 描述 |
+| --- | --- | --- |
+| `/traffic` | WS | 实时流量上下行速度 |
+| `/logs` | WS | 实时日志流 |
+| `/connections` | WS | 实时连接变更 |
+| `/memory` | WS | 实时内存使用 |

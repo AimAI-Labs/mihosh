@@ -1,0 +1,24 @@
+---
+title: mihosh service
+description: systemd 服务管理
+---
+
+## 说明
+
+`mihosh service <action>` 命令用于在 Linux 系统中管理 Mihomo 的 systemd 服务。
+
+## 支持的动作 (action)
+
+- `status`：查看服务状态
+- `start`：启动服务
+- `stop`：停止服务
+- `restart`：重启服务
+- `enable`：设置开机自启
+- `disable`：取消开机自启
+
+## 示例
+
+```bash
+mihosh service status
+mihosh service restart
+```

@@ -34,23 +34,16 @@ Thumbs.db
 *.prof
 .gocache/
 .gomodcache/
-
-
-# docs
-docs/*
-!docs/fumadocs/
-docs/fumadocs/node_modules/
-docs/fumadocs/.next/
-docs/fumadocs/.source/
-docs/fumadocs/out/
-docs/fumadocs/build/
-docs/fumadocs/*.tsbuildinfo
-docs/fumadocs/.vercel
-docs/fumadocs/.env*.local
-docs/fumadocs/.agents/*
-docs/fumadocs/skills/
-
-
-
 .spec-workflow/
 .kiro/
+
+# Docs (Fumadocs / Next.js)
+docs/superpowers/
+docs/*.md
+
+docs/fumadocs/.next/
+docs/fumadocs/.source/
+docs/fumadocs/node_modules/
+docs/fumadocs/skills/
+
+docs/fumadocs/*.tsbuildinfo

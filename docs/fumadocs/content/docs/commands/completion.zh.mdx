@@ -1,0 +1,45 @@
+---
+title: completion
+description: 生成终端自动补全脚本
+---
+
+## 用法
+
+```bash
+mihosh completion <bash|zsh|fish|powershell>
+```
+
+## 说明
+
+生成用于所选 shell 的自动补全脚本，可以极大地提升命令输入效率，支持自动补全子命令、代理组名称、节点名称等。
+
+## 示例配置
+
+### Bash
+
+```bash
+# 将补全加载到当前会话
+source <(mihosh completion bash)
+
+# 或将其配置为全局可用（Linux）
+mihosh completion bash > /etc/bash_completion.d/mihosh
+```
+
+### Zsh
+
+```zsh
+# 如果未开启自动补全功能，请先运行
+echo "autoload -U compinit; compinit" >> ~/.zshrc
+
+# 加载到当前会话
+source <(mihosh completion zsh)
+```
+
+### Fish
+
+```fish
+mihosh completion fish | source
+
+# 永久加载
+mihosh completion fish > ~/.config/fish/completions/mihosh.fish
+```

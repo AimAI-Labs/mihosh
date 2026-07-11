@@ -1,0 +1,73 @@
+---
+title: 配置指南
+description: Mihosh 配置详解
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Mihosh 的配置文件默认存储在 `~/.mihosh/config.yaml`。当首次运行 `mihosh` 时，如果配置文件不存在，系统会自动生成带有默认值的配置。
+
+## 初始化配置
+
+你可以通过交互式命令快速初始化或重置配置：
+
+```bash
+mihosh config init
+```
+该命令会提示你输入 Mihomo API 的地址、端口和密钥。
+
+<Callout title="提示" type="info">
+  如果你的 Mihomo 核心未设置验证密钥，在提示输入密钥时直接按回车留空即可。
+</Callout>
+
+## 配置项参考
+
+以下是 Mihosh 支持的所有配置项说明：
+
+| 配置项 | 类型 | 描述 | 默认值 |
+| --- | --- | --- | --- |
+| `server.host` | string | Mihomo API 地址 | `127.0.0.1` |
+| `server.port` | int | Mihomo API 端口 | `9090` |
+| `server.secret` | string | API 密钥 | `""` |
+| `test_url` | string | 延迟测试 URL | `http://www.gstatic.com/generate_204` |
+| `timeout` | int | 测试超时(ms) | `5000` |
+| `language` | string | 界面语言 | `auto` (支持: `auto`, `en-US`, `zh-CN`) |
+| `auto_refresh_interval` | int | 自动刷新间隔(秒) | `5` |
+| `theme` | string | UI 主题 | `tokyo-night` |
+
+## 命令行配置管理
+
+除了手动修改文件，你也可以直接使用命令行工具快速修改或查看配置项，这在编写自动化脚本时非常有用：
+
+```bash
+mihosh config set theme catppuccin
+mihosh config set language zh-CN
+mihosh config show
+```
+
+## 完整配置示例
+
+```yaml title="~/.mihosh/config.yaml"
+active_sub: 0eadd5c7
+auto_refresh_highlight: false
+auto_refresh_interval: 5
+language: auto
+subs:
+  - uid: c37c7c25
+    name: fn
+    source:
+      kind: 0
+      url: https://xx.xx.xx.xx/subscribe?token=1a3b3a4
+      path: ""
+    updated_at: 0
+  - uid: 2fb6a0dc
+    name: tf
+    source:
+      kind: 0
+      url: https://xx.x.x.xx/subscribe?token=f47f9
+      path: ""
+    updated_at: 0
+test_url: http://www.gstatic.com/generate_204
+theme: tokyo-night
+timeout: 4000
+```

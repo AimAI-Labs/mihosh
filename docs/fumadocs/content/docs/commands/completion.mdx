@@ -1,0 +1,45 @@
+---
+title: "completion"
+description: Generate terminal auto-completion script
+---
+
+## Usage
+
+```bash
+mihosh completion <bash|zsh|fish|powershell>
+```
+
+## Description
+
+Generates an auto-completion script for the selected shell, which can greatly improve command input efficiency. It supports auto-completion for subcommands, proxy group names, node names, etc.
+
+## Example Configuration
+
+### Bash
+
+```bash
+# Load completions into the current session
+source <(mihosh completion bash)
+
+# Or make it globally available (Linux)
+mihosh completion bash > /etc/bash_completion.d/mihosh
+```
+
+### Zsh
+
+```zsh
+# If auto-completion is not enabled, run this first
+echo "autoload -U compinit; compinit" >> ~/.zshrc
+
+# Load into the current session
+source <(mihosh completion zsh)
+```
+
+### Fish
+
+```fish
+mihosh completion fish | source
+
+# Permanent load
+mihosh completion fish > ~/.config/fish/completions/mihosh.fish
+```

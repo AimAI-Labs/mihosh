@@ -1,0 +1,80 @@
+---
+title: mihosh test
+description: 对代理节点进行延迟测试。
+---
+
+`mihosh test` 命令用于对代理节点进行延迟测试，帮助你了解各节点的网络质量。
+
+## 用法
+
+```bash
+mihosh test [command] [flags]
+```
+
+## 子命令
+
+### 测试当前节点
+
+不带子命令时，测试当前选中的代理节点：
+
+```bash
+mihosh test
+```
+
+### 测试指定节点
+
+使用 `node` 子命令测试指定名称的节点：
+
+```bash
+mihosh test node <name>
+```
+
+### 测试代理组
+
+使用 `group` 子命令测试代理组内的所有节点：
+
+```bash
+mihosh test group <name>
+```
+
+## 选项
+
+| 选项 | 简写 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--output` | `-o` | `text` | 输出格式，支持 `text`、`json`、`table` |
+
+## 示例
+
+### 测试当前节点
+
+```bash
+mihosh test
+```
+
+### 测试指定节点的延迟
+
+```bash
+mihosh test node "香港 01"
+```
+
+### 测试整个代理组
+
+```bash
+mihosh test group Proxy
+```
+
+### 以表格形式展示结果
+
+```bash
+mihosh test group Proxy -o table
+```
+
+### 以 JSON 格式输出
+
+```bash
+mihosh test group Proxy -o json
+```
+
+<Callout type="info">
+延迟测试的目标 URL 和超时时间可通过 `mihosh config set` 命令进行配置。
+</Callout>

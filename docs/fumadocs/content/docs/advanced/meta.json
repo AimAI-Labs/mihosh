@@ -1,0 +1,12 @@
+{
+  "title": "Advanced",
+  "pages": [
+    "index",
+    "architecture",
+    "themes",
+    "i18n",
+    "api",
+    "faq",
+    "development"
+  ]
+}

@@ -1,0 +1,46 @@
+---
+title: "Command Reference"
+description: Overview and quick reference for all available Mihosh commands.
+---
+
+Mihosh provides a rich command-line interface, allowing you to quickly manage the Mihomo proxy core without opening the TUI.
+
+## Command Overview
+
+| Command | Description |
+| --- | --- |
+| `mihosh` | Start the interactive TUI |
+| `mihosh list` | List proxy groups and nodes |
+| `mihosh select` | Switch proxy node |
+| `mihosh test` | Latency test |
+| `mihosh connections` | View active connections |
+| `mihosh mode` | Switch proxy mode |
+| `mihosh status` | View Mihomo core status |
+| `mihosh config` | Configuration management |
+| `mihosh service` | systemd service management |
+| `mihosh doctor` | Configuration health check |
+| `mihosh on/off` | Enable/Disable system proxy |
+| `mihosh selfupdate` | Auto-update |
+| `mihosh version` | Version information |
+
+## Global Options
+
+All commands support the following global option:
+
+```bash
+mihosh <command> --config, -c <path>
+```
+
+Using `--config` (or the short form `-c`) allows you to specify a custom configuration file path. This is especially useful when you have multiple sets of configurations:
+
+```bash
+# Use custom configuration file
+mihosh list -c ~/.config/mihosh/custom.toml
+
+# Equivalent to
+mihosh list --config ~/.config/mihosh/custom.toml
+```
+
+<Callout type="info">
+If `--config` is not specified, Mihosh will use the configuration file from the default path.
+</Callout>

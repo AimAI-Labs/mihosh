@@ -1,0 +1,51 @@
+---
+title: "mihosh select"
+description: Switch the active node in a proxy group.
+---
+
+The `mihosh select` command switches the active node within a specified proxy group.
+
+## Usage
+
+```bash
+mihosh select <group> <node>
+```
+
+## Parameters
+
+| Parameter | Description |
+| --- | --- |
+| `<group>` | Proxy group name, e.g., `Proxy`, `Auto`, etc. |
+| `<node>` | Target node name, must be a valid node within the group |
+
+## Examples
+
+### Switch to a Specific Node
+
+```bash
+mihosh select Proxy "Hong Kong 01"
+```
+
+### Node Name with Spaces
+
+When a node name contains spaces, it must be wrapped in quotes:
+
+```bash
+mihosh select Proxy "US - Los Angeles"
+```
+
+### Using with the list Command
+
+First, view available proxy groups and nodes, then switch:
+
+```bash
+# View all proxy groups and nodes
+mihosh list
+
+# Switch to the target node
+mihosh select "Node Select" "Japan 01"
+```
+
+<Callout type="warn">
+If the specified proxy group does not exist or the node name is not in that group, the command will return an error.
+</Callout>

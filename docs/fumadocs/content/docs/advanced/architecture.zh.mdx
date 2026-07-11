@@ -1,0 +1,35 @@
+---
+title: 架构设计
+description: 了解 Mihosh 的内部架构
+---
+
+Mihosh 基于 **Clean Architecture (整洁架构)** 原则设计，确保了代码的高内聚、低耦合以及良好的可测试性。
+
+## 整体包结构
+
+项目的请求流转如下：
+
+```text
+main.go 
+  ↓
+internal/cli (命令行入口，Cobra)
+  ↓
+internal/app (应用服务层：ProxyService, ConnectionService 等)
+  ↓
+internal/domain/port (依赖倒置接口：MihomoClient, ConfigRepository)
+  ↓
+internal/infrastructure (基础设施实现：HTTP/WS 客户端，YAML 配置持久化)
+```
+
+## 关键模块职责
+
+1. **Domain (领域层)**：`internal/domain/model` 定义了核心业务对象（如 `ProxyGroup`, `Connection`），`port` 定义了基础设施必须实现的接口。它不依赖任何其他层。
+2. **App (应用层)**：负责编排业务逻辑，通过调用 `port` 接口获取数据并执行逻辑。
+3. **Infrastructure (基础设施层)**：实现了与外部系统（Mihomo API，文件系统）的交互。
+4. **UI (展示层)**：
+   - `internal/cli`：命令行接口。
+   - `internal/ui/tui`：基于 Bubbletea 框架构建的 TUI 界面。
+
+## 数据流转
+
+在 TUI 界面中，Mihosh 大量使用 WebSocket 订阅（包括流量、日志、连接和内存）来实现数据的**实时推送**，从而避免了高频的轮询，降低了系统开销。
