@@ -1,0 +1,56 @@
+---
+title: 开发指南
+description: 如何参与 Mihosh 的开发
+---
+
+欢迎为 Mihosh 贡献代码！以下是设置开发环境的指南。
+
+## 前置要求
+
+- Go 1.25 或更高版本
+- [mise](https://mise.jdx.dev/) (可选，用于环境管理)
+
+## 获取与构建
+
+```bash
+# 1. 克隆代码
+git clone https://github.com/AimAI-Labs/mihosh.git
+cd mihosh
+
+# 2. 安装依赖
+go mod download
+
+# 3. 编译
+make build
+# 或者: go build -o mihosh .
+```
+
+## 测试与检查
+
+项目使用了标准的 Go 测试工具，并且配置了详尽的 Makefile：
+
+```bash
+# 运行单元测试
+make test
+
+# 执行格式化、静态检查、测试和编译的全套检查
+make check
+```
+
+## CI 验证
+
+项目配置了 GitHub Actions。每次提交或 Pull Request 都会进行以下验证：
+- 代码格式化 (Formatting)
+- 模块依赖校验 (Module verification)
+- 静态分析 (go vet)
+- 单元测试 (go test)
+- 编译构建
+- Lint
+- CodeQL 漏洞分析
+
+## 注入版本信息
+
+发布版通常会在编译时通过 `ldflags` 注入版本变量：
+```bash
+go build -ldflags "-X github.com/AimAI-Labs/mihosh/internal/domain/model.Version=v1.0.0"
+```

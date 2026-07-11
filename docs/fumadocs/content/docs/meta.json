@@ -1,0 +1,10 @@
+{
+  "title": "Mihosh",
+  "pages": [
+    "index",
+    "getting-started",
+    "tui",
+    "commands",
+    "advanced"
+  ]
+}
