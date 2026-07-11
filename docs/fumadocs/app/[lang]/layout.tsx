@@ -1,5 +1,10 @@
 import { RootProvider } from 'fumadocs-ui/provider/next';
+import { i18n } from '@/lib/i18n';
 import '../global.css';
+
+export function generateStaticParams() {
+  return i18n.languages.map((lang) => ({ lang }));
+}
 
 export default async function Layout(props: { children: React.ReactNode; params: Promise<{ lang: string }> }) {
   const params = await props.params;
