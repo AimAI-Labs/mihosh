@@ -1,0 +1,13 @@
+{
+  "title": "TUI Interface",
+  "pages": [
+    "index",
+    "nodes",
+    "connections",
+    "logs",
+    "rules",
+    "subscriptions",
+    "settings",
+    "shortcuts"
+  ]
+}

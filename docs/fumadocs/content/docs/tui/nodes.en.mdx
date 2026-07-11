@@ -1,0 +1,33 @@
+---
+title: "Node Management"
+description: Proxy nodes and policy group management
+---
+
+## Features
+
+- **Dual Panel Layout**: In widescreen mode, the proxy groups (policy groups) list is on the left/top, and the nodes list is on the right/bottom.
+- **Mode Switching**: The mode switch bar at the top allows you to quickly toggle between **Rule**, **Global**, and **Direct** modes.
+- **Latency Testing**: Click the latency indicator on the bottom status bar, or use the corresponding shortcut, to test node latency.
+- **Status Indicators**: The dot to the left of each node indicates its status:
+  - 🟢 Green: Latency < 100ms
+  - 🟡 Yellow: Latency 100-300ms
+  - 🔴 Red: Latency > 300ms
+- **Special Nodes**:
+  - `REJECT`: Displayed in red.
+  - `DIRECT`: Displayed in gray.
+
+## Shortcuts
+
+In the node management page, you can use the following shortcuts for efficient operations:
+
+| Shortcut | Description |
+| --- | --- |
+| `↑` / `↓` | Move selection up or down in the proxy group or node list |
+| `←` / `→` | Switch focus between left and right panels in widescreen mode |
+| `Enter` | Switch the current proxy group's exit to the selected node |
+| `t` | Test latency of the currently selected node |
+| `a` | Batch test latency for all nodes in the currently selected proxy group |
+| `m` | Quickly switch proxy mode (Rule / Global / Direct) |
+| `/` | Search or filter nodes in the current list |
+
+> **Tip**: In addition to shortcuts, Mihosh also fully supports mouse operations. You can click to select nodes, double-click to switch nodes, or click buttons on the status bar to trigger tests and mode switches.
