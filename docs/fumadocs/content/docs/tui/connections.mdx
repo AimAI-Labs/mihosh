@@ -1,33 +1,32 @@
 ---
-title: 连接监控
-description: 实时查看和管理活跃连接
+title: "Connection Monitor"
+description: Real-time active connection monitoring and management
 ---
 
 import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
 
-
-<Tabs items={['流量 (Traffic)', '活跃 (Active)', '历史 (History)']}>
-  <Tab value="流量 (Traffic)">
-    包含微型图表 (Sparkline) 显示上传和下载的实时速度。同时提供内存使用情况图表，帮助你直观了解 Mihomo 核心的资源占用。
+<Tabs items={['Traffic', 'Active', 'History']}>
+  <Tab value="Traffic">
+    Contains a Sparkline displaying real-time upload and download speeds. It also provides a memory usage chart to help you visualize Mihomo core's resource consumption.
   </Tab>
-  <Tab value="活跃 (Active)">
-    列表显示所有当前活跃的连接详情，包括：源 IP、目标地址、上传/下载量以及使用的具体节点。支持选中特定连接并强制关闭它。
+  <Tab value="Active">
+    A list displaying details of all currently active connections, including: Source IP, Target Address, Upload/Download amount, and the specific node used. You can select a specific connection and forcefully close it.
   </Tab>
-  <Tab value="历史 (History)">
-    记录已关闭连接的历史日志，方便后续进行连接审查和调试。
+  <Tab value="History">
+    Records historical logs of closed connections, facilitating subsequent connection review and debugging.
   </Tab>
 </Tabs>
 
-## 快捷操作
+## Shortcuts
 
-在连接监控页面中，你可以使用以下快捷键来管理活动连接：
+In the connection monitor page, you can use the following shortcuts to manage active connections:
 
-| 快捷键 | 操作说明 |
+| Shortcut | Description |
 | --- | --- |
-| `↑` / `↓`  | 在活动连接或历史记录列表中上下滚动 |
-| `x` | 强制关闭当前选中的活动连接 |
-| `X` | 强制关闭所有活动连接 |
-| `s` | 切换列表的排序方式（如按流量、按下载速度排序等） |
-| `/` | 搜索或过滤连接（如按目标域名过滤） |
+| `↑` / `↓`  | Scroll up/down the active connection or history list |
+| `x` | Forcefully close the currently selected active connection |
+| `X` | Forcefully close ALL active connections |
+| `s` | Toggle list sorting methods (e.g., sort by traffic, sort by download speed) |
+| `/` | Search or filter connections (e.g., filter by target domain) |
 
-> **提示**：所有连接数据均通过 WebSocket 实时更新，无需手动刷新页面。
+> **Tip**: All connection data is updated in real-time via WebSocket, no manual page refresh is required.

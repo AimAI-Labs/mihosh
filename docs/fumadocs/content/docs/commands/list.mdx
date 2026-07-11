@@ -1,48 +1,48 @@
 ---
-title: mihosh list
-description: 列出所有代理组和节点信息。
+title: "mihosh list"
+description: List all proxy groups and node information.
 ---
 
-`mihosh list` 命令用于列出当前配置中的所有代理组及其节点信息。
+The `mihosh list` command lists all proxy groups and their node information in the current configuration.
 
-## 用法
+## Usage
 
 ```bash
 mihosh list [flags]
 ```
 
-## 选项
+## Options
 
-| 选项 | 简写 | 默认值 | 说明 |
+| Option | Shorthand | Default | Description |
 | --- | --- | --- | --- |
-| `--output` | `-o` | `text` | 输出格式，支持 `text`、`json`、`table` |
+| `--output` | `-o` | `text` | Output format, supports `text`, `json`, `table` |
 
-## 示例
+## Examples
 
-### 默认文本输出
+### Default Text Output
 
 ```bash
 mihosh list
 ```
 
-### 以表格形式输出
+### Output as Table
 
 ```bash
 mihosh list -o table
 ```
 
-### 以 JSON 格式输出
+### Output as JSON
 
-适合与其他工具（如 `jq`）配合使用：
+Ideal for use with other tools (e.g., `jq`):
 
 ```bash
 mihosh list -o json
 
-# 配合 jq 筛选特定代理组
+# Filter for a specific proxy group using jq
 mihosh list -o json | jq '.[] | select(.name == "Proxy")'
 ```
 
-### 使用自定义配置
+### Using Custom Configuration
 
 ```bash
 mihosh list -c ~/.config/mihosh/custom.toml

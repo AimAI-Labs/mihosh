@@ -1,35 +1,35 @@
 ---
-title: 架构设计
-description: 了解 Mihosh 的内部架构
+title: "Architecture Design"
+description: Understand Mihosh's internal architecture
 ---
 
-Mihosh 基于 **Clean Architecture (整洁架构)** 原则设计，确保了代码的高内聚、低耦合以及良好的可测试性。
+Mihosh is designed based on **Clean Architecture** principles, ensuring high cohesion, low coupling, and excellent testability.
 
-## 整体包结构
+## Overall Package Structure
 
-项目的请求流转如下：
+The project's request flow is as follows:
 
 ```text
 main.go 
   ↓
-internal/cli (命令行入口，Cobra)
+internal/cli (Command Line Entry, Cobra)
   ↓
-internal/app (应用服务层：ProxyService, ConnectionService 等)
+internal/app (Application Service Layer: ProxyService, ConnectionService, etc.)
   ↓
-internal/domain/port (依赖倒置接口：MihomoClient, ConfigRepository)
+internal/domain/port (Dependency Inversion Interfaces: MihomoClient, ConfigRepository)
   ↓
-internal/infrastructure (基础设施实现：HTTP/WS 客户端，YAML 配置持久化)
+internal/infrastructure (Infrastructure Implementation: HTTP/WS Clients, YAML Config Persistence)
 ```
 
-## 关键模块职责
+## Key Module Responsibilities
 
-1. **Domain (领域层)**：`internal/domain/model` 定义了核心业务对象（如 `ProxyGroup`, `Connection`），`port` 定义了基础设施必须实现的接口。它不依赖任何其他层。
-2. **App (应用层)**：负责编排业务逻辑，通过调用 `port` 接口获取数据并执行逻辑。
-3. **Infrastructure (基础设施层)**：实现了与外部系统（Mihomo API，文件系统）的交互。
-4. **UI (展示层)**：
-   - `internal/cli`：命令行接口。
-   - `internal/ui/tui`：基于 Bubbletea 框架构建的 TUI 界面。
+1. **Domain**: `internal/domain/model` defines core business objects (e.g., `ProxyGroup`, `Connection`), `port` defines interfaces that infrastructure must implement. It does not depend on any other layers.
+2. **App**: Orchestrates business logic by calling `port` interfaces to fetch data and execute logic.
+3. **Infrastructure**: Implements interactions with external systems (Mihomo API, file system).
+4. **UI**:
+   - `internal/cli`: Command line interfaces.
+   - `internal/ui/tui`: TUI built on top of the Bubbletea framework.
 
-## 数据流转
+## Data Flow
 
-在 TUI 界面中，Mihosh 大量使用 WebSocket 订阅（包括流量、日志、连接和内存）来实现数据的**实时推送**，从而避免了高频的轮询，降低了系统开销。
+In the TUI, Mihosh heavily utilizes WebSocket subscriptions (including traffic, logs, connections, and memory) for **real-time pushes**, avoiding high-frequency polling and reducing system overhead.

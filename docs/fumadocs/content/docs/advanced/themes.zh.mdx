@@ -1,0 +1,44 @@
+---
+title: 主题系统
+description: 体验多主题引擎
+---
+
+Mihosh 内置了强大的多主题引擎，允许你根据终端和个人喜好自由切换主题。
+
+## 内置主题
+
+目前支持 5 款预设主题：
+- **`tokyo-night`** (默认)：深蓝灰背景与高饱和冷色调。
+- **`catppuccin`**：柔和、低对比度的马卡龙配色。
+- **`gruvbox`**：复古、偏暖的暗色主题。
+- **`nord`**：源自北欧冰雪的冷灰色系。
+- **`dracula`**：偏紫色的经典暗色主题。
+
+可以通过设置页面或命令行切换：
+```bash
+mihosh config set theme catppuccin
+```
+
+## 语义化颜色系统
+
+Mihosh 的所有组件都不会硬编码颜色，而是通过语义化的方式从 `theme.Current()` 获取颜色：
+- `Foreground`, `Muted`, `Background`, `Surface`
+- `Primary`, `Secondary`
+- `Success`, `Warning`, `Danger`, `Info`, `Border`
+
+### 延迟颜色阶梯
+
+节点延迟测试的颜色遵循严格的阶梯策略：
+- **< 100ms**：`Success` (绿色)
+- **100 - 300ms**：`Warning` (黄色)
+- **> 300ms**：`Danger` (红色)
+
+### Tokyo Night 调色板示例
+
+| 角色 | 颜色值 (HEX) | 说明 |
+| --- | --- | --- |
+| 背景 (Background) | `#1A1B26` | 页面基础底色 |
+| 正文 (Foreground) | `#C0CAF5` | 主要文字 |
+| 主颜色 (Primary) | `#7AA2F7` | 边框、标题、高亮区域 |
+| 成功 (Success) | `#9ECE6A` | 在线、低延迟 |
+| 危险 (Danger) | `#F7768E` | 错误、离线、高延迟 |

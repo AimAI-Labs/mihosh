@@ -1,51 +1,51 @@
 ---
-title: mihosh select
-description: 切换代理组中的活跃节点。
+title: "mihosh select"
+description: Switch the active node in a proxy group.
 ---
 
-`mihosh select` 命令用于在指定代理组中切换活跃节点。
+The `mihosh select` command switches the active node within a specified proxy group.
 
-## 用法
+## Usage
 
 ```bash
 mihosh select <group> <node>
 ```
 
-## 参数
+## Parameters
 
-| 参数 | 说明 |
+| Parameter | Description |
 | --- | --- |
-| `<group>` | 代理组名称，例如 `Proxy`、`Auto` 等 |
-| `<node>` | 目标节点名称，需为该代理组中的有效节点 |
+| `<group>` | Proxy group name, e.g., `Proxy`, `Auto`, etc. |
+| `<node>` | Target node name, must be a valid node within the group |
 
-## 示例
+## Examples
 
-### 切换到指定节点
+### Switch to a Specific Node
 
 ```bash
-mihosh select Proxy "香港 01"
+mihosh select Proxy "Hong Kong 01"
 ```
 
-### 节点名称包含空格
+### Node Name with Spaces
 
-当节点名称包含空格时，需要使用引号包裹：
+When a node name contains spaces, it must be wrapped in quotes:
 
 ```bash
 mihosh select Proxy "US - Los Angeles"
 ```
 
-### 配合 list 命令使用
+### Using with the list Command
 
-先查看可用的代理组和节点，再进行切换：
+First, view available proxy groups and nodes, then switch:
 
 ```bash
-# 查看所有代理组和节点
+# View all proxy groups and nodes
 mihosh list
 
-# 切换到目标节点
-mihosh select "节点选择" "日本 01"
+# Switch to the target node
+mihosh select "Node Select" "Japan 01"
 ```
 
 <Callout type="warn">
-如果指定的代理组不存在或节点名称不在该组中，命令将返回错误提示。
+If the specified proxy group does not exist or the node name is not in that group, the command will return an error.
 </Callout>

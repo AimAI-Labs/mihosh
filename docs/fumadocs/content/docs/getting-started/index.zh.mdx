@@ -1,0 +1,42 @@
+---
+title: 快速开始
+description: Mihosh 的快速入门指南
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+Mihosh 是一款基于 Mihomo 的全功能终端 UI (TUI) 代理管理工具。
+
+## 前置要求
+
+在运行 Mihosh 之前，你需要确保 Mihomo 代理核心已经在运行，并且启用了 RESTful API。
+
+## 快速步骤
+
+<Steps>
+  <Step>
+    ### 安装 Mihosh
+    请参考 [安装指南](/docs/getting-started/installation) 将 Mihosh 安装到你的系统中。
+  </Step>
+
+  <Step>
+    ### 初始化配置
+    运行以下命令并按提示输入 Mihomo 的 API 地址和密钥：
+    ```bash
+    mihosh config init
+    ```
+  </Step>
+
+  <Step>
+    ### 启动应用
+    只需在终端输入：
+    ```bash
+    mihosh
+    ```
+  </Step>
+</Steps>
+
+## 下一步
+
+- 查看详细的 [配置指南](/docs/getting-started/configuration)
+- 探索 [命令参考](/docs/commands)

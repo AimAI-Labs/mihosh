@@ -1,32 +1,32 @@
 ---
-title: 国际化
-description: 多语言支持
+title: "Internationalization"
+description: Multi-language Support
 ---
 
-Mihosh 支持完整的国际化 (i18n)，界面会根据环境自动切换语言。
+Mihosh supports full internationalization (i18n), automatically switching languages based on your environment.
 
-## 支持的语言
+## Supported Languages
 
-- 英文 (`en-US`)
-- 简体中文 (`zh-CN`)
+- English (`en-US`)
+- Simplified Chinese (`zh-CN`)
 
-## 配置语言
+## Configuring Language
 
-默认情况下，Mihosh 会通过 `go-locale` 读取操作系统的语言设置，自动匹配合适的语言（配置为 `auto`）。
+By default, Mihosh uses `go-locale` to read the OS language settings and automatically matches the appropriate language (configured as `auto`).
 
-你可以通过命令覆盖自动检测：
+You can override automatic detection via command:
 ```bash
 mihosh config set language en-US
 ```
-或是：
+Or:
 ```bash
 mihosh config set language zh-CN
 ```
-恢复自动检测：
+To revert to auto-detection:
 ```bash
 mihosh config set language auto
 ```
 
-## 实现细节
+## Implementation Details
 
-核心实现位于 `pkg/i18n`。新增语言只需在该目录添加对应的字典文件并注册即可，无需修改业务代码。
+The core implementation is located in `pkg/i18n`. To add a new language, simply add the corresponding dictionary file to this directory and register it; no business code modification is required.

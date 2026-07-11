@@ -1,23 +1,23 @@
 ---
-title: 常见问题 (FAQ)
-description: 排障与常见问题解答
+title: "FAQ"
+description: Troubleshooting and Frequently Asked Questions
 ---
 
-## 常见问题列表
+## Common Issues
 
-| 问题现象 | 解决方案 |
+| Phenomenon | Solution |
 | --- | --- |
-| **连接失败** | 检查 Mihomo 核心是否在运行，仔细验证 `mihosh config show` 中的 API 地址和 Secret 是否与 Mihomo 配置文件中的一致。 |
-| **找不到节点** | 确保 Mihomo 的配置文件中正确配置了代理组 (Proxy Groups)。 |
-| **测试超时** | 在配置中增加 `timeout` 值，或者将 `test_url` 更换为国内/本地响应更快的地址。 |
-| **主题不生效** | 确认配置的 `theme` 名称是否拼写正确（支持：`tokyo-night`, `catppuccin`, `gruvbox`, `nord`, `dracula`）。 |
-| **界面乱码、表格对齐问题** | 你的终端字体可能不支持特殊字符。强烈推荐使用 **Nerd Font**，或确保使用的字体对 CJK (中日韩) 等宽字符支持良好。 |
-| **自动刷新不工作** | 检查配置中的 `auto_refresh_interval`，设为 `0` 会禁用自动刷新。 |
+| **Connection Failed** | Check if Mihomo core is running, and carefully verify that the API address and Secret in `mihosh config show` match the ones in Mihomo's configuration file. |
+| **Nodes Not Found** | Ensure Proxy Groups are correctly configured in Mihomo's configuration file. |
+| **Test Timeout** | Increase the `timeout` value in the config, or change `test_url` to a faster local/regional address. |
+| **Theme Not Applied** | Check if the configured `theme` name is spelled correctly (Supported: `tokyo-night`, `catppuccin`, `gruvbox`, `nord`, `dracula`). |
+| **Garbled UI or Misaligned Tables** | Your terminal font might not support special characters. It is highly recommended to use a **Nerd Font**, or ensure your font supports CJK monospace characters well. |
+| **Auto-refresh Not Working** | Check `auto_refresh_interval` in config. Setting it to `0` disables auto-refresh. |
 
-## 快速排查
+## Quick Diagnostics
 
-如果你遇到奇怪的错误，请先运行诊断命令：
+If you encounter weird errors, please run the diagnostics command first:
 ```bash
 mihosh doctor
 ```
-该命令会自动检查配置文件、连接状态和 API 兼容性，并输出检查报告。
+This command will automatically check your config file, connection status, and API compatibility, then output a report.

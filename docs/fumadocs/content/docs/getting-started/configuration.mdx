@@ -1,43 +1,43 @@
 ---
-title: 配置指南
-description: Mihosh 配置详解
+title: Configuration Guide
+description: Detailed explanation of Mihosh configuration
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 
-Mihosh 的配置文件默认存储在 `~/.mihosh/config.yaml`。当首次运行 `mihosh` 时，如果配置文件不存在，系统会自动生成带有默认值的配置。
+The configuration file for Mihosh is stored in `~/.mihosh/config.yaml` by default. When running `mihosh` for the first time, if the configuration file does not exist, the system will automatically generate a configuration with default values.
 
-## 初始化配置
+## Initialize Configuration
 
-你可以通过交互式命令快速初始化或重置配置：
+You can quickly initialize or reset the configuration through interactive commands:
 
 ```bash
 mihosh config init
 ```
-该命令会提示你输入 Mihomo API 的地址、端口和密钥。
+This command will prompt you to enter the Mihomo API address, port, and secret.
 
-<Callout title="提示" type="info">
-  如果你的 Mihomo 核心未设置验证密钥，在提示输入密钥时直接按回车留空即可。
+<Callout title="Hint" type="info">
+  If your Mihomo core does not have an authentication secret set, simply press Enter to leave it blank when prompted for the secret.
 </Callout>
 
-## 配置项参考
+## Configuration Items Reference
 
-以下是 Mihosh 支持的所有配置项说明：
+Here are all the configuration items supported by Mihosh:
 
-| 配置项 | 类型 | 描述 | 默认值 |
+| Configuration Item | Type | Description | Default Value |
 | --- | --- | --- | --- |
-| `server.host` | string | Mihomo API 地址 | `127.0.0.1` |
-| `server.port` | int | Mihomo API 端口 | `9090` |
-| `server.secret` | string | API 密钥 | `""` |
-| `test_url` | string | 延迟测试 URL | `http://www.gstatic.com/generate_204` |
-| `timeout` | int | 测试超时(ms) | `5000` |
-| `language` | string | 界面语言 | `auto` (支持: `auto`, `en-US`, `zh-CN`) |
-| `auto_refresh_interval` | int | 自动刷新间隔(秒) | `5` |
-| `theme` | string | UI 主题 | `tokyo-night` |
+| `server.host` | string | Mihomo API address | `127.0.0.1` |
+| `server.port` | int | Mihomo API port | `9090` |
+| `server.secret` | string | API secret | `""` |
+| `test_url` | string | Latency test URL | `http://www.gstatic.com/generate_204` |
+| `timeout` | int | Test timeout (ms) | `5000` |
+| `language` | string | Interface language | `auto` (Supports: `auto`, `en-US`, `zh-CN`) |
+| `auto_refresh_interval` | int | Auto refresh interval (seconds) | `5` |
+| `theme` | string | UI theme | `tokyo-night` |
 
-## 命令行配置管理
+## Command Line Configuration Management
 
-除了手动修改文件，你也可以直接使用命令行工具快速修改或查看配置项，这在编写自动化脚本时非常有用：
+In addition to manually modifying the file, you can also use command-line tools directly to quickly modify or view configuration items, which is very useful when writing automation scripts:
 
 ```bash
 mihosh config set theme catppuccin
@@ -45,7 +45,7 @@ mihosh config set language zh-CN
 mihosh config show
 ```
 
-## 完整配置示例
+## Complete Configuration Example
 
 ```yaml title="~/.mihosh/config.yaml"
 active_sub: 0eadd5c7

@@ -1,44 +1,44 @@
 ---
-title: 安装指南
-description: 如何在你的系统中安装 Mihosh
+title: Installation Guide
+description: How to install Mihosh on your system
 ---
 
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
-Mihosh 支持 Linux 和 macOS 系统 (amd64 和 arm64 架构)。
+Mihosh supports Linux and macOS systems (amd64 and arm64 architectures).
 
-## 安装方法
+## Installation Methods
 
-我们提供多种安装方式，请根据你的系统环境选择最适合的一种：
+We provide multiple installation methods, please choose the one that best suits your system environment:
 
-<Tabs items={['脚本安装 (推荐)', 'Homebrew (macOS)', '源码编译']}>
-  <Tab value="脚本安装 (推荐)">
-    在 Linux 或 macOS 终端中运行以下一键安装脚本：
+<Tabs items={['Script Installation (Recommended)', 'Homebrew (macOS)', 'Build from Source']}>
+  <Tab value="Script Installation (Recommended)">
+    Run the following one-click installation script in the Linux or macOS terminal:
     ```bash
     curl -fsSL https://raw.githubusercontent.com/AimAI-Labs/mihosh/refs/heads/main/install.sh | bash
     ```
   </Tab>
   <Tab value="Homebrew (macOS)">
-    如果你是 macOS 用户，并使用 Homebrew 包管理器，可以通过以下命令安装：
+    If you are a macOS user and use the Homebrew package manager, you can install it via the following commands:
     ```bash
     brew tap AimAI-Labs/mihosh https://github.com/AimAI-Labs/mihosh
     brew install mihosh
     ```
   </Tab>
-  <Tab value="源码编译">
-    要求你的系统中已安装 Go 1.25+：
+  <Tab value="Build from Source">
+    Requires Go 1.25+ installed on your system:
     ```bash
     git clone https://github.com/AimAI-Labs/mihosh.git
     cd mihosh
     make build
-    # 编译后的二进制文件位于当前目录的 mihosh
+    # The compiled binary file is located in the current directory as mihosh
     ```
   </Tab>
 </Tabs>
 
-## 验证安装
+## Verify Installation
 
-安装完成后，可以通过以下命令验证是否安装成功：
+After the installation is complete, you can verify whether the installation was successful using the following command:
 
 ```bash
 mihosh version

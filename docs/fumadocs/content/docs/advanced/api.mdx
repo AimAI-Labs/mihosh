@@ -1,46 +1,46 @@
 ---
-title: Mihomo API 参考
-description: Mihosh 交互的 RESTful API 列表
+title: "Mihomo API Reference"
+description: List of RESTful APIs used by Mihosh
 ---
 
-Mihosh 作为 Mihomo 的客户端，依赖其 RESTful API 进行交互。以下是 Mihosh 用到的关键端点。
+As a Mihomo client, Mihosh relies on its RESTful API for interaction. Below are the key endpoints used by Mihosh.
 
-> **注意**：所有 HTTP 和 WS 请求都需要在 Header 中携带 `Authorization: Bearer <secret>`。
+> **Note**: All HTTP and WS requests require `Authorization: Bearer <secret>` in the Header.
 
-## 代理相关
+## Proxies
 
-| 路径 | 方法 | 描述 |
+| Path | Method | Description |
 | --- | --- | --- |
-| `/proxies` | GET | 获取所有代理组和节点 |
-| `/proxies/:group` | GET | 获取特定代理组信息 |
-| `/proxies/:group` | PUT | 选择代理节点 |
-| `/proxies/:group/delay` | GET | 测试节点延迟 |
-| `/group/:group/delay` | GET | 测试组内所有节点 |
+| `/proxies` | GET | Get all proxy groups and nodes |
+| `/proxies/:group` | GET | Get specific proxy group info |
+| `/proxies/:group` | PUT | Select a proxy node |
+| `/proxies/:group/delay` | GET | Test node latency |
+| `/group/:group/delay` | GET | Test all nodes in a group |
 
-## 连接与配置
+## Connections & Configs
 
-| 路径 | 方法 | 描述 |
+| Path | Method | Description |
 | --- | --- | --- |
-| `/connections` | GET | 获取连接列表 |
-| `/connections` | DELETE | 关闭所有连接 |
-| `/connections/:id` | DELETE | 关闭指定连接 |
-| `/configs` | GET | 获取当前配置 |
-| `/configs` | PATCH | 更新配置 (如模式切换) |
-| `/version` | GET | 获取 Mihomo 版本 |
+| `/connections` | GET | Get connections list |
+| `/connections` | DELETE | Close all connections |
+| `/connections/:id` | DELETE | Close a specific connection |
+| `/configs` | GET | Get current configuration |
+| `/configs` | PATCH | Update configuration (e.g., mode switch) |
+| `/version` | GET | Get Mihomo version |
 
-## 规则
+## Rules
 
-| 路径 | 方法 | 描述 |
+| Path | Method | Description |
 | --- | --- | --- |
-| `/rules` | GET | 获取规则列表 |
-| `/providers/rules` | GET | 获取规则提供者列表 |
-| `/providers/rules/:name` | PUT | 更新指定规则提供者 |
+| `/rules` | GET | Get rules list |
+| `/providers/rules` | GET | Get rule providers list |
+| `/providers/rules/:name` | PUT | Update a specific rule provider |
 
-## 实时数据 (WebSocket)
+## Real-time Data (WebSocket)
 
-| 路径 | 方法 | 描述 |
+| Path | Method | Description |
 | --- | --- | --- |
-| `/traffic` | WS | 实时流量上下行速度 |
-| `/logs` | WS | 实时日志流 |
-| `/connections` | WS | 实时连接变更 |
-| `/memory` | WS | 实时内存使用 |
+| `/traffic` | WS | Real-time traffic up/down speeds |
+| `/logs` | WS | Real-time log stream |
+| `/connections` | WS | Real-time connection changes |
+| `/memory` | WS | Real-time memory usage |

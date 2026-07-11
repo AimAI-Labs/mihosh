@@ -1,56 +1,56 @@
 ---
-title: 开发指南
-description: 如何参与 Mihosh 的开发
+title: "Development Guide"
+description: How to contribute to Mihosh
 ---
 
-欢迎为 Mihosh 贡献代码！以下是设置开发环境的指南。
+Welcome to contribute to Mihosh! Below is a guide for setting up your development environment.
 
-## 前置要求
+## Prerequisites
 
-- Go 1.25 或更高版本
-- [mise](https://mise.jdx.dev/) (可选，用于环境管理)
+- Go 1.25 or higher
+- [mise](https://mise.jdx.dev/) (Optional, for environment management)
 
-## 获取与构建
+## Fetch & Build
 
 ```bash
-# 1. 克隆代码
+# 1. Clone code
 git clone https://github.com/AimAI-Labs/mihosh.git
 cd mihosh
 
-# 2. 安装依赖
+# 2. Install dependencies
 go mod download
 
-# 3. 编译
+# 3. Build
 make build
-# 或者: go build -o mihosh .
+# Or: go build -o mihosh .
 ```
 
-## 测试与检查
+## Test & Check
 
-项目使用了标准的 Go 测试工具，并且配置了详尽的 Makefile：
+The project uses standard Go test tools and is configured with a comprehensive Makefile:
 
 ```bash
-# 运行单元测试
+# Run unit tests
 make test
 
-# 执行格式化、静态检查、测试和编译的全套检查
+# Run full checks including formatting, static analysis, tests, and build
 make check
 ```
 
-## CI 验证
+## CI Verification
 
-项目配置了 GitHub Actions。每次提交或 Pull Request 都会进行以下验证：
-- 代码格式化 (Formatting)
-- 模块依赖校验 (Module verification)
-- 静态分析 (go vet)
-- 单元测试 (go test)
-- 编译构建
+The project is configured with GitHub Actions. Every commit or Pull Request will trigger:
+- Formatting
+- Module verification
+- Static analysis (go vet)
+- Unit testing (go test)
+- Build
 - Lint
-- CodeQL 漏洞分析
+- CodeQL Vulnerability Analysis
 
-## 注入版本信息
+## Injecting Version Info
 
-发布版通常会在编译时通过 `ldflags` 注入版本变量：
+Release builds usually inject version variables via `ldflags` at compile time:
 ```bash
 go build -ldflags "-X github.com/AimAI-Labs/mihosh/internal/domain/model.Version=v1.0.0"
 ```
