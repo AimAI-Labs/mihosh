@@ -5,7 +5,7 @@ export default async function Layout(props: { children: React.ReactNode; params:
   const params = await props.params;
   return (
     <html lang={params.lang} suppressHydrationWarning>
-      <body className="flex flex-col min-h-screen font-sans antialiased">
+      <body className="flex flex-col min-h-screen font-sans antialiased" suppressHydrationWarning>
         <RootProvider
           i18n={{
             locale: params.lang,
