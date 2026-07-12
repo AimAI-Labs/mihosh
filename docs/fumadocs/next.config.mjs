@@ -6,7 +6,8 @@ const withMDX = createMDX();
 const config = {
   reactStrictMode: true,
   allowedDevOrigins: ['*.*.*.*'],
-  output: 'export',
+  // 静态导出与 middleware/proxy 不兼容，仅在生产构建时通过 STATIC_EXPORT=true 启用
+  output: process.env.STATIC_EXPORT === 'true' ? 'export' : undefined,
   images: {
     unoptimized: true,
   }
