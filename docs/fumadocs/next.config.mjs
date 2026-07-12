@@ -6,8 +6,10 @@ const withMDX = createMDX();
 const config = {
   reactStrictMode: true,
   allowedDevOrigins: ['*.*.*.*'],
-  // 静态导出与 middleware/proxy 不兼容，仅在生产构建时通过 STATIC_EXPORT=true 启用
-  output: process.env.STATIC_EXPORT === 'true' ? 'export' : undefined,
+  // 静态导出与 middleware/proxy 不兼容，CI 中由 configure-pages 设置 GITHUB_PAGES=true 启用
+  output: process.env.GITHUB_PAGES === 'true' ? 'export' : undefined,
+  // GitHub Pages 项目页需 basePath=/mihosh，configure-pages 可能无法解析 withMDX 包装的配置
+  basePath: process.env.GITHUB_PAGES === 'true' ? '/mihosh' : '',
   images: {
     unoptimized: true,
   }

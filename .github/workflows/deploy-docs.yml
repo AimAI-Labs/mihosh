@@ -40,6 +40,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Remove proxy for static export
+        run: rm -f proxy.ts
+
       - name: Build with Next.js
         run: npm run build
 
