@@ -34,7 +34,7 @@ var rootCmd = &cobra.Command{
 		client := api.NewClient(endpoint, cfg.Timeout)
 		m := tui.NewModel(client, cfg.TestURL, cfg.Timeout)
 
-		p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
+		p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithoutCatchPanics())
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf(i18n.T("cli.root.err_start")+": %w", err)
 		}

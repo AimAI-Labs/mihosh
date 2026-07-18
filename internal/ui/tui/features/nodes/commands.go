@@ -1,6 +1,8 @@
 package nodes
 
 import (
+	"fmt"
+
 	"github.com/AimAI-Labs/mihosh/internal/app/service" // Need for testAllProxies
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
@@ -38,7 +40,17 @@ func SelectProxy(client *api.Client, group, proxy string) tea.Cmd {
 }
 
 func TestProxy(client *api.Client, name, testURL string, timeout int) tea.Cmd {
-	return func() tea.Msg {
+	return func() (msg tea.Msg) {
+		defer func() {
+			if r := recover(); r != nil {
+				msg = messages.TestDoneMsg{Name: name, Delay: -1, Err: fmt.Errorf("panic in TestProxy: %v", r), TestURL: testURL}
+			}
+		}()
+		
+		if client == nil {
+			return messages.TestDoneMsg{Name: name, Delay: -1, Err: fmt.Errorf("client is nil"), TestURL: testURL}
+		}
+
 		delay, err := client.TestProxyDelay(name, testURL, timeout)
 		if err != nil {
 			return messages.TestDoneMsg{Name: name, Delay: -1, Err: err, TestURL: testURL}
