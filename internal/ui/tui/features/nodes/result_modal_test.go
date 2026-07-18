@@ -7,13 +7,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
 
-func TestSummarizeFailure_ExtractsRequestDetail(t *testing.T) {
-	raw := `Get "http://127.0.0.1:9097/Proxies/hy2%E5%8F%B0%E6%B9%BE05/delay?url=http%3A%2F%2Fwww.gstatic.com%2Fgenerate_204&timeout=5000": dial tcp 127.0.0.1:9097: connectex: No connection could be made`
-	summary := summarizeFailure(raw)
-	if !strings.HasPrefix(summary, "dial tcp 127.0.0.1:9097") {
-		t.Fatalf("expected concise detail extracted, got %q", summary)
-	}
-}
+
 
 func TestBuildTestResultModal_FailureEntry(t *testing.T) {
 	i18n.Init()
@@ -32,9 +26,7 @@ func TestBuildTestResultModal_FailureEntry(t *testing.T) {
 	if !strings.Contains(modal, "原因:") {
 		t.Fatalf("expected reason section in modal")
 	}
-	if !strings.Contains(modal, "源信息:") {
-		t.Fatalf("expected source section in modal")
-	}
+
 	if !strings.Contains(modal, "dial tcp 127.0.0.1:9097") {
 		t.Fatalf("expected source detail retained, got %q", modal)
 	}

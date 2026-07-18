@@ -233,9 +233,6 @@ func buildTestResultModal(state PageState) string {
 	if endIdx < totalLines {
 		bodyLines = append(bodyLines, common.DimStyle().Render(i18n.Tf("nodes.result_scroll_down", totalLines-endIdx)))
 	}
-	bodyLines = append(bodyLines, "")
-	bodyLines = append(bodyLines, common.MutedStyle().Render(i18n.T("nodes.result_modal_help")))
-
 	body := strings.Join(bodyLines, "\n")
 
 	// 标题：显示总数和失败数
@@ -271,13 +268,11 @@ func buildTestResultDetailLines(results []TestResultEntry, width int) []string {
 		if entry.Error != "" {
 			// 失败条目
 			lines = append(lines, common.ErrorStyle().Render(fmt.Sprintf("[%02d] %s", i+1, entry.Name)))
-			summary := summarizeFailure(entry.Error)
-			lines = append(lines, wrapWithPrefix(i18n.T("nodes.reason_prefix"), summary, width)...)
 			rawMsg := entry.Error
 			if entry.TestURL != "" {
 				rawMsg = fmt.Sprintf("[%s] %s", entry.TestURL, entry.Error)
 			}
-			lines = append(lines, wrapWithPrefix(i18n.T("nodes.raw_prefix"), rawMsg, width)...)
+			lines = append(lines, wrapWithPrefix(i18n.T("nodes.reason_prefix"), rawMsg, width)...)
 		} else {
 			// 成功条目
 			lines = append(lines, fmt.Sprintf("[%02d] %s", i+1, entry.Name))
@@ -294,39 +289,7 @@ func buildTestResultDetailLines(results []TestResultEntry, width int) []string {
 	return lines
 }
 
-func summarizeFailure(raw string) string {
-	msg := strings.TrimSpace(raw)
-	if msg == "" {
-		return i18n.T("nodes.unknown_error")
-	}
 
-	if detail := extractRequestFailureDetail(msg); detail != "" {
-		return detail
-	}
-
-	if strings.Contains(msg, "context deadline exceeded") {
-		return i18n.T("nodes.timeout_context")
-	}
-	if strings.Contains(strings.ToLower(msg), "timeout") {
-		return i18n.T("nodes.timeout")
-	}
-
-	return msg
-}
-
-func extractRequestFailureDetail(msg string) string {
-	idx := strings.LastIndex(msg, `": `)
-	if idx == -1 {
-		return ""
-	}
-	quotedPart := msg[:idx]
-	if !strings.Contains(quotedPart, `"http://`) &&
-		!strings.Contains(quotedPart, `"https://`) &&
-		!strings.Contains(quotedPart, `"socks5://`) {
-		return ""
-	}
-	return strings.TrimSpace(msg[idx+3:])
-}
 
 func wrapWithPrefix(prefix, text string, width int) []string {
 	prefixWidth := displayWidth(prefix)
