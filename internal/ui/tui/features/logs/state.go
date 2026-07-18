@@ -408,16 +408,9 @@ func (s State) HandleMouseScroll(up bool, pageHeight int) State {
 
 // UpdateMaxHScrollOffset 根据页面尺寸更新最大水平滚动偏移
 func (s State) UpdateMaxHScrollOffset(width, height int) State {
-	pageWidth := width - 2
-	if pageWidth < 1 {
-		pageWidth = 1
-	}
-	fixedOverhead := 8 + 1 + 20
-	maxOffset := pageWidth - fixedOverhead - 20
-	if maxOffset < 0 {
-		maxOffset = 0
-	}
-	s.maxHScrollOffset = maxOffset
+	// 允许用户向右滚动足够多的距离以查看长日志
+	// 以前的逻辑限制了滚动范围为单个屏幕宽度，导致长日志无法完全查看
+	s.maxHScrollOffset = 4096
 	if s.logHScrollOffset > s.maxHScrollOffset {
 		s.logHScrollOffset = s.maxHScrollOffset
 	}

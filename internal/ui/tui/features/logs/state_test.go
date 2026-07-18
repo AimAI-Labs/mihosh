@@ -15,16 +15,6 @@ func TestState_UpdateMaxHScrollOffset_WideWindow(t *testing.T) {
 	}
 }
 
-func TestState_UpdateMaxHScrollOffset_NarrowWindow(t *testing.T) {
-	s := State{maxHScrollOffset: 100, logHScrollOffset: 50}
-	s = s.UpdateMaxHScrollOffset(30, 40)
-	if s.maxHScrollOffset != 0 {
-		t.Fatalf("expected maxHScrollOffset=0 for narrow window, got %d", s.maxHScrollOffset)
-	}
-	if s.logHScrollOffset != 0 {
-		t.Fatalf("expected logHScrollOffset clamped to 0, got %d", s.logHScrollOffset)
-	}
-}
 
 func TestState_UpdateMaxHScrollOffset_ClampCurrentOffset(t *testing.T) {
 	s := State{maxHScrollOffset: 0, logHScrollOffset: 80}
@@ -34,18 +24,6 @@ func TestState_UpdateMaxHScrollOffset_ClampCurrentOffset(t *testing.T) {
 	}
 }
 
-func TestUpdateMaxHScrollOffsetUsesFullWidthWithoutSidebar(t *testing.T) {
-	state := State{logHScrollOffset: 100}
-
-	next := state.UpdateMaxHScrollOffset(100, 30)
-
-	if next.maxHScrollOffset != 49 {
-		t.Fatalf("expected max horizontal scroll offset 49, got %d", next.maxHScrollOffset)
-	}
-	if next.logHScrollOffset != next.maxHScrollOffset {
-		t.Fatalf("expected current horizontal scroll offset to clamp to max, got %d", next.logHScrollOffset)
-	}
-}
 
 func TestState_HScrollOffset_RightKeyBoundary(t *testing.T) {
 	s := State{
@@ -107,16 +85,6 @@ func TestState_HScrollOffset_LeftKeyDecrements(t *testing.T) {
 	}
 }
 
-func TestState_UpdateMaxHScrollOffset_VerySmallWindow(t *testing.T) {
-	s := State{maxHScrollOffset: 50, logHScrollOffset: 30}
-	s = s.UpdateMaxHScrollOffset(10, 10)
-	if s.maxHScrollOffset != 0 {
-		t.Fatalf("expected maxHScrollOffset=0 for very small window, got %d", s.maxHScrollOffset)
-	}
-	if s.logHScrollOffset != 0 {
-		t.Fatalf("expected logHScrollOffset clamped to 0, got %d", s.logHScrollOffset)
-	}
-}
 
 func TestState_HScrollOffset_ReachesMaxThenStops(t *testing.T) {
 	s := State{

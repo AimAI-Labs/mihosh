@@ -9,6 +9,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 const (
@@ -309,7 +310,6 @@ func renderLogList(logs []model.LogEntry, selectedIdx, scrollTop, maxLines, widt
 	}
 
 	var lines []string
-	maxWidth := width - 20 // 预留边距
 
 	// 调整滚动位置确保选中项可见
 	if selectedIdx < scrollTop {
@@ -326,7 +326,7 @@ func renderLogList(logs []model.LogEntry, selectedIdx, scrollTop, maxLines, widt
 
 	for i := scrollTop; i < endIdx; i++ {
 		log := logs[i]
-		line := RenderLogEntry(log, i == selectedIdx, maxWidth, hOffset)
+		line := RenderLogEntry(log, i == selectedIdx, width, hOffset)
 		lines = append(lines, line)
 	}
 
@@ -354,33 +354,29 @@ func RenderLogEntry(log model.LogEntry, selected bool, maxWidth int, hOffset int
 		content = decoded
 	}
 
-	usableWidth := maxWidth - logsDefaultPadding
+	// 符号 (2) + 时间 (8) + 空格 (1) + 级别 (logsLevelWidth) + 空格 (1) = 20
+	prefixWidth := 2 + len(timeStr) + 1 + logsLevelWidth + 1
+	usableWidth := maxWidth - prefixWidth
 	if usableWidth < 1 {
 		usableWidth = 1
 	}
 
 	if hOffset > 0 {
-		contentWidth := 0
-		for i, r := range content {
-			if r > 127 {
-				contentWidth += 2
-			} else {
-				contentWidth++
+		var b strings.Builder
+		w := 0
+		for _, r := range content {
+			rw := runewidth.RuneWidth(r)
+			if w+rw <= hOffset {
+				w += rw
+				continue
 			}
-			if contentWidth > hOffset {
-				content = content[i:]
-				break
-			}
+			w += rw
+			b.WriteRune(r)
 		}
-		if contentWidth <= hOffset {
-			content = ""
-		}
+		content = b.String()
 	}
 
-	displayWidth := usableWidth
-	if len(content) > displayWidth {
-		content = content[:displayWidth]
-	}
+	content = runewidth.Truncate(content, usableWidth, "")
 
 	line := fmt.Sprintf("%s %s %s",
 		timePart,
@@ -389,11 +385,16 @@ func RenderLogEntry(log model.LogEntry, selected bool, maxWidth int, hOffset int
 	)
 
 	if selected {
+		line = common.SymbolSelectActive + line
 		line = lipgloss.NewStyle().
 			Background(common.TokyoSelected()).
-			Render(common.SymbolSelectActive + line)
+			Width(maxWidth).
+			Render(line)
 	} else {
 		line = common.SymbolSelectInactive + line
+		line = lipgloss.NewStyle().
+			Width(maxWidth).
+			Render(line)
 	}
 
 	return line
