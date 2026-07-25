@@ -431,3 +431,40 @@ func TestNewUID(t *testing.T) {
 		seen[uid] = true
 	}
 }
+
+func TestProfileService_FirstStartup(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+	t.Setenv("USERPROFILE", tmpHome)
+	t.Setenv("APPDATA", "")
+	t.Setenv("HOMEDRIVE", "")
+	t.Setenv("HOMEPATH", "")
+
+	// 预置 mihomo 配置文件，模拟本地存在运行中的 mihomo
+	mihomoDir := filepath.Join(tmpHome, ".config", "mihomo")
+	require.NoError(t, os.MkdirAll(mihomoDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(mihomoDir, "config.yaml"), []byte("port: 7890\n"), 0644))
+
+	s := NewProfileService(nil)
+
+	// 1. 在 mihosh 配置文件不存在时，ListProfiles 应正常返回空列表
+	subs, active, err := s.ListProfiles()
+	require.NoError(t, err)
+	assert.Empty(t, subs)
+	assert.Empty(t, active)
+
+	// 2. 在 mihosh 配置文件不存在时，AutoImportLocalSub 应成功自动导入本地配置
+	imported, err := s.AutoImportLocalSub()
+	require.NoError(t, err)
+	require.NotNil(t, imported)
+	assert.Equal(t, "Local Config", imported.Name)
+
+	// 3. 导入后应已生成 mihosh 配置文件且 ListProfiles 可查出
+	subsAfter, _, err := s.ListProfiles()
+	require.NoError(t, err)
+	assert.Len(t, subsAfter, 1)
+	assert.Equal(t, imported.UID, subsAfter[0].UID)
+}

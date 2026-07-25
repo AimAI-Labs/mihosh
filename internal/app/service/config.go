@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -36,7 +37,12 @@ func (s *ConfigService) SaveConfig(cfg *config.Config) error {
 func (s *ConfigService) SetConfigValue(key, value string) error {
 	cfg, err := config.Load()
 	if err != nil {
-		return err
+		if errors.Is(err, config.ErrConfigNotFound) {
+			defaultCopy := config.DefaultConfig
+			cfg = &defaultCopy
+		} else {
+			return err
+		}
 	}
 
 	switch key {

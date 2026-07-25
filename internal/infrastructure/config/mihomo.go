@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -28,13 +27,11 @@ var DefaultMihomoEndpoint = MihomoEndpoint{
 func ResolveMihomoEndpoint() MihomoEndpoint {
 	path, err := GetMihomoConfigPath()
 	if err != nil {
-		log.Printf("ResolveMihomoEndpoint: auto discovery failed, using defaults: %v", err)
 		return DefaultMihomoEndpoint
 	}
 
 	data, err := ReadMihomoYAML(path)
 	if err != nil {
-		log.Printf("ResolveMihomoEndpoint: failed to read mihomo yaml (%s), using defaults: %v", path, err)
 		return DefaultMihomoEndpoint
 	}
 

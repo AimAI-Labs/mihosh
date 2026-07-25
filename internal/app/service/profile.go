@@ -48,7 +48,9 @@ func NewProfileService(client *api.Client) *ProfileService {
 // ListProfiles 返回当前所有订阅元数据与激活 UID。
 func (s *ProfileService) ListProfiles() ([]profile.Profile, string, error) {
 	cfg, err := config.Load()
-	if err != nil {
+	if errors.Is(err, config.ErrConfigNotFound) {
+		return []profile.Profile{}, "", nil
+	} else if err != nil {
 		return nil, "", err
 	}
 	if cfg.Subs == nil {
@@ -291,7 +293,14 @@ func (s *ProfileService) Activate(uid string) (ActivateResult, error) {
 func (s *ProfileService) AutoImportLocalSub() (*profile.Profile, error) {
 	cfg, err := config.Load()
 	if err != nil {
-		return nil, nil // 配置未初始化，静默跳过
+		if errors.Is(err, config.ErrConfigNotFound) {
+			defaultCopy := config.DefaultConfig
+			cfg = &defaultCopy
+			cfg.Subs = []profile.Profile{}
+			cfg.ActiveSub = ""
+		} else {
+			return nil, nil // 配置异常，静默跳过
+		}
 	}
 
 	// 已有本地订阅，跳过
@@ -354,7 +363,9 @@ const i18nLocalSubName = "Local Config"
 // findProfile 按 UID 查找订阅元数据。
 func (s *ProfileService) findProfile(uid string) (profile.Profile, error) {
 	cfg, err := config.Load()
-	if err != nil {
+	if errors.Is(err, config.ErrConfigNotFound) {
+		return profile.Profile{}, ErrSubNotFound
+	} else if err != nil {
 		return profile.Profile{}, err
 	}
 	for _, p := range cfg.Subs {
@@ -393,7 +404,12 @@ func (s *ProfileService) mutateProfile(uid string, fn func(*profile.Profile)) er
 // 保存采用读-改-写，调用方在 fn 内完成对 cfg 的就地修改。
 func (s *ProfileService) persistMutation(fn func(*config.Config)) error {
 	cfg, err := config.Load()
-	if err != nil {
+	if errors.Is(err, config.ErrConfigNotFound) {
+		defaultCopy := config.DefaultConfig
+		cfg = &defaultCopy
+		cfg.Subs = []profile.Profile{}
+		cfg.ActiveSub = ""
+	} else if err != nil {
 		return err
 	}
 	fn(cfg)
