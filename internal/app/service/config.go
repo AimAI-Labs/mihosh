@@ -123,7 +123,7 @@ func (s *ConfigService) fetchMihomoConfigFromFile(apiErr error) messages.MihomoC
 // 非 Linux 或 systemctl 不可用时降级为 API 热重载。
 func (s *ConfigService) SaveMihomoConfigField(client *api.Client, key string, value interface{}) tea.Cmd {
 	return func() tea.Msg {
-		path, err := config.GetMihomoConfigPath()
+		path, err := config.GetMihomoConfigPathForWrite()
 		if err != nil {
 			return messages.MihomoConfigSavedMsg{Err: err}
 		}

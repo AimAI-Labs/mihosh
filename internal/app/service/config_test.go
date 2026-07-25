@@ -46,3 +46,26 @@ func TestConfigService_SaveMihomoConfigField_Success(t *testing.T) {
 	// depending on the environment, so we just check it returns a function
 	// and doesn't crash on construction.
 }
+
+func TestConfigService_SaveMihomoConfigField_FirstLaunchWritesYAML(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("HOME", tempDir)
+	t.Setenv("USERPROFILE", tempDir)
+	t.Setenv("APPDATA", tempDir)
+
+	s := NewConfigService()
+	cmd := s.SaveMihomoConfigField(nil, "external-controller", "127.0.0.1:9090")
+	requireCmdNotNil := func() messages.MihomoConfigSavedMsg {
+		msg := cmd()
+		savedMsg, ok := msg.(messages.MihomoConfigSavedMsg)
+		if !ok {
+			t.Fatalf("expected MihomoConfigSavedMsg, got %T", msg)
+		}
+		return savedMsg
+	}
+
+	saved := requireCmdNotNil()
+	if !saved.WriteOK {
+		t.Errorf("expected WriteOK to be true on first launch save, got false (err: %v)", saved.Err)
+	}
+}

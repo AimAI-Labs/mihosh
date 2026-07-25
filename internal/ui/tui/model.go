@@ -25,7 +25,7 @@ import (
 // 路径解析失败时静默留空（用户尝试添加规则时会得到明确错误）。
 func newRulesState() rules.State {
 	s := rules.State{}
-	if path, err := config.GetMihomoConfigPath(); err == nil {
+	if path, err := config.GetMihomoConfigPathForWrite(); err == nil {
 		s = s.SetConfigPath(path)
 	}
 	return s

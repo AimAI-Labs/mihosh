@@ -254,7 +254,7 @@ func resolveAutoMihomoConfigTarget() (string, error) {
 	if strings.TrimSpace(configEditPath) != "" {
 		return resolveMihomoConfigTarget(configEditPath)
 	}
-	return config.GetMihomoConfigPath()
+	return config.GetMihomoConfigPathForWrite()
 }
 
 func resolveMihomoConfigTarget(input string) (string, error) {

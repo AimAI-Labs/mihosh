@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -157,6 +158,10 @@ func WriteMihomoField(configPath, key string, value interface{}) error {
 
 	out, err := marshalYAML(&root)
 	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
 		return err
 	}
 

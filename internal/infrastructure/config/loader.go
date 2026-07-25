@@ -57,6 +57,30 @@ func GetMihomoConfigPath() (string, error) {
 	return "", buildMihomoConfigPathNotFoundError()
 }
 
+// GetMihomoConfigPathForWrite 获取用于写入的 mihomo 配置文件路径。
+// 优先返回自动发现到的现有配置文件路径；若未发现，则返回默认创建路径（如 Windows 下 %APPDATA%\mihomo\config.yaml 或类 Unix 下 ~/.config/mihomo/config.yaml）。
+func GetMihomoConfigPathForWrite() (string, error) {
+	if configFile, err := GetMihomoConfigPath(); err == nil {
+		return configFile, nil
+	}
+	return GetDefaultMihomoConfigPath()
+}
+
+// GetDefaultMihomoConfigPath 获取默认的 mihomo 配置文件路径
+func GetDefaultMihomoConfigPath() (string, error) {
+	if runtime.GOOS == "windows" {
+		appData := os.Getenv("APPDATA")
+		if appData != "" {
+			return filepath.Join(appData, "mihomo", "config.yaml"), nil
+		}
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".config", "mihomo", "config.yaml"), nil
+}
+
 func GetMihomoConfigPathFromProcess() (string, error) {
 	output, err := systemctlStatusRunner()
 	if err != nil {

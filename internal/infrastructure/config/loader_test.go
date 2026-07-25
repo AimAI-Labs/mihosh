@@ -47,6 +47,28 @@ func TestGetMihomoConfigPathReturnsFallbackHintWhenAutoDiscoveryFails(t *testing
 	assert.Empty(t, path)
 }
 
+func TestGetMihomoConfigPathForWriteReturnsDefaultWhenNotExists(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("USERPROFILE", tempHome)
+	if runtime.GOOS == "windows" {
+		t.Setenv("APPDATA", filepath.Join(tempHome, "AppData", "Roaming"))
+	}
+
+	originalRunner := systemctlStatusRunner
+	systemctlStatusRunner = func() ([]byte, error) {
+		return []byte("mihomo.service could not be found"), nil
+	}
+	t.Cleanup(func() {
+		systemctlStatusRunner = originalRunner
+	})
+
+	path, err := GetMihomoConfigPathForWrite()
+	require.NoError(t, err)
+	assert.NotEmpty(t, path)
+	assert.Contains(t, path, "config.yaml")
+}
+
 func TestGetMihomoConfigPathFromProcessFindsConfigInSystemctlDirectory(t *testing.T) {
 	homeDir := t.TempDir()
 	serviceDir := t.TempDir()
