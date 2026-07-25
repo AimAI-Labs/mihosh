@@ -11,10 +11,31 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+// checkInitialConnectionCmd 发起初始 Mihomo API 健康检测
+func checkInitialConnectionCmd(client *api.Client) tea.Cmd {
+	return func() tea.Msg {
+		if _, err := client.GetVersion(); err != nil {
+			endpoint := config.ResolveMihomoEndpoint()
+			secretMasked := ""
+			if endpoint.Secret != "" {
+				secretMasked = "******"
+			}
+			return messages.ShowGuideModalMsg{
+				Endpoint:     endpoint.ExternalController,
+				SecretMasked: secretMasked,
+				ErrMessage:   err.Error(),
+			}
+		}
+		return messages.HideGuideModalMsg{}
+	}
+}
 
 // Init 初始化
 func (m Model) Init() tea.Cmd {
@@ -22,6 +43,7 @@ func (m Model) Init() tea.Cmd {
 		nodes.FetchGroups(m.client),
 		nodes.FetchProxies(m.client),
 		nodes.FetchConfigMode(m.client),
+		checkInitialConnectionCmd(m.client),
 		autoRefreshTick(),
 		startWSStreams(m.wsCtx, m.wsClient, m.wsMsgChan),
 		listenWSMessages(m.wsCtx, m.wsMsgChan),

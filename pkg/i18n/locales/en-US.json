@@ -752,5 +752,13 @@
   "settings.action.success": "Success",
   "settings.action.error": "Error"
 ,
-  "settings.action.panel_title": "Core Actions"
+  "settings.action.panel_title": "Core Actions",
+
+  "guide.title": "Mihomo Connection Guide",
+  "guide.subtitle": "Mihomo service not detected or API misconfigured",
+  "guide.current_endpoint": "Current API Endpoint",
+  "guide.current_secret": "Current Secret",
+  "guide.btn_edit": "[e] Edit Config",
+  "guide.btn_retry": "[r] Retry",
+  "guide.btn_close": "[Esc] Dismiss"
 }

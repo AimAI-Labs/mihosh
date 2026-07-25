@@ -64,6 +64,18 @@ func reloadConfigCmd(client interface {
 
 func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case messages.ShowGuideModalMsg:
+		m.guideState = m.guideState.Activate(msg.Endpoint, msg.SecretMasked, msg.ErrMessage)
+		return m, nil
+
+	case messages.HideGuideModalMsg:
+		if m.guideState.Active {
+			m.notice = i18n.T("status.normal")
+			m.noticeTicks = autoRefreshNoticeTicks
+		}
+		m.guideState = m.guideState.Dismiss()
+		return m, nil
+
 	case messages.UpdateCheckedMsg:
 		if msg.Info != nil {
 			m.updateInfo = msg.Info

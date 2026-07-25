@@ -102,6 +102,11 @@ func (m Model) View() string {
 		fullPage = overlayUpdateDialog(fullPage, m.width, m.height, m.updateInfo, m.isUpdating, m.updateError)
 	}
 
+	// ── 引导弹窗叠加 ──
+	if m.guideState.Active {
+		return m.guideState.Render(m.width, m.height)
+	}
+
 	// ── 帮助弹窗叠加（lazygit 风格，叠加在完整页面之上）──
 	// 节点页始终显示右下角内联帮助提示；按 ? 可叠加完整帮助弹窗
 	if m.showHelp {

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/guide"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/logs"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
@@ -78,6 +79,7 @@ type Model struct {
 	rulesState    rules.State
 	subState      sub.State
 	settingsState settings.State
+	guideState    guide.State
 
 	// 自动更新
 	updateInfo       *model.UpdateInfo

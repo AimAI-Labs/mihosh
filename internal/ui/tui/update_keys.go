@@ -13,6 +13,44 @@ import (
 )
 
 func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// 引导弹窗拦截
+	if m.guideState.Active {
+		switch msg.String() {
+		case "tab", "right", "down", "l", "j":
+			m.guideState = m.guideState.NextButton()
+			return m, nil
+		case "shift+tab", "left", "up", "h", "k":
+			m.guideState = m.guideState.PrevButton()
+			return m, nil
+		case "e":
+			m.guideState = m.guideState.Dismiss()
+			m.currentPage = layout.PageSettings
+			return m, m.onPageChange()
+		case "r":
+			return m, checkInitialConnectionCmd(m.client)
+		case "esc", "q":
+			m.guideState = m.guideState.Dismiss()
+			return m, nil
+		case "enter":
+			switch m.guideState.FocusedButton {
+			case 0:
+				m.guideState = m.guideState.Dismiss()
+				m.currentPage = layout.PageSettings
+				return m, m.onPageChange()
+			case 1:
+				return m, checkInitialConnectionCmd(m.client)
+			case 2:
+				m.guideState = m.guideState.Dismiss()
+				return m, nil
+			}
+		}
+		if key.Matches(msg, common.Keys.Quit) {
+			m.onAppQuit()
+			return m, tea.Quit
+		}
+		return m, nil
+	}
+
 	// 帮助弹窗拦截
 	if m.showHelp {
 		switch msg.String() {

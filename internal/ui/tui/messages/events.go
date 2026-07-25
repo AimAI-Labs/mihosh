@@ -38,6 +38,14 @@ type MihomoConfigSavedMsg struct {
 	WriteOK bool // YAML 已写入成功（即使 reload 失败也应刷新端点）
 }
 
+type ShowGuideModalMsg struct {
+	Endpoint     string
+	SecretMasked string
+	ErrMessage   string
+}
+
+type HideGuideModalMsg struct{}
+
 // ========= Node / Proxy Testing Messages =========
 
 type TestDoneMsg struct {
