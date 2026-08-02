@@ -27,6 +27,14 @@ type Client struct {
 	httpClient *http.Client
 }
 
+// noProxyTransport 屏蔽系统环境变量代理（如 http_proxy/https_proxy），
+// 确保与 mihomo 本地 API 的通信不受终端代理污染。
+var noProxyTransport = func() *http.Transport {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.Proxy = nil
+	return t
+}()
+
 // NewClient 创建新的 API 客户端。
 // endpoint.ExternalController 存原值（无 scheme），由 doRawRequest 在请求时补 http://。
 func NewClient(endpoint config.MihomoEndpoint, timeout int) *Client {
@@ -34,7 +42,8 @@ func NewClient(endpoint config.MihomoEndpoint, timeout int) *Client {
 		baseURL: endpoint.ExternalController,
 		secret:  endpoint.Secret,
 		httpClient: &http.Client{
-			Timeout: time.Duration(timeout) * time.Millisecond,
+			Timeout:   time.Duration(timeout) * time.Millisecond,
+			Transport: noProxyTransport,
 		},
 	}
 }

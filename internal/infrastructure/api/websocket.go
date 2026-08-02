@@ -251,6 +251,13 @@ func (c *WSClient) IsRunning() bool {
 	return c.isRunning
 }
 
+// noProxyWSDialer 屏蔽系统环境变量代理（如 http_proxy/https_proxy），
+// 确保与 mihomo 本地 WebSocket 的通信不受终端代理污染。
+var noProxyWSDialer = &websocket.Dialer{
+	Proxy:            nil,
+	HandshakeTimeout: 45 * time.Second,
+}
+
 // connectStream 通用WebSocket流连接，处理重连生命周期。
 // endpoint 同时作为 conns map 的 key，因此带查询参数的端点（如 "logs?level=debug"）
 // 与其他端点不会冲突。
@@ -272,7 +279,7 @@ func connectStream[T any](c *WSClient, endpoint string, handler func(T)) {
 			}
 		}
 
-		conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+		conn, _, err := noProxyWSDialer.Dial(wsURL, nil)
 		if err != nil {
 			select {
 			case <-c.ctx.Done():
