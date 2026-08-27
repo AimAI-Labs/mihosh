@@ -13,7 +13,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.16
 	github.com/minio/selfupdate v0.6.0
 	github.com/muesli/termenv v0.16.0
-	github.com/spf13/cobra v1.10.1
+	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/mod v0.37.0
