@@ -12,12 +12,6 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-const (
-	nodesFixedLines     = 11 // 模式切换(1) + 面板标题(2*2) + 搜索行(1) + 失败行(1) + 间距(4)
-	nodesMinHeight      = 10
-	nodesDefaultNameLen = 8
-)
-
 // PageState 节点页面状态（由 Model 传入）
 type PageState struct {
 	Mode             string
@@ -36,8 +30,6 @@ type PageState struct {
 	CurrentSortOrder int      // 当前排序模式
 	Width            int
 	Height           int    // 终端高度
-	GroupScrollTop   int    // 策略组列表滚动偏移
-	ProxyScrollTop   int    // 节点列表滚动偏移
 	FilterText       string // 节点搜索关键词
 	FilterMode       bool   // 是否处于搜索输入模式
 	FilterEngine     FilterEngine
@@ -48,19 +40,13 @@ func displayWidth(s string) int {
 	return common.DisplayWidth(s)
 }
 
-// padString 委托给 common.PadString
-func padString(s string, targetWidth int) string {
-	return common.PadString(s, targetWidth)
-}
-
 // RenderNodesPage 渲染节点管理页面
 func RenderNodesPage(state PageState) string {
-	metrics := calcNodesLayoutMetrics(state.Width, state.Height)
 	modeSwitch := RenderModeSwitchComponent(state.Mode, state.Width)
 
 	// ── 底部固定行：搜索提示 + 失败徽标 ──────────────────────────────
 	// 搜索行始终占一行（空行或内容行），确保其位置固定在底栏上方，
-	// 不随策略组/节点面板内容多少而上下漂移。
+	// 不随卡片内容多少而上下漂移。
 	var searchLine string
 	var engineIndicator string
 	switch state.FilterEngine {
@@ -94,64 +80,17 @@ func RenderNodesPage(state PageState) string {
 			" " + common.MutedStyle().Render(i18n.T("nodes.view_detail"))
 	}
 
-	// 底部固定区域占用的行数：搜索行(1) + 结果徽标(0或1)
-	bottomLines := 1 // 搜索行始终占 1 行
-	if resultBadge != "" {
-		bottomLines++
-	}
+	// 卡片流区域：按宽度自适应分列，选中的策略组卡片展开显示节点网格。
+	areaHeight := cardAreaHeight(state)
+	cardArea := clampToLines(renderCardArea(state, areaHeight), areaHeight)
 
-	// panel 区域可用高度 = 总高度 - 底部固定行数
-	panelAreaHeight := state.Height - bottomLines
-	if panelAreaHeight < nodesMinHeight {
-		panelAreaHeight = nodesMinHeight
-	}
-
-	// ── 面板区域渲染 ─────────────────────────────────────────────────
-	var panelArea string
-	if metrics.Wide {
-		groupPanel := renderTokyoPanel(
-			i18n.Tf("nodes.group_header", state.SelectedGroup+1, len(state.GroupNames)),
-			RenderGroupListComponentWidth(state, metrics.GroupMaxLines, metrics.GroupPanelWidth-4),
-			metrics.GroupPanelWidth,
-		)
-		proxyPanel := renderTokyoPanel(
-			i18n.Tf("nodes.list_header", state.SelectedProxy+1, len(state.CurrentProxies)),
-			RenderProxyListComponentWidth(state, metrics.ProxyMaxLines, metrics.ProxyPanelWidth-4),
-			metrics.ProxyPanelWidth,
-		)
-		panels := lipgloss.JoinHorizontal(lipgloss.Top, groupPanel, strings.Repeat(" ", nodesPanelGap), proxyPanel)
-		panelArea = lipgloss.JoinVertical(lipgloss.Left, modeSwitch, "", panels)
-	} else {
-		groupList := RenderGroupListComponentWidth(state, metrics.GroupMaxLines, state.Width-6)
-		proxyList := RenderProxyListComponentWidth(state, metrics.ProxyMaxLines, state.Width-6)
-		panelArea = lipgloss.JoinVertical(
-			lipgloss.Left,
-			modeSwitch,
-			"",
-			renderTokyoPanel(
-				i18n.Tf("nodes.group_header", state.SelectedGroup+1, len(state.GroupNames)),
-				groupList,
-				state.Width-2,
-			),
-			"",
-			renderTokyoPanel(
-				i18n.Tf("nodes.list_header", state.SelectedProxy+1, len(state.CurrentProxies)),
-				proxyList,
-				state.Width-2,
-			),
-		)
-	}
-
-	// 将面板区域精确约束到 panelAreaHeight 行，确保底部固定行不随内容漂移
-	panelArea = clampToLines(panelArea, panelAreaHeight)
-
-	// ── 拼接：面板区 + 搜索行 + 结果徽标 ────────────────────
+	// ── 拼接：模式切换 + 卡片区 + 搜索行 + 结果徽标 ──────────────
 	bottomParts := []string{searchLine}
 	if resultBadge != "" {
 		bottomParts = append(bottomParts, resultBadge)
 	}
 	mainContent := lipgloss.JoinVertical(lipgloss.Left,
-		append([]string{panelArea}, bottomParts...)...,
+		append([]string{modeSwitch, "", cardArea}, bottomParts...)...,
 	)
 
 	if state.ShowTestDetail {
