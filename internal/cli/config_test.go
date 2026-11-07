@@ -11,11 +11,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// isolateHostMihomoDiscovery 用空的 ps/systemctl 屏蔽宿主机环境，
+// 避免自动发现命中开发机上真实运行的 mihomo（Windows 不走进程发现）。
+func isolateHostMihomoDiscovery(t *testing.T) {
+	t.Helper()
+	binDir := t.TempDir()
+	for _, name := range []string{"ps", "systemctl", "sudo"} {
+		require.NoError(t, os.WriteFile(filepath.Join(binDir, name), []byte("#!/bin/sh\nexit 1\n"), 0755))
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
 func TestRenderConfigShow(t *testing.T) {
 	// 将 mihomo 配置自动发现隔离到临时目录，避免读取真实环境。
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("USERPROFILE", t.TempDir())
 	t.Setenv("APPDATA", "")
+	isolateHostMihomoDiscovery(t)
 
 	cfg := &configpkg.Config{
 		TestURL:             "http://www.gstatic.com/generate_204",

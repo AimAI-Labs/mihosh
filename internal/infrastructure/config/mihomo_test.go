@@ -96,6 +96,7 @@ func TestResolveMihomoEndpointParsesYAML(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("APPDATA", "")
+	stubEmptyProcessList(t)
 
 	mihomoDir := filepath.Join(home, ".config", "mihomo")
 	require.NoError(t, os.MkdirAll(mihomoDir, 0755))
@@ -126,6 +127,7 @@ func TestResolveMihomoEndpointFallsBackToDefaults(t *testing.T) {
 		return []byte("mihomo.service could not be found"), nil
 	}
 	t.Cleanup(func() { systemctlStatusRunner = originalRunner })
+	stubEmptyProcessList(t)
 
 	got := ResolveMihomoEndpoint()
 	assert.Equal(t, DefaultMihomoEndpoint, got, "auto discovery failure should fall back to defaults")
@@ -139,6 +141,7 @@ func TestResolveMihomoEndpointPartialFields(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("APPDATA", "")
+	stubEmptyProcessList(t)
 
 	mihomoDir := filepath.Join(home, ".config", "mihomo")
 	require.NoError(t, os.MkdirAll(mihomoDir, 0755))

@@ -29,6 +29,18 @@ func TestParseSystemctlStatusParsesCGroupProcessLine(t *testing.T) {
 	)
 }
 
+// stubEmptyProcessList 隔离真实进程扫描，避免测试受本机运行中的 mihomo 影响。
+func stubEmptyProcessList(t *testing.T) {
+	t.Helper()
+	originalRunner := processListRunner
+	processListRunner = func() ([]byte, error) {
+		return []byte{}, nil
+	}
+	t.Cleanup(func() {
+		processListRunner = originalRunner
+	})
+}
+
 func TestGetMihomoConfigPathReturnsFallbackHintWhenAutoDiscoveryFails(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("USERPROFILE", t.TempDir())
@@ -41,6 +53,7 @@ func TestGetMihomoConfigPathReturnsFallbackHintWhenAutoDiscoveryFails(t *testing
 	t.Cleanup(func() {
 		systemctlStatusRunner = originalRunner
 	})
+	stubEmptyProcessList(t)
 
 	path, err := GetMihomoConfigPath()
 	require.Error(t, err)
@@ -62,6 +75,7 @@ func TestGetMihomoConfigPathForWriteReturnsDefaultWhenNotExists(t *testing.T) {
 	t.Cleanup(func() {
 		systemctlStatusRunner = originalRunner
 	})
+	stubEmptyProcessList(t)
 
 	path, err := GetMihomoConfigPathForWrite()
 	require.NoError(t, err)
@@ -92,6 +106,76 @@ func TestGetMihomoConfigPathFromProcessFindsConfigInSystemctlDirectory(t *testin
 	path, err := GetMihomoConfigPathFromProcess()
 	require.NoError(t, err)
 	assert.Equal(t, configPath, path)
+}
+
+// TestGetMihomoConfigPathFromProcessFindsManuallyStartedInstance 验证无 systemd 服务时，
+// 通过进程命令行发现手动启动的 mihomo（-d 目录 + -f 自定义配置文件）。
+func TestGetMihomoConfigPathFromProcessFindsManuallyStartedInstance(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "COCODUCK.yaml")
+	require.NoError(t, os.WriteFile(configPath, []byte("mixed-port: 7890\n"), 0644))
+
+	originalSystemctl := systemctlStatusRunner
+	systemctlStatusRunner = func() ([]byte, error) {
+		return []byte("mihomo.service could not be found"), nil
+	}
+	t.Cleanup(func() {
+		systemctlStatusRunner = originalSystemctl
+	})
+
+	originalProcessList := processListRunner
+	processListRunner = func() ([]byte, error) {
+		return []byte(" 123 /usr/local/bin/mihomo -d " + dir + " -f " + configPath + "\n"), nil
+	}
+	t.Cleanup(func() {
+		processListRunner = originalProcessList
+	})
+
+	path, err := GetMihomoConfigPathFromProcess()
+	require.NoError(t, err)
+	assert.Equal(t, configPath, path)
+}
+
+// TestParseMihomoConfigFromProcessListPrefersConfigFile 验证 -f 优先于 -d 目录下的默认文件。
+func TestParseMihomoConfigFromProcessListPrefersConfigFile(t *testing.T) {
+	dir := t.TempDir()
+	defaultConfig := filepath.Join(dir, "config.yaml")
+	customConfig := filepath.Join(dir, "COCODUCK.yaml")
+	require.NoError(t, os.WriteFile(defaultConfig, []byte("mixed-port: 7890\n"), 0644))
+	require.NoError(t, os.WriteFile(customConfig, []byte("mixed-port: 7891\n"), 0644))
+
+	output := " 123 /usr/local/bin/mihomo -d " + dir + " -f " + customConfig + "\n"
+	assert.Equal(t, customConfig, parseMihomoConfigFromProcessList(output))
+}
+
+// TestParseMihomoConfigFromProcessListUsesDirectory 验证只有 -d 时使用目录下的 config.yaml。
+func TestParseMihomoConfigFromProcessListUsesDirectory(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yml")
+	require.NoError(t, os.WriteFile(configPath, []byte("mixed-port: 7890\n"), 0644))
+
+	output := " 123 /usr/local/bin/mihomo -d " + dir + "\n"
+	assert.Equal(t, configPath, parseMihomoConfigFromProcessList(output))
+}
+
+// TestParseMihomoConfigFromProcessListSupportsEqualsSyntax 验证 -f=path 写法。
+func TestParseMihomoConfigFromProcessListSupportsEqualsSyntax(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "custom.yaml")
+	require.NoError(t, os.WriteFile(configPath, []byte("mixed-port: 7890\n"), 0644))
+
+	output := " 123 /usr/local/bin/mihomo -f=" + configPath + "\n"
+	assert.Equal(t, configPath, parseMihomoConfigFromProcessList(output))
+}
+
+// TestParseMihomoConfigFromProcessListIgnoresUnrelatedProcesses 防止误匹配编辑器、
+// mihosh 自身或 grep 等包含 "mihomo" 字样的进程。
+func TestParseMihomoConfigFromProcessListIgnoresUnrelatedProcesses(t *testing.T) {
+	output := " 1 /usr/bin/vim /home/u/.config/mihomo/config.yaml\n" +
+		" 2 /home/u/mihosh\n" +
+		" 3 /usr/bin/grep mihomo\n" +
+		" 4 /usr/bin/zsh -c ./mihomo -d /tmp"
+	assert.Empty(t, parseMihomoConfigFromProcessList(output))
 }
 
 // TestSearchKnownMihomoDirectoriesFindsClashVerge 验证 Clash Verge Rev（基于 Tauri）

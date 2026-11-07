@@ -12,6 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// isolateMihomoDiscovery 用空的 ps/systemctl 屏蔽宿主机环境，避免自动发现命中
+// 开发机上真实运行的 mihomo，使测试只依赖临时 HOME（Windows 不走进程发现）。
+func isolateMihomoDiscovery(t *testing.T) {
+	t.Helper()
+	binDir := t.TempDir()
+	for _, name := range []string{"ps", "systemctl", "sudo"} {
+		require.NoError(t, os.WriteFile(filepath.Join(binDir, name), []byte("#!/bin/sh\nexit 1\n"), 0755))
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
 // newIsolatedService 创建隔离 HOME 与 viper 的 ProfileService。
 // 返回服务与配置目录（供测试写入原始订阅文件）。
 func newIsolatedService(t *testing.T) *ProfileService {
@@ -25,6 +36,7 @@ func newIsolatedService(t *testing.T) *ProfileService {
 	t.Setenv("APPDATA", "") // 防 Windows 下搜到真实系统的 mihomo 目录
 	t.Setenv("HOMEDRIVE", "")
 	t.Setenv("HOMEPATH", "")
+	isolateMihomoDiscovery(t)
 
 	// 预置一份最小 mihosh 配置文件，使 config.Load 可用。
 	dir, err := config.GetConfigDir()
@@ -36,7 +48,6 @@ func newIsolatedService(t *testing.T) *ProfileService {
 	mihomoDir := filepath.Join(tmpHome, ".config", "mihomo")
 	require.NoError(t, os.MkdirAll(mihomoDir, 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(mihomoDir, "config.yaml"), []byte(""), 0644))
-
 
 	return NewProfileService(nil)
 }
@@ -236,6 +247,7 @@ func TestProfileService_ActivateSkipsUnchangedConfig(t *testing.T) {
 	t.Setenv("APPDATA", "") // 防 Windows 下搜到真实系统的 mihomo 目录
 	t.Setenv("HOMEDRIVE", "")
 	t.Setenv("HOMEPATH", "")
+	isolateMihomoDiscovery(t)
 	viper.Reset()
 	t.Cleanup(viper.Reset)
 
@@ -278,6 +290,7 @@ func TestProfileService_ActivateRewritesWhenConfigChanged(t *testing.T) {
 	t.Setenv("APPDATA", "")
 	t.Setenv("HOMEDRIVE", "")
 	t.Setenv("HOMEPATH", "")
+	isolateMihomoDiscovery(t)
 	viper.Reset()
 	t.Cleanup(viper.Reset)
 
@@ -313,6 +326,7 @@ func TestProfileService_ActivatePreservesManagedFields(t *testing.T) {
 	t.Setenv("APPDATA", "")
 	t.Setenv("HOMEDRIVE", "")
 	t.Setenv("HOMEPATH", "")
+	isolateMihomoDiscovery(t)
 	viper.Reset()
 	t.Cleanup(viper.Reset)
 
@@ -326,9 +340,9 @@ func TestProfileService_ActivatePreservesManagedFields(t *testing.T) {
 	require.NoError(t, err)
 
 	// 订阅 S 不包含 5 个托管字段。
-	require.NoError(t, profile.WriteRaw(p.UID, []byte("" +
-		"mode: rule\n" +
-		"proxies: []\n" +
+	require.NoError(t, profile.WriteRaw(p.UID, []byte(""+
+		"mode: rule\n"+
+		"proxies: []\n"+
 		"proxy-groups: []\n")))
 
 	// merge M 也不包含 5 个托管字段。
@@ -338,12 +352,12 @@ func TestProfileService_ActivatePreservesManagedFields(t *testing.T) {
 	mihomoDir := filepath.Join(home, ".config", "mihomo")
 	require.NoError(t, os.MkdirAll(mihomoDir, 0755))
 	mihomoPath := filepath.Join(mihomoDir, "config.yaml")
-	require.NoError(t, os.WriteFile(mihomoPath, []byte("" +
-		"external-controller: 127.0.0.1:9090\n" +
-		"secret: abc123\n" +
-		"mixed-port: 7890\n" +
-		"allow-lan: true\n" +
-		"log-level: debug\n" +
+	require.NoError(t, os.WriteFile(mihomoPath, []byte(""+
+		"external-controller: 127.0.0.1:9090\n"+
+		"secret: abc123\n"+
+		"mixed-port: 7890\n"+
+		"allow-lan: true\n"+
+		"log-level: debug\n"+
 		"mode: global\n"), 0644))
 
 	// client==nil：会在写入后进入重载阶段报错，但足以验证最终 O 已被正确写回。
@@ -369,6 +383,7 @@ func TestProfileService_ActivateManagedFieldsOverrideSubscription(t *testing.T) 
 	t.Setenv("APPDATA", "")
 	t.Setenv("HOMEDRIVE", "")
 	t.Setenv("HOMEPATH", "")
+	isolateMihomoDiscovery(t)
 	viper.Reset()
 	t.Cleanup(viper.Reset)
 
@@ -382,24 +397,24 @@ func TestProfileService_ActivateManagedFieldsOverrideSubscription(t *testing.T) 
 	require.NoError(t, err)
 
 	// 订阅 S 明确带了与当前 O 冲突的 5 个字段。
-	require.NoError(t, profile.WriteRaw(p.UID, []byte("" +
-		"mixed-port: 17890\n" +
-		"allow-lan: false\n" +
-		"log-level: debug\n" +
-		"external-controller: 127.0.0.1:19090\n" +
-		"secret: from-subscription\n" +
-		"mode: rule\n" +
+	require.NoError(t, profile.WriteRaw(p.UID, []byte(""+
+		"mixed-port: 17890\n"+
+		"allow-lan: false\n"+
+		"log-level: debug\n"+
+		"external-controller: 127.0.0.1:19090\n"+
+		"secret: from-subscription\n"+
+		"mode: rule\n"+
 		"proxies: []\n")))
 
 	mihomoDir := filepath.Join(home, ".config", "mihomo")
 	require.NoError(t, os.MkdirAll(mihomoDir, 0755))
 	mihomoPath := filepath.Join(mihomoDir, "config.yaml")
-	require.NoError(t, os.WriteFile(mihomoPath, []byte("" +
-		"mixed-port: 7890\n" +
-		"allow-lan: true\n" +
-		"log-level: info\n" +
-		"external-controller: 0.0.0.0:9090\n" +
-		"secret: xxxxx\n" +
+	require.NoError(t, os.WriteFile(mihomoPath, []byte(""+
+		"mixed-port: 7890\n"+
+		"allow-lan: true\n"+
+		"log-level: info\n"+
+		"external-controller: 0.0.0.0:9090\n"+
+		"secret: xxxxx\n"+
 		"mode: global\n"), 0644))
 
 	_, err = s.Activate(p.UID)
@@ -442,6 +457,7 @@ func TestProfileService_FirstStartup(t *testing.T) {
 	t.Setenv("APPDATA", "")
 	t.Setenv("HOMEDRIVE", "")
 	t.Setenv("HOMEPATH", "")
+	isolateMihomoDiscovery(t)
 
 	// 预置 mihomo 配置文件，模拟本地存在运行中的 mihomo
 	mihomoDir := filepath.Join(tmpHome, ".config", "mihomo")
