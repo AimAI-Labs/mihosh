@@ -52,6 +52,7 @@ func TestConfigService_SaveMihomoConfigField_FirstLaunchWritesYAML(t *testing.T)
 	t.Setenv("HOME", tempDir)
 	t.Setenv("USERPROFILE", tempDir)
 	t.Setenv("APPDATA", tempDir)
+	isolateMihomoDiscovery(t)
 
 	s := NewConfigService()
 	cmd := s.SaveMihomoConfigField(nil, "external-controller", "127.0.0.1:9090")
