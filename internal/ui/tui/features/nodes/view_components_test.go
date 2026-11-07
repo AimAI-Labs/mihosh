@@ -1,6 +1,7 @@
 package nodes
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -10,149 +11,148 @@ import (
 	_ "github.com/mattn/go-runewidth"
 )
 
-func TestRenderTokyoPanel(t *testing.T) {
-	// 验证在标题过长时安全截断并且无崩溃，且渲染结果的每一行显示宽度完全等于 width
-	width := 30
-	title := "This is an extremely long title that exceeds the panel width"
-	body := "Row 1\nRow 2"
-	result := renderTokyoPanel(title, body, width)
-	lines := strings.Split(result, "\n")
-	if len(lines) < 4 {
-		t.Fatalf("expected at least 4 lines, got %d", len(lines))
-	}
-	for i, l := range lines {
-		actualWidth := lipgloss.Width(l)
-		if actualWidth != width {
-			t.Errorf("line %d %q width = %d, want %d", i, l, actualWidth, width)
-		}
-	}
+// cardPointAt 返回第 groupIndex 张卡片内第 lineOffset 行（0=上边框）上的可点击坐标。
+func cardPointAt(state PageState, groupIndex, lineOffset int) (int, int) {
+	l := calcCardLayout(state, cardAreaHeight(state))
+	b := l.Boxes[groupIndex]
+	x := b.X + 3
+	y := l.AreaStartY + b.Y + lineOffset - l.ScrollRows
+	return x, y
 }
 
-func TestResolveMouseHit_GroupAndProxy(t *testing.T) {
-	state := PageState{
-		GroupNames:     []string{"g1", "g2", "g3"},
-		SelectedGroup:  0,
-		CurrentProxies: []string{"p1", "p2", "p3", "p4"},
-		SelectedProxy:  0,
-		Height:         24,
-	}
-
-	// 模式切换占 3 行 (Y=0-2)，ListStartY=4，nodesSectionHeaderLines=2
-	// groupListStart = 4 + 2 = 6
-	// groupDataStart = 6 + 1 = 7 (跳过表头)
-	groupHit := ResolveMouseHit(state, 10, 7)
-	if groupHit.Target != MouseTargetGroup || groupHit.Index != 0 {
-		t.Fatalf("expected group index 0, got target=%v index=%d", groupHit.Target, groupHit.Index)
-	}
-
-	// height=24, availableHeight=11, groupMaxLines=3, proxyMaxLines=8
-	// groupListLines = 1 + 3 = 4 (header + 3 visible rows)
-	// proxyHeaderStart = 6 + 4 + 1 = 11
-	// proxyListStart = 11 + 2 = 13
-	// proxyDataStart = 13 + 1 = 14
-	proxyHit := ResolveMouseHit(state, 10, 14)
-	if proxyHit.Target != MouseTargetProxy || proxyHit.Index != 0 {
-		t.Fatalf("expected proxy index 0, got target=%v index=%d", proxyHit.Target, proxyHit.Index)
-	}
-
-	headerHit := ResolveMouseHit(state, 10, 6)
-	if headerHit.Target != MouseTargetNone {
-		t.Fatalf("expected no hit on header row, got target=%v index=%d", headerHit.Target, headerHit.Index)
-	}
-}
-
-func TestResolveMouseHit_WithScrollWindow(t *testing.T) {
-	state := PageState{
-		GroupNames:     []string{"g0", "g1", "g2", "g3", "g4", "g5", "g6", "g7", "g8", "g9"},
-		SelectedGroup:  7,
-		GroupScrollTop: 0,
-		CurrentProxies: []string{"p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11"},
-		SelectedProxy:  11,
-		ProxyScrollTop: 0,
-		Height:         24,
-	}
-
-	// height=24, availableHeight=11, groupMaxLines=3, selected=7 -> scrollTop = 7-3+1 = 5, 窗口显示 g5,g6,g7
-	// groupListStart = 4 + 2 = 6, groupDataStart = 6 + 1 = 7
-	groupHit := ResolveMouseHit(state, 10, 7)
-	if groupHit.Target != MouseTargetGroup || groupHit.Index != 5 {
-		t.Fatalf("expected group index 5, got target=%v index=%d", groupHit.Target, groupHit.Index)
-	}
-
-	// proxyMaxLines=8, selected=11 -> scrollTop = 11-8+1 = 4, 窗口显示 p4-p11
-	// groupListLines = 1 + 3 = 4 (header + 3 visible rows)
-	// proxyHeaderStart = 6 + 4 + 1 = 11
-	// proxyListStart = 11 + 2 = 13
-	// proxyDataStart = 13 + 1 = 14
-	proxyHit := ResolveMouseHit(state, 10, 14)
-	if proxyHit.Target != MouseTargetProxy || proxyHit.Index < 0 {
-		t.Fatalf("expected proxy hit, got target=%v index=%d", proxyHit.Target, proxyHit.Index)
-	}
-}
-
-func TestRenderNodesPage_UsesSideBySidePanelsOnWideScreens(t *testing.T) {
-	state := PageState{
+func cardTestState(width, height int) PageState {
+	return PageState{
 		GroupNames:     []string{"Proxy", "Netflix"},
 		SelectedGroup:  0,
 		Groups:         testGroups(),
 		CurrentProxies: []string{"Hong Kong 1", "Tokyo 1"},
 		SelectedProxy:  0,
 		Proxies:        testProxies(),
-		Width:          130,
-		Height:         32,
+		Width:          width,
+		Height:         height,
+	}
+}
+
+func TestRenderCardArea_LinesHaveExactWidth(t *testing.T) {
+	for _, width := range []int{78, 130, 200} {
+		state := cardTestState(width, 32)
+		area := renderCardArea(state, cardAreaHeight(state))
+		for i, line := range strings.Split(area, "\n") {
+			if got := lipgloss.Width(line); got != width {
+				t.Fatalf("width=%d line %d has display width %d, want %d", width, i, got, width)
+			}
+		}
+	}
+}
+
+func TestCalcCardLayout_AdaptsColumnCount(t *testing.T) {
+	for _, tt := range []struct {
+		width   int
+		columns int
+	}{
+		{78, 1},
+		{130, 2},
+		{200, 3},
+	} {
+		state := cardTestState(tt.width, 32)
+		l := calcCardLayout(state, cardAreaHeight(state))
+		if l.Columns != tt.columns {
+			t.Fatalf("width=%d: columns=%d, want %d", tt.width, l.Columns, tt.columns)
+		}
+		total := 0
+		for _, w := range l.ColumnWidth {
+			total += w
+		}
+		total += cardsColumnGap * (l.Columns - 1)
+		if total != tt.width {
+			t.Fatalf("width=%d: column widths sum to %d", tt.width, total)
+		}
+	}
+}
+
+func TestResolveMouseHit_GroupAndProxyCards(t *testing.T) {
+	i18n.Init()
+	state := PageState{
+		GroupNames:     []string{"g1", "g2", "g3"},
+		SelectedGroup:  0,
+		CurrentProxies: []string{"p1", "p2", "p3", "p4"},
+		SelectedProxy:  0,
+		Groups: map[string]model.Group{
+			"g1": {Type: "Selector", Now: "p1", All: []string{"p1", "p2", "p3", "p4"}},
+			"g2": {Type: "Selector", Now: "p1", All: []string{"p1"}},
+			"g3": {Type: "Selector", Now: "p1", All: []string{"p1"}},
+		},
+		Width:  130,
+		Height: 30,
 	}
 
+	// 选中组 g1 展开：节点网格首行命中第一个节点
+	x, y := cardPointAt(state, 0, 3)
+	if hit := ResolveMouseHit(state, x, y); hit.Target != MouseTargetProxy || hit.Index != 0 {
+		t.Fatalf("expected proxy index 0, got target=%v index=%d", hit.Target, hit.Index)
+	}
+
+	// 点击折叠卡片 g2 的标题行，命中策略组
+	x, y = cardPointAt(state, 1, 1)
+	if hit := ResolveMouseHit(state, x, y); hit.Target != MouseTargetGroup || hit.Index != 1 {
+		t.Fatalf("expected group index 1, got target=%v index=%d", hit.Target, hit.Index)
+	}
+}
+
+func TestResolveMouseHit_GridScrollKeepsIndex(t *testing.T) {
+	names := make([]string, 0, 40)
+	for i := 0; i < 40; i++ {
+		names = append(names, fmt.Sprintf("node-%02d", i))
+	}
+	state := PageState{
+		GroupNames:     []string{"g1"},
+		SelectedGroup:  0,
+		CurrentProxies: names,
+		SelectedProxy:  36,
+		Groups:         map[string]model.Group{"g1": {Type: "Selector", Now: names[0], All: names}},
+		Width:          130,
+		Height:         30,
+	}
+	l := calcCardLayout(state, cardAreaHeight(state))
+	b := l.Boxes[0]
+	if b.GridScrollRow == 0 {
+		t.Fatalf("expected grid to scroll for selected proxy 36, got scrollRow=0")
+	}
+
+	// 命中可见网格首行第一列，索引应等于滚动后的首个节点
+	x := b.X + 3
+	y := l.AreaStartY + b.DataStartY - l.ScrollRows
+	hit := ResolveMouseHit(state, x, y)
+	if hit.Target != MouseTargetProxy || hit.Index != b.GridScrollRow*b.GridCols {
+		t.Fatalf("expected proxy index %d, got target=%v index=%d",
+			b.GridScrollRow*b.GridCols, hit.Target, hit.Index)
+	}
+}
+
+func TestRenderNodesPage_WideScreenRendersCardsSideBySide(t *testing.T) {
+	i18n.Init()
+	state := cardTestState(130, 32)
 	lines := strings.Split(RenderNodesPage(state), "\n")
-	groupHeader := i18n.Tf("nodes.group_header", state.SelectedGroup+1, len(state.GroupNames))
-	listHeader := i18n.Tf("nodes.list_header", state.SelectedProxy+1, len(state.CurrentProxies))
 	var sideBySide bool
 	for _, line := range lines {
-		if strings.Contains(line, groupHeader) && strings.Contains(line, listHeader) {
+		if strings.Contains(line, "Proxy") && strings.Contains(line, "Netflix") {
 			sideBySide = true
 			break
 		}
 	}
 	if !sideBySide {
-		t.Fatalf("expected wide nodes page to render policy and node panels side by side")
+		t.Fatalf("expected two group cards on the same row on wide screens")
 	}
 }
 
-func TestRenderNodesPage_StacksPanelsOnNarrowScreens(t *testing.T) {
-	state := PageState{
-		GroupNames:     []string{"Proxy", "Netflix"},
-		SelectedGroup:  0,
-		Groups:         testGroups(),
-		CurrentProxies: []string{"Hong Kong 1", "Tokyo 1"},
-		SelectedProxy:  0,
-		Proxies:        testProxies(),
-		Width:          78,
-		Height:         28,
-	}
-
+func TestRenderNodesPage_NarrowScreenStacksCards(t *testing.T) {
+	i18n.Init()
+	state := cardTestState(78, 28)
 	lines := strings.Split(RenderNodesPage(state), "\n")
-	groupHeader := i18n.Tf("nodes.group_header", state.SelectedGroup+1, len(state.GroupNames))
-	listHeader := i18n.Tf("nodes.list_header", state.SelectedProxy+1, len(state.CurrentProxies))
 	for _, line := range lines {
-		if strings.Contains(line, groupHeader) && strings.Contains(line, listHeader) {
-			t.Fatalf("expected narrow nodes page to stack panels, got combined header line %q", line)
+		if strings.Contains(line, "Proxy") && strings.Contains(line, "Netflix") {
+			t.Fatalf("expected stacked cards on narrow screens, got combined line %q", line)
 		}
-	}
-}
-
-func TestResolveMouseHit_WideLayoutProxyPanel(t *testing.T) {
-	state := PageState{
-		GroupNames:     []string{"g1", "g2", "g3"},
-		SelectedGroup:  0,
-		CurrentProxies: []string{"p1", "p2", "p3", "p4"},
-		SelectedProxy:  0,
-		Width:          130,
-		Height:         30,
-	}
-
-	// DataStartY = 6 (模式切换 3 行 + 间距 1 行 + 面板标题 2 行)
-	hit := ResolveMouseHit(state, 58, 6)
-	if hit.Target != MouseTargetProxy || hit.Index != 0 {
-		t.Fatalf("expected first proxy row in right panel, got target=%v index=%d", hit.Target, hit.Index)
 	}
 }
 

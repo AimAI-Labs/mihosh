@@ -76,8 +76,6 @@ type State struct {
 	CurrentProxies []string
 	SelectedGroup  int
 	SelectedProxy  int
-	GroupScrollTop int
-	ProxyScrollTop int
 	TestPending    int
 	Testing        bool
 	TestingTarget  string
@@ -194,8 +192,6 @@ func (s State) ToPageState(width, height int) PageState {
 		CurrentSortOrder: int(s.ProxySortOrder),
 		Width:            width,
 		Height:           height,
-		GroupScrollTop:   s.GroupScrollTop,
-		ProxyScrollTop:   s.ProxyScrollTop,
 		FilterText:       s.NodeFilter,
 		FilterMode:       s.NodeFilterMode,
 		FilterEngine:     s.FilterEngine,
@@ -244,9 +240,6 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		s.MouseFocus = nodesMouseFocusProxy
 		if s.SelectedProxy > 0 {
 			s.SelectedProxy--
-			if s.SelectedProxy < s.ProxyScrollTop {
-				s.ProxyScrollTop = s.SelectedProxy
-			}
 		}
 
 	case key.Matches(msg, common.Keys.Down):
@@ -261,10 +254,6 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			s.SelectedGroup--
 			s.updateCurrentProxies()
 			s.SelectedProxy = 0
-			s.ProxyScrollTop = 0
-			if s.SelectedGroup < s.GroupScrollTop {
-				s.GroupScrollTop = s.SelectedGroup
-			}
 		}
 
 	case key.Matches(msg, common.Keys.Right):
@@ -273,7 +262,6 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			s.SelectedGroup++
 			s.updateCurrentProxies()
 			s.SelectedProxy = 0
-			s.ProxyScrollTop = 0
 		}
 
 	case key.Matches(msg, common.Keys.Enter):
@@ -328,7 +316,6 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		s.applySortOrder()
 		s.updateFilteredProxies()
 		s.SelectedProxy = 0
-		s.ProxyScrollTop = 0
 
 	case msg.String() == "/":
 		s.NodeFilterMode = true
@@ -337,7 +324,6 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		if s.NodeFilter != "" {
 			s.NodeFilter = ""
 			s.SelectedProxy = 0
-			s.ProxyScrollTop = 0
 			s.updateFilteredProxies()
 		}
 	}
@@ -357,7 +343,6 @@ func (s State) handleNodeFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		}
 		s.updateFilteredProxies()
 		s.SelectedProxy = 0
-		s.ProxyScrollTop = 0
 	case msg.Type == tea.KeyCtrlF:
 		if s.FilterEngine == FilterEngineFuzzy {
 			s.FilterEngine = FilterEngineSubstring
@@ -366,17 +351,14 @@ func (s State) handleNodeFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		}
 		s.updateFilteredProxies()
 		s.SelectedProxy = 0
-		s.ProxyScrollTop = 0
 	case key.Matches(msg, common.Keys.Escape):
 		s.NodeFilterMode = false
 		s.NodeFilter = ""
 		s.SelectedProxy = 0
-		s.ProxyScrollTop = 0
 		s.updateFilteredProxies()
 	case key.Matches(msg, common.Keys.Enter):
 		s.NodeFilterMode = false
 		s.SelectedProxy = 0
-		s.ProxyScrollTop = 0
 	case key.Matches(msg, common.Keys.Backspace):
 		if len(s.NodeFilter) > 0 {
 			// 正确截断多字节字符
@@ -385,7 +367,6 @@ func (s State) handleNodeFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 				s.NodeFilter = string(runes[:len(runes)-1])
 				s.updateFilteredProxies()
 				s.SelectedProxy = 0
-				s.ProxyScrollTop = 0
 			}
 		}
 	default:
@@ -396,7 +377,6 @@ func (s State) handleNodeFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 			s.NodeFilter += input
 			s.updateFilteredProxies()
 			s.SelectedProxy = 0
-			s.ProxyScrollTop = 0
 		}
 	}
 	return s, nil
@@ -495,9 +475,6 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		}
 		s.MouseFocus = nodesMouseFocusProxy
 		s.SelectedProxy = hit.Index
-		if s.SelectedProxy < s.ProxyScrollTop {
-			s.ProxyScrollTop = s.SelectedProxy
-		}
 
 		if !s.doubleClickDetector.IsDoubleClick(MouseTargetProxy, hit.Index, now) {
 			return s, nil
@@ -538,13 +515,10 @@ func (s *State) applyGroupSelection(groupIdx int) {
 	s.SelectedGroup = groupIdx
 	s.updateCurrentProxies()
 	s.SelectedProxy = 0
-	s.ProxyScrollTop = 0
-	if s.SelectedGroup < s.GroupScrollTop {
-		s.GroupScrollTop = s.SelectedGroup
-	}
 }
 
-// HandleMouseScroll 处理鼠标滚轮（弹窗打开时控制弹窗滚动，否则根据鼠标位置或焦点控制列表滚动）
+// HandleMouseScroll 处理鼠标滚轮（弹窗打开时控制弹窗滚动，否则切换选中的策略组或节点，
+// 卡片流与节点网格会根据选中项自动滚动到可见位置）
 func (s State) HandleMouseScroll(up bool, pageX, pageY, pageWidth, pageHeight int) State {
 	if s.ShowTestDetail {
 		if up {
@@ -558,51 +532,31 @@ func (s State) HandleMouseScroll(up bool, pageX, pageY, pageWidth, pageHeight in
 	}
 
 	hit := ResolveMouseHit(s.ToPageState(pageWidth, pageHeight), pageX, pageY)
-	groupMaxLines, proxyMaxLines := CalcNodesListMaxLines(pageHeight)
 
-	// 如果鼠标在策略组区域，或鼠标在非列表区域（模式切换/无目标）但当前焦点是策略组
+	// 鼠标在策略组卡片上，或鼠标不在节点格子上且当前焦点是策略组
 	if hit.Target == MouseTargetGroup || (hit.Target != MouseTargetProxy && s.MouseFocus == nodesMouseFocusGroup) {
 		if up {
 			if s.SelectedGroup > 0 {
 				s.SelectedGroup--
 				s.updateCurrentProxies()
 				s.SelectedProxy = 0
-				s.ProxyScrollTop = 0
-				if s.SelectedGroup < s.GroupScrollTop {
-					s.GroupScrollTop = s.SelectedGroup
-				}
 			}
-		} else {
-			if s.SelectedGroup < len(s.GroupNames)-1 {
-				s.SelectedGroup++
-				s.updateCurrentProxies()
-				s.SelectedProxy = 0
-				s.ProxyScrollTop = 0
-				if s.SelectedGroup >= s.GroupScrollTop+groupMaxLines {
-					s.GroupScrollTop = s.SelectedGroup - groupMaxLines + 1
-				}
-			}
+		} else if s.SelectedGroup < len(s.GroupNames)-1 {
+			s.SelectedGroup++
+			s.updateCurrentProxies()
+			s.SelectedProxy = 0
 		}
 		return s
 	}
 
-	// 否则处理节点列表（鼠标在节点区域，或鼠标不在有效区域且非策略组焦点，默认处理节点列表）
+	// 否则在展开卡片的节点网格中移动选中项
 	display := s.displayProxies()
-	displayCount := len(display)
 	if up {
 		if s.SelectedProxy > 0 {
 			s.SelectedProxy--
-			if s.SelectedProxy < s.ProxyScrollTop {
-				s.ProxyScrollTop = s.SelectedProxy
-			}
 		}
-	} else {
-		if s.SelectedProxy < displayCount-1 {
-			s.SelectedProxy++
-			if s.SelectedProxy >= s.ProxyScrollTop+proxyMaxLines {
-				s.ProxyScrollTop = s.SelectedProxy - proxyMaxLines + 1
-			}
-		}
+	} else if s.SelectedProxy < len(display)-1 {
+		s.SelectedProxy++
 	}
 	return s
 }
