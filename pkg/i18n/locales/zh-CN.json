@@ -814,5 +814,21 @@
   "core.profile_source": "订阅 URL 或本地配置路径（隐藏输入）",
   "core.profile_default": "导入配置",
   "cli.setup.next": "运行 mihosh core start 前台启动，或进入 Core 菜单。",
-  "core.download_timeout": "下载任务总时限秒数（30–3600；0 使用默认 600）"
+  "core.download_timeout": "下载任务总时限秒数（30–3600；0 使用默认 600）",
+  "core.action.service": "后台服务与自动启动",
+  "core.action.system-proxy": "切换系统代理（仅支持的平台）",
+  "core.action.tun": "切换 TUN（需要网络管理权限）",
+  "core.action.recover": "恢复异常退出遗留的网络设置",
+  "core.network.on": "启用",
+  "core.network.off": "关闭并恢复",
+  "core.network.status": "查看网络设置",
+  "core.service.install": "安装后台服务",
+  "core.service.uninstall": "卸载后台服务",
+  "core.service.start": "启动后台服务",
+  "core.service.stop": "停止后台服务",
+  "core.service.restart": "重启后台服务",
+  "core.service.enable": "启用自动启动（Linux 登录时）",
+  "core.service.disable": "关闭自动启动",
+  "core.service.boot": "启用开机启动（Linux linger）",
+  "core.service.status": "查看后台服务状态"
 }

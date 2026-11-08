@@ -1,12 +1,17 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/host"
 
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/spf13/cobra"
@@ -23,14 +28,16 @@ var isLinuxSystemdFn = func() bool {
 
 func newServiceCommand() *cobra.Command {
 	opts := serviceOptions{
-		unit:  defaultSystemdUnit,
-		lines: 200,
+		unit:   defaultSystemdUnit,
+		lines:  200,
+		output: "table",
 	}
 
 	cmd := &cobra.Command{
-		Use:   "service",
+		Use: "service",
 	}
 	cmd.PersistentFlags().StringVar(&opts.unit, "unit", defaultSystemdUnit, "")
+	cmd.PersistentFlags().StringVarP(&opts.output, "output", "o", "table", "plain|table|json")
 
 	cmd.AddCommand(newServiceActionCommand("status", "", false, &opts))
 	for _, action := range []string{"start", "stop", "restart", "enable", "disable"} {
@@ -42,6 +49,7 @@ func newServiceCommand() *cobra.Command {
 }
 
 type serviceOptions struct {
+	output string
 	unit   string
 	lines  int
 	follow bool
@@ -53,6 +61,16 @@ func newServiceActionCommand(action, short string, sudo bool, opts *serviceOptio
 		Short: short,
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if managedServiceTarget(cmd) {
+				return coreActionResult(cmd, opts.output, "service-"+action, func(ctx context.Context) (any, error) {
+					svc := service.NewCoreService()
+					defer svc.Close()
+					if action == "status" {
+						return svc.Status()
+					}
+					return nil, svc.ServiceAction(ctx, action)
+				})
+			}
 			if err := ensureLinuxSystemd(); err != nil {
 				return err
 			}
@@ -75,8 +93,8 @@ func newServiceActionCommand(action, short string, sudo bool, opts *serviceOptio
 
 func newServiceLogsCommand(opts *serviceOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "logs",
-		Args:  cobra.NoArgs,
+		Use:  "logs",
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := ensureLinuxSystemd(); err != nil {
 				return err
@@ -87,6 +105,13 @@ func newServiceLogsCommand(opts *serviceOptions) *cobra.Command {
 
 			unit := normalizeSystemdUnit(opts.unit)
 			journalArgs := []string{"-u", unit, "-n", strconv.Itoa(opts.lines)}
+			if managedServiceTarget(cmd) {
+				root, err := config.GetConfigDir()
+				if err != nil {
+					return err
+				}
+				journalArgs = []string{"--user", "-u", host.ServiceName(root) + ".service", "-n", strconv.Itoa(opts.lines)}
+			}
 			if opts.follow {
 				journalArgs = append(journalArgs, "-f")
 			} else {
@@ -102,6 +127,14 @@ func newServiceLogsCommand(opts *serviceOptions) *cobra.Command {
 	cmd.Flags().IntVarP(&opts.lines, "lines", "n", 200, "")
 	cmd.Flags().BoolVarP(&opts.follow, "follow", "f", false, "")
 	return cmd
+}
+
+func managedServiceTarget(cmd *cobra.Command) bool {
+	if cmd.Flags().Changed("unit") || cmd.InheritedFlags().Changed("unit") {
+		return false
+	}
+	cfg, err := config.Load()
+	return err == nil && cfg.Core.Mode == "managed"
 }
 
 func normalizeSystemdUnit(unit string) string {

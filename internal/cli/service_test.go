@@ -100,6 +100,8 @@ func TestServiceCommandFailureIsWrapped(t *testing.T) {
 
 func captureServiceCommand(t *testing.T, args ...string) []systemCommandCall {
 	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", t.TempDir())
 
 	var calls []systemCommandCall
 	oldRunner := runSystemCommandFn

@@ -73,3 +73,38 @@ func TestCoreJSONFailureHasMachineReadableResult(t *testing.T) {
 		t.Fatal(result)
 	}
 }
+
+func TestCoreServiceAndNetworkCommandsValidateOutputBeforeOSChanges(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", t.TempDir())
+	for _, args := range [][]string{{"service", "install"}, {"system-proxy", "on"}, {"tun", "on"}, {"network-recover"}} {
+		cmd := newCoreCommand()
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+		cmd.SetArgs(append(args, "--output", "invalid"))
+		if err := cmd.Execute(); err == nil {
+			t.Fatal("accepted invalid output", args)
+		}
+	}
+}
+func TestCoreNetworkFailureIsJSONWithoutCredentials(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", t.TempDir())
+	viper.Reset()
+	defer viper.Reset()
+	cmd := newCoreCommand()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"tun", "on", "--output", "json"})
+	if cmd.Execute() == nil {
+		t.Fatal("TUN enabled without managed configuration")
+	}
+	var result map[string]string
+	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result["result"] != "error" || result["action"] != "tun-on" {
+		t.Fatal(result)
+	}
+}

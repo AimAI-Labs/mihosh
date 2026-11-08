@@ -88,6 +88,13 @@ func localizeCommands() {
 		core.Short = i18n.T("cli.core.short")
 		for _, child := range core.Commands() {
 			child.Short = i18n.T("core.action." + child.Name())
+			if child.Name()=="network-recover"{child.Short=i18n.T("core.action.recover")}
+			for _,nested:=range child.Commands(){
+				prefix:="core.network.";if child.Name()=="service"{prefix="core.service."}
+				nested.Short=i18n.T(prefix+nested.Name())
+
+
+			}
 			for _, flagName := range []string{"version", "file", "sha256"} {
 				if flag := child.Flags().Lookup(flagName); flag != nil { flag.Usage = i18n.T("cli.core." + flagName) }
 			}

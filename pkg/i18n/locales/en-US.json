@@ -814,5 +814,21 @@
   "core.profile_source": "Subscription URL or local configuration path (hidden)",
   "core.profile_default": "Imported profile",
   "cli.setup.next": "Run mihosh core start in the foreground or open the Core menu.",
-  "core.download_timeout": "Download task deadline in seconds (30–3600; 0 uses 600)"
+  "core.download_timeout": "Download task deadline in seconds (30–3600; 0 uses 600)",
+  "core.action.service": "Background service and automatic startup",
+  "core.action.system-proxy": "Toggle system proxy on supported platforms",
+  "core.action.tun": "Toggle TUN (network administration privileges required)",
+  "core.action.recover": "Recover network settings left after an unexpected exit",
+  "core.network.on": "Enable",
+  "core.network.off": "Disable and restore",
+  "core.network.status": "Show network settings",
+  "core.service.install": "Install background service",
+  "core.service.uninstall": "Uninstall background service",
+  "core.service.start": "Start background service",
+  "core.service.stop": "Stop background service",
+  "core.service.restart": "Restart background service",
+  "core.service.enable": "Enable automatic startup (on Linux login)",
+  "core.service.disable": "Disable automatic startup",
+  "core.service.boot": "Enable boot startup (Linux linger)",
+  "core.service.status": "Show background service status"
 }

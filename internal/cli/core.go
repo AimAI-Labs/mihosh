@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
@@ -18,6 +19,7 @@ func newCoreCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "core", SilenceUsage: true, SilenceErrors: true, Short: i18n.T("cli.core.short")}
 	var output string
 	cmd.PersistentFlags().StringVarP(&output, "output", "o", "table", "plain|table|json")
+	cmd.AddCommand(newCoreServiceCommand(&output), newCoreNetworkCommand("system-proxy", &output), newCoreNetworkCommand("tun", &output), newCoreRecoveryCommand(&output), newCoreGuardCommand())
 	for _, action := range []string{"status", "releases", "install", "import", "configure", "start", "restart", "stop", "upgrade", "rollback", "activate"} {
 		var version, source, digest string
 		child := &cobra.Command{Use: action, Short: i18n.T("core.action." + action), Args: cobra.NoArgs}
@@ -36,7 +38,7 @@ func newCoreCommand() *cobra.Command {
 			}()
 			svc := service.NewCoreService()
 			defer svc.Close()
-			ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt)
+			ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer cancel()
 			var result any
 			var progress coreinfra.Progress
@@ -77,7 +79,7 @@ func newCoreCommand() *cobra.Command {
 					err = svc.ActivateVersion(ctx, "")
 				}
 			case "stop":
-				err = svc.Control(ctx, "stop", "")
+				err = svc.StopContext(ctx)
 			case "start", "restart":
 				// First-stage runtime is explicitly foreground: never leave an unowned child.
 				if action == "start" {
@@ -151,11 +153,11 @@ func writeCoreResult(out io.Writer, format outputFormat, result any) error {
 	case service.CoreStatus:
 		if format == outputFormatTable {
 			w := newTabWriter(out)
-			fmt.Fprintln(w, "MODE\tVERSION\tRUNNING\tINSTALLED")
-			fmt.Fprintf(w, "%s\t%s\t%t\t%s\n", value.Mode, value.Version, value.Running, strings.Join(value.Installed, ","))
+			fmt.Fprintln(w, "MODE\tVERSION\tRUNNING\tINSTALLED\tRUNTIME\tSERVICE\tAUTOSTART\tSYSTEM_PROXY\tTUN\tRECOVERY")
+			fmt.Fprintf(w, "%s\t%s\t%t\t%s\t%s\t%t\t%t\t%t\t%t\t%t\n", value.Mode, value.Version, value.Running, strings.Join(value.Installed, ","), value.Runtime, value.ServiceInstalled, value.AutoStart, value.SystemProxy, value.TUN, value.RecoveryPending)
 			return w.Flush()
 		}
-		_, err := fmt.Fprintf(out, "%s %s %t %s\n", value.Mode, value.Version, value.Running, strings.Join(value.Installed, ","))
+		_, err := fmt.Fprintf(out, "%s %s %t %s %s %t %t %t %t %t\n", value.Mode, value.Version, value.Running, strings.Join(value.Installed, ","), value.Runtime, value.ServiceInstalled, value.AutoStart, value.SystemProxy, value.TUN, value.RecoveryPending)
 		return err
 	case coreinfra.Release:
 		if format == outputFormatTable {
