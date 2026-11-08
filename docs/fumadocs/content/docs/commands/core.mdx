@@ -23,13 +23,16 @@ The baseline configuration provides direct connections, not proxy nodes. System 
 | `l` | Import a local executable using its independently verified SHA-256 |
 | `o` | Import and activate a subscription or local configuration |
 | `e` | Edit download proxy and accelerator settings |
+| `h` | Install, control and configure automatic startup of the background service |
+| `y` / `n` | Toggle system proxy / TUN |
+| `c` | Recover network settings after an unexpected exit |
 | `p` | Change managed ports after stopping the core |
 | `u` | Connect to an external API; leave the address empty for auto-discovery |
 | `r` | Refresh status and retry the connection |
 | Arrows / mouse wheel | Scroll |
 | `Esc` | Cancel the task or leave the form |
 
-Wide terminals use 43% / 57% panels; narrow terminals stack the content. Use `Tab` and `Enter` inside forms. Exiting Mihosh stops the child owned by that session. Existing external cores remain under their original owner.
+Wide terminals use 43% / 57% panels; narrow terminals stack the content. Use `Tab` and `Enter` inside forms. Exiting Mihosh stops the child owned by a session. A background service continues after the TUI exits. Existing external cores remain under their original owner.
 
 ## CLI
 
@@ -60,7 +63,57 @@ mihosh core import --file /path/to/mihomo --version v1.19.33 --sha256 "YOUR_VERI
 mihosh core configure --output json
 ```
 
-`setup` and every `core` subcommand support `--output plain|table|json`. Foreground `start` returns its final result after stopping or interruption. Ending the owning foreground command stops its child. Background services and boot startup are later phases.
+`setup` and every `core` subcommand support `--output plain|table|json`. Foreground `start` returns its final result after stopping or interruption. Ending the owning foreground command stops its child. In service mode, `start` returns when the background core is ready.
+
+## Background services and automatic startup
+
+Press `h` in Core and enter `install`. Stop a session core before installing its background service. Installation copies Mihosh into `~/.mihosh/bin/` as a stable service entry and selects `core.runtime: service`. Core start/stop/restart then control that service. Closing the TUI leaves it running; profile activation and version changes are forwarded to its private owner endpoint.
+
+```bash
+mihosh core service install --output json
+mihosh core service enable --output json
+mihosh core start --output json
+mihosh core service status --output json
+mihosh core service boot --output json
+mihosh core service disable --output json
+mihosh core service uninstall --output json
+```
+
+Linux uses a systemd **user service**. `enable` starts it on login. `boot` additionally invokes `loginctl enable-linger`, which may require authorization. Uninstall removes only the owned unit and retains data; it leaves user lingering unchanged to protect other services. Restart attempts are bounded. Core logs go to the user journal, available through `mihosh service logs`.
+
+After updating Mihosh itself, stop and reinstall the stable service entry. Legacy `mihosh service` commands resolve the managed target when no `--unit` is supplied; explicit units retain their external systemd semantics.
+
+## System proxy, TUN and recovery
+
+```bash
+mihosh core system-proxy on --output json
+mihosh core system-proxy off --output json
+mihosh core tun on --output json
+mihosh core tun off --output json
+mihosh core network-recover --output json
+```
+
+These commands share Core's `y` / `n` / `c` actions and support `--output plain|table|json`. Switches record desired settings; a stopped core does not imply active traffic capture. Running TUN changes validate a candidate and restart under control, restoring the old configuration and preference on failure. Download proxies, shell `on/off`, system proxies and TUN remain separate facilities.
+
+P2/P3 target Linux only. System proxy uses GNOME GSettings with a user D-Bus. Other desktop backends fail before mutation. Prior values are saved and restored only for fields still matching Mihosh's applied values, preserving intervening user changes.
+
+Linux TUN requires `/dev/net/tun`, iproute2 and `CAP_NET_ADMIN` on **the Mihosh coordinator and recovery guard**, not only on the kernel executable. An administrator can explicitly grant capabilities to the installed stable service entry:
+
+```bash
+sudo setcap cap_net_admin,cap_net_raw+ep "$HOME/.mihosh/bin/mihosh"
+```
+
+For foreground use, grant them to the actual Mihosh executable. Recheck capabilities after updates or copying binaries. No silent elevation occurs.
+
+Managed TUN reserves its own interface name, routing table and rule range after checking collisions. It uses the system stack, automatic routing/interface detection, and no additional auto-redirect or strict firewall rules. DNS has no external listener; existing nameservers are retained, or Cloudflare/Alibaba DoH and bootstrap DNS are generated. Interface DNS state is restored with the owned TUN resources.
+
+`runtime/network-recovery.json` records recovery data before network mutation; `network-change.json` also protects interrupted TUN configuration changes. An independent guard restores proxy fields and cleans owned TUN resources after owner exit. Under systemd it lives in a separate transient user unit. Failures retain the journal for retry. `network-recover` requires ownership locks to prove that no active owner exists; it never adopts another core or removes unrelated interfaces. Status includes runtime, automatic startup, desired proxy/TUN switches and pending recovery.
+
+## Native verification
+
+Regular `go test ./...` never mutates real system services or desktop proxies. `scripts/test-managed-core-linux.sh` accepts `isolated`, `service`, `tun` or `proxy`, followed by verified local kernel and Mihosh paths. TUN tests create their test uplink in a separate user/network namespace. Native desktop proxy tests require `MIHOSH_ALLOW_NETWORK_CHANGES=1`.
+
+`scripts/test-managed-core-container.sh` provides an isolated Linux environment with TUN, D-Bus and GNOME settings. It mounts no host directories and publishes no ports. The container is removed after testing unless `--keep` is supplied. Run `test-managed-core-linux.sh service` separately for native systemd lifecycle coverage: it creates only an independently named temporary unit with a 256 MiB memory limit and no system proxy or TUN. Actual results are recorded in the proposal.
 
 ## Download fallback and verification
 
@@ -86,10 +139,10 @@ Downloads have task and route deadlines, one bounded retry and progress reportin
 
 ## Ownership and files
 
-Managed versions live in `~/.mihosh/core/versions/<tag>/`; runtime configuration is in `~/.mihosh/runtime/`. Installation records include source URLs, hashes and upstream source/license links. Application `core` settings choose mode and version; controller credentials and proxy ports come from `runtime/config.yaml`.
+Managed versions live in `~/.mihosh/core/versions/<tag>/`; runtime configuration is in `~/.mihosh/runtime/`. Installation records include source URLs, hashes and upstream source/license links. Application `core` settings choose mode and version; controller credentials and proxy ports come from `runtime/config.yaml`. `MIHOSH_CONFIG_DIR` selects an absolute data root, fixed through the service entry’s `--home`; configuration, profiles and backups share that root.
 
 External API connections retain their original installation method. Explicit external connections have no implicit local file binding and cannot write a default local Mihomo configuration.
 
-Profile activation validates a candidate before applying it and restores the previous configuration and active profile on failure. Managed imports preserve local controller and proxy settings, disable TUN and remove additional subscription-provided listeners. Interrupted version changes and configuration transactions are recovered during startup.
+Profile activation validates a candidate before applying it and restores the previous configuration and active profile on failure. Managed imports preserve local controller and proxy settings, apply the explicit Core TUN choice and remove additional subscription-provided listeners. Imported data cannot enable TUN by itself. Interrupted version changes and configuration transactions are recovered during startup.
 
 Asset selection covers Linux/Windows amd64 compatible and arm64. Linux amd64 has real-core integration coverage; see implementation records in the proposal for build and runtime verification of other targets.

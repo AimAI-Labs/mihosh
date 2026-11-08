@@ -23,13 +23,16 @@ description: 下载、配置和托管独立 Mihomo 内核
 | `l` | 按独立核对的 SHA-256 导入本地内核可执行文件 |
 | `o` | 导入并激活订阅或本地配置 |
 | `e` | 下载代理与加速网址设置 |
+| `h` | 后台服务：安装、启停、自动启动、卸载 |
+| `y` / `n` | 切换系统代理 / TUN |
+| `c` | 恢复异常退出遗留的网络设置 |
 | `p` | 修改托管端口，需先停止内核 |
 | `u` | 连接外部 API；地址留空时恢复自动发现 |
 | `r` | 刷新状态、重试连接 |
 | `↑` / `↓`、滚轮 | 滚动页面 |
 | `Esc` | 取消任务或退出表单 |
 
-宽屏采用 43% / 57% 双栏，窄屏纵向排列。表单使用 `Tab` 切换字段、`Enter` 保存。退出应用会停止该会话拥有的内核；已有外部内核不受影响。
+宽屏采用 43% / 57% 双栏，窄屏纵向排列。表单使用 `Tab` 切换字段、`Enter` 保存。会话模式退出应用会停止该会话拥有的内核；服务模式退出 TUI 后继续运行。已有外部内核不受影响。
 
 ## CLI
 
@@ -60,7 +63,57 @@ mihosh core import --file /path/to/mihomo --version v1.19.33 --sha256 "YOUR_VERI
 mihosh core configure --output json
 ```
 
-`setup` 与全部 `core` 子命令支持 `--output plain|table|json`。前台 `start` 等待停止或中断后返回最终结果；关闭拥有该会话的前台命令会停止子进程。后台服务与开机启动属于后续阶段。
+`setup` 与全部 `core` 子命令支持 `--output plain|table|json`。前台 `start` 等待停止或中断后返回最终结果；关闭拥有该会话的前台命令会停止子进程。服务模式的 `start` 在后台就绪后返回，不等待服务停止。
+
+## 后台服务与自动启动
+
+Core 菜单按 `h`，输入 `install` 安装后台服务。先停止会话内核再安装；安装会将当前 Mihosh 复制到 `~/.mihosh/bin/`，作为固定的服务入口，并将 `core.runtime` 切换为 `service`。之后 `s` / `x` / `z` 和 `core start/stop/restart` 操作后台服务。关闭 TUI 不会停止服务；订阅、升级和回滚通过私有控制入口交给拥有内核的后台会话执行。
+
+```bash
+mihosh core service install --output json
+mihosh core service enable --output json
+mihosh core start --output json
+mihosh core service status --output json
+mihosh core service boot --output json
+mihosh core service disable --output json
+mihosh core service uninstall --output json
+```
+
+Linux 使用 systemd **用户服务**。`enable` 随用户登录启动；`boot` 额外调用 `loginctl enable-linger`，允许用户管理器在开机、未登录时运行，可能需要系统授权。卸载只删除本应用按配置根目录生成的服务单元，保留订阅、内核和备份；不会关闭用户的 linger，以免影响其他用户服务。服务失败启动受次数与时间窗口限制。内核日志写入用户 journal，可用 `mihosh service logs` 查看。
+
+Mihosh 自身升级后，可停止服务并重新安装固定入口。既有 `mihosh service` 在托管模式且未指定 `--unit` 时使用托管目标；显式 `--unit` 保留原有外部 systemd 服务语义。
+
+## 系统代理、TUN 与恢复
+
+```bash
+mihosh core system-proxy on --output json
+mihosh core system-proxy off --output json
+mihosh core tun on --output json
+mihosh core tun off --output json
+mihosh core network-recover --output json
+```
+
+这些命令与 Core 的 `y` / `n` / `c` 共用实现，均支持 `--output plain|table|json`。开关保存期望设置；未运行时不会宣称已改变系统流量。TUN 变更先校验候选配置；运行中会受控重启，失败恢复旧配置与开关。下载代理、终端 `on/off`、系统代理和 TUN 各自独立。
+
+本轮 P2／P3 仅支持 Linux。系统代理使用 GNOME 的 GSettings，需要用户 D-Bus；其他桌面环境会在修改前拒绝。启用代理时先记录原值，关闭或拥有会话退出时，只恢复仍与本应用写入值一致的字段，保留期间用户另行修改的字段。
+
+TUN 默认关闭。Linux 需要 `/dev/net/tun`、iproute2，且 **Mihosh 协调进程和恢复守护进程**需要 `CAP_NET_ADMIN`；不能只给内核可执行文件授权。对已安装的固定服务入口，可由管理员明确授权：
+
+```bash
+sudo setcap cap_net_admin,cap_net_raw+ep "$HOME/.mihosh/bin/mihosh"
+```
+
+前台模式应给实际运行的 Mihosh 可执行文件授权；更新或重新复制文件后需重新核对能力。不会静默提权。
+
+托管 TUN 使用独立名称、路由表和规则区间，预先检查冲突。采用系统协议栈、自动路由和出口接口检测，不启用额外自动重定向或严格防火墙规则。DNS 不对外监听；保留已有 nameserver，缺少时生成 Cloudflare/阿里 DoH 与引导 DNS。系统 DNS 的接口配置随托管 TUN 一起恢复。
+
+修改前将恢复记录写入 `runtime/network-recovery.json`；TUN 切换还使用 `network-change.json` 恢复中断的配置变更。独立守护进程在拥有进程退出后恢复代理并清理本应用的 TUN 网络；systemd 模式将守护放入单独的临时用户服务单元。恢复失败保留记录供重试；`network-recover` 仅在运行锁证明没有活动拥有者时执行，不接管其他内核或清理其他接口。`core status` 显示运行方式、自动启动、期望的代理/TUN 开关和待恢复状态。
+
+## 原生验收
+
+普通 `go test ./...` 不修改真实系统服务或桌面代理。Linux 可运行 `scripts/test-managed-core-linux.sh`，依次选择 `isolated`、`service`、`tun` 或 `proxy`；传入已独立校验的本地内核路径与 Mihosh 路径。`tun` 模式在独立用户/网络命名空间创建测试出口。原生代理测试需明确设置 `MIHOSH_ALLOW_NETWORK_CHANGES=1`。
+
+`scripts/test-managed-core-container.sh` 提供带 TUN、D-Bus 和 GNOME 设置后端的隔离 Linux 验收环境，不挂载宿主目录、不发布端口，默认验收后删除容器；传入 `--keep` 可保留环境。原生 systemd 生命周期可通过 `test-managed-core-linux.sh service` 在本机单独验证：仅安装独立命名的临时服务，硬限内存 256 MiB，不开启系统代理或 TUN。实际验收结果见方案实施记录。
 
 ## 下载回退与校验
 
@@ -86,10 +139,10 @@ core:
 
 ## 模式与文件
 
-托管文件位于 `~/.mihosh/core/versions/<版本>/` 和 `~/.mihosh/runtime/`；每次安装记录来源、摘要和上游源码/许可链接。`core` 配置选择托管模式与版本，托管控制器及代理端口以 `runtime/config.yaml` 为准。
+托管文件位于 `~/.mihosh/core/versions/<版本>/` 和 `~/.mihosh/runtime/`；每次安装记录来源、摘要和上游源码/许可链接。`core` 配置选择托管模式与版本，托管控制器及代理端口以 `runtime/config.yaml` 为准。`MIHOSH_CONFIG_DIR` 可指定绝对配置根目录，服务入口通过 `--home` 固定它；配置、订阅和备份使用同一根目录。
 
 外部 API 连接保留原安装方式。显式外部连接不绑定本地文件，Mihosh 不会为其写入默认本地 Mihomo 配置。
 
-订阅激活先生成并校验候选文件，再应用；失败时恢复旧配置和激活记录。托管导入保留本地控制器与代理端口，关闭 TUN，并清除订阅附带的其他监听入口。升级中断记录和配置恢复记录在下次启动时处理。
+订阅激活先生成并校验候选文件，再应用；失败时恢复旧配置和激活记录。托管导入保留本地控制器与代理端口，按 Core 中明确选择的 TUN 开关生成托管网络配置，并清除订阅附带的其他监听入口。订阅不能自行启用 TUN。升级中断记录和配置恢复记录在下次启动时处理。
 
 当前资产选择覆盖 Linux/Windows 的 amd64 compatible 与 arm64。Linux amd64 已通过真实内核验证；其他目标的构建与实际运行验证情况见方案中的实施记录。
