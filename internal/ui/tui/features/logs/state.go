@@ -153,6 +153,8 @@ func (s State) ToPageState(width, height int) PageState {
 // Update 处理日志页面按键和消息
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
+	case messages.CoreTargetChangedMsg:
+		if msg.Reset { return s.ClearLogs(), nil }; return s, nil
 	case messages.PageResizeMsg:
 		return s.UpdateMaxHScrollOffset(msg.Width, msg.Height), nil
 	case messages.PageMouseScrollMsg:

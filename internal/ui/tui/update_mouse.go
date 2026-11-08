@@ -11,6 +11,9 @@ import (
 )
 
 func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if m.guideState.Active {
+		return m, nil
+	}
 	// 帮助弹窗打开时吞掉所有鼠标事件，防止穿透到底层
 	if m.showHelp {
 		// 左键点击任意位置关闭弹窗
@@ -70,8 +73,9 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 
 		if msg.Y >= 0 && msg.Y < layout.TopNavHeight {
-			clickedPage := layout.GetClickedTopNavPage(msg.X, msg.Y, m.width)
+			clickedPage := layout.GetClickedTopNavPageForState(msg.X, msg.Y, m.width, m.currentPage, layout.TopNavRefreshStatus{Enabled: m.autoRefreshInterval() > 0, SecondsRemaining: m.autoRefreshRemaining, Interval: m.autoRefreshInterval(), Synced: m.autoRefreshSynced})
 			if clickedPage >= 0 && clickedPage < layout.PageCount {
+				m.onPageLeave()
 				m.currentPage = clickedPage
 				return m, m.onPageChange()
 			}
@@ -102,6 +106,7 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 // handleMouseScroll 处理鼠标滚轮滚动
 func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
 	if y >= 0 && y < layout.TopNavHeight {
+		m.onPageLeave()
 		if up {
 			m.currentPage = (m.currentPage + layout.PageCount - 1) % layout.PageCount
 		} else {
@@ -125,8 +130,6 @@ func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
 	}
 	return m.dispatchToPage(scrollMsg)
 }
-
-
 
 func (m Model) resolveMainPageMouseHit(x, y int) (pageX, pageY, pageWidth, pageHeight int, ok bool) {
 	statusBarHeight := common.StatusBarHeight

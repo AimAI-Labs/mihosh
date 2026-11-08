@@ -17,6 +17,7 @@ const (
 	PageRules       = 3
 	PageSub         = 4
 	PageSettings    = 5
+	PageCore        = 6
 )
 
 // ── 连接页视图模式常量（与 connections 包保持一致）──
@@ -81,7 +82,7 @@ func buildHelpSections(ctx HelpContext) []section {
 		bindings: []keybinding{
 			{"?", i18n.T("help.global.toggle")},
 			{"Tab / Shift+Tab", i18n.T("help.global.switch")},
-			{"1-6", i18n.T("help.global.go")},
+
 			{"r", i18n.T("help.global.refresh")},
 			{"q / Ctrl+C", i18n.T("help.global.quit")},
 		},
@@ -108,6 +109,8 @@ func buildHelpSections(ctx HelpContext) []section {
 		sections = append(sections, buildRulesSections(ctx)...)
 	case PageSub:
 		sections = append(sections, buildSubSections(ctx)...)
+	case PageCore:
+		sections = append(sections, section{title: i18n.T("menu.core"), bindings: []keybinding{{"v", i18n.T("core.action.check")}, {"i", i18n.T("core.action.install")}, {"m", i18n.T("core.action.configure")}, {"s / x", i18n.T("core.help.runtime")}, {"e", i18n.T("core.action.network")}, {"Esc", i18n.T("core.cancel")}}})
 	case PageSettings:
 		sections = append(sections, buildSettingsSections(ctx)...)
 	}

@@ -38,7 +38,7 @@ func startWSStreams(ctx context.Context, wsClient *api.WSClient, msgChan chan in
 		// 设置内存处理器
 		wsClient.SetMemoryHandler(func(data api.MemoryData) {
 			select {
-			case msgChan <- messages.MemoryWSMsg{Memory: data.Inuse}:
+			case msgChan <- messages.CoreWSMsg{Generation: data.Generation, Payload: messages.MemoryWSMsg{Memory: data.Inuse}}:
 			default:
 				// channel满了就丢弃
 			}
@@ -47,7 +47,7 @@ func startWSStreams(ctx context.Context, wsClient *api.WSClient, msgChan chan in
 		// 设置流量处理器
 		wsClient.SetTrafficHandler(func(data api.TrafficData) {
 			select {
-			case msgChan <- messages.TrafficWSMsg{Up: data.Up, Down: data.Down}:
+			case msgChan <- messages.CoreWSMsg{Generation: data.Generation, Payload: messages.TrafficWSMsg{Up: data.Up, Down: data.Down}}:
 			default:
 				// channel满了就丢弃
 			}
@@ -56,7 +56,7 @@ func startWSStreams(ctx context.Context, wsClient *api.WSClient, msgChan chan in
 		// 设置连接处理器
 		wsClient.SetConnectionsHandler(func(data api.ConnectionsData) {
 			select {
-			case msgChan <- messages.ConnectionsWSMsg{Data: data}:
+			case msgChan <- messages.CoreWSMsg{Generation: data.Generation, Payload: messages.ConnectionsWSMsg{Data: data}}:
 			default:
 				// channel满了就丢弃
 			}
@@ -65,7 +65,7 @@ func startWSStreams(ctx context.Context, wsClient *api.WSClient, msgChan chan in
 		// 设置日志处理器
 		wsClient.SetLogsHandler(func(data api.LogData) {
 			select {
-			case msgChan <- messages.LogsWSMsg{LogType: data.Type, Payload: data.Payload}:
+			case msgChan <- messages.CoreWSMsg{Generation: data.Generation, Payload: messages.LogsWSMsg{LogType: data.Type, Payload: data.Payload}}:
 			default:
 				// channel满了就丢弃
 			}

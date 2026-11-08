@@ -53,6 +53,9 @@ func (m Model) View() string {
 		pageContent = m.renderRulesPage()
 	case layout.PageSub:
 		pageContent = m.renderSubPage()
+	case layout.PageCore:
+		pw, ph := m.getPageSize()
+		pageContent = m.coreState.Render(pw, ph)
 	}
 	// 将页面内容约束在精确的 contentHeight 行内：
 	// 内容不足时补空行，内容溢出时截断，确保状态栏始终固定在底部

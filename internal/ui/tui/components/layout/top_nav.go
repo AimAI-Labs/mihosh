@@ -8,6 +8,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // PageType 页面类型
@@ -20,6 +21,7 @@ const (
 	PageRules
 	PageSub
 	PageSettings
+	PageCore
 	PageCount // 页面总数，必须放在最后
 )
 
@@ -32,6 +34,7 @@ func getTopNavItems() []struct{ Label string } {
 		{i18n.T("menu.rules")},
 		{i18n.T("menu.sub")},
 		{i18n.T("menu.settings")},
+		{i18n.T("menu.core")},
 	}
 }
 
@@ -101,26 +104,44 @@ func renderTopNavContent(currentPage PageType, width int, refreshStatus ...TopNa
 	}
 
 	left := lipgloss.JoinHorizontal(lipgloss.Left, parts...)
-	right := ""
-	if len(refreshStatus) > 0 {
-		right = renderTopNavRefreshStatus(refreshStatus[0], true)
-		if right != "" && lipgloss.Width(left)+lipgloss.Width(right)+1 > width {
-			right = renderTopNavRefreshStatus(refreshStatus[0], false)
-		}
-	}
+	offset, visible, right := topNavViewport(currentPage, width, refreshStatus...)
+	left = ansi.Cut(left, offset, offset+visible)
 	if right == "" {
 		return fitTopNavLine(left, width)
 	}
-
-	gap := width - lipgloss.Width(left) - lipgloss.Width(right)
-	if gap < 1 {
-		leftWidth := width - lipgloss.Width(right) - 1
-		if leftWidth <= 0 {
-			return fitTopNavLine(right, width)
-		}
-		return truncateTopNavLine(left, leftWidth) + " " + right
+	if visible <= 0 {
+		return fitTopNavLine(right, width)
 	}
-	return fitTopNavLine(left+strings.Repeat(" ", gap)+right, width)
+	return fitTopNavLine(left, width-lipgloss.Width(right)-1) + " " + right
+}
+
+// topNavViewport is shared by rendering and hit testing. Narrow terminals keep
+// the selected page visible while retaining the existing refresh indicator.
+func topNavViewport(currentPage PageType, width int, status ...TopNavRefreshStatus) (int, int, string) {
+	bounds := calcTopNavItemBounds()
+	fullWidth := 0
+	if len(bounds) > 0 {
+		fullWidth = bounds[len(bounds)-1].EndX
+	}
+	right := ""
+	if len(status) > 0 {
+		right = renderTopNavRefreshStatus(status[0], true)
+		if fullWidth+lipgloss.Width(right)+1 > width {
+			right = renderTopNavRefreshStatus(status[0], false)
+		}
+	}
+	visible := width
+	if right != "" {
+		visible = max(0, width-lipgloss.Width(right)-1)
+	}
+	offset := 0
+	for _, b := range bounds {
+		if b.Page == currentPage && b.EndX > visible {
+			offset = b.EndX - visible
+			break
+		}
+	}
+	return offset, visible, right
 }
 
 func fitTopNavLine(line string, width int) string {
@@ -169,10 +190,19 @@ func truncateTopNavLine(line string, width int) string {
 
 // GetClickedTopNavPage 获取点击位置对应的顶部导航页面。
 func GetClickedTopNavPage(x, y, width int) PageType {
+	return GetClickedTopNavPageForState(x, y, width, PageNodes)
+}
+
+func GetClickedTopNavPageForState(x, y, width int, currentPage PageType, status ...TopNavRefreshStatus) PageType {
 	if y != 1 || x <= 0 || x >= width-1 {
 		return -1
 	}
+	offset, visible, _ := topNavViewport(currentPage, width-2, status...)
 	contentX := x - 1
+	if contentX >= visible {
+		return -1
+	}
+	contentX += offset
 	for _, bounds := range calcTopNavItemBounds() {
 		if contentX >= bounds.StartX && contentX < bounds.EndX {
 			return bounds.Page
@@ -249,6 +279,7 @@ func GetPageTitle(page PageType) string {
 		i18n.T("title.rules"),
 		i18n.T("title.sub"),
 		i18n.T("title.settings"),
+		i18n.T("title.core"),
 	}
 	if int(page) < len(titles) {
 		return titles[page]

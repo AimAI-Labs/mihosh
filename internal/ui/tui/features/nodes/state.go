@@ -202,6 +202,8 @@ func (s State) ToPageState(width, height int) PageState {
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 
 	switch msg := msg.(type) {
+ case messages.CoreTargetChangedMsg:
+  if msg.Reset{return NewState(s.client,s.proxySvc,s.testURL,s.timeout),nil};return s,nil
 	case messages.PageMouseScrollMsg:
 		return s.HandleMouseScroll(msg.Up, msg.X, msg.Y, msg.Width, msg.Height), nil
 	case messages.PageMouseClickMsg:

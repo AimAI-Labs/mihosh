@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
@@ -9,6 +11,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/sub"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
@@ -64,6 +67,83 @@ func reloadConfigCmd(client interface {
 
 func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case messages.CoreOwnerChangedMsg:
+		m.reloadStoredConfig()
+		m.connectionEpoch++
+		if msg.Action == "stop" {
+			m.connectionChecked = true
+			m.connectionReady = false
+			return m, tea.Batch(m.listenCoreOwner(), m.coreState.Refresh())
+		}
+		return m, tea.Batch(m.listenCoreOwner(), m.coreState.Refresh(), m.checkCoreConnection())
+	case messages.CoreWSMsg:
+		if m.wsClient == nil || msg.Generation != m.wsClient.Generation() {
+			return m, listenWSMessages(m.wsCtx, m.wsMsgChan)
+		}
+		return m.handleWSMessages(msg.Payload)
+
+	case messages.CoreConnectionMsg:
+		if msg.Epoch != m.connectionEpoch {
+			return m, nil
+		}
+		m.coreState, _ = m.coreState.Update(msg)
+		m.connectionChecked = true
+		m.connectionReady = msg.Err == nil
+		if msg.Err != nil {
+			m.currentPage = layout.PageCore
+			return m, nil
+		}
+		var stream tea.Cmd
+		if !m.wsStarted {
+			m.wsStarted = true
+			stream = startWSStreams(m.wsCtx, m.wsClient, m.wsMsgChan)
+		}
+		return m, tea.Batch(stream, m.fetchNodes(), m.coreState.Refresh())
+
+	case messages.CoreStatusMsg, messages.CoreProgressTickMsg, messages.CoreOperationMsg:
+		if result, ok := msg.(messages.CoreOperationMsg); ok && result.ID != m.coreState.OperationID() {
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.coreState, cmd = m.coreState.Update(msg)
+		if result, ok := msg.(messages.CoreOperationMsg); ok && result.Err == nil {
+			switch result.Action {
+			case "configure", "start", "stop", "setup", "connect", "external", "ports", "activate", "rollback", "restart", "upgrade", "profile":
+				m.connectionEpoch++
+			}
+			m.reloadStoredConfig()
+		}
+		if result, ok := msg.(messages.CoreOperationMsg); ok && result.Err == nil && (result.Action == "configure" || result.Action == "start" || result.Action == "setup" || result.Action == "external" || result.Action == "connect" || result.Action == "ports" || result.Action == "profile") {
+			endpoint := config.ResolveMihomoEndpoint()
+			reset := false
+			if m.client != nil {
+				old := m.client.EndpointSnapshot()
+				reset = old.ExternalController != endpoint.ExternalController || old.Secret != endpoint.Secret
+			}
+			m.reloadClients(endpoint.ExternalController, endpoint.Secret)
+			path, _ := config.GetMihomoConfigPathForWrite()
+			changed := messages.CoreTargetChangedMsg{Reset: reset, ConfigPath: path, ProxyURL: config.MixedPortToProxyURL(endpoint.MixedPort)}
+			m.rulesState, _ = m.rulesState.Update(changed)
+			m.connsState, _ = m.connsState.Update(changed)
+			m.nodesState, _ = m.nodesState.Update(changed)
+			m.logsState, _ = m.logsState.Update(changed)
+			if reset && m.chartData != nil {
+				*m.chartData = *model.NewChartData(common.ChartPoints)
+			}
+			if result.Action == "start" || result.Action == "setup" || result.Action == "profile" {
+				return m, tea.Batch(cmd, m.checkCoreConnection())
+			}
+		}
+		if result, ok := msg.(messages.CoreOperationMsg); ok && (result.Action == "stop" || result.Action == "external" || result.Action == "connect") && result.Err == nil {
+			m.connectionChecked = true
+			m.connectionReady = false
+			if result.Action == "external" || result.Action == "connect" {
+				return m, tea.Batch(cmd, m.checkCoreConnection())
+			}
+		}
+
+		return m, cmd
+
 	case messages.ShowGuideModalMsg:
 		m.guideState = m.guideState.Activate(msg.Endpoint, msg.SecretMasked, msg.ErrMessage)
 		return m, nil
@@ -283,6 +363,9 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.autoRefreshRemaining--
 		if m.autoRefreshRemaining <= 0 {
 			m.autoRefreshRemaining = interval
+			if m.connectionChecked && !m.connectionReady {
+				return m, autoRefreshTick()
+			}
 			return m, tea.Batch(autoRefreshTick(), fetchAutoRefresh(m.client, m.nodesState))
 		}
 		return m, autoRefreshTick()
@@ -572,4 +655,26 @@ func (m Model) fetchNodes() tea.Cmd {
 		nodes.FetchProxies(m.client),
 		nodes.FetchConfigMode(m.client),
 	)
+}
+
+func (m *Model) reloadStoredConfig() {
+	cfg, err := config.Load()
+	if err != nil {
+		return
+	}
+	previousLanguage := ""
+	previousTheme := ""
+	if m.config != nil {
+		previousLanguage = m.config.Language
+		previousTheme = m.config.Theme
+	}
+	m.config = cfg
+	m.settingsState.Config = cfg
+	if cfg.Language != previousLanguage {
+		i18n.SetLanguageOverride(cfg.Language)
+		common.InitKeyBindings()
+	}
+	if cfg.Theme != "" && cfg.Theme != previousTheme {
+		theme.SetTheme(cfg.Theme)
+	}
 }

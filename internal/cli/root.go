@@ -33,6 +33,7 @@ var rootCmd = &cobra.Command{
 		endpoint := config.ResolveMihomoEndpoint()
 		client := api.NewClient(endpoint, cfg.Timeout)
 		m := tui.NewModel(client, cfg.TestURL, cfg.Timeout)
+		defer m.Close()
 
 		p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithoutCatchPanics())
 		if _, err := p.Run(); err != nil {

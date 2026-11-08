@@ -165,3 +165,10 @@ func (c *Client) GetVersion() (*VersionInfo, error) {
 	}
 	return &info, nil
 }
+
+// EndpointSnapshot allows consumers to detect controller changes without exposing mutable state.
+func (c *Client) EndpointSnapshot() config.MihomoEndpoint {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return config.MihomoEndpoint{ExternalController: c.baseURL, Secret: c.secret}
+}

@@ -193,3 +193,30 @@ func stripANSI(s string) string {
 	}
 	return out.String()
 }
+
+func TestNarrowNavigationKeepsCoreVisibleAndClickable(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("en-US")
+	status := TopNavRefreshStatus{Enabled: true, SecondsRemaining: 5, Interval: 5}
+	nav := RenderTopNav(PageCore, 24, status)
+	if !strings.Contains(stripANSI(nav), "Core") {
+		t.Fatalf("selected Core page hidden: %q", nav)
+	}
+	found := false
+	for x := 1; x < 23; x++ {
+		if GetClickedTopNavPageForState(x, 1, 24, PageCore, status) == PageCore {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("selected Core page has no hit target")
+	}
+	for _, line := range strings.Split(nav, "\n") {
+		if lipgloss.Width(line) != 24 {
+			t.Fatalf("width overflow: %q", line)
+		}
+	}
+	if GetClickedTopNavPageForState(21, 1, 24, PageCore, status) != -1 {
+		t.Fatal("refresh indicator is clickable as a page")
+	}
+}

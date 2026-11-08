@@ -13,6 +13,10 @@ import (
 )
 
 func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.currentPage == layout.PageCore && msg.String() == "ctrl+c" {
+		m.onAppQuit()
+		return m, tea.Quit
+	}
 	// 引导弹窗拦截
 	if m.guideState.Active {
 		switch msg.String() {
@@ -24,7 +28,7 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "e":
 			m.guideState = m.guideState.Dismiss()
-			m.currentPage = layout.PageSettings
+			m.currentPage = layout.PageCore
 			return m, m.onPageChange()
 		case "r":
 			return m, checkInitialConnectionCmd(m.client)
@@ -35,7 +39,7 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			switch m.guideState.FocusedButton {
 			case 0:
 				m.guideState = m.guideState.Dismiss()
-				m.currentPage = layout.PageSettings
+				m.currentPage = layout.PageCore
 				return m, m.onPageChange()
 			case 1:
 				return m, checkInitialConnectionCmd(m.client)
@@ -105,6 +109,9 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if m.currentPage == layout.PageCore && m.coreState.Editing {
+		return m.dispatchToPage(msg)
+	}
 	// 全局帮助
 	if msg.String() == "?" {
 		m.showHelp = true
@@ -153,6 +160,8 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) dispatchToPage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch m.currentPage {
+	case layout.PageCore:
+		m.coreState, cmd = m.coreState.Update(msg)
 	case layout.PageNodes:
 		m.nodesState, cmd = m.nodesState.Update(msg)
 
@@ -202,6 +211,8 @@ func (m Model) dispatchToPage(msg tea.Msg) (tea.Model, tea.Cmd) {
 // 避免被全局快捷键（q/r/a/t/s/c 等）拦截。
 func (m Model) isInputCapturing() bool {
 	switch m.currentPage {
+	case layout.PageCore:
+		return m.coreState.Editing
 	case layout.PageNodes:
 		return m.nodesState.NodeFilterMode
 	case layout.PageConnections:

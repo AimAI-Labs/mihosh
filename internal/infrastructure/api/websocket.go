@@ -19,18 +19,21 @@ type WSMessage struct {
 
 // MemoryData 内存数据
 type MemoryData struct {
-	Inuse   int64 `json:"inuse"`
-	OSLimit int64 `json:"oslimit"`
+	Generation uint64 `json:"-"`
+	Inuse      int64  `json:"inuse"`
+	OSLimit    int64  `json:"oslimit"`
 }
 
 // TrafficData 流量数据
 type TrafficData struct {
-	Up   int64 `json:"up"`
-	Down int64 `json:"down"`
+	Generation uint64 `json:"-"`
+	Up         int64  `json:"up"`
+	Down       int64  `json:"down"`
 }
 
 // ConnectionsData 连接数据（与ConnectionsResponse结构相同）
 type ConnectionsData struct {
+	Generation    uint64           `json:"-"`
 	DownloadTotal int64            `json:"downloadTotal"`
 	UploadTotal   int64            `json:"uploadTotal"`
 	Connections   []ConnectionData `json:"connections"`
@@ -65,8 +68,9 @@ type ConnectionMeta struct {
 
 // LogData 日志数据
 type LogData struct {
-	Type    string `json:"type"`    // debug, info, warning, error, silent
-	Payload string `json:"payload"` // 日志内容
+	Generation uint64 `json:"-"`
+	Type       string `json:"type"`    // debug, info, warning, error, silent
+	Payload    string `json:"payload"` // 日志内容
 }
 
 // WSClient WebSocket客户端
@@ -74,9 +78,10 @@ type LogData struct {
 // baseURL/secret 支持运行时热更新（UpdateEndpoint）：调用后主动关闭所有
 // 现有连接，让 connectStream 在下一轮用新端点重连，无需重启 mihosh。
 type WSClient struct {
-	mu      sync.RWMutex
-	baseURL string
-	secret  string
+	mu         sync.RWMutex
+	baseURL    string
+	secret     string
+	generation uint64
 
 	connsMu sync.Mutex
 	conns   map[string]*websocket.Conn // key: 端点名称
@@ -109,6 +114,7 @@ func (c *WSClient) UpdateEndpoint(baseURL, secret string) {
 	c.mu.Lock()
 	c.baseURL = baseURL
 	c.secret = secret
+	c.generation++
 	c.mu.Unlock()
 
 	// 关闭现有连接：connectStream 的 ReadMessage 会返回错误，
@@ -199,22 +205,26 @@ func (c *WSClient) Start(ctx context.Context) error {
 		level = "debug"
 	}
 
-	go connectStream(c, "memory", func(d MemoryData) {
+	go connectStream(c, "memory", func(d MemoryData, generation uint64) {
+		d.Generation = generation
 		if c.memoryHandler != nil {
 			c.memoryHandler(d)
 		}
 	})
-	go connectStream(c, "traffic", func(d TrafficData) {
+	go connectStream(c, "traffic", func(d TrafficData, generation uint64) {
+		d.Generation = generation
 		if c.trafficHandler != nil {
 			c.trafficHandler(d)
 		}
 	})
-	go connectStream(c, "connections", func(d ConnectionsData) {
+	go connectStream(c, "connections", func(d ConnectionsData, generation uint64) {
+		d.Generation = generation
 		if c.connectionsHandler != nil {
 			c.connectionsHandler(d)
 		}
 	})
-	go connectStream(c, "logs?level="+level, func(d LogData) {
+	go connectStream(c, "logs?level="+level, func(d LogData, generation uint64) {
+		d.Generation = generation
 		if c.logsHandler != nil {
 			c.logsHandler(d)
 		}
@@ -261,7 +271,7 @@ var noProxyWSDialer = &websocket.Dialer{
 // connectStream 通用WebSocket流连接，处理重连生命周期。
 // endpoint 同时作为 conns map 的 key，因此带查询参数的端点（如 "logs?level=debug"）
 // 与其他端点不会冲突。
-func connectStream[T any](c *WSClient, endpoint string, handler func(T)) {
+func connectStream[T any](c *WSClient, endpoint string, handler func(T, uint64)) {
 	for {
 		select {
 		case <-c.ctx.Done():
@@ -269,6 +279,7 @@ func connectStream[T any](c *WSClient, endpoint string, handler func(T)) {
 		default:
 		}
 
+		generation := c.Generation()
 		wsURL := c.buildWSURL(endpoint)
 		if wsURL == "" {
 			select {
@@ -289,7 +300,14 @@ func connectStream[T any](c *WSClient, endpoint string, handler func(T)) {
 			}
 		}
 
+		c.mu.RLock()
+		if c.generation != generation {
+			c.mu.RUnlock()
+			conn.Close()
+			continue
+		}
 		c.setConn(endpoint, conn)
+		c.mu.RUnlock()
 
 		// 读取消息，直到连接断开或收到停止信号
 		for {
@@ -310,7 +328,9 @@ func connectStream[T any](c *WSClient, endpoint string, handler func(T)) {
 			if err := json.Unmarshal(message, &data); err != nil {
 				continue
 			}
-			handler(data)
+			if generation == c.Generation() {
+				handler(data, generation)
+			}
 		}
 
 		c.setConn(endpoint, nil)
@@ -323,3 +343,6 @@ func connectStream[T any](c *WSClient, endpoint string, handler func(T)) {
 		}
 	}
 }
+
+// Generation identifies the controller snapshot that produced stream messages.
+func (c *WSClient) Generation() uint64 { c.mu.RLock(); defer c.mu.RUnlock(); return c.generation }

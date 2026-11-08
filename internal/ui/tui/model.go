@@ -3,6 +3,8 @@ package tui
 import (
 	"context"
 
+	corepage "github.com/AimAI-Labs/mihosh/internal/ui/tui/features/core"
+
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/guide"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/logs"
@@ -40,6 +42,7 @@ type Model struct {
 	configSvc  *service.ConfigService
 	connSvc    *service.ConnectionService
 	profileSvc *service.ProfileService
+	coreSvc    *service.CoreService
 
 	// 路由与布局
 	currentPage          layout.PageType
@@ -64,10 +67,14 @@ type Model struct {
 	noticeTicks    int
 
 	// WebSocket
-	wsClient  *api.WSClient
-	wsMsgChan chan interface{}
-	wsCtx     context.Context
-	wsCancel  context.CancelFunc
+	connectionEpoch   uint64
+	connectionChecked bool
+	connectionReady   bool
+	wsStarted         bool
+	wsClient          *api.WSClient
+	wsMsgChan         chan interface{}
+	wsCtx             context.Context
+	wsCancel          context.CancelFunc
 
 	// IP 解析器
 	ipResolver *service.IPResolver
@@ -80,6 +87,7 @@ type Model struct {
 	subState      sub.State
 	settingsState settings.State
 	guideState    guide.State
+	coreState     corepage.State
 
 	// 自动更新
 	updateInfo       *model.UpdateInfo
@@ -105,7 +113,8 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 	proxySvc := service.NewProxyService(client, testURL, timeout)
 	configSvc := service.NewConfigService()
 	connSvc := service.NewConnectionService(client)
-	profileSvc := service.NewProfileService(client)
+	coreSvc := service.NewCoreService()
+	profileSvc := service.NewProfileService(client, coreSvc)
 
 	// 连接信息由 mihomo 配置文件自动发现（external-controller/secret/mixed-port）
 	endpoint := config.ResolveMihomoEndpoint()
@@ -115,8 +124,15 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 
 	chartData := model.NewChartData(common.ChartPoints)
 
+	initialPage := layout.PageNodes
+	if err != nil {
+		initialPage = layout.PageCore
+	}
 	return Model{
 		client:               client,
+		connectionChecked:    true,
+		coreSvc:              coreSvc,
+		coreState:            corepage.NewState(coreSvc),
 		config:               cfg,
 		proxySvc:             proxySvc,
 		configSvc:            configSvc,
@@ -124,7 +140,7 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 		profileSvc:           profileSvc,
 		testURL:              testURL,
 		timeout:              timeout,
-		currentPage:          layout.PageNodes,
+		currentPage:          initialPage,
 		chartData:            chartData,
 		wsClient:             wsClient,
 		wsMsgChan:            make(chan interface{}, common.WSMsgChanCap),

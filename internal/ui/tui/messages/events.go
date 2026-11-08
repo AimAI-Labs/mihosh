@@ -1,6 +1,7 @@
 package messages
 
 import (
+	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
@@ -331,3 +332,34 @@ type PageMouseScrollMsg struct {
 	Width  int // 页面总宽度
 	Height int // 页面总高度
 }
+
+// Core operations are delivered globally even when the user changes pages.
+type CoreStatusMsg struct {
+	Status coreinfra.Status
+	Err    error
+}
+type CoreOperationMsg struct {
+	ID      uint64
+	Action  string
+	Release *coreinfra.Release
+	Err     error
+}
+type CoreProgressTickMsg struct{ ID uint64 }
+
+type CoreConnectionMsg struct {
+	Epoch uint64
+	Err   error
+}
+
+type CoreTargetChangedMsg struct {
+	Reset      bool
+	ConfigPath string
+	ProxyURL   string
+}
+
+type CoreWSMsg struct {
+	Generation uint64
+	Payload    any
+}
+
+type CoreOwnerChangedMsg struct{ Action string }

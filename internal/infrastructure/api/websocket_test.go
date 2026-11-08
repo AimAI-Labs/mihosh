@@ -127,13 +127,13 @@ func TestWSClient_Reconnection(t *testing.T) {
 
 	client := NewWSClient(ts.URL, "")
 	// We only start memory stream manually to test reconnection simply
-	go connectStream(client, "memory", func(d MemoryData) {})
 	
 	// Need to manually set isRunning for test to avoid immediate exit in connectStream loop
 	client.runningMu.Lock()
 	client.isRunning = true
 	client.ctx, client.cancel = context.WithCancel(context.Background())
 	client.runningMu.Unlock()
+	go connectStream(client, "memory", func(MemoryData, uint64) {})
 
 	time.Sleep(2500 * time.Millisecond) // enough time for initial connection + 1s delay + second connection
 

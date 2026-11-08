@@ -872,6 +872,10 @@ func (s State) getEditValue(cfg *config.Config, settingKey string) string {
 // Core Actions
 func UpgradeCoreCmd(client *api.Client, channel string) tea.Cmd {
 	return func() tea.Msg {
+		if cfg, err := config.Load(); err == nil && cfg.Core.Mode == "managed" {
+			return messages.CoreActionErrorMsg{Action: i18n.T("menu.core"), Err: fmt.Errorf("%s", i18n.T("core.manage_here"))}
+		}
+
 		if err := client.UpgradeCore(channel); err != nil {
 			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.upgrade_auto"), Err: err}
 		}
@@ -881,6 +885,10 @@ func UpgradeCoreCmd(client *api.Client, channel string) tea.Cmd {
 
 func RestartCoreCmd(client *api.Client) tea.Cmd {
 	return func() tea.Msg {
+		if cfg, err := config.Load(); err == nil && cfg.Core.Mode == "managed" {
+			return messages.CoreActionErrorMsg{Action: i18n.T("menu.core"), Err: fmt.Errorf("%s", i18n.T("core.manage_here"))}
+		}
+
 		if err := client.RestartCore(); err != nil {
 			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.restart"), Err: err}
 		}

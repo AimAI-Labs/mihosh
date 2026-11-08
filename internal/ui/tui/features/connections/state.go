@@ -166,6 +166,10 @@ func (s State) ToPageState(chartData *model.ChartData, width, height int) PageSt
 // Update 处理连接页面按键和鼠标事件
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
+	case messages.CoreTargetChangedMsg:
+		if msg.Reset { s.CancelTest(); return NewState(msg.ProxyURL, model.DefaultSiteTests(), s.client, s.timeout, s.chartData), nil }
+		return s.UpdateProxyAddr(msg.ProxyURL), nil
+
 	case messages.PageMouseScrollMsg:
 		return s.HandleMouseScroll(msg.Up, msg.X, msg.Y, msg.Width, msg.Height)
 	case messages.PageMouseClickMsg:

@@ -109,6 +109,9 @@ func (s State) SetConfigPath(path string) State {
 // Update 处理规则页面按键
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
+	case messages.CoreTargetChangedMsg:
+		return s.SetConfigPath(msg.ConfigPath), nil
+
 	case messages.PageMouseScrollMsg:
 		return s.HandleMouseScroll(msg.Up), nil
 	case messages.PageMouseClickMsg:

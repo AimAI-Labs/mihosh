@@ -40,27 +40,42 @@ func checkInitialConnectionCmd(client *api.Client) tea.Cmd {
 // Init 初始化
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
-		nodes.FetchGroups(m.client),
-		nodes.FetchProxies(m.client),
-		nodes.FetchConfigMode(m.client),
-		checkInitialConnectionCmd(m.client),
+		m.coreState.Refresh(),
+		m.listenCoreOwner(),
+		func() tea.Msg {
+			if m.config.Core.Mode == "managed" {
+				if err := m.coreSvc.Start(m.wsCtx); err != nil {
+					return messages.CoreConnectionMsg{Epoch: m.connectionEpoch, Err: err}
+				}
+			}
+			_, err := m.client.GetVersion()
+			return messages.CoreConnectionMsg{Epoch: m.connectionEpoch, Err: err}
+		},
 		autoRefreshTick(),
-		startWSStreams(m.wsCtx, m.wsClient, m.wsMsgChan),
 		listenWSMessages(m.wsCtx, m.wsMsgChan),
-		// 自动更新检测
 		func() tea.Msg {
 			info, err := service.CheckUpdate(model.Version)
 			if err != nil || info == nil {
-				return messages.UpdateCheckedMsg{Info: nil}
+				return messages.UpdateCheckedMsg{}
 			}
 			return messages.UpdateCheckedMsg{Info: info}
 		},
-		// 首次启动时自动将本地 mihomo 配置导入为本地订阅（幂等，已有则跳过）
 		func() tea.Msg {
 			p, err := m.profileSvc.AutoImportLocalSub()
 			return messages.LocalSubImportedMsg{Profile: p, Err: err}
 		},
 	)
+}
+
+// Close also covers terminal errors and signal-driven exits from Bubble Tea.
+func (m Model) Close() {
+	m.coreState.Close()
+	if m.coreSvc != nil {
+		m.coreSvc.Close()
+	}
+	if m.wsCancel != nil {
+		m.wsCancel()
+	}
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -89,7 +104,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // onPageChange 页面切换处理
 func (m *Model) onPageChange() tea.Cmd {
 	m.err = nil
+	if m.connectionChecked && !m.connectionReady && m.currentPage != layout.PageCore && m.currentPage != layout.PageSub && m.currentPage != layout.PageSettings {
+		return nil
+	}
 	switch m.currentPage {
+	case layout.PageCore:
+		return m.coreState.Refresh()
 	case layout.PageConnections:
 		m.connsState = m.connsState.ResetPrevConnIDs()
 		return tea.Batch(connections.FetchConnections(m.client), connTick())
@@ -114,6 +134,8 @@ func (m *Model) onPageChange() tea.Cmd {
 // onPageLeave 页面离开处理
 func (m *Model) onPageLeave() {
 	switch m.currentPage {
+	case layout.PageCore:
+		m.coreState = m.coreState.Leave()
 	case layout.PageConnections:
 		m.connsState.CancelTest()
 	}
@@ -121,14 +143,21 @@ func (m *Model) onPageLeave() {
 
 // onAppQuit 应用退出前清理
 func (m *Model) onAppQuit() {
+	m.coreState.Close()
+	if m.coreSvc != nil {
+		m.coreSvc.Close()
+	}
 	m.connsState.CancelTest()
 	if m.wsCancel != nil {
 		m.wsCancel()
 	}
 }
+
 // refreshCurrentPage 刷新当前页面
 func (m *Model) refreshCurrentPage() tea.Cmd {
 	switch m.currentPage {
+	case layout.PageCore:
+		return tea.Batch(m.coreState.Refresh(), m.checkCoreConnection())
 	case layout.PageNodes:
 		return tea.Batch(nodes.FetchGroups(m.client), nodes.FetchProxies(m.client))
 	case layout.PageRules:
@@ -148,4 +177,26 @@ func (m *Model) refreshCurrentPage() tea.Cmd {
 
 func (m Model) topNavActive() bool {
 	return false
+}
+
+func (m Model) checkCoreConnection() tea.Cmd {
+	epoch := m.connectionEpoch
+	client := m.client
+	return func() tea.Msg {
+		_, err := client.GetVersion()
+		return messages.CoreConnectionMsg{Epoch: epoch, Err: err}
+	}
+}
+
+func (m Model) listenCoreOwner() tea.Cmd {
+	ctx := m.wsCtx
+	events := m.coreSvc.Events()
+	return func() tea.Msg {
+		select {
+		case <-ctx.Done():
+			return nil
+		case action := <-events:
+			return messages.CoreOwnerChangedMsg{Action: action}
+		}
+	}
 }
