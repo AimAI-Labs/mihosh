@@ -1,0 +1,95 @@
+---
+title: mihosh core / setup
+description: Download, configure and manage an independent Mihomo core
+---
+
+## First use
+
+Run `mihosh` and open **Core** in the navigation bar. The application works without an installed core or a subscription.
+
+Press `Enter` to install the bundled verified version, create a DIRECT configuration and start the core. Press `o` to import a subscription URL or a local Mihomo configuration. Existing subscriptions remain available on the Sub page.
+
+The baseline configuration provides direct connections, not proxy nodes. System proxy settings, shell environment variables and TUN are separate facilities; starting the core does not route every application's traffic through it.
+
+## Core menu
+
+| Key | Action |
+| --- | --- |
+| `Enter` | Install, configure and start |
+| `v` / `t` | Query the latest stable release / a stable tag |
+| `i` / `a` | Install the displayed release / activate that installed version |
+| `g` / `b` | Upgrade to the latest stable release / restore the previous version |
+| `s` / `x` / `z` | Start / stop / restart |
+| `l` | Import a local executable using its independently verified SHA-256 |
+| `o` | Import and activate a subscription or local configuration |
+| `e` | Edit download proxy and accelerator settings |
+| `p` | Change managed ports after stopping the core |
+| `u` | Connect to an external API; leave the address empty for auto-discovery |
+| `r` | Refresh status and retry the connection |
+| Arrows / mouse wheel | Scroll |
+| `Esc` | Cancel the task or leave the form |
+
+Wide terminals use 43% / 57% panels; narrow terminals stack the content. Use `Tab` and `Enter` inside forms. Exiting Mihosh stops the child owned by that session. Existing external cores remain under their original owner.
+
+## CLI
+
+```bash
+# Install the verified version and save a baseline configuration without starting it
+mihosh setup --output json
+
+# Run in the foreground; another terminal can control that managed session
+mihosh core start
+mihosh core status --output json
+mihosh core restart --output table
+mihosh core stop --output plain
+
+# Query, install and select stable versions
+mihosh core releases --output table
+mihosh core install --version v1.19.33 --output json
+mihosh core activate --version v1.19.33 --output json
+mihosh core upgrade --output json
+mihosh core rollback --output json
+```
+
+Without `--version`, `core install` uses the application's verified release record. An explicit tag queries official release metadata. Installation and activation are separate operations, and external installations are not overwritten.
+
+Local import expects an **extracted executable** and its independently verified SHA-256. An archive's digest cannot verify the extracted file.
+
+```bash
+mihosh core import --file /path/to/mihomo --version v1.19.33 --sha256 "YOUR_VERIFIED_SHA256" --output json
+mihosh core configure --output json
+```
+
+`setup` and every `core` subcommand support `--output plain|table|json`. Foreground `start` returns its final result after stopping or interruption. Ending the owning foreground command stops its child. Background services and boot startup are later phases.
+
+## Download fallback and verification
+
+Release queries and asset downloads independently try **official direct access → available HTTP(S) proxies → GitHub accelerators**. The proxy stage is skipped when none is available. Direct and accelerator requests explicitly bypass environment proxies. The proxy stage considers configured, applicable environment and node-capable managed proxies in that order; environment proxies honor `NO_PROXY`.
+
+Built-in endpoints are `https://gh-proxy.org/` and its same-service compatibility endpoint `https://gh-proxy.com/`. Use `e` in Core to reorder or add endpoints, or leave the list empty to disable them. Advanced capability settings are available in application configuration:
+
+```yaml
+core:
+  proxy: ""
+  download_timeout_seconds: 600
+  accelerators:
+    - url: https://gh-proxy.org/
+      metadata: true
+      asset: true
+```
+
+The download task deadline accepts 30–3600 seconds; `0` uses 600 seconds, and route deadlines scale with that budget. Omitting `accelerators` uses the defaults; `accelerators: []` disables them. Set `metadata: false` for asset-only endpoints.
+
+Accelerators carry public GitHub resources. They do not receive subscription addresses, controller secrets or GitHub Tokens. Gateway metadata cannot establish asset authenticity: installation still requires an embedded official digest or a valid digest obtained through official direct/proxy access. Missing trusted digests cause installation to fail.
+
+Downloads have task and route deadlines, one bounded retry and progress reporting. Changing routes starts a fresh download. Unverified `.part` files cannot replace an installed version. Retry failed third-party endpoints, change network settings or import a local executable.
+
+## Ownership and files
+
+Managed versions live in `~/.mihosh/core/versions/<tag>/`; runtime configuration is in `~/.mihosh/runtime/`. Installation records include source URLs, hashes and upstream source/license links. Application `core` settings choose mode and version; controller credentials and proxy ports come from `runtime/config.yaml`.
+
+External API connections retain their original installation method. Explicit external connections have no implicit local file binding and cannot write a default local Mihomo configuration.
+
+Profile activation validates a candidate before applying it and restores the previous configuration and active profile on failure. Managed imports preserve local controller and proxy settings, disable TUN and remove additional subscription-provided listeners. Interrupted version changes and configuration transactions are recovered during startup.
+
+Asset selection covers Linux/Windows amd64 compatible and arm64. Linux amd64 has real-core integration coverage; see implementation records in the proposal for build and runtime verification of other targets.

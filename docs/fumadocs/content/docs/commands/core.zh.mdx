@@ -1,0 +1,95 @@
+---
+title: mihosh core / setup
+description: 下载、配置和托管独立 Mihomo 内核
+---
+
+## 首次使用
+
+运行 `mihosh`，进入导航栏 **Core** 菜单。没有内核和订阅也能进入应用。
+
+按 `Enter` 自动安装内置校验版本、生成 DIRECT 基础配置并启动。随后按 `o` 导入订阅 URL 或本地 Mihomo 配置。已有订阅仍可在订阅页管理。
+
+没有订阅时，基础配置提供直连能力，不会自动提供代理节点。系统代理、终端环境变量和 TUN 各自独立；内核运行不代表所有应用已接入代理。
+
+## Core 菜单
+
+| 按键 | 操作 |
+| --- | --- |
+| `Enter` | 一键安装、配置、启动 |
+| `v` / `t` | 查询最新稳定发行 / 指定稳定版本 |
+| `i` / `a` | 安装显示版本 / 切换到该已安装版本 |
+| `g` / `b` | 升级到最新稳定版 / 回滚上一版本 |
+| `s` / `x` / `z` | 启动 / 停止 / 重启 |
+| `l` | 按独立核对的 SHA-256 导入本地内核可执行文件 |
+| `o` | 导入并激活订阅或本地配置 |
+| `e` | 下载代理与加速网址设置 |
+| `p` | 修改托管端口，需先停止内核 |
+| `u` | 连接外部 API；地址留空时恢复自动发现 |
+| `r` | 刷新状态、重试连接 |
+| `↑` / `↓`、滚轮 | 滚动页面 |
+| `Esc` | 取消任务或退出表单 |
+
+宽屏采用 43% / 57% 双栏，窄屏纵向排列。表单使用 `Tab` 切换字段、`Enter` 保存。退出应用会停止该会话拥有的内核；已有外部内核不受影响。
+
+## CLI
+
+```bash
+# 安装校验版本并生成基础配置，暂不启动
+mihosh setup --output json
+
+# 前台运行；另一个终端可以停止或重启该托管会话
+mihosh core start
+mihosh core status --output json
+mihosh core restart --output table
+mihosh core stop --output plain
+
+# 查询、安装与切换稳定版本
+mihosh core releases --output table
+mihosh core install --version v1.19.33 --output json
+mihosh core activate --version v1.19.33 --output json
+mihosh core upgrade --output json
+mihosh core rollback --output json
+```
+
+`core install` 省略 `--version` 时使用随应用记录的已校验版本；指定版本时查询官方发行信息。安装和版本选择分别进行，不覆盖外部软件安装的内核。
+
+本地导入要求**解压后的可执行文件**和已独立核对的该文件 SHA-256；压缩包摘要不能用于校验解压后的文件。
+
+```bash
+mihosh core import --file /path/to/mihomo --version v1.19.33 --sha256 "YOUR_VERIFIED_SHA256" --output json
+mihosh core configure --output json
+```
+
+`setup` 与全部 `core` 子命令支持 `--output plain|table|json`。前台 `start` 等待停止或中断后返回最终结果；关闭拥有该会话的前台命令会停止子进程。后台服务与开机启动属于后续阶段。
+
+## 下载回退与校验
+
+每次发行查询和资产下载依次尝试：**官方直连 → 可用 HTTP(S) 代理 → GitHub 加速网址**。没有代理时跳过代理阶段；直连与加速站请求显式禁用环境代理。代理阶段按显式配置、适用的环境代理、具备节点的托管代理顺序尝试，环境代理遵循 `NO_PROXY`。
+
+内置 `https://gh-proxy.org/` 与同服务兼容入口 `https://gh-proxy.com/`。Core 菜单 `e` 可更改顺序、追加入口或留空禁用。高级能力可在应用配置中指定：
+
+```yaml
+core:
+  proxy: ""
+  download_timeout_seconds: 600
+  accelerators:
+    - url: https://gh-proxy.org/
+      metadata: true
+      asset: true
+```
+
+下载总时限可设为 30–3600 秒，`0` 使用默认 600 秒；各线路时限随总预算缩放。省略 `accelerators` 使用默认列表；`accelerators: []` 禁用加速站。仅支持资产的站点将 `metadata` 设为 `false`。
+
+加速站用于传输公开 GitHub 资源，不接收订阅地址、控制器 secret 或 GitHub Token。加速元数据本身不能建立资产可信性：安装仍需匹配内置官方摘要，或由官方直连/代理连接取得的有效摘要。缺少可信摘要时安装会失败，不会跳过校验。
+
+下载具有总时限、单线路时限、一次有界重试和进度显示。切换线路重新下载；未校验的 `.part` 文件不会替换已安装版本。第三方入口返回错误时可重试、调整网络设置或改用本地导入。
+
+## 模式与文件
+
+托管文件位于 `~/.mihosh/core/versions/<版本>/` 和 `~/.mihosh/runtime/`；每次安装记录来源、摘要和上游源码/许可链接。`core` 配置选择托管模式与版本，托管控制器及代理端口以 `runtime/config.yaml` 为准。
+
+外部 API 连接保留原安装方式。显式外部连接不绑定本地文件，Mihosh 不会为其写入默认本地 Mihomo 配置。
+
+订阅激活先生成并校验候选文件，再应用；失败时恢复旧配置和激活记录。托管导入保留本地控制器与代理端口，关闭 TUN，并清除订阅附带的其他监听入口。升级中断记录和配置恢复记录在下次启动时处理。
+
+当前资产选择覆盖 Linux/Windows 的 amd64 compatible 与 arm64。Linux amd64 已通过真实内核验证；其他目标的构建与实际运行验证情况见方案中的实施记录。
