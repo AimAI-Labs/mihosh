@@ -26,6 +26,13 @@ var DefaultMihomoEndpoint = MihomoEndpoint{
 // 发现或解析失败时返回 DefaultMihomoEndpoint（不返回 error，保证启动零门槛）。
 // secret 统一在此收敛 fallback 逻辑：API 可能省略 secret，从 YAML 读取补全。
 func ResolveMihomoEndpoint() MihomoEndpoint {
+	if cfg, err := Load(); err == nil && cfg.Core.Mode != "managed" && cfg.Core.ExternalController != "" {
+		port := cfg.Core.ExternalMixedPort
+		if port <= 0 {
+			port = DefaultMihomoEndpoint.MixedPort
+		}
+		return MihomoEndpoint{ExternalController: cfg.Core.ExternalController, Secret: cfg.Core.ExternalSecret, MixedPort: port}
+	}
 	path, err := GetMihomoConfigPath()
 	if err != nil {
 		return DefaultMihomoEndpoint
@@ -101,6 +108,11 @@ func ReadMihomoYAML(configPath string) (map[string]interface{}, error) {
 
 // WriteMihomoField modifies a specific field in the mihomo config file while preserving comments and structure
 func WriteMihomoField(configPath, key string, value interface{}) error {
+	release, err := lockMihomoFile(configPath)
+	if err != nil {
+		return err
+	}
+	defer release()
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -165,5 +177,13 @@ func WriteMihomoField(configPath, key string, value interface{}) error {
 		return err
 	}
 
-	return os.WriteFile(configPath, out, 0644)
+	target := configPath
+	if info, err := os.Lstat(configPath); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		resolved, err := filepath.EvalSymlinks(configPath)
+		if err != nil {
+			return err
+		}
+		target = resolved
+	}
+	return atomicWriteFile(target, out, 0644)
 }

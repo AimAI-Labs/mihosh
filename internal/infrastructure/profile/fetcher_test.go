@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"context"
 	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,7 @@ import (
 
 // TestFetch_Local 读取本地文件并写入 raw.yaml。
 func TestFetch_Local(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uid := "fetch-local"
 	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
 
@@ -32,6 +34,7 @@ func TestFetch_Local(t *testing.T) {
 
 // TestFetch_LocalMissingFile 本地路径不存在时报错。
 func TestFetch_LocalMissingFile(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uid := "fetch-local-missing"
 	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
 
@@ -42,6 +45,7 @@ func TestFetch_LocalMissingFile(t *testing.T) {
 
 // TestFetch_Remote 远程拉取正常响应。
 func TestFetch_Remote(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uid := "fetch-remote"
 	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
 
@@ -62,6 +66,7 @@ func TestFetch_Remote(t *testing.T) {
 
 // TestFetch_RemoteNon2xx 非 2xx 报错且不写 raw。
 func TestFetch_RemoteNon2xx(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uid := "fetch-remote-err"
 	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
 
@@ -82,6 +87,7 @@ func TestFetch_RemoteNon2xx(t *testing.T) {
 
 // TestFetch_RemoteInvalidYAML 非 YAML 内容（如 HTML 错误页）被拒绝。
 func TestFetch_RemoteInvalidYAML(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uid := "fetch-remote-invalid"
 	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
 
@@ -101,6 +107,7 @@ func TestFetch_RemoteInvalidYAML(t *testing.T) {
 
 // TestFetch_RemoteInvalidScheme 非 http(s) 协议被拒绝（防 file:// 绕过）。
 func TestFetch_RemoteInvalidScheme(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uid := "fetch-remote-scheme"
 	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
 
@@ -111,6 +118,7 @@ func TestFetch_RemoteInvalidScheme(t *testing.T) {
 
 // TestFetch_RemoteEmptyURL 空 URL 报错。
 func TestFetch_RemoteEmptyURL(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uid := "fetch-remote-empty"
 	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
 
@@ -142,6 +150,7 @@ func TestSubSourceDisplay(t *testing.T) {
 
 // TestFetch_PreservesOldRawOnError 本地读取失败时不覆盖已有 raw。
 func TestFetch_PreservesOldRawOnError(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uid := "fetch-preserve"
 	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
 
@@ -161,6 +170,7 @@ func TestFetch_PreservesOldRawOnError(t *testing.T) {
 
 // TestFetch_RemoteV2RayBase64 远程 v2ray base64 订阅自动转换。
 func TestFetch_RemoteV2RayBase64(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uid := "fetch-v2ray-remote"
 	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
 
@@ -199,6 +209,7 @@ func TestFetch_RemoteV2RayBase64(t *testing.T) {
 
 // TestFetch_LocalV2RayBase64 本地 v2ray base64 文件自动转换。
 func TestFetch_LocalV2RayBase64(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uid := "fetch-v2ray-local"
 	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
 
@@ -220,6 +231,7 @@ func TestFetch_LocalV2RayBase64(t *testing.T) {
 
 // TestFetch_RemoteV2RayInvalidContent 远程返回的 base64 解码后全部解析失败。
 func TestFetch_RemoteV2RayInvalidContent(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uid := "fetch-v2ray-invalid"
 	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
 
@@ -239,6 +251,7 @@ func TestFetch_RemoteV2RayInvalidContent(t *testing.T) {
 
 // TestFetch_YAMLStillWorks 确保原有 YAML 订阅不受影响（回归测试）。
 func TestFetch_YAMLStillWorks(t *testing.T) {
+	mockMihoshConfigDir(t)
 	uid := "fetch-yaml-regression"
 	t.Cleanup(func() { _ = DeleteProfileDir(uid) })
 
@@ -258,3 +271,36 @@ func TestFetch_YAMLStillWorks(t *testing.T) {
 // ensure fetchTimeout is used (compile-time reference to avoid unused)
 var _ = fetchTimeout
 var _ = time.Second
+
+func TestFetchContextCancellationPreservesOldRaw(t *testing.T) {
+	mockMihoshConfigDir(t)
+	uid := "cancelled-fetch"
+	old := []byte("mode: direct\n")
+	require.NoError(t, WriteRaw(uid, old))
+	started := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { close(started); <-r.Context().Done() }))
+	defer server.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- FetchContext(ctx, Profile{UID: uid, Source: SubSource{Kind: SourceRemote, URL: server.URL}})
+	}()
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("request did not start")
+	}
+	cancel()
+	select {
+	case err := <-done:
+		require.Error(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("cancelled fetch did not return")
+	}
+	path, err := RawPath(uid)
+	require.NoError(t, err)
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, old, raw)
+}

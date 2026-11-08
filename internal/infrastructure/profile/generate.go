@@ -162,7 +162,7 @@ func WriteFinal(targetPath string, data []byte) error {
 	if targetPath == "" {
 		return fmt.Errorf("目标配置路径为空")
 	}
-	return atomicWrite(targetPath, data)
+	return atomicWrite(targetPath, data, 0644)
 }
 
 // GenerateAndWriteForUID 针对某订阅完成「读 raw → 读 merge → 合并 → 序列化」。

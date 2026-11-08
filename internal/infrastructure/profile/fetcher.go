@@ -10,6 +10,7 @@ package profile
 // 并发：v1 仅单个更新；批量更新（若后续支持）由调用方用 semaphore 限制。
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -30,11 +31,20 @@ const fetchUserAgent = "clash-verge/v2.4.5"
 // Fetch 拉取订阅原始配置，写回 raw.yaml。
 //   - remote: HTTP GET，状态码非 2xx 视为失败；
 //   - local: 读取文件。
+//
 // 写入前对内容做 YAML 合法性校验，并要求顶层为 mapping（mihomo 配置必须是键值结构），
 // 非法则返回错误且不覆盖已有 raw。这能拦截订阅端返回的 HTML 错误页等非配置响应。
-func Fetch(p Profile) error {
-	data, err := fetchBytes(p.Source)
+func Fetch(p Profile) error { return FetchContext(context.Background(), p) }
+
+func FetchContext(ctx context.Context, p Profile) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	data, err := fetchBytesContext(ctx, p.Source)
 	if err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	// 校验 YAML 合法性 + 顶层必须为 mapping。
@@ -62,17 +72,21 @@ func Fetch(p Profile) error {
 }
 
 // fetchBytes 按 Source 类型获取原始字节。
-func fetchBytes(src SubSource) ([]byte, error) {
+func fetchBytes(src SubSource) ([]byte, error) { return fetchBytesContext(context.Background(), src) }
+
+func fetchBytesContext(ctx context.Context, src SubSource) ([]byte, error) {
 	switch src.Kind {
 	case SourceLocal:
 		return fetchLocal(src.Path)
 	default:
-		return fetchRemote(src.URL)
+		return fetchRemoteContext(ctx, src.URL)
 	}
 }
 
 // fetchRemote 拉取远程 URL。
-func fetchRemote(url string) ([]byte, error) {
+func fetchRemote(url string) ([]byte, error) { return fetchRemoteContext(context.Background(), url) }
+
+func fetchRemoteContext(ctx context.Context, url string) ([]byte, error) {
 	subURL := strings.TrimSpace(url)
 	if subURL == "" {
 		return nil, fmt.Errorf("%s", i18n.T("profile.fetcher.err_empty_url"))
@@ -84,7 +98,7 @@ func fetchRemote(url string) ([]byte, error) {
 	}
 
 	client := &http.Client{Timeout: fetchTimeout}
-	req, err := http.NewRequest(http.MethodGet, subURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, subURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf(i18n.T("profile.fetcher.err_build_req"), err)
 	}

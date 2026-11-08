@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -97,6 +98,9 @@ func TestResolveMihomoEndpointParsesYAML(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("APPDATA", "")
 	stubEmptyProcessList(t)
+	originalStatus := systemctlStatusRunner
+	systemctlStatusRunner = func() ([]byte, error) { return nil, nil }
+	t.Cleanup(func() { systemctlStatusRunner = originalStatus })
 
 	mihomoDir := filepath.Join(home, ".config", "mihomo")
 	require.NoError(t, os.MkdirAll(mihomoDir, 0755))
@@ -128,6 +132,9 @@ func TestResolveMihomoEndpointFallsBackToDefaults(t *testing.T) {
 	}
 	t.Cleanup(func() { systemctlStatusRunner = originalRunner })
 	stubEmptyProcessList(t)
+	originalStatus := systemctlStatusRunner
+	systemctlStatusRunner = func() ([]byte, error) { return nil, nil }
+	t.Cleanup(func() { systemctlStatusRunner = originalStatus })
 
 	got := ResolveMihomoEndpoint()
 	assert.Equal(t, DefaultMihomoEndpoint, got, "auto discovery failure should fall back to defaults")
@@ -142,6 +149,9 @@ func TestResolveMihomoEndpointPartialFields(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("APPDATA", "")
 	stubEmptyProcessList(t)
+	originalStatus := systemctlStatusRunner
+	systemctlStatusRunner = func() ([]byte, error) { return nil, nil }
+	t.Cleanup(func() { systemctlStatusRunner = originalStatus })
 
 	mihomoDir := filepath.Join(home, ".config", "mihomo")
 	require.NoError(t, os.MkdirAll(mihomoDir, 0755))
@@ -153,4 +163,17 @@ func TestResolveMihomoEndpointPartialFields(t *testing.T) {
 	assert.Equal(t, "10.0.0.1:9090", got.ExternalController)
 	assert.Equal(t, "", got.Secret, "missing secret should be empty (default)")
 	assert.Equal(t, DefaultMihomoEndpoint.MixedPort, got.MixedPort, "missing mixed-port should fall back to default")
+}
+
+func TestManagedFieldAndRuleEditsPreservePrivatePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows permissions require native ACL validation")
+	}
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("mixed-port: 7890\nrules:\n  - MATCH,DIRECT\n"), 0600))
+	require.NoError(t, WriteMihomoField(path, "mixed-port", 7891))
+	require.NoError(t, InsertRule(path, "DOMAIN,example.com,DIRECT", 0))
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0600), info.Mode().Perm())
 }

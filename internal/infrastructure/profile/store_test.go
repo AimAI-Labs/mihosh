@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -195,4 +196,22 @@ func TestStore_WriteMergeField(t *testing.T) {
 
 	assert.True(t, bytes.Contains(data, []byte("allow-lan: true")))
 	assert.True(t, bytes.Contains(data, []byte("log-level: info")))
+}
+
+func TestSensitiveProfileFilesArePrivate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows permissions require native ACL validation")
+	}
+	mockMihoshConfigDir(t)
+	require.NoError(t, WriteRaw("private", []byte("mode: direct\n")))
+	require.NoError(t, WriteMerge([]byte("mode: direct\n")))
+	raw, err := RawPath("private")
+	require.NoError(t, err)
+	merge, err := MergePath()
+	require.NoError(t, err)
+	for _, path := range []string{raw, merge} {
+		info, err := os.Stat(path)
+		require.NoError(t, err)
+		require.Equal(t, os.FileMode(0600), info.Mode().Perm())
+	}
 }

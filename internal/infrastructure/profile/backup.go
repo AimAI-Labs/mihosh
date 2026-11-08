@@ -41,7 +41,7 @@ func BackupConfig(targetPath string) (string, error) {
 	}
 	name := fmt.Sprintf("config.yaml.bak.%d", time.Now().Unix())
 	dst := filepath.Join(backupDir, name)
-	if err := atomicWrite(dst, src); err != nil {
+	if err := atomicWrite(dst, src, 0600); err != nil {
 		return "", err
 	}
 

@@ -1,7 +1,6 @@
 package service
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -35,49 +34,41 @@ func (s *ConfigService) SaveConfig(cfg *config.Config) error {
 // 连接信息（external-controller/secret/mixed-port）已迁移至 mihomo 配置文件，
 // 不再通过本方法管理；请用 TUI 的 Mihomo 标签页或 config edit 编辑 mihomo 配置。
 func (s *ConfigService) SetConfigValue(key, value string) error {
-	cfg, err := config.Load()
-	if err != nil {
-		if errors.Is(err, config.ErrConfigNotFound) {
-			defaultCopy := config.DefaultConfig
-			cfg = &defaultCopy
-		} else {
-			return err
+	return config.Update(func(cfg *config.Config) error {
+		switch key {
+		case "test_url", "test-url":
+			cfg.TestURL = value
+		case "timeout":
+			var timeout int
+			if _, err := fmt.Sscanf(value, "%d", &timeout); err != nil {
+				return fmt.Errorf("timeout 必须是数字: %v", err)
+			}
+			cfg.Timeout = timeout
+		case "language":
+			if value != "auto" && value != "zh-CN" && value != "en-US" {
+				return fmt.Errorf("language 必须是 auto, zh-CN 或 en-US")
+			}
+			cfg.Language = value
+		case "auto_refresh_interval", "auto-refresh-interval":
+			var interval int
+			if _, err := fmt.Sscanf(value, "%d", &interval); err != nil {
+				return fmt.Errorf("auto_refresh_interval 必须是数字: %v", err)
+			}
+			if interval < 0 {
+				return fmt.Errorf("auto_refresh_interval 不能小于 0")
+			}
+			cfg.AutoRefreshInterval = interval
+		case "theme":
+			if !theme.IsValid(value) {
+				return fmt.Errorf("theme 必须是: %s", strings.Join(theme.Names(), ", "))
+			}
+			cfg.Theme = value
+		default:
+			return fmt.Errorf("未知的配置项: %s (可用: test_url, timeout, language, auto_refresh_interval, theme)", key)
 		}
-	}
 
-	switch key {
-	case "test_url", "test-url":
-		cfg.TestURL = value
-	case "timeout":
-		var timeout int
-		if _, err := fmt.Sscanf(value, "%d", &timeout); err != nil {
-			return fmt.Errorf("timeout 必须是数字: %v", err)
-		}
-		cfg.Timeout = timeout
-	case "language":
-		if value != "auto" && value != "zh-CN" && value != "en-US" {
-			return fmt.Errorf("language 必须是 auto, zh-CN 或 en-US")
-		}
-		cfg.Language = value
-	case "auto_refresh_interval", "auto-refresh-interval":
-		var interval int
-		if _, err := fmt.Sscanf(value, "%d", &interval); err != nil {
-			return fmt.Errorf("auto_refresh_interval 必须是数字: %v", err)
-		}
-		if interval < 0 {
-			return fmt.Errorf("auto_refresh_interval 不能小于 0")
-		}
-		cfg.AutoRefreshInterval = interval
-	case "theme":
-		if !theme.IsValid(value) {
-			return fmt.Errorf("theme 必须是: %s", strings.Join(theme.Names(), ", "))
-		}
-		cfg.Theme = value
-	default:
-		return fmt.Errorf("未知的配置项: %s (可用: test_url, timeout, language, auto_refresh_interval, theme)", key)
-	}
-
-	return config.Save(cfg)
+		return nil
+	})
 }
 
 // FetchMihomoConfig 从 mihomo 配置文件（YAML）读取 5 个托管字段。

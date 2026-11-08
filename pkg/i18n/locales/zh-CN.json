@@ -760,5 +760,6 @@
   "guide.current_secret": "当前 Secret",
   "guide.btn_edit": "[e] 前往配置页",
   "guide.btn_retry": "[r] 重新连接",
-  "guide.btn_close": "[Esc] 暂不配置"
+  "guide.btn_close": "[Esc] 暂不配置",
+  "core.external_no_file": "当前外部 API 连接未绑定本地配置文件。"
 }

@@ -91,7 +91,7 @@ func WriteRaw(uid string, data []byte) error {
 	if err != nil {
 		return err
 	}
-	return atomicWrite(p, data)
+	return atomicWrite(p, data, 0600)
 }
 
 // WriteMergeField modifies a specific field in the global merge.yaml file while preserving structure.
@@ -205,7 +205,7 @@ func WriteMerge(data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
 		return fmt.Errorf("创建配置目录失败: %w", err)
 	}
-	return atomicWrite(p, data)
+	return atomicWrite(p, data, 0600)
 }
 
 // DeleteProfileDir 删除某订阅的整个目录（raw + merge）。
@@ -224,7 +224,7 @@ func DeleteProfileDir(uid string) error {
 
 // atomicWrite 先写临时文件再 Rename 覆盖目标（避免半写损坏）。
 // 与 config 包的 atomicWriteFile 行为一致。
-func atomicWrite(path string, data []byte) error {
+func atomicWrite(path string, data []byte, perm os.FileMode) error {
 	dir := filepath.Dir(path)
 	tmp, err := os.CreateTemp(dir, ".mihosh-profile-*")
 	if err != nil {
@@ -244,7 +244,7 @@ func atomicWrite(path string, data []byte) error {
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("关闭临时文件失败: %w", err)
 	}
-	if err := os.Chmod(tmpName, 0644); err != nil {
+	if err := os.Chmod(tmpName, perm); err != nil {
 		return fmt.Errorf("设置临时文件权限失败: %w", err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {
@@ -292,4 +292,3 @@ func marshalYAML2Spaces(v interface{}) ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
-

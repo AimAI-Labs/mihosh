@@ -47,6 +47,14 @@ func GetConfigDir() (string, error) {
 // Linux 下优先从 systemctl status 解析 -d 参数（运行时实际生效的配置），
 // 再降级搜索已知目录；其他平台直接搜索已知目录。
 func GetMihomoConfigPath() (string, error) {
+	if cfg, err := Load(); err == nil {
+		if cfg.Core.Mode == "managed" {
+			return ManagedMihomoConfigPath()
+		}
+		if cfg.Core.ExternalController != "" {
+			return "", ErrExternalConfig
+		}
+	}
 	// 优先：从运行中的 mihomo 进程解析 -d 参数（最权威的实际配置路径）
 	if runtime.GOOS != "windows" {
 		if configFile, err := GetMihomoConfigPathFromProcess(); err == nil {
@@ -67,6 +75,8 @@ func GetMihomoConfigPath() (string, error) {
 func GetMihomoConfigPathForWrite() (string, error) {
 	if configFile, err := GetMihomoConfigPath(); err == nil {
 		return configFile, nil
+	} else if errors.Is(err, ErrExternalConfig) {
+		return "", err
 	}
 	return GetDefaultMihomoConfigPath()
 }
@@ -336,7 +346,10 @@ func buildMihomoConfigPathNotFoundError() error {
 func Load() (*Config, error) {
 	mu.Lock()
 	defer mu.Unlock()
+	return loadLocked()
+}
 
+func loadLocked() (*Config, error) {
 	configDir, err := GetConfigDir()
 	if err != nil {
 		return nil, err
@@ -349,25 +362,26 @@ func Load() (*Config, error) {
 		return nil, ErrConfigNotFound
 	}
 
-	viper.SetConfigFile(configFile)
-	viper.SetConfigType("yaml")
+	reader := viper.New()
+	reader.SetConfigFile(configFile)
+	reader.SetConfigType("yaml")
 
 	// 预注册默认值，防止 Unmarshal 将 YAML 缺失字段重置为零值
-	viper.SetDefault("test_url", DefaultConfig.TestURL)
-	viper.SetDefault("timeout", DefaultConfig.Timeout)
-	viper.SetDefault("language", DefaultConfig.Language)
-	viper.SetDefault("auto_refresh_interval", DefaultConfig.AutoRefreshInterval)
-	viper.SetDefault("theme", DefaultConfig.Theme)
+	reader.SetDefault("test_url", DefaultConfig.TestURL)
+	reader.SetDefault("timeout", DefaultConfig.Timeout)
+	reader.SetDefault("language", DefaultConfig.Language)
+	reader.SetDefault("auto_refresh_interval", DefaultConfig.AutoRefreshInterval)
+	reader.SetDefault("theme", DefaultConfig.Theme)
 	// 订阅：subs 默认空列表（旧配置文件无此键时保持空），active_sub 默认空（未启用）
-	viper.SetDefault("subs", []profile.Profile{})
-	viper.SetDefault("active_sub", "")
+	reader.SetDefault("subs", []profile.Profile{})
+	reader.SetDefault("active_sub", "")
 
-	if err := viper.ReadInConfig(); err != nil {
+	if err := reader.ReadInConfig(); err != nil {
 		return nil, err
 	}
 
 	var cfg Config
-	if err := viper.Unmarshal(&cfg); err != nil {
+	if err := reader.Unmarshal(&cfg); err != nil {
 		return nil, err
 	}
 

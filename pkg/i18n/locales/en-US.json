@@ -760,5 +760,6 @@
   "guide.current_secret": "Current Secret",
   "guide.btn_edit": "[e] Edit Config",
   "guide.btn_retry": "[r] Retry",
-  "guide.btn_close": "[Esc] Dismiss"
+  "guide.btn_close": "[Esc] Dismiss",
+  "core.external_no_file": "This external API connection has no local configuration file."
 }
