@@ -50,7 +50,11 @@ docs/fumadocs/node_modules/
 docs/fumadocs/skills/
 docs/fumadocs/out/
 
+docs/proposals/*
 
 docs/fumadocs/*.tsbuildinfo
 
 skills-lock.json
+
+
+Requirements.md
