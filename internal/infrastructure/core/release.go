@@ -126,9 +126,15 @@ func validDigest(s string) bool {
 }
 
 type Status struct {
-	Mode      string   `json:"mode"`
-	Version   string   `json:"version"`
-	Installed []string `json:"installed"`
-	Running   bool     `json:"running"`
-	HasNodes  bool     `json:"has_nodes"`
+	Runtime          string   `json:"runtime"`
+	ServiceInstalled bool     `json:"service_installed"`
+	AutoStart        bool     `json:"auto_start"`
+	SystemProxy      bool     `json:"system_proxy"`
+	TUN              bool     `json:"tun"`
+	RecoveryPending  bool     `json:"recovery_pending"`
+	Mode             string   `json:"mode"`
+	Version          string   `json:"version"`
+	Installed        []string `json:"installed"`
+	Running          bool     `json:"running"`
+	HasNodes         bool     `json:"has_nodes"`
 }

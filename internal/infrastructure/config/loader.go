@@ -35,6 +35,12 @@ var processListRunner = func() ([]byte, error) {
 
 // GetConfigDir 获取配置目录
 func GetConfigDir() (string, error) {
+	if root := os.Getenv("MIHOSH_CONFIG_DIR"); root != "" {
+		if !filepath.IsAbs(root) {
+			return "", errors.New("MIHOSH_CONFIG_DIR must be an absolute path")
+		}
+		return filepath.Clean(root), nil
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err

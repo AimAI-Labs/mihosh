@@ -256,6 +256,12 @@ func atomicWrite(path string, data []byte, perm os.FileMode) error {
 // mihoshConfigDir 返回 ~/.mihosh 配置目录。
 // （从 config 包取，但为避免循环依赖此处独立实现，逻辑与 config.GetConfigDir 一致。）
 var mihoshConfigDir = func() (string, error) {
+	if root := os.Getenv("MIHOSH_CONFIG_DIR"); root != "" {
+		if !filepath.IsAbs(root) {
+			return "", errors.New("MIHOSH_CONFIG_DIR must be an absolute path")
+		}
+		return filepath.Clean(root), nil
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err

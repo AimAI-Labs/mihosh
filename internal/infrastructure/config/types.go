@@ -8,6 +8,9 @@ import (
 // CoreConfig 保存内核托管、下载网络和显式外部 API 连接设置。
 // 托管模式的控制器凭据与代理端口仍以 runtime/config.yaml 为准。
 type CoreConfig struct {
+	Runtime                string             `mapstructure:"runtime" yaml:"runtime"`
+	SystemProxy            bool               `mapstructure:"system_proxy" yaml:"system_proxy"`
+	TUN                    bool               `mapstructure:"tun" yaml:"tun"`
 	DownloadTimeoutSeconds int                `mapstructure:"download_timeout_seconds" yaml:"download_timeout_seconds"`
 	ExternalController     string             `mapstructure:"external_controller" yaml:"external_controller"`
 	ExternalSecret         string             `mapstructure:"external_secret" yaml:"external_secret"`

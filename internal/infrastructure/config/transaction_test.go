@@ -30,6 +30,28 @@ func TestLoadReflectsAnotherProcessConfigurationWrite(t *testing.T) {
 	require.Equal(t, 9876, latest.Timeout)
 }
 
+func TestExplicitServiceRootIsSharedByConfigProfilesAndBackups(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("MIHOSH_CONFIG_DIR", root)
+	require.NoError(t, Save(&DefaultConfig))
+	path, err := profile.RawPath("root-test")
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join(root, "profiles", "root-test", "raw.yaml"), path)
+	actual, err := GetConfigDir()
+	require.NoError(t, err)
+	require.Equal(t, root, actual)
+	backup, err := profile.BackupConfig(filepath.Join(root, "config.yaml"))
+	require.NoError(t, err)
+	require.NotEmpty(t, backup)
+	_, err = os.Stat(filepath.Join(root, "config-backups", backup))
+	require.NoError(t, err)
+	t.Setenv("MIHOSH_CONFIG_DIR", "relative-root")
+	_, err = GetConfigDir()
+	require.Error(t, err)
+	_, err = profile.RawPath("root-test")
+	require.Error(t, err)
+}
+
 func TestConfigurationUpdatesAreAtomicAcrossProcesses(t *testing.T) {
 	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
 		t.Skip("cross-process managed-core locking is Linux/Windows only")
