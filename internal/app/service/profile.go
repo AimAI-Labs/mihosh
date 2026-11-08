@@ -14,6 +14,7 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -35,14 +36,19 @@ var ErrMihomoPathMissing = errors.New("未找到 mihomo 配置文件路径")
 
 // ProfileService 订阅管理服务。
 type ProfileService struct {
+	core   *CoreService
 	client *api.Client // 仅为 ReloadConfig
 	mu     sync.Mutex  // Activate 流程串行化
 }
 
 // NewProfileService 创建订阅管理服务。
 // client 用于激活后的核心热重载；为 nil 时激活流程会在重载阶段报错。
-func NewProfileService(client *api.Client) *ProfileService {
-	return &ProfileService{client: client}
+func NewProfileService(client *api.Client, cores ...*CoreService) *ProfileService {
+	s := &ProfileService{client: client}
+	if len(cores) > 0 {
+		s.core = cores[0]
+	}
+	return s
 }
 
 // ListProfiles 返回当前所有订阅元数据与激活 UID。
@@ -184,11 +190,15 @@ func (s *ProfileService) SetActiveSub(uid string) error {
 
 // FetchProfile 拉取订阅原始配置并刷新 UpdatedAt。
 func (s *ProfileService) FetchProfile(uid string) error {
+	return s.FetchProfileContext(context.Background(), uid)
+}
+
+func (s *ProfileService) FetchProfileContext(ctx context.Context, uid string) error {
 	p, err := s.findProfile(uid)
 	if err != nil {
 		return err
 	}
-	if err := profile.Fetch(p); err != nil {
+	if err := profile.FetchContext(ctx, p); err != nil {
 		return err
 	}
 	// 更新 UpdatedAt
@@ -230,6 +240,14 @@ func (s *ProfileService) Activate(uid string) (ActivateResult, error) {
 		return ActivateResult{}, err
 	}
 	_ = p // UID 已通过 findProfile 校验存在
+	if cfg, err := config.Load(); err == nil && cfg.Core.Mode == "managed" {
+		if s.core != nil {
+			return s.core.ApplyProfile(context.Background(), uid, true)
+		}
+		runtime := NewCoreService()
+		defer runtime.Close()
+		return runtime.ApplyProfile(context.Background(), uid, false)
+	}
 
 	// 1. 解析 mihomo 配置路径（提前获取用于保留字段）
 	mihomoPath, err := config.GetMihomoConfigPath()
@@ -303,6 +321,9 @@ func (s *ProfileService) AutoImportLocalSub() (*profile.Profile, error) {
 		}
 	}
 
+	if cfg.Core.Mode == "managed" {
+		return nil, nil
+	}
 	// 已有本地订阅，跳过
 	for _, p := range cfg.Subs {
 		if p.Source.Kind == profile.SourceLocal {
@@ -403,17 +424,7 @@ func (s *ProfileService) mutateProfile(uid string, fn func(*profile.Profile)) er
 // persistMutation 加载配置、应用变更函数、保存。
 // 保存采用读-改-写，调用方在 fn 内完成对 cfg 的就地修改。
 func (s *ProfileService) persistMutation(fn func(*config.Config)) error {
-	cfg, err := config.Load()
-	if errors.Is(err, config.ErrConfigNotFound) {
-		defaultCopy := config.DefaultConfig
-		cfg = &defaultCopy
-		cfg.Subs = []profile.Profile{}
-		cfg.ActiveSub = ""
-	} else if err != nil {
-		return err
-	}
-	fn(cfg)
-	return config.Save(cfg)
+	return config.Update(func(cfg *config.Config) error { fn(cfg); return nil })
 }
 
 // newUID 生成 8 字符 hex 订阅 ID（碰撞概率极低，足够本场景）。
