@@ -43,6 +43,8 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
+	rootCmd.AddCommand(newCoreCommand())
+	rootCmd.AddCommand(newSetupCommand())
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(selectCmd)
@@ -81,6 +83,18 @@ func loadClient(cfg *config.Config) *api.Client {
 }
 
 func localizeCommands() {
+	if core, _, err := rootCmd.Find([]string{"core"}); err == nil {
+		core.Short = i18n.T("cli.core.short")
+		for _, child := range core.Commands() {
+			child.Short = i18n.T("core.action." + child.Name())
+			for _, flagName := range []string{"version", "file", "sha256"} {
+				if flag := child.Flags().Lookup(flagName); flag != nil { flag.Usage = i18n.T("cli.core." + flagName) }
+			}
+		}
+	}
+	if setup, _, err := rootCmd.Find([]string{"setup"}); err == nil {
+		setup.Short = i18n.T("cli.setup.short")
+	}
 	rootCmd.Short = i18n.T("cli.root.short")
 	rootCmd.Long = i18n.T("cli.root.long")
 
