@@ -84,11 +84,21 @@ func (s State) begin(action string) (State, tea.Cmd) {
 	svc := s.svc
 	release := s.Release
 	args := append([]string(nil), s.args...)
+	s.args = nil
+	status := s.Status
 	return s, tea.Batch(s.poll(), func() tea.Msg {
 		defer cancel()
 		var err error
 		var result *coreinfra.Release
 		switch action {
+		case "service":
+			err = svc.ServiceAction(ctx, args[0])
+		case "system-proxy":
+			err = svc.SetSystemProxy(ctx, !status.SystemProxy)
+		case "tun":
+			err = svc.SetTUN(ctx, !status.TUN)
+		case "recover":
+			err = svc.RecoverNetwork(ctx)
 		case "check", "release":
 			tag := "latest"
 			if action == "release" && len(args) > 0 {
@@ -151,9 +161,16 @@ func (s State) begin(action string) (State, tea.Cmd) {
 		case "start":
 			err = svc.Start(ctx)
 		case "stop":
-			err = svc.Stop()
+			err = svc.StopContext(ctx)
 		}
-		return messages.CoreOperationMsg{ID: id, Release: result, Err: err, Action: action}
+		resultAction := action
+		if action == "service" {
+			resultAction += "-" + args[0]
+		}
+		if action == "tun" && !status.Running {
+			resultAction = "tun-offline"
+		}
+		return messages.CoreOperationMsg{ID: id, Release: result, Err: err, Action: resultAction}
 	})
 }
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
@@ -195,7 +212,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		row := msg.Y + s.effectiveScroll(msg.Width, msg.Height) - originY
 		if msg.X >= originX && row >= 0 && row < len(actions) {
 			action := actions[row].action
-			if action == "network" || action == "version" || action == "import" || action == "ports" || action == "external" || action == "profile" {
+			if action == "network" || action == "version" || action == "import" || action == "ports" || action == "external" || action == "profile" || action == "service" {
 				return s.editForm(action)
 			}
 			return s.begin(action)
@@ -204,7 +221,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		if msg.Up {
 			s.scroll = max(0, s.scroll-1)
 		} else {
-			s.scroll = min(24, s.scroll+1)
+			s.scroll = min(16+len(actions), s.scroll+1)
 		}
 		return s, nil
 	case tea.KeyMsg:
@@ -212,11 +229,19 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			return s.updateForm(msg)
 		}
 		switch msg.String() {
+		case "h":
+			return s.editForm("service")
+		case "y":
+			return s.begin("system-proxy")
+		case "n":
+			return s.begin("tun")
+		case "c":
+			return s.begin("recover")
 		case "up", "k":
 			s.scroll = max(0, s.scroll-1)
 			return s, nil
 		case "down", "j":
-			s.scroll = min(24, s.scroll+1)
+			s.scroll = min(16+len(actions), s.scroll+1)
 			return s, nil
 		case "esc":
 			if s.cancel != nil {
@@ -274,6 +299,7 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 		if kind == "ports" || kind == "profile" {
 			count = 2
 		}
+
 		s.fields = make([]textinput.Model, count)
 		for i := range s.fields {
 			s.fields[i] = textinput.New()
@@ -281,6 +307,9 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 			s.fields[i].Width = 50
 		}
 		switch kind {
+		case "service":
+			s.fields[0].SetValue("install")
+
 		case "profile":
 			s.fields[0].SetValue(i18n.T("core.profile_default"))
 			s.fields[1].EchoMode = textinput.EchoPassword
@@ -364,6 +393,7 @@ func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 				if s.form == "external" && len(s.args) == 1 {
 					value = f.Value()
 				}
+
 				s.args = append(s.args, value)
 			}
 			action := "release"
@@ -378,6 +408,9 @@ func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 			}
 			if s.form == "profile" {
 				action = "profile"
+			}
+			if s.form == "service" {
+				action = "service"
 			}
 			s.Editing = false
 			s.fields = nil
@@ -416,9 +449,9 @@ func (s State) effectiveScroll(width, height int) int {
 	if s.Err != nil {
 		extra++
 	}
-	total := 8 + len(actions) + 2 + extra
+	total := 8 + len(actions) + 4 + extra
 	if width >= 100 {
-		total = max(2+len(actions), 10+extra)
+		total = max(2+len(actions), 12+extra)
 	}
 	return min(s.scroll, max(0, total-height))
 }

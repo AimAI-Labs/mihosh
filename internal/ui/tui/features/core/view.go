@@ -13,6 +13,7 @@ import (
 
 var actions = []struct{ key, action string }{
 	{"enter", "setup"}, {"v", "check"}, {"i", "install"}, {"m", "configure"}, {"s", "start"}, {"x", "stop"}, {"e", "network"}, {"t", "version"}, {"l", "import"}, {"a", "activate"}, {"b", "rollback"}, {"z", "restart"}, {"u", "external"}, {"p", "ports"}, {"g", "upgrade"}, {"o", "profile"},
+	{"h", "service"}, {"y", "system-proxy"}, {"n", "tun"}, {"c", "recover"},
 }
 
 func actionOrigin(width int) (int, int) {
@@ -47,7 +48,7 @@ func (s State) Render(width, height int) string {
 	for _, a := range actions {
 		buttons = append(buttons, "["+a.key+"] "+i18n.T("core.action."+a.action))
 	}
-	details := []string{"", muted.Render(i18n.T("core.subscription_hint"))}
+	details := []string{"", muted.Render(i18n.T("core.subscription_hint")), fmt.Sprintf("%s: %s · %s: %t · %s: %t", i18n.T("core.runtime"), s.Status.Runtime, i18n.T("core.system_proxy"), s.Status.SystemProxy, "TUN", s.Status.TUN), fmt.Sprintf("%s: %t · %s: %t", i18n.T("core.autostart"), s.Status.AutoStart, i18n.T("core.recovery_pending"), s.Status.RecoveryPending)}
 	if !s.Release.FetchedAt.IsZero() {
 		info[5] += " " + s.Release.FetchedAt.Format(time.DateOnly)
 	}
@@ -85,6 +86,10 @@ func (s State) Render(width, height int) string {
 	}
 	if s.Editing {
 		labels := []string{"core.proxy", "core.accelerators", "core.download_timeout"}
+		if s.form == "service" {
+			labels = []string{"core.service.action"}
+
+		}
 		if s.form == "profile" {
 			labels = []string{"core.profile_name", "core.profile_source"}
 		}

@@ -64,3 +64,19 @@ func TestCoreFormLeaveClearsSensitiveInputs(t *testing.T) {
 		t.Fatal("form state survived leaving page")
 	}
 }
+
+func TestServiceFormAndNetworkActionsRemainInCoreState(t *testing.T) {
+	svc := service.NewCoreService()
+	defer svc.Close()
+	s := NewState(svc)
+	s, cmd := s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	if !s.Editing || s.form != "service" || cmd == nil {
+		t.Fatal("service form missing")
+	}
+	s = s.Leave()
+	s, cmd = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	if !s.Busy || cmd == nil {
+		t.Fatal("system proxy action missing")
+	}
+	s.Close()
+}

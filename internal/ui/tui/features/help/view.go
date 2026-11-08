@@ -110,7 +110,7 @@ func buildHelpSections(ctx HelpContext) []section {
 	case PageSub:
 		sections = append(sections, buildSubSections(ctx)...)
 	case PageCore:
-		sections = append(sections, section{title: i18n.T("menu.core"), bindings: []keybinding{{"v", i18n.T("core.action.check")}, {"i", i18n.T("core.action.install")}, {"m", i18n.T("core.action.configure")}, {"s / x", i18n.T("core.help.runtime")}, {"e", i18n.T("core.action.network")}, {"Esc", i18n.T("core.cancel")}}})
+		sections = append(sections, section{title: i18n.T("menu.core"), bindings: []keybinding{{"v", i18n.T("core.action.check")}, {"i", i18n.T("core.action.install")}, {"m", i18n.T("core.action.configure")}, {"s / x", i18n.T("core.help.runtime")}, {"e", i18n.T("core.action.network")}, {"h",i18n.T("core.action.service")},{"y",i18n.T("core.action.system-proxy")},{"n",i18n.T("core.action.tun")},{"c",i18n.T("core.action.recover")},{"Esc", i18n.T("core.cancel")}}})
 	case PageSettings:
 		sections = append(sections, buildSettingsSections(ctx)...)
 	}

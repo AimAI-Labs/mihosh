@@ -108,10 +108,13 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.coreState, cmd = m.coreState.Update(msg)
 		if result, ok := msg.(messages.CoreOperationMsg); ok && result.Err == nil {
 			switch result.Action {
-			case "configure", "start", "stop", "setup", "connect", "external", "ports", "activate", "rollback", "restart", "upgrade", "profile":
+			case "configure", "start", "stop", "setup", "connect", "external", "ports", "activate", "rollback", "restart", "upgrade", "profile", "service-install", "service-uninstall", "service-start", "service-stop", "service-restart", "tun":
 				m.connectionEpoch++
 			}
 			m.reloadStoredConfig()
+		}
+		if result, ok := msg.(messages.CoreOperationMsg); ok && result.Err == nil && (result.Action == "service-start" || result.Action == "service-restart" || result.Action == "tun" || result.Action == "restart" || result.Action == "upgrade" || result.Action == "activate" || result.Action == "rollback") {
+			return m, tea.Batch(cmd, m.checkCoreConnection())
 		}
 		if result, ok := msg.(messages.CoreOperationMsg); ok && result.Err == nil && (result.Action == "configure" || result.Action == "start" || result.Action == "setup" || result.Action == "external" || result.Action == "connect" || result.Action == "ports" || result.Action == "profile") {
 			endpoint := config.ResolveMihomoEndpoint()
@@ -134,7 +137,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Batch(cmd, m.checkCoreConnection())
 			}
 		}
-		if result, ok := msg.(messages.CoreOperationMsg); ok && (result.Action == "stop" || result.Action == "external" || result.Action == "connect") && result.Err == nil {
+		if result, ok := msg.(messages.CoreOperationMsg); ok && (result.Action == "stop" || result.Action == "external" || result.Action == "connect" || result.Action == "service-stop" || result.Action == "service-uninstall") && result.Err == nil {
 			m.connectionChecked = true
 			m.connectionReady = false
 			if result.Action == "external" || result.Action == "connect" {
