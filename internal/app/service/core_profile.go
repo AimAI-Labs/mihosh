@@ -94,6 +94,19 @@ func recoverManagedProfile(root string) error {
 // ApplyProfile is serialized with core installation and process operations. A journal
 // preserves the last committed configuration across interruption of the apply step.
 func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopped bool) (ActivateResult, error) {
+	if forwarded, err := s.forward(ctx, "profile", uid); forwarded {
+		return ActivateResult{}, err
+	}
+	if startIfStopped && s.usesService() {
+		if err := s.Start(ctx); err != nil {
+			return ActivateResult{}, err
+		}
+		forwarded, err := s.forward(ctx, "profile", uid)
+		if !forwarded && err == nil {
+			err = errors.New("background core owner disappeared before applying the subscription")
+		}
+		return ActivateResult{}, err
+	}
 	ctx, cancelOperation := s.operationContext(ctx)
 	defer cancelOperation()
 	if !s.mu.TryLock() {
@@ -138,6 +151,10 @@ func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopp
 		return ActivateResult{}, profile.ErrRawNotFound
 	}
 	data, err = sanitizeManagedInbound(data)
+	if err != nil {
+		return ActivateResult{}, err
+	}
+	data, err = applyManagedNetwork(data, cfg.Core.TUN, root)
 	if err != nil {
 		return ActivateResult{}, err
 	}
@@ -202,6 +219,9 @@ func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopp
 		var reloadErr error
 		if restoreErr == nil && running {
 			reloadErr = client.ReloadConfig(path)
+			if reloadErr == nil {
+				reloadErr = s.refreshNetworkTUN(context.Background(), root)
+			}
 		}
 		return ActivateResult{}, errors.Join(cause, restoreErr, reloadErr)
 	}
@@ -214,6 +234,9 @@ func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopp
 		}
 		if _, err = client.GetVersion(); err != nil {
 			return rollback(errors.New("core did not become ready after subscription reload"))
+		}
+		if err = s.refreshNetworkTUN(ctx, root); err != nil {
+			return rollback(err)
 		}
 	} else if startIfStopped {
 		if err = s.start(ctx, true); err != nil {

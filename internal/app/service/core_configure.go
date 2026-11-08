@@ -110,7 +110,9 @@ func (s *CoreService) UseExternal() error {
 	}
 	defer releaseMutation()
 
-	s.stopLocked()
+	if err := s.stopLocked(); err != nil {
+		return err
+	}
 	return config.Update(func(latest *config.Config) error {
 		latest.Core.Mode = "external"
 		latest.Core.ExternalController = ""
@@ -146,6 +148,9 @@ func (s *CoreService) ConnectExternal(address, secret string, mixedPort int) err
 	}
 	defer releaseMutation()
 
+	if err = s.stopLocked(); err != nil {
+		return err
+	}
 	if err = config.Update(func(latest *config.Config) error {
 		latest.Core.Mode = "external"
 		latest.Core.ExternalController = strings.TrimRight(normalized, "/")
@@ -155,7 +160,6 @@ func (s *CoreService) ConnectExternal(address, secret string, mixedPort int) err
 	}); err != nil {
 		return err
 	}
-	s.stopLocked()
 	return nil
 }
 func (s *CoreService) SetPorts(controllerPort, mixedPort int) error {

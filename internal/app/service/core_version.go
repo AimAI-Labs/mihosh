@@ -17,9 +17,15 @@ import (
 )
 
 func (s *CoreService) ActivateVersion(ctx context.Context, version string) error {
+	if forwarded, err := s.forward(ctx, "activate", version); forwarded {
+		return err
+	}
 	return s.activateVersion(ctx, version, false)
 }
 func (s *CoreService) UpgradeVersion(ctx context.Context, version string) error {
+	if forwarded, err := s.forward(ctx, "upgrade", version); forwarded {
+		return err
+	}
 	return s.activateVersion(ctx, version, true)
 }
 
@@ -94,7 +100,9 @@ func (s *CoreService) activateVersion(ctx context.Context, version string, upgra
 		}
 	}
 	if wasRunning {
-		s.stopLocked()
+		if err = s.stopLocked(); err != nil {
+			return err
+		}
 	}
 	pending := ""
 	if wasRunning {

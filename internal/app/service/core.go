@@ -9,15 +9,23 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/host"
 )
 
 // CoreService serializes mutations and owns only the child it started.
 // One instance is shared by all Core page commands for the TUI's lifetime.
 type CoreService struct {
+	daemon         bool
+	services       host.Services
+	network        host.Network
+	startGuard     func(string) error
+	failure        error
+	endpoint       config.MihomoEndpoint
 	control        *http.Server
 	controlOwner   coreOwner
 	controlCleanup func()
@@ -37,7 +45,9 @@ type CoreStatus = coreinfra.Status
 
 func NewCoreService() *CoreService {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &CoreService{lifetime: ctx, shutdown: cancel, ownerEvents: make(chan string, 1)}
+	s := &CoreService{lifetime: ctx, shutdown: cancel, ownerEvents: make(chan string, 1), network: host.NewNetwork()}
+	s.startGuard = func(root string) error { return startNetworkGuard(root, s.daemon) }
+	return s
 }
 func loadCoreConfig() (*config.Config, error) {
 	cfg, err := config.Load()
@@ -59,6 +69,24 @@ func (s *CoreService) Status() (CoreStatus, error) {
 		return CoreStatus{}, err
 	}
 	state := CoreStatus{Mode: cfg.Core.Mode, Version: cfg.Core.Version, Installed: []string{}}
+	state.Runtime = cfg.Core.Runtime
+	if state.Runtime == "" {
+		state.Runtime = "session"
+	}
+	state.SystemProxy = cfg.Core.SystemProxy
+	state.TUN = cfg.Core.TUN
+	_, journalErr := os.Stat(filepath.Join(root, "runtime", "network-recovery.json"))
+	state.RecoveryPending = journalErr == nil
+	if state.Runtime == "service" {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		service, serviceErr := s.serviceManager(root).Status(ctx)
+		cancel()
+		state.ServiceInstalled = service.Installed
+		state.AutoStart = service.Enabled
+		if serviceErr != nil {
+			return state, serviceErr
+		}
+	}
 	if state.Mode == "" {
 		state.Mode = "external"
 	}
@@ -76,19 +104,9 @@ func (s *CoreService) Status() (CoreStatus, error) {
 	if s.process != nil {
 		select {
 		case <-s.done:
-			s.process = nil
-			s.done = nil
-			if s.releaseLock != nil {
-				s.releaseLock()
-				s.releaseLock = nil
-			}
-			if s.releaseJob != nil {
-				s.releaseJob()
-				s.releaseJob = nil
-			}
-			if s.stop != nil {
-				s.stop()
-				s.stop = nil
+			s.failure = errors.New("managed core exited unexpectedly")
+			if err = s.stopLocked(); err != nil {
+				return state, err
 			}
 		default:
 			state.Running = true
@@ -119,6 +137,7 @@ func (s *CoreService) Status() (CoreStatus, error) {
 			}
 		}
 	}
+	state.RecoveryPending = state.RecoveryPending && !state.Running
 	return state, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -14,9 +15,20 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/host"
 )
 
 func (s *CoreService) Start(ctx context.Context) error {
+	if s.usesService() {
+		return s.ServiceAction(ctx, "start")
+	}
+	if cfg, err := loadCoreConfig(); err == nil && cfg.Core.Mode == "managed" {
+		if forwarded, err := s.forward(ctx, "status", ""); forwarded && err == nil {
+			if _, err = api.NewClient(config.ResolveMihomoEndpoint(), 500).GetVersion(); err == nil {
+				return nil
+			}
+		}
+	}
 	if !s.mu.TryLock() {
 		return errors.New("another core operation is active")
 	}
@@ -26,6 +38,7 @@ func (s *CoreService) Start(ctx context.Context) error {
 func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 	ctx, cancelOperation := s.operationContext(ctx)
 	defer cancelOperation()
+	s.failure = nil
 	if s.process != nil {
 		select {
 		case <-s.done:
@@ -97,6 +110,18 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 			return e
 		}
 	}
+	if err = s.recoverNetworkLocked(ctx, root); err != nil {
+		return err
+	}
+	if len(skipRecovery) == 0 || !skipRecovery[0] {
+		if err = recoverNetworkChange(root); err != nil {
+			return err
+		}
+		cfg, err = loadCoreConfig()
+		if err != nil {
+			return err
+		}
+	}
 	// Never execute an installed file if its recorded directory is missing.
 	if _, err = os.Stat(binary); err != nil {
 		return err
@@ -130,11 +155,29 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 	if _, err = client.GetVersion(); err == nil {
 		return errors.New("controller address is already in use; choose another port")
 	}
+	if err = s.prepareNetwork(ctx, root, cfg, binary); err != nil {
+		return err
+	}
+	succeeded := false
+	defer func() {
+		if !succeeded {
+			_ = s.recoverNetworkLocked(context.Background(), root)
+		}
+	}()
 	runCtx, stop := context.WithCancel(s.lifetime)
 	cmd := exec.CommandContext(runCtx, binary, "-d", filepath.Dir(path), "-f", path)
 	coreinfra.ConfigureProcess(cmd)
+	host.GracefulCancel(cmd)
+	if cfg.Core.TUN {
+		host.ConfigureTUNProcess(cmd)
+	}
+	cmd.WaitDelay = 5 * time.Second
 	cmd.Stdout = &s.logs
 	cmd.Stderr = &s.logs
+	if s.daemon {
+		cmd.Stdout = io.MultiWriter(&s.logs, os.Stderr)
+		cmd.Stderr = cmd.Stdout
+	}
 	if err = cmd.Start(); err != nil {
 		stop()
 		return errors.New("cannot start managed core")
@@ -149,10 +192,20 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 	keepLock = true
 	s.releaseLock = unlock
 	s.process = cmd
+	s.endpoint = endpoint
 	s.stop = stop
 	s.done = make(chan error, 1)
 	done := s.done
-	go func() { done <- cmd.Wait(); close(done) }()
+	go func() {
+		done <- cmd.Wait()
+		close(done)
+		s.mu.Lock()
+		current := s.done == done
+		s.mu.Unlock()
+		if current {
+			s.notifyOwner("exit")
+		}
+	}()
 	if err = s.startControl(root); err != nil {
 		s.stopLocked()
 		return err
@@ -191,16 +244,27 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 				proxy, e := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", endpoint.MixedPort), 250*time.Millisecond)
 				if e == nil {
 					proxy.Close()
+					if cfg.Core.TUN {
+						if _, err = s.network.CaptureTUN(ctx, host.TUNIdentity(root)); err != nil {
+							continue
+						}
+					}
+					if err = s.activateNetwork(ctx, root, cfg); err != nil {
+						s.stopLocked()
+						return err
+					}
+					succeeded = true
 					return nil
 				}
 			}
 		}
 	}
 }
-func (s *CoreService) stopLocked() {
+func (s *CoreService) stopLocked() error {
 	if s.stop == nil {
-		return
+		return nil
 	}
+	s.disableRunningTUN()
 	s.stop()
 	if s.done != nil {
 		<-s.done
@@ -208,6 +272,12 @@ func (s *CoreService) stopLocked() {
 	s.process = nil
 	s.stop = nil
 	s.done = nil
+	var recoveryErr error
+	if root, err := config.GetConfigDir(); err == nil {
+		recoveryErr = s.recoverNetworkLocked(context.Background(), root)
+	} else {
+		recoveryErr = err
+	}
 	if s.releaseJob != nil {
 		s.releaseJob()
 		s.releaseJob = nil
@@ -216,21 +286,39 @@ func (s *CoreService) stopLocked() {
 		s.releaseLock()
 		s.releaseLock = nil
 	}
+	return recoveryErr
 }
 func (s *CoreService) Stop() error {
+	return s.StopContext(context.Background())
+}
+func (s *CoreService) StopContext(ctx context.Context) error {
+	if s.usesService() {
+		return s.ServiceAction(ctx, "stop")
+	}
+	if forwarded, err := s.forward(ctx, "stop", ""); forwarded {
+		return err
+	}
 	if !s.mu.TryLock() {
 		return errors.New("another core operation is active")
 	}
 	defer s.mu.Unlock()
-	s.stopLocked()
-	return nil
+	s.failure = nil
+	return s.stopLocked()
 }
 func (s *CoreService) Restart(ctx context.Context) error {
+	if s.usesService() {
+		return s.ServiceAction(ctx, "restart")
+	}
+	if forwarded, err := s.forward(ctx, "restart", ""); forwarded {
+		return err
+	}
 	if !s.mu.TryLock() {
 		return errors.New("another core operation is active")
 	}
 	defer s.mu.Unlock()
-	s.stopLocked()
+	if err := s.stopLocked(); err != nil {
+		return err
+	}
 	return s.start(ctx)
 }
 

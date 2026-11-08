@@ -52,7 +52,7 @@ func (s *CoreService) startControl(root string) error {
 		return err
 	}
 	owner := coreOwner{"http://" + listener.Addr().String(), hex.EncodeToString(secret[:])}
-	server := &http.Server{ReadHeaderTimeout: 3 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 45 * time.Second, IdleTimeout: 5 * time.Second, MaxHeaderBytes: 4096}
+	server := &http.Server{ReadHeaderTimeout: 3 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 180 * time.Second, IdleTimeout: 5 * time.Second, MaxHeaderBytes: 4096}
 	slots := make(chan struct{}, 1)
 	server.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -82,7 +82,7 @@ func (s *CoreService) startControl(root string) error {
 		case "status":
 			_, err = s.Status()
 		case "stop":
-			err = s.Stop()
+			err = s.StopContext(r.Context())
 		case "restart":
 			err = s.Restart(r.Context())
 		case "upgrade":
@@ -91,6 +91,18 @@ func (s *CoreService) startControl(root string) error {
 			err = s.ActivateVersion(r.Context(), request.Version)
 		case "rollback":
 			err = s.ActivateVersion(r.Context(), "")
+		case "profile":
+			_, err = s.ApplyProfile(r.Context(), request.Version, false)
+		case "system-proxy", "tun":
+			if request.Version != "on" && request.Version != "off" {
+				http.Error(w, "invalid network setting", 400)
+				return
+			}
+			if request.Action == "tun" {
+				err = s.SetTUN(r.Context(), request.Version == "on")
+			} else {
+				err = s.SetSystemProxy(r.Context(), request.Version == "on")
+			}
 		default:
 			http.Error(w, "unsupported local control action", 400)
 			return
@@ -166,7 +178,7 @@ func (s *CoreService) Control(ctx context.Context, action, version string) error
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
 	defer transport.CloseIdleConnections()
-	client := &http.Client{Transport: transport, Timeout: 45 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("local control redirects are forbidden") }}
+	client := &http.Client{Transport: transport, Timeout: 180 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("local control redirects are forbidden") }}
 	resp, err := client.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -190,9 +202,10 @@ func (s *CoreService) Wait(ctx context.Context) error {
 		s.mu.Lock()
 		process := s.process
 		done := s.done
+		failure := s.failure
 		s.mu.Unlock()
 		if process == nil || done == nil {
-			return nil
+			return failure
 		}
 		select {
 		case <-ctx.Done():
@@ -207,6 +220,9 @@ func (s *CoreService) Wait(ctx context.Context) error {
 			}
 			s.stopLocked()
 			s.mu.Unlock()
+			if s.daemon {
+				return errors.New("managed service child exited unexpectedly")
+			}
 			return nil
 		}
 	}
