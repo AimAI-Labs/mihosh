@@ -1,0 +1,29 @@
+{
+  "tag_name": "v1.19.33",
+  "assets": [
+    {
+      "name": "mihomo-linux-amd64-compatible-v1.19.33.gz",
+      "browser_download_url": "https://github.com/MetaCubeX/mihomo/releases/download/v1.19.33/mihomo-linux-amd64-compatible-v1.19.33.gz",
+      "digest": "sha256:386508bfb1c72c43b6a0eda73708ecdce82546581b0ebcb16366c53757c622b6",
+      "size": 22893972
+    },
+    {
+      "name": "mihomo-linux-arm64-v1.19.33.gz",
+      "browser_download_url": "https://github.com/MetaCubeX/mihomo/releases/download/v1.19.33/mihomo-linux-arm64-v1.19.33.gz",
+      "digest": "sha256:ba408b317080ee265c46cb923a50018c1b82cbd708551cdd46a1e3e307396187",
+      "size": 20824326
+    },
+    {
+      "name": "mihomo-windows-amd64-compatible-v1.19.33.zip",
+      "browser_download_url": "https://github.com/MetaCubeX/mihomo/releases/download/v1.19.33/mihomo-windows-amd64-compatible-v1.19.33.zip",
+      "digest": "sha256:7aaf636a4f2172dcd8ec34ac4f52797b059195e5afd6409508c963e545f8864d",
+      "size": 22543546
+    },
+    {
+      "name": "mihomo-windows-arm64-v1.19.33.zip",
+      "browser_download_url": "https://github.com/MetaCubeX/mihomo/releases/download/v1.19.33/mihomo-windows-arm64-v1.19.33.zip",
+      "digest": "sha256:a2a26869a14634c49f3fbcecc593b498ed8591fbdd7616b24475b3d60b148da3",
+      "size": 20212418
+    }
+  ]
+}
