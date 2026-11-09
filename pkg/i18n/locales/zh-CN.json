@@ -938,5 +938,9 @@
   "core.inline.field": "字段",
   "core.inline.save": "保存",
   "core.inline.cancel": "取消",
-  "core.inline.help": "帮助"
+  "core.inline.help": "帮助",
+  "core.binary_path": "内核路径",
+  "core.config_path": "配置路径",
+  "core.controller_address": "管理接口",
+  "core.mixed_port_label": "代理端口"
 }

@@ -33,7 +33,7 @@ func TestCoreFirstUseExplainsNextStepWithoutConnectionDiagnostics(t *testing.T) 
 	s := State{followSelection: true}
 	s, _ = s.Update(messages.CoreConnectionMsg{Err: errors.New("dial tcp: connection refused")})
 	view := ansi.Strip(s.Render(120, 28))
-	for _, want := range []string{"欢迎使用", "一键开始使用", "已有内核", "第一次使用"} {
+	for _, want := range []string{"欢迎使用", "一键开始使用", "已有内核", "版本", "内核路径"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("first-use guidance missing %q", want)
 		}
@@ -230,4 +230,26 @@ func TestCoreHelpStaysAtBottomRightWhileScrolling(t *testing.T) {
 		}
 	}
 	i18n.SetLanguageOverride("")
+}
+
+func TestDailyOverviewShowsCoreDetailsWithoutGuidance(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("en-US")
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	s := State{Status: service.CoreStatus{Mode: "managed", Version: "v1.2.3", BinaryPath: "/core/mihomo", ConfigPath: "/runtime/config.yaml", Controller: "127.0.0.1:9090", MixedPort: 7890}}
+	view := ansi.Strip(s.overview(70))
+	for _, want := range []string{"v1.2.3", "/core/mihomo", "/runtime/config.yaml", "127.0.0.1:9090", "7890"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("overview missing %q", want)
+		}
+	}
+	if strings.Contains(view, i18n.T("core.hint.start")) {
+		t.Fatal("daily overview still contains guidance")
+	}
+	s.Status.Mode = "external"
+	s, _ = s.Update(messages.CoreConnectionMsg{Version: "v9.8.7"})
+	view = ansi.Strip(s.overview(70))
+	if !strings.Contains(view, "v9.8.7") || strings.Contains(view, "v1.2.3") {
+		t.Fatal("external overview did not use the connected core version")
+	}
 }

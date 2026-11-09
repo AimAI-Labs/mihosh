@@ -112,19 +112,34 @@ func (s State) overview(width int) string {
 		rows = append(rows, lipgloss.NewStyle().Foreground(t.Warning).Render(wrap(i18n.T("core.connection_unavailable"), width-4)))
 	}
 	if s.tab == 0 {
-		hint := "core.hint.setup"
-		if s.Status.Mode == "managed" && s.Status.Version != "" {
-			hint = "core.hint.start"
-			if s.Status.Running {
-				hint = "core.hint.ready"
-				if !s.Status.HasNodes {
-					hint = "core.hint.profile"
-				}
+		value := func(text string) string {
+			if text == "" {
+				return i18n.T("core.unknown_version")
 			}
-		} else if s.connected {
-			hint = "core.hint.external"
+			return text
 		}
-		rows = append(rows, "", wrap(i18n.T(hint), width-4))
+		if s.Status.Mode != "managed" {
+			version = value(s.externalVersion)
+		}
+		rows = rows[:1]
+		for _, field := range []struct{ key, value string }{
+			{"core.version", version},
+			{"core.binary_path", value(s.Status.BinaryPath)},
+			{"core.config_path", value(s.Status.ConfigPath)},
+			{"core.controller_address", value(s.Status.Controller)},
+		} {
+			rows = append(rows, wrap(i18n.T(field.key)+": "+field.value, width-4))
+		}
+		if s.Status.MixedPort > 0 {
+			rows = append(rows, i18n.T("core.mixed_port_label")+": "+fmt.Sprint(s.Status.MixedPort))
+		}
+		if s.Status.Mode == "managed" {
+			runtime := "core.runtime.session"
+			if s.Status.Runtime == "service" {
+				runtime = "core.runtime.service"
+			}
+			rows = append(rows, i18n.T("core.runtime")+": "+i18n.T(runtime))
+		}
 	} else if s.tab == 1 {
 		tag := s.Release.Tag
 		if tag == "" {

@@ -48,8 +48,11 @@ func (m Model) Init() tea.Cmd {
 					return messages.CoreConnectionMsg{Epoch: m.connectionEpoch, Err: err}
 				}
 			}
-			_, err := m.client.GetVersion()
-			return messages.CoreConnectionMsg{Epoch: m.connectionEpoch, Err: err}
+			version, err := m.client.GetVersion()
+			if err != nil {
+				return messages.CoreConnectionMsg{Epoch: m.connectionEpoch, Err: err}
+			}
+			return messages.CoreConnectionMsg{Epoch: m.connectionEpoch, Version: version.Version}
 		},
 		autoRefreshTick(),
 		listenWSMessages(m.wsCtx, m.wsMsgChan),
@@ -185,8 +188,11 @@ func (m Model) checkCoreConnection() tea.Cmd {
 	epoch := m.connectionEpoch
 	client := m.client
 	return func() tea.Msg {
-		_, err := client.GetVersion()
-		return messages.CoreConnectionMsg{Epoch: epoch, Err: err}
+		version, err := client.GetVersion()
+		if err != nil {
+			return messages.CoreConnectionMsg{Epoch: epoch, Err: err}
+		}
+		return messages.CoreConnectionMsg{Epoch: epoch, Version: version.Version}
 	}
 }
 

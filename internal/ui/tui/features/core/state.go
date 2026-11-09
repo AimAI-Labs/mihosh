@@ -35,6 +35,7 @@ type State struct {
 	selected          int
 	followSelection   bool
 	connected         bool
+	externalVersion   string
 	connectionChecked bool
 	task              string
 	cancel            context.CancelFunc
@@ -203,6 +204,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.CoreConnectionMsg:
 		s.connected = msg.Err == nil
+		s.externalVersion = msg.Version
 		s.connectionChecked = true
 		return s, nil
 	case messages.CoreStatusMsg:

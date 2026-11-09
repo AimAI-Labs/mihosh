@@ -348,8 +348,9 @@ type CoreOperationMsg struct {
 type CoreProgressTickMsg struct{ ID uint64 }
 
 type CoreConnectionMsg struct {
-	Epoch uint64
-	Err   error
+	Version string
+	Epoch   uint64
+	Err     error
 }
 
 type CoreTargetChangedMsg struct {

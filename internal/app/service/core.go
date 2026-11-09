@@ -69,6 +69,14 @@ func (s *CoreService) Status() (CoreStatus, error) {
 		return CoreStatus{}, err
 	}
 	state := CoreStatus{Mode: cfg.Core.Mode, Version: cfg.Core.Version, Installed: []string{}}
+	endpoint := config.ResolveMihomoEndpoint()
+	state.Controller, state.MixedPort = endpoint.ExternalController, endpoint.MixedPort
+	if path, e := config.GetMihomoConfigPath(); e == nil {
+		state.ConfigPath = path
+	}
+	if state.Mode == "managed" && state.Version != "" {
+		state.BinaryPath, _ = coreinfra.BinaryPath(root, state.Version, runtime.GOOS)
+	}
 	state.Runtime = cfg.Core.Runtime
 	if state.Runtime == "" {
 		state.Runtime = "session"

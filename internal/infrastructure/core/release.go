@@ -195,6 +195,10 @@ func validDigest(s string) bool {
 }
 
 type Status struct {
+	BinaryPath       string   `json:"binary_path"`
+	ConfigPath       string   `json:"config_path"`
+	Controller       string   `json:"controller"`
+	MixedPort        int      `json:"mixed_port"`
 	Runtime          string   `json:"runtime"`
 	ServiceInstalled bool     `json:"service_installed"`
 	AutoStart        bool     `json:"auto_start"`

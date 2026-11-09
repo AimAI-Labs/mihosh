@@ -938,5 +938,9 @@
   "core.inline.field": "Field",
   "core.inline.save": "Save",
   "core.inline.cancel": "Cancel",
-  "core.inline.help": "Help"
+  "core.inline.help": "Help",
+  "core.binary_path": "Binary path",
+  "core.config_path": "Config path",
+  "core.controller_address": "Controller",
+  "core.mixed_port_label": "Proxy port"
 }

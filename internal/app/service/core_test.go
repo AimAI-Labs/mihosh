@@ -2,6 +2,7 @@ package service
 
 import (
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -82,4 +83,27 @@ func TestCoreExternalConnectionRoundTripDoesNotResolveLocalFiles(t *testing.T) {
 	cfg, err = config.Load()
 	require.NoError(t, err)
 	require.Equal(t, "v1.2.2", cfg.Core.PreviousVersion)
+}
+
+func TestCoreStatusIncludesManagedPathsAndEndpoint(t *testing.T) {
+	newIsolatedService(t)
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	cfg.Core.Version = "v1.2.3"
+	require.NoError(t, config.Save(cfg))
+	svc := NewCoreService()
+	defer svc.Close()
+	require.NoError(t, svc.Configure())
+	status, err := svc.Status()
+	require.NoError(t, err)
+	root, err := config.GetConfigDir()
+	require.NoError(t, err)
+	binary, err := coreinfra.BinaryPath(root, cfg.Core.Version, runtime.GOOS)
+	require.NoError(t, err)
+	path, err := config.ManagedMihomoConfigPath()
+	require.NoError(t, err)
+	require.Equal(t, binary, status.BinaryPath)
+	require.Equal(t, path, status.ConfigPath)
+	require.Equal(t, config.ResolveMihomoEndpoint().ExternalController, status.Controller)
+	require.Equal(t, config.ResolveMihomoEndpoint().MixedPort, status.MixedPort)
 }
