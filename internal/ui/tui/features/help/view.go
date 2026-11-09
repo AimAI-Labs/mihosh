@@ -29,7 +29,8 @@ const (
 
 // HelpContext 帮助弹窗所需的当前界面上下文
 type HelpContext struct {
-	CurrentPage int // 当前页面（PageNodes / PageConnections / ...）
+	CurrentPage  int // 当前页面（PageNodes / PageConnections / ...）
+	CoreReleases bool
 
 	// 连接页子状态
 	ConnViewMode int  // ConnViewTraffic / ConnViewActive / ConnViewHistory
@@ -110,7 +111,30 @@ func buildHelpSections(ctx HelpContext) []section {
 	case PageSub:
 		sections = append(sections, buildSubSections(ctx)...)
 	case PageCore:
-		sections = append(sections, section{title: i18n.T("menu.core"), bindings: []keybinding{{"v", i18n.T("core.action.check")}, {"i", i18n.T("core.action.install")}, {"m", i18n.T("core.action.configure")}, {"s / x", i18n.T("core.help.runtime")}, {"e", i18n.T("core.action.network")}, {"h",i18n.T("core.action.service")},{"y",i18n.T("core.action.system-proxy")},{"n",i18n.T("core.action.tun")},{"c",i18n.T("core.action.recover")},{"Esc", i18n.T("core.cancel")}}})
+		if ctx.CoreReleases {
+			sections = append(sections, section{title: i18n.T("core.catalog.title"), bindings: []keybinding{
+				{"↑↓", i18n.T("core.catalog.help.select")},
+				{"Enter / i", i18n.T("core.catalog.help.download")},
+				{"a", i18n.T("core.catalog.help.activate")},
+				{"PgUp / PgDn", i18n.T("core.catalog.help.pages")},
+				{"r / v", i18n.T("core.action.releases")},
+				{"t", i18n.T("core.action.version")},
+				{"l", i18n.T("core.action.import")},
+				{"g / b", i18n.T("core.catalog.help.update")},
+				{"1–3", i18n.T("core.help.sections")},
+				{"Esc", i18n.T("core.cancel")},
+			}})
+			break
+		}
+		sections = append(sections, section{title: i18n.T("menu.core"), bindings: []keybinding{
+			{"↑↓ / Enter", i18n.T("core.help.select")},
+			{"←→ / 1–3", i18n.T("core.help.sections")},
+			{"o", i18n.T("core.action.profile")},
+			{"s / x", i18n.T("core.help.runtime")},
+			{"e", i18n.T("core.action.network")},
+			{"h", i18n.T("core.action.service")},
+			{"Esc", i18n.T("core.cancel")},
+		}})
 	case PageSettings:
 		sections = append(sections, buildSettingsSections(ctx)...)
 	}

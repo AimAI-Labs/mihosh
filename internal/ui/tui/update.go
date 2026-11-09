@@ -157,7 +157,9 @@ func (m *Model) onAppQuit() {
 func (m *Model) refreshCurrentPage() tea.Cmd {
 	switch m.currentPage {
 	case layout.PageCore:
-		return tea.Batch(m.coreState.Refresh(), m.checkCoreConnection())
+		var cmd tea.Cmd
+		m.coreState, cmd = m.coreState.RefreshCurrent()
+		return tea.Batch(cmd, m.checkCoreConnection())
 	case layout.PageNodes:
 		return tea.Batch(nodes.FetchGroups(m.client), nodes.FetchProxies(m.client))
 	case layout.PageRules:

@@ -70,8 +70,8 @@ func TestServiceFormAndNetworkActionsRemainInCoreState(t *testing.T) {
 	defer svc.Close()
 	s := NewState(svc)
 	s, cmd := s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
-	if !s.Editing || s.form != "service" || cmd == nil {
-		t.Fatal("service form missing")
+	if !s.Editing || s.form != "service" || cmd != nil || len(s.fields) != 0 {
+		t.Fatal("service menu should open without text inputs or a background command")
 	}
 	s = s.Leave()
 	s, cmd = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})

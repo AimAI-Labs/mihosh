@@ -123,6 +123,7 @@ func (m Model) View() string {
 func (m Model) buildHelpContext() help.HelpContext {
 	return help.HelpContext{
 		CurrentPage:        int(m.currentPage),
+		CoreReleases:       m.coreState.BrowsingReleases(),
 		ConnViewMode:       m.connsState.ViewMode(),
 		ConnDetail:         m.connsState.DetailMode(),
 		ConnTopN:           m.connsState.TopNModalMode(),

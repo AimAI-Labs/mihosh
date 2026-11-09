@@ -9,6 +9,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	corepage "github.com/AimAI-Labs/mihosh/internal/ui/tui/features/core"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
@@ -68,5 +69,35 @@ func TestQueuedWebSocketMessageFromPreviousControllerIsIgnored(t *testing.T) {
 	updated, _ := m.Update(messages.CoreWSMsg{Generation: old, Payload: messages.MemoryWSMsg{Memory: 1234}})
 	if len(updated.(Model).chartData.MemoryHistory) != 0 {
 		t.Fatal("old controller message polluted new chart")
+	}
+}
+
+func TestCoreReleaseCatalogueSurvivesPageChangeAndGlobalRefresh(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	svc := service.NewCoreService()
+	defer svc.Close()
+	s := corepage.NewState(svc)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
+	defer s.Close()
+	m := Model{currentPage: layout.PageSub, coreSvc: svc, coreState: s, width: 120, height: 30}
+	page := coreinfra.ReleasePage{Page: 1, Releases: []coreinfra.Release{coreinfra.PinnedRelease()}}
+	updated, _ := m.Update(messages.CoreOperationMsg{ID: s.OperationID(), Action: "releases", Releases: &page})
+	m = updated.(Model)
+	if m.currentPage != layout.PageSub || m.coreState.Busy {
+		t.Fatal("release query completion changed the page or left the task running")
+	}
+	m.currentPage = layout.PageCore
+	i18n.Init()
+	i18n.SetLanguageOverride("en-US")
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	if !strings.Contains(m.View(), "Available core versions") {
+		t.Fatal("background query did not reach the version browser")
+	}
+	previous := m.coreState.OperationID()
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	m = updated.(Model)
+	defer m.coreState.Close()
+	if !m.coreState.Busy || m.coreState.OperationID() != previous+1 || cmd == nil {
+		t.Fatal("global r did not refresh the release list")
 	}
 }

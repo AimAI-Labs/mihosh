@@ -15,24 +15,32 @@ import (
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type State struct {
-	svc        *service.CoreService
-	Status     service.CoreStatus
-	Release    coreinfra.Release
-	Progress   coreinfra.Progress
-	Err        error
-	Busy       bool
-	Editing    bool
-	form       string
-	args       []string
-	fields     []textinput.Model
-	focus      int
-	scroll     int
-	cancel     context.CancelFunc
-	updates    chan coreinfra.Progress
-	generation uint64
+	svc               *service.CoreService
+	Status            service.CoreStatus
+	Release           coreinfra.Release
+	Progress          coreinfra.Progress
+	Err               error
+	Busy              bool
+	Editing           bool
+	form              string
+	args              []string
+	fields            []textinput.Model
+	focus             int
+	scroll            int
+	tab               int
+	selected          int
+	followSelection   bool
+	connected         bool
+	connectionChecked bool
+	task              string
+	cancel            context.CancelFunc
+	updates           chan coreinfra.Progress
+	generation        uint64
+	catalog           releaseCatalog
 }
 
 func NewState(svc *service.CoreService) State {
@@ -40,12 +48,17 @@ func NewState(svc *service.CoreService) State {
 	if asset, err := release.SelectAsset(runtime.GOOS, runtime.GOARCH); err == nil {
 		release.Assets = []coreinfra.Asset{asset}
 	}
-	return State{svc: svc, Release: release}
+	return State{svc: svc, Release: release, followSelection: true, catalog: releaseCatalog{page: coreinfra.ReleasePage{Releases: []coreinfra.Release{release}}, cleanup: &releaseCleanup{}}}
 }
 func (s State) Refresh() tea.Cmd {
 	return func() tea.Msg { status, err := s.svc.Status(); return messages.CoreStatusMsg{Status: status, Err: err} }
 }
 func (s *State) Close() {
+	if s.catalog.cleanup != nil {
+		s.catalog.cleanup.store.close()
+	} else {
+		s.catalog.store.close()
+	}
 	if s.cancel != nil {
 		s.cancel()
 	}
@@ -59,6 +72,11 @@ func (s State) begin(action string) (State, tea.Cmd) {
 		return s, nil
 	}
 	s.Busy = true
+	s.task = action
+	s.scroll = 0
+	if action != "releases" || !s.catalog.loaded {
+		s.followSelection = false
+	}
 	s.Err = nil
 	s.Progress = coreinfra.Progress{}
 	s.generation++
@@ -86,11 +104,19 @@ func (s State) begin(action string) (State, tea.Cmd) {
 	args := append([]string(nil), s.args...)
 	s.args = nil
 	status := s.Status
+	releasePage := s.catalog.requested
 	return s, tea.Batch(s.poll(), func() tea.Msg {
 		defer cancel()
 		var err error
 		var result *coreinfra.Release
+		var releases *coreinfra.ReleasePage
 		switch action {
+		case "releases":
+			page, e := svc.Releases(ctx, releasePage, notify)
+			err = e
+			if e == nil {
+				releases = &page
+			}
 		case "service":
 			err = svc.ServiceAction(ctx, args[0])
 		case "system-proxy":
@@ -170,16 +196,20 @@ func (s State) begin(action string) (State, tea.Cmd) {
 		if action == "tun" && !status.Running {
 			resultAction = "tun-offline"
 		}
-		return messages.CoreOperationMsg{ID: id, Release: result, Err: err, Action: resultAction}
+		return messages.CoreOperationMsg{ID: id, Release: result, Releases: releases, Err: err, Action: resultAction}
 	})
 }
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.CoreConnectionMsg:
-		s.Err = msg.Err
+		s.connected = msg.Err == nil
+		s.connectionChecked = true
 		return s, nil
 	case messages.CoreStatusMsg:
 		s.Status = msg.Status
+		if !s.Editing {
+			s.selected = min(s.selected, s.selectionCount()-1)
+		}
 		if msg.Err != nil {
 			s.Err = msg.Err
 		}
@@ -200,35 +230,87 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		s.Busy = false
 		s.cancel = nil
 		s.Err = msg.Err
+		if msg.Action == "releases" && msg.Err != nil {
+			s.catalog.failed = true
+		}
+		if msg.Err != nil {
+			s.scroll, s.followSelection = 0, false
+		}
 		if msg.Release != nil {
 			s.Release = *msg.Release
+			if msg.Action == "release" || msg.Action == "check" {
+				s = s.applyReleaseLookup(*msg.Release)
+			}
+		}
+		if msg.Releases != nil {
+			before := s.releaseCount()
+			s = s.applyReleasePage(*msg.Releases)
+			if s.Err == nil && s.catalog.page.HasNext && (len(msg.Releases.Releases) == 0 || (s.catalog.resume && s.releaseCount() == before)) {
+				next, cmd := s.releaseAction("next")
+				return next, tea.Batch(cmd, s.Refresh())
+			}
 		}
 		return s, s.Refresh()
 	case messages.PageMouseClickMsg:
-		if s.Editing {
+		if msg.X < 0 || msg.X >= msg.Width || msg.Y < 0 || msg.Y >= msg.Height {
 			return s, nil
 		}
-		originX, originY := actionOrigin(msg.Width)
-		row := msg.Y + s.effectiveScroll(msg.Width, msg.Height) - originY
-		if msg.X >= originX && row >= 0 && row < len(actions) {
-			action := actions[row].action
-			if action == "network" || action == "version" || action == "import" || action == "ports" || action == "external" || action == "profile" || action == "service" {
-				return s.editForm(action)
+		if s.Editing && s.form != "service" {
+			return s, nil
+		}
+		page := s.layout(msg.Width, msg.Height)
+		y := msg.Y + s.viewportOffset(page, msg.Height)
+		if !s.Editing {
+			for _, hit := range page.tabs {
+				if msg.X >= hit.x && msg.X < hit.x+hit.width && y == hit.y {
+					return s.openTab(hit.index)
+				}
 			}
-			return s.begin(action)
+		}
+		if !s.Editing && s.tab == 1 {
+			return s.clickReleasePage(page, msg.X, msg.Y)
+		}
+		for _, hit := range page.actions {
+			if msg.X >= hit.x && msg.X < hit.x+hit.width && y >= hit.y && y < hit.y+hit.height {
+				s.selected = hit.index
+				if s.Editing {
+					return s.submitService()
+				}
+				return s.choose(s.actions()[hit.index].action)
+			}
 		}
 	case messages.PageMouseScrollMsg:
+		if s.Editing && s.form != "service" {
+			return s, nil
+		}
+		if !s.Editing && s.tab == 1 {
+			return s.scrollReleasePage(msg)
+		}
+		page := s.layout(msg.Width, msg.Height)
+		s.scroll = s.viewportOffset(page, msg.Height)
+		s.followSelection = false
 		if msg.Up {
 			s.scroll = max(0, s.scroll-1)
 		} else {
-			s.scroll = min(16+len(actions), s.scroll+1)
+			s.scroll = min(max(0, lipgloss.Height(page.content)-msg.Height), s.scroll+1)
 		}
 		return s, nil
 	case tea.KeyMsg:
 		if s.Editing {
 			return s.updateForm(msg)
 		}
+		if s.tab == 1 {
+			if next, cmd, handled := s.updateReleaseKeys(msg); handled {
+				return next, cmd
+			}
+		}
 		switch msg.String() {
+		case "1", "2", "3":
+			return s.openTab(int(msg.String()[0] - '1'))
+		case "left":
+			return s.openTab(s.tab - 1)
+		case "right":
+			return s.openTab(s.tab + 1)
 		case "h":
 			return s.editForm("service")
 		case "y":
@@ -238,10 +320,12 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case "c":
 			return s.begin("recover")
 		case "up", "k":
-			s.scroll = max(0, s.scroll-1)
+			s.selected = max(0, s.selected-1)
+			s.followSelection = true
 			return s, nil
 		case "down", "j":
-			s.scroll = min(16+len(actions), s.scroll+1)
+			s.selected = min(s.selectionCount()-1, s.selected+1)
+			s.followSelection = true
 			return s, nil
 		case "esc":
 			if s.cancel != nil {
@@ -249,7 +333,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			}
 			return s, nil
 		case "enter":
-			return s.begin("setup")
+			return s.choose(s.actions()[min(s.selected, s.selectionCount()-1)].action)
 		case "t":
 			return s.editForm("version")
 		case "l":
@@ -269,7 +353,8 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case "p":
 			return s.editForm("ports")
 		case "v":
-			return s.begin("check")
+			s = s.selectTab(1)
+			return s.releaseAction("refresh")
 		case "i":
 			return s.begin("install")
 		case "m":
@@ -285,10 +370,17 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	return s, nil
 }
 func (s State) editForm(kind string) (State, tea.Cmd) {
+	if s.Busy {
+		return s, nil
+	}
+	s.Err = nil
+	if kind == "service" {
+		s.form, s.Editing = kind, true
+		s.selected, s.scroll = 0, 0
+		s.followSelection = true
+		return s, nil
+	}
 	if kind != "network" {
-		if s.Busy {
-			return s, nil
-		}
 		s.form = kind
 		s.Editing = true
 		s.focus = 0
@@ -307,9 +399,6 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 			s.fields[i].Width = 50
 		}
 		switch kind {
-		case "service":
-			s.fields[0].SetValue("install")
-
 		case "profile":
 			s.fields[0].SetValue(i18n.T("core.profile_default"))
 			s.fields[1].EchoMode = textinput.EchoPassword
@@ -340,9 +429,6 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 		return s, textinput.Blink
 	}
 	s.form = "network"
-	if s.Busy {
-		return s, nil
-	}
 	cfg, err := config.Load()
 	if err != nil {
 		c := config.DefaultConfig
@@ -376,6 +462,22 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 	return s, textinput.Blink
 }
 func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
+	if s.form == "service" {
+		switch msg.String() {
+		case "esc":
+			s.Editing = false
+			s.selected, s.scroll = 0, 0
+		case "up", "k":
+			s.selected = max(0, s.selected-1)
+			s.followSelection = true
+		case "down", "j":
+			s.selected = min(len(serviceActions)-1, s.selected+1)
+			s.followSelection = true
+		case "enter":
+			return s.submitService()
+		}
+		return s, nil
+	}
 	switch msg.String() {
 	case "esc":
 		s.Editing = false
@@ -383,7 +485,11 @@ func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 		return s, nil
 	case "tab", "shift+tab":
 		s.fields[s.focus].Blur()
-		s.focus = (s.focus + 1) % len(s.fields)
+		delta := 1
+		if msg.String() == "shift+tab" {
+			delta = -1
+		}
+		s.focus = (s.focus + delta + len(s.fields)) % len(s.fields)
 		return s, s.fields[s.focus].Focus()
 	case "enter":
 		if s.form != "network" {
@@ -408,9 +514,6 @@ func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 			}
 			if s.form == "profile" {
 				action = "profile"
-			}
-			if s.form == "service" {
-				action = "service"
 			}
 			s.Editing = false
 			s.fields = nil
@@ -440,22 +543,21 @@ func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 	return s, cmd
 }
 
-// effectiveScroll mirrors Render's viewport so clicks address rendered action rows.
-func (s State) effectiveScroll(width, height int) int {
-	extra := 0
-	if s.Busy {
-		extra += 2
-	}
-	if s.Err != nil {
-		extra++
-	}
-	total := 8 + len(actions) + 4 + extra
-	if width >= 100 {
-		total = max(2+len(actions), 12+extra)
-	}
-	return min(s.scroll, max(0, total-height))
+func (s State) submitService() (State, tea.Cmd) {
+	s.args = []string{serviceActions[s.selected]}
+	s.Editing = false
+	s.selected, s.scroll = 0, 0
+	return s.begin("service")
 }
 
 func (s State) OperationID() uint64 { return s.generation }
 
-func (s State) Leave() State { s.Editing = false; s.fields = nil; s.args = nil; return s }
+func (s State) Leave() State {
+	if s.Editing && s.form == "service" {
+		s.selected, s.scroll = 0, 0
+	}
+	s.Editing = false
+	s.fields = nil
+	s.args = nil
+	return s
+}
