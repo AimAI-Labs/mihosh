@@ -7,7 +7,7 @@ description: Download, configure and manage an independent Mihomo core
 
 Run `mihosh` and open **Core** in the navigation bar. The application works without an installed core or a subscription.
 
-Press `Enter` to install the bundled verified version, create a DIRECT configuration and start the core. Press `o` to import a subscription URL or a local Mihomo configuration. Existing subscriptions remain available on the Sub page.
+On first use, select **Set up and start** and press `Enter` to install the bundled verified version, create a DIRECT configuration and start the core. Press `o` to import a subscription URL or a local Mihomo configuration. Existing subscriptions remain available on the Sub page.
 
 The baseline configuration provides direct connections, not proxy nodes. System proxy settings, shell environment variables and TUN are separate facilities; starting the core does not route every application's traffic through it.
 
@@ -15,9 +15,12 @@ The baseline configuration provides direct connections, not proxy nodes. System 
 
 | Key | Action |
 | --- | --- |
-| `Enter` | Install, configure and start |
-| `v` / `t` | Query the latest stable release / a stable tag |
-| `i` / `a` | Install the displayed release / activate that installed version |
+| `↑` / `↓`, `Enter` | Select / run an action (defaults to Set up and start on first use) |
+| `←` / `→` or `1` / `2` / `3` | Switch Everyday, Versions and Advanced sections |
+| `v` / `t` | Open or refresh the release browser / look up a stable tag |
+| `Enter` / `i` (Versions), `a` | Download the selected release / activate it after installation |
+| `PgUp` / `PgDn` or `[` / `]` | Move up / down the continuous version list |
+| `Home` / `End` | Jump to the loaded list ends; load more near the bottom |
 | `g` / `b` | Upgrade to the latest stable release / restore the previous version |
 | `s` / `x` / `z` | Start / stop / restart |
 | `l` | Import a local executable using its independently verified SHA-256 |
@@ -28,11 +31,21 @@ The baseline configuration provides direct connections, not proxy nodes. System 
 | `c` | Recover network settings after an unexpected exit |
 | `p` | Change managed ports after stopping the core |
 | `u` | Connect to an external API; leave the address empty for auto-discovery |
-| `r` | Refresh status and retry the connection |
-| Arrows / mouse wheel | Scroll |
+| `r` | Refresh status and retry the connection; also refresh the list on Versions |
+| Mouse wheel | Scroll |
 | `Esc` | Cancel the task or leave the form |
 
-Wide terminals use 43% / 57% panels; narrow terminals stack the content. Use `Tab` and `Enter` inside forms. Exiting Mihosh stops the child owned by a session. A background service continues after the TUI exits. Existing external cores remain under their original owner.
+Actions are grouped into Everyday, Versions and Advanced, each with a short explanation. Click an action to run it. The status panel suggests the next step; switches show saved preferences, whose effects depend on the running core. Wide terminals use 43% / 57% panels; narrow terminals stack the content. Use `Tab` and `Enter` inside forms. Exiting Mihosh stops the child owned by a session. A background service continues after the TUI exits. Existing external cores remain under their original owner.
+
+## Visual release browser
+
+Press `2` in Core to browse official stable releases. The list matches assets to the current OS and architecture, showing version, publication date, size, and Current / Installed badges. Each on-demand request reads up to 10 upstream releases. Compatible stable entries are appended to one continuous list and deduplicated by tag. Arrow-key and wheel navigation near the bottom automatically load older releases until upstream history ends, skipping fully filtered batches. Loaded records live in a session temporary directory, with a fixed 64-record memory cache and rendering limited to visible rows. All loaded history remains browsable; exiting the app cleans up the temporary directory.
+
+Select with the arrow keys or mouse to inspect the matching asset. **Selecting or downloading a release does not switch or restart the running core.** Press `Enter` / `i` to download, then explicitly press `a` to activate an installed version, which may restart a managed core. The current version is not activated again.
+
+Use `PgUp` / `PgDn` or `[` / `]` to move through the continuous list. `End` moves to its loaded end and triggers another load, also available through Load more. The footer shows the loaded count, loading status, or completion. `r` / `v` refresh from the latest releases and replace the old snapshot only after success; `t` finds a stable version directly. Failed loads retain all displayed data and pause automatic requests; press `r` or click Retry to resume the failed batch. An initial failure leaves the bundled verified release or the existing single-release cache available, explicitly labelled as fallback data. Downloads without trusted SHA-256 metadata are disabled. Retry through direct/proxy access, or use `l` to import an independently verified local executable.
+
+The interaction draws on the list, status chips and separate action buttons in [Clash Verge Rev's core manager](https://github.com/clash-verge-rev/clash-verge-rev/blob/dev/src/components/setting/mods/clash-core-viewer.tsx), extended here to lazily browse all compatible stable release history. Metadata uses the [GitHub Releases API](https://docs.github.com/en/rest/releases/releases#list-releases), retaining Mihosh's download fallback, source restrictions and checksum verification.
 
 ## CLI
 
@@ -67,7 +80,7 @@ mihosh core configure --output json
 
 ## Background services and automatic startup
 
-Press `h` in Core and enter `install`. Stop a session core before installing its background service. Installation copies Mihosh into `~/.mihosh/bin/` as a stable service entry and selects `core.runtime: service`. Core start/stop/restart then control that service. Closing the TUI leaves it running; profile activation and version changes are forwarded to its private owner endpoint.
+Press `h` in Core, select **Install background service** with the arrow keys and press `Enter`. Press `Esc` to return. Stop a session core before installing its background service. Installation copies Mihosh into `~/.mihosh/bin/` as a stable service entry and selects `core.runtime: service`. Core start/stop/restart then control that service. Closing the TUI leaves it running; profile activation and version changes are forwarded to its private owner endpoint.
 
 ```bash
 mihosh core service install --output json
