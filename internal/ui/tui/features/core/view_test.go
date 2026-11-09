@@ -99,8 +99,14 @@ func TestCoreTabsCanBeSelectedByMouse(t *testing.T) {
 	i18n.SetLanguageOverride("en-US")
 	t.Cleanup(func() { i18n.SetLanguageOverride("") })
 	s := State{followSelection: true}
-	for y, line := range strings.Split(ansi.Strip(s.Render(120, 28)), "\n") {
-		if at := strings.Index(line, "3 Advanced"); at >= 0 {
+	view := ansi.Strip(s.Render(120, 28))
+	for _, label := range []string{"1 Daily use", "2 Versions", "3 Advanced"} {
+		if strings.Contains(view, label) {
+			t.Fatalf("section still has a numeric prefix: %q", label)
+		}
+	}
+	for y, line := range strings.Split(view, "\n") {
+		if at := strings.Index(line, "Advanced"); at >= 0 {
 			next, cmd := s.Update(messages.PageMouseClickMsg{X: lipgloss.Width(line[:at]), Y: y, Width: 120, Height: 28})
 			if next.tab != 2 || next.Busy || next.Editing || cmd != nil {
 				t.Fatal("tab click did not change section without running an action")

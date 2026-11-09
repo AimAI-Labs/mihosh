@@ -169,7 +169,7 @@ func (s State) layout(width, height int) pageLayout {
 	var labels []string
 	x := 2
 	for i, tab := range tabs {
-		label := fmt.Sprintf(" %d %s ", i+1, i18n.T("core.tab."+tab))
+		label := " " + i18n.T("core.tab."+tab) + " "
 		result.tabs = append(result.tabs, actionHit{x: x, y: 1, width: lipgloss.Width(label), height: 1, index: i})
 		x += lipgloss.Width(label) + 1
 		style := lipgloss.NewStyle().Foreground(t.Muted)
