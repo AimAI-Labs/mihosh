@@ -929,5 +929,14 @@
   "core.catalog.loading": "Loading more…",
   "core.catalog.load_failed": "Loading failed; press r to retry",
   "core.catalog.load_more": "[End] Load more",
-  "core.catalog.retry": "[r] Retry"
+  "core.catalog.retry": "[r] Retry",
+  "core.inline.sections": "Sections",
+  "core.inline.select": "Select",
+  "core.inline.run": "Run",
+  "core.inline.download": "Download",
+  "core.inline.activate": "Activate",
+  "core.inline.field": "Field",
+  "core.inline.save": "Save",
+  "core.inline.cancel": "Cancel",
+  "core.inline.help": "Help"
 }

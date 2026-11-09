@@ -929,5 +929,14 @@
   "core.catalog.loading": "正在加载更多…",
   "core.catalog.load_failed": "加载失败，按 r 重试",
   "core.catalog.load_more": "[End] 加载更多",
-  "core.catalog.retry": "[r] 重试"
+  "core.catalog.retry": "[r] 重试",
+  "core.inline.sections": "切换",
+  "core.inline.select": "选择",
+  "core.inline.run": "执行",
+  "core.inline.download": "下载",
+  "core.inline.activate": "使用",
+  "core.inline.field": "字段",
+  "core.inline.save": "保存",
+  "core.inline.cancel": "取消",
+  "core.inline.help": "帮助"
 }

@@ -163,7 +163,7 @@ func (s State) layout(width, height int) pageLayout {
 	}
 	if s.Editing {
 		content, hits := s.actionPanel(width, true)
-		return pageLayout{content: content + "\n" + muted.Render(wrap(i18n.T("core.service_help"), width)), actions: hits}
+		return pageLayout{content: content, actions: hits}
 	}
 	var result pageLayout
 	var labels []string
@@ -242,7 +242,6 @@ func (s State) layout(width, height int) pageLayout {
 	} else {
 		parts = append(parts, left, "", right)
 	}
-	parts = append(parts, "", muted.Render(wrap(i18n.T("core.navigation_help"), width)))
 	result.content = strings.Join(parts, "\n")
 	return result
 }
@@ -268,7 +267,6 @@ func (s State) formLayout(width int) pageLayout {
 		field.Width = max(1, width-8)
 		lines = append(lines, i18n.T(key), field.View(), "")
 	}
-	lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).Render(wrap(i18n.T("core.form_help"), width-4)))
 	if s.Err != nil {
 		lines = append(lines, lipgloss.NewStyle().Foreground(t.Danger).Render(wrap(s.Err.Error(), width-4)))
 	}
@@ -298,12 +296,13 @@ func (s State) Render(width, height int) string {
 	if width <= 0 || height <= 0 {
 		return ""
 	}
-	page := s.layout(width, height)
+	contentHeight := max(1, height-1)
+	page := s.layout(width, contentHeight)
 	lines := strings.Split(page.content, "\n")
-	offset := s.viewportOffset(page, height)
-	lines = lines[offset:min(len(lines), offset+height)]
+	offset := s.viewportOffset(page, contentHeight)
+	lines = lines[offset:min(len(lines), offset+contentHeight)]
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], width, "…")
 	}
-	return strings.Join(lines, "\n")
+	return common.OverlayHelpAtBottomRight(strings.Join(lines, "\n"), s.inlineHelp(width), width, height)
 }

@@ -207,3 +207,21 @@ func TestCoreAllSectionsAndFormsRespectTerminalBounds(t *testing.T) {
 		}
 	}
 }
+
+func TestCoreHelpStaysAtBottomRightWhileScrolling(t *testing.T) {
+	i18n.Init()
+	for _, language := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(language)
+		for _, width := range []int{24, 80, 120} {
+			s := State{tab: 2, selected: 4, followSelection: true}
+			lines := strings.Split(ansi.Strip(s.Render(width, 16)), "\n")
+			if len(lines) != 16 || !strings.HasSuffix(lines[15], "? "+i18n.T("core.inline.help")) {
+				t.Fatalf("%s %d: help is not fixed at bottom right: %q", language, width, lines)
+			}
+			if lipgloss.Width(lines[15]) != width-1 {
+				t.Fatalf("help does not align with right margin: %q", lines[15])
+			}
+		}
+	}
+	i18n.SetLanguageOverride("")
+}

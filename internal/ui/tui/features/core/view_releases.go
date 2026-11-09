@@ -145,8 +145,7 @@ func (s State) releaseLayout(width, height int, parts []string, result pageLayou
 	if !s.catalog.loaded {
 		caption = i18n.T("core.catalog.fallback")
 	}
-	footerText := muted.Render(wrap(i18n.T("core.catalog.help"), width))
-	footerHeight := 3 + lipgloss.Height(footerText)
+	footerHeight := 3
 	detailBudget := height - top - footerHeight
 	if !wide {
 		detailBudget -= 5 // one visible release and a separating line
@@ -216,7 +215,7 @@ func (s State) releaseLayout(width, height int, parts []string, result pageLayou
 		buttons = append(buttons, style.Render(control.text))
 		x += lipgloss.Width(control.text) + 2
 	}
-	parts = append(parts, "", strings.Join(buttons, "  "), muted.Render(caption), footerText)
+	parts = append(parts, "", strings.Join(buttons, "  "), muted.Render(caption))
 	result.content = strings.Join(parts, "\n")
 	return result
 }
@@ -243,7 +242,7 @@ func (s State) scrollReleasePage(msg messages.PageMouseScrollMsg) (State, tea.Cm
 	if s.Busy && s.task != "releases" {
 		return s, nil
 	}
-	page := s.layout(msg.Width, msg.Height)
+	page := s.layout(msg.Width, max(1, msg.Height-1))
 	s.catalog.scroll = s.releaseStart(page.listRows)
 	if msg.Up {
 		s.catalog.scroll = max(0, s.catalog.scroll-1)

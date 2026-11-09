@@ -252,14 +252,14 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		}
 		return s, s.Refresh()
 	case messages.PageMouseClickMsg:
-		if msg.X < 0 || msg.X >= msg.Width || msg.Y < 0 || msg.Y >= msg.Height {
+		if msg.X < 0 || msg.X >= msg.Width || msg.Y < 0 || msg.Y >= msg.Height-1 {
 			return s, nil
 		}
 		if s.Editing && s.form != "service" {
 			return s, nil
 		}
-		page := s.layout(msg.Width, msg.Height)
-		y := msg.Y + s.viewportOffset(page, msg.Height)
+		page := s.layout(msg.Width, max(1, msg.Height-1))
+		y := msg.Y + s.viewportOffset(page, max(1, msg.Height-1))
 		if !s.Editing {
 			for _, hit := range page.tabs {
 				if msg.X >= hit.x && msg.X < hit.x+hit.width && y == hit.y {
@@ -286,13 +286,13 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		if !s.Editing && s.tab == 1 {
 			return s.scrollReleasePage(msg)
 		}
-		page := s.layout(msg.Width, msg.Height)
-		s.scroll = s.viewportOffset(page, msg.Height)
+		page := s.layout(msg.Width, max(1, msg.Height-1))
+		s.scroll = s.viewportOffset(page, max(1, msg.Height-1))
 		s.followSelection = false
 		if msg.Up {
 			s.scroll = max(0, s.scroll-1)
 		} else {
-			s.scroll = min(max(0, lipgloss.Height(page.content)-msg.Height), s.scroll+1)
+			s.scroll = min(max(0, lipgloss.Height(page.content)-max(1, msg.Height-1)), s.scroll+1)
 		}
 		return s, nil
 	case tea.KeyMsg:
