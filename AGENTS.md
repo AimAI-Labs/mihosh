@@ -41,4 +41,7 @@
 - **定长缓存 (Ring Buffer)**: 历史数据（连接、日志、图表点）**必须**使用 Ring Buffer，如 `LogsCap=1000`。禁止使用无界切片导致内存泄漏。
 - **WebSocket (`infrastructure/api/websocket.go`)**: 必须复用现有的 `WSClient.Start` 和 `connectStream[T]` 泛型封装。禁止自行实现断线重连或重新挂载流。
 
-@RTK.md
+
+## 5. 第三方工具
+- **噪声简化**：如果当前的开发环境为linux，使用rtk，@RTK.md
+- **文档搜索**：使用`npx ctx7`，具体用法详见：https://context7.com/docs/clients/cli
