@@ -787,7 +787,7 @@
   "core.manage_here": "请在 Core 菜单中管理此托管内核。",
   "core.help.runtime": "启动 / 停止托管内核",
   "cli.core.short": "安装和管理 Mihomo 内核",
-  "cli.core.version": "稳定发行标签（安装默认使用内置校验版本）",
+  "cli.core.version": "发行标签，如 v1.19.0 或 Prerelease-Alpha（安装默认使用内置校验版本）",
   "cli.core.file": "待导入的本地可执行文件",
   "cli.core.sha256": "已独立验证的本地文件 SHA-256",
   "cli.setup.short": "安装已验证内核并创建 DIRECT 配置",
@@ -865,7 +865,7 @@
   "core.error_title": "操作未完成 · 可重试或检查设置",
   "core.navigation_help": "↑↓ 选择 · Enter 执行 · ←→ / 1–3 切换分类 · 滚轮浏览 · ? 帮助",
   "core.service_help": "↑↓ 选择 · Enter 执行 · Esc 返回；安装后台服务前请先停止内核。",
-  "core.version_input": "版本号（例如 v1.19.33）",
+  "core.version_input": "版本标签（如 v1.19.33 / Prerelease-Alpha）",
   "core.desc.setup": "自动下载、完成基础设置并启动。没有订阅也能先用直连。",
   "core.desc.profile": "填写订阅链接或本地配置路径，导入后立即使用。",
   "core.desc.start": "使用已经准备好的配置启动内核。",
@@ -914,7 +914,7 @@
   "core.catalog.activate": "[a] 使用此版本（可能重启）",
   "core.catalog.download_hint": "下载不会切换或重启当前内核；需要时再选择使用。",
   "core.catalog.unverified": "缺少可信校验信息，请刷新重试或导入已独立校验的本地文件。",
-  "core.catalog.empty": "暂未找到适配本机的稳定版本；可重试或按 t 查找指定版本。",
+  "core.catalog.empty": "暂未找到适配本机的版本；可重试或按 t 查找指定版本。",
   "core.catalog.fallback": "当前显示本地缓存或内置版本，按 r 查询官方列表。",
   "core.catalog.refresh": "[r] 刷新",
   "core.catalog.help": "↑↓ / 滚轮浏览并自动加载 · Enter 下载 · a 使用 · t 查找 · l 导入 · g 更新 · b 回滚",
@@ -942,5 +942,9 @@
   "core.binary_path": "内核路径",
   "core.config_path": "配置路径",
   "core.controller_address": "管理接口",
-  "core.mixed_port_label": "代理端口"
+  "core.mixed_port_label": "代理端口",
+  "core.catalog.prerelease": "预发布",
+  "core.task.complete": "任务已完成",
+  "core.task.cancelled": "任务已取消",
+  "core.task.close": "Enter / Esc 关闭"
 }

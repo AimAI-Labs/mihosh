@@ -109,7 +109,7 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.currentPage == layout.PageCore && m.coreState.Editing {
+	if m.currentPage == layout.PageCore && (m.coreState.Editing || m.coreState.TaskModal()) {
 		return m.dispatchToPage(msg)
 	}
 	// 全局帮助
@@ -212,7 +212,7 @@ func (m Model) dispatchToPage(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) isInputCapturing() bool {
 	switch m.currentPage {
 	case layout.PageCore:
-		return m.coreState.Editing
+		return m.coreState.Editing || m.coreState.TaskModal()
 	case layout.PageNodes:
 		return m.nodesState.NodeFilterMode
 	case layout.PageConnections:

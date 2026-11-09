@@ -31,6 +31,10 @@ func (s State) inlineHelp(width int) string {
 		hints = []common.InlineHelpHint{{Key: "Esc", Desc: i18n.T("core.inline.cancel")}}
 	}
 	help := common.InlineHelpHint{Key: "?", Desc: i18n.T("core.inline.help")}
+	if s.Editing || s.taskDialog {
+		help = common.InlineHelpHint{Key: "Esc", Desc: i18n.T("core.inline.cancel")}
+		hints = hints[:max(0, len(hints)-1)]
+	}
 	for len(hints) > 0 && lipgloss.Width(common.FormatInlineHintRow(append(hints, help))) > width-1 {
 		hints = hints[:len(hints)-1]
 	}

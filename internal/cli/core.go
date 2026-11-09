@@ -59,11 +59,11 @@ func newCoreCommand() *cobra.Command {
 				if err == nil {
 					err = svc.Install(ctx, release, notify)
 				}
-				selectedVersion = release.Tag
+				selectedVersion = release.Version()
 				if err == nil && action == "upgrade" {
-					err = svc.Control(ctx, "upgrade", release.Tag)
+					err = svc.Control(ctx, "upgrade", release.Version())
 					if errors.Is(err, service.ErrNoCoreOwner) {
-						err = svc.UpgradeVersion(ctx, release.Tag)
+						err = svc.UpgradeVersion(ctx, release.Version())
 					}
 				}
 			case "import":

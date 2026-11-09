@@ -85,14 +85,14 @@ func (f *Fetcher) Install(ctx context.Context, root string, r Release, goos, arc
 	if err = cleanupInstallStages(coreRoot); err != nil {
 		return Installation{}, err
 	}
-	target, err := BinaryPath(root, r.Tag, goos)
+	target, err := BinaryPath(root, r.Version(), goos)
 	if err != nil {
 		return Installation{}, err
 	}
 	if _, err = os.Stat(filepath.Dir(target)); err == nil {
 		data, e := os.ReadFile(filepath.Join(filepath.Dir(target), "installation.json"))
 		var existing Installation
-		if e == nil && json.Unmarshal(data, &existing) == nil && existing.Version == r.Tag && existing.Source == asset.URL && existing.SHA256 == digest && validDigest(existing.BinarySHA256) {
+		if e == nil && json.Unmarshal(data, &existing) == nil && existing.Version == r.Version() && existing.Source == asset.URL && existing.SHA256 == digest && validDigest(existing.BinarySHA256) {
 			got, e := fileDigest(target)
 			if e == nil && got == existing.BinarySHA256 {
 				return existing, nil
@@ -127,7 +127,7 @@ func (f *Fetcher) Install(ctx context.Context, root string, r Release, goos, arc
 	if err != nil {
 		return Installation{}, err
 	}
-	result := Installation{Version: r.Tag, Asset: asset.Name, Source: asset.URL, Route: route.Name, SHA256: digest, BinarySHA256: binaryDigest}
+	result := Installation{Version: r.Version(), Asset: asset.Name, Source: asset.URL, Route: route.Name, SHA256: digest, BinarySHA256: binaryDigest}
 	data, _ := json.MarshalIndent(result, "", "  ")
 	if err = os.WriteFile(filepath.Join(stage, "installation.json"), data, 0600); err != nil {
 		return Installation{}, err

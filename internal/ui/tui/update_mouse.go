@@ -37,6 +37,9 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	if m.currentPage == layout.PageCore && m.coreState.TaskModal() {
+		return m, nil
+	}
 	switch {
 	case isMouseLeftPress(msg):
 		statusBarHeight := common.StatusBarHeight

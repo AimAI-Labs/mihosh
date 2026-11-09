@@ -227,7 +227,7 @@ func (s State) releaseAction(action string) (State, tea.Cmd) {
 			return s, nil
 		}
 		s.Release = r
-		installed := s.releaseInstalled(r.Tag)
+		installed := s.releaseInstalled(r.Version())
 		if action == "install" {
 			if installed {
 				return s, nil
@@ -237,9 +237,10 @@ func (s State) releaseAction(action string) (State, tea.Cmd) {
 			}
 			if _, err := r.TrustedDigest(r.Assets[0], coreinfra.PinnedDigests()); err != nil {
 				s.Err = errors.New(i18n.T("core.catalog.unverified"))
+				s.task, s.taskDialog = "install", true
 				return s, nil
 			}
-		} else if !installed || (s.Status.Mode == "managed" && s.Status.Version == r.Tag) {
+		} else if !installed || (s.Status.Mode == "managed" && s.Status.Version == r.Version()) {
 			return s, nil
 		}
 		return s.begin(action)

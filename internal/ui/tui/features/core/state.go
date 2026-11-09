@@ -38,6 +38,7 @@ type State struct {
 	externalVersion   string
 	connectionChecked bool
 	task              string
+	taskDialog        bool
 	cancel            context.CancelFunc
 	updates           chan coreinfra.Progress
 	generation        uint64
@@ -74,8 +75,11 @@ func (s State) begin(action string) (State, tea.Cmd) {
 	}
 	s.Busy = true
 	s.task = action
-	s.scroll = 0
-	if action != "releases" || !s.catalog.loaded {
+	s.taskDialog = downloadTask(action)
+	if !s.taskDialog {
+		s.scroll = 0
+	}
+	if !s.taskDialog && (action != "releases" || !s.catalog.loaded) {
 		s.followSelection = false
 	}
 	s.Err = nil
@@ -151,7 +155,7 @@ func (s State) begin(action string) (State, tea.Cmd) {
 		case "import":
 			err = svc.Import(ctx, args[0], args[1], args[2])
 		case "activate":
-			err = svc.ActivateVersion(ctx, release.Tag)
+			err = svc.ActivateVersion(ctx, release.Version())
 		case "rollback":
 			err = svc.ActivateVersion(ctx, "")
 		case "restart":
@@ -235,7 +239,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		if msg.Action == "releases" && msg.Err != nil {
 			s.catalog.failed = true
 		}
-		if msg.Err != nil {
+		if msg.Err != nil && !s.taskDialog {
 			s.scroll, s.followSelection = 0, false
 		}
 		if msg.Release != nil {
@@ -254,6 +258,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		}
 		return s, s.Refresh()
 	case messages.PageMouseClickMsg:
+		if s.taskDialog {
+			return s, nil
+		}
 		if msg.X < 0 || msg.X >= msg.Width || msg.Y < 0 || msg.Y >= msg.Height-1 {
 			return s, nil
 		}
@@ -282,6 +289,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			}
 		}
 	case messages.PageMouseScrollMsg:
+		if s.taskDialog {
+			return s, nil
+		}
 		if s.Editing && s.form != "service" {
 			return s, nil
 		}
@@ -298,6 +308,25 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		}
 		return s, nil
 	case tea.KeyMsg:
+		if s.taskDialog {
+			switch msg.String() {
+			case "esc":
+				if s.Busy {
+					if s.cancel != nil {
+						s.cancel()
+					}
+				} else {
+					s.taskDialog, s.Err = false, nil
+					s.Progress = coreinfra.Progress{}
+				}
+			case "enter":
+				if !s.Busy {
+					s.taskDialog, s.Err = false, nil
+					s.Progress = coreinfra.Progress{}
+				}
+			}
+			return s, nil
+		}
 		if s.Editing {
 			return s.updateForm(msg)
 		}
@@ -555,6 +584,7 @@ func (s State) submitService() (State, tea.Cmd) {
 func (s State) OperationID() uint64 { return s.generation }
 
 func (s State) Leave() State {
+	s.taskDialog = false
 	if s.Editing && s.form == "service" {
 		s.selected, s.scroll = 0, 0
 	}
@@ -563,3 +593,5 @@ func (s State) Leave() State {
 	s.args = nil
 	return s
 }
+
+func (s State) TaskModal() bool { return s.taskDialog }

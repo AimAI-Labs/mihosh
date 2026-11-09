@@ -101,3 +101,28 @@ func TestCoreReleaseCatalogueSurvivesPageChangeAndGlobalRefresh(t *testing.T) {
 		t.Fatal("global r did not refresh the release list")
 	}
 }
+
+func TestCoreDownloadModalBlocksGlobalNavigationAndMouse(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	svc := service.NewCoreService()
+	defer svc.Close()
+	s := corepage.NewState(svc)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	defer s.Close()
+	m := Model{currentPage: layout.PageCore, coreState: s, width: 120, height: 30}
+	for _, key := range []tea.KeyMsg{{Type: tea.KeyTab}, {Type: tea.KeyRunes, Runes: []rune("r")}, {Type: tea.KeyRunes, Runes: []rune("?")}} {
+		next, cmd := m.Update(key)
+		if next.(Model).currentPage != layout.PageCore || next.(Model).showHelp || cmd != nil {
+			t.Fatal("global key escaped the download modal")
+		}
+	}
+	for _, mouse := range []tea.MouseMsg{
+		{X: 5, Y: 1, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress},
+		{X: 5, Y: 1, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress},
+	} {
+		next, cmd := m.Update(mouse)
+		if next.(Model).currentPage != layout.PageCore || cmd != nil {
+			t.Fatal("mouse navigation escaped the download modal")
+		}
+	}
+}

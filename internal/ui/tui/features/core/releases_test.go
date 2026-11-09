@@ -4,17 +4,20 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 )
 
 func releaseFixture(t *testing.T) State {
@@ -372,6 +375,87 @@ func TestInitialModelCloseCleansUpLatestLazySnapshot(t *testing.T) {
 	for _, dir := range []string{oldRoot, root} {
 		if _, err := os.Stat(dir); !os.IsNotExist(err) {
 			t.Fatal("an initial model value leaked an updated catalogue snapshot")
+		}
+	}
+}
+
+func TestReleaseRowsUseOneLineAndPreserveMouseBounds(t *testing.T) {
+	i18n.Init()
+	s := releaseFixture(t)
+	for _, width := range []int{80, 120} {
+		page := s.layout(width, 29)
+		if len(page.releases) < 2 {
+			t.Fatal("release rows are not visible")
+		}
+		lines := strings.Split(ansi.Strip(page.content), "\n")
+		for i, hit := range page.releases {
+			if hit.height != 1 || (i > 0 && hit.y != page.releases[i-1].y+1) {
+				t.Fatal("release rows still consume two lines")
+			}
+			r, _ := s.releaseAt(hit.index)
+			if !strings.Contains(lines[hit.y], r.Version()) {
+				t.Fatal("release mouse bounds do not match rendered row")
+			}
+		}
+	}
+}
+
+func TestPrereleaseDownloadAndActivationUseExecutableBuildVersion(t *testing.T) {
+	s := releaseFixture(t)
+	r := coreinfra.Release{Tag: "Prerelease-Alpha", Prerelease: true, Trusted: true, Assets: []coreinfra.Asset{{Name: "mihomo-linux-amd64-compatible-alpha-478af2a.gz", Digest: "sha256:" + strings.Repeat("a", 64)}}}
+	s = s.applyReleaseLookup(r)
+	s, cmd := s.releaseAction("install")
+	defer s.Close()
+	if !s.Busy || !s.TaskModal() || s.Release.Version() != "alpha-478af2a" || cmd == nil {
+		t.Fatal("alpha cannot be downloaded from the catalogue")
+	}
+	s, _ = s.Update(messages.CoreOperationMsg{ID: s.generation, Action: "install"})
+	s, _ = s.Update(coreKey("esc"))
+	s.Status.Installed = []string{"alpha-478af2a"}
+	s, cmd = s.releaseAction("activate")
+	defer s.Close()
+	if !s.Busy || s.task != "activate" || cmd == nil {
+		t.Fatal("downloaded alpha build is not available for activation")
+	}
+}
+
+func TestReleaseRowColorsDistinguishVersionStatesAcrossThemes(t *testing.T) {
+	i18n.Init()
+	profile := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	t.Cleanup(func() { lipgloss.SetColorProfile(profile) })
+	originalTheme := theme.CurrentName()
+	t.Cleanup(func() { theme.SetTheme(originalTheme) })
+	s := releaseFixture(t)
+	current, _ := s.releaseAt(0)
+	installed, _ := s.releaseAt(1)
+	s.Status = service.CoreStatus{Mode: "managed", Version: current.Version(), Installed: []string{current.Version(), installed.Version()}}
+	prerelease, _ := s.releaseAt(3)
+	prerelease.Prerelease = true
+	if err := s.catalog.store.put(3, prerelease); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range theme.Names() {
+		theme.SetTheme(name)
+		page := s.layout(120, 29)
+		lines := strings.Split(page.content, "\n")
+		colors := map[string]bool{}
+		for _, hit := range page.releases[:4] {
+			row := ansi.Cut(lines[hit.y], hit.x+1, hit.x+hit.width-1)
+			r, _ := s.releaseAt(hit.index)
+			at := strings.Index(row, r.Version())
+			if at < 0 {
+				t.Fatal("colored version is missing")
+			}
+			codes := regexp.MustCompile(`\x1b\[38;2;[0-9;]+m`).FindAllString(row[:at], -1)
+			if len(codes) == 0 {
+				t.Fatal("version row is not colored")
+			}
+			color := codes[len(codes)-1]
+			if colors[color] {
+				t.Fatalf("theme %s: release states lack distinct colors: %q", name, row)
+			}
+			colors[color] = true
 		}
 	}
 }

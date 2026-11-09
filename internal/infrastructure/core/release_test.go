@@ -234,3 +234,68 @@ func TestReleasePaginationDoesNotRelaxProxyOrAcceleratorValidation(t *testing.T)
 		t.Fatal("accelerator query string was accepted")
 	}
 }
+
+func TestReleaseListAndLookupIncludePrereleases(t *testing.T) {
+	alpha := catalogRelease("Prerelease-Alpha", "linux-amd64-compatible")
+	alpha.Prerelease = true
+	alpha.Assets[0].Name = "mihomo-linux-amd64-compatible-alpha-478af2a.gz"
+	alpha.Assets[0].URL = "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/" + alpha.Assets[0].Name
+	rc := catalogRelease("v1.20.0-rc.1", "linux-amd64-compatible")
+	rc.Prerelease = true
+	stable := catalogRelease("v1.19.0", "linux-amd64-compatible")
+	list, _ := json.Marshal([]Release{alpha, rc, stable})
+	f := testFetcher(t, func(_ Route, req *http.Request) (int, string, error) {
+		if strings.Contains(req.URL.Path, "/tags/") || strings.HasSuffix(req.URL.Path, "/latest") {
+			data, _ := json.Marshal(alpha)
+			return 200, string(data), nil
+		}
+		return 200, string(list), nil
+	})
+	page, err := f.Releases(context.Background(), 1, "linux", "amd64")
+	if err != nil || len(page.Releases) != 3 {
+		t.Fatalf("prereleases missing: %+v %v", page, err)
+	}
+	if got := page.Releases[0].Version(); got != "alpha-478af2a" {
+		t.Fatalf("rolling tag did not resolve its executable version: %s", got)
+	}
+	lookup, err := f.Release(context.Background(), "Prerelease-Alpha")
+	if err != nil || lookup.Version() != "alpha-478af2a" {
+		t.Fatalf("alpha lookup failed: %+v %v", lookup, err)
+	}
+	f.Accelerators = []Accelerator{}
+	if _, err = f.Release(context.Background(), "latest"); err == nil {
+		t.Fatal("stable update accepted prerelease metadata")
+	}
+	for _, version := range []string{"alpha-478af2a", "beta-1234567", "v1.20.0-rc.1"} {
+		path, err := BinaryPath(t.TempDir(), version, "windows")
+		if err != nil || !strings.HasSuffix(path, "mihomo.exe") {
+			t.Fatalf("prerelease cannot be installed: %s %v", version, err)
+		}
+	}
+}
+
+func TestAlphaInstallUsesBuildVersionAndVerifiesArchive(t *testing.T) {
+	var archive bytes.Buffer
+	w := gzip.NewWriter(&archive)
+	_, _ = w.Write([]byte("alpha executable"))
+	_ = w.Close()
+	digest := sha256.Sum256(archive.Bytes())
+	r := Release{Tag: "Prerelease-Alpha", Prerelease: true, Trusted: true}
+	name := "mihomo-linux-amd64-compatible-alpha-478af2a.gz"
+	r.Assets = []Asset{{Name: name, URL: "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/" + name, Digest: "sha256:" + hex.EncodeToString(digest[:])}}
+	f := testFetcher(t, func(Route, *http.Request) (int, string, error) { return 200, archive.String(), nil })
+	root := t.TempDir()
+	installed, err := f.Install(context.Background(), root, r, "linux", "amd64")
+	if err != nil || installed.Version != "alpha-478af2a" {
+		t.Fatalf("alpha installation failed: %+v %v", installed, err)
+	}
+	binary, _ := BinaryPath(root, installed.Version, "linux")
+	data, err := os.ReadFile(binary)
+	if err != nil || string(data) != "alpha executable" {
+		t.Fatalf("wrong executable installation: %s %v", data, err)
+	}
+	r.Assets[0].Digest = "sha256:" + strings.Repeat("0", 64)
+	if _, err = f.Install(context.Background(), t.TempDir(), r, "linux", "amd64"); err == nil {
+		t.Fatal("alpha download skipped checksum verification")
+	}
+}

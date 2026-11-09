@@ -1,7 +1,9 @@
 package service
 
 import (
+	"context"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -106,4 +108,33 @@ func TestCoreStatusIncludesManagedPathsAndEndpoint(t *testing.T) {
 	require.Equal(t, path, status.ConfigPath)
 	require.Equal(t, config.ResolveMihomoEndpoint().ExternalController, status.Controller)
 	require.Equal(t, config.ResolveMihomoEndpoint().MixedPort, status.MixedPort)
+}
+
+func TestCoreActivatesPrereleaseByExactBuildVersion(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fixture executable uses a POSIX shell")
+	}
+	newIsolatedService(t)
+	root, err := config.GetConfigDir()
+	require.NoError(t, err)
+	version := "alpha-478af2a"
+	binary, err := coreinfra.BinaryPath(root, version, runtime.GOOS)
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(filepath.Dir(binary), 0700))
+	require.NoError(t, os.WriteFile(binary, []byte("#!/bin/sh\nprintf 'Mihomo alpha-478af2a linux amd64\\n'\n"), 0700))
+	svc := NewCoreService()
+	defer svc.Close()
+	require.NoError(t, svc.ActivateVersion(context.Background(), version))
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	require.Equal(t, version, cfg.Core.Version)
+	other := "alpha-1234567"
+	wrongBinary, err := coreinfra.BinaryPath(root, other, runtime.GOOS)
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(filepath.Dir(wrongBinary), 0700))
+	require.NoError(t, os.WriteFile(wrongBinary, []byte("#!/bin/sh\nprintf 'Mihomo alpha-478af2a linux amd64\\n'\n"), 0700))
+	require.Error(t, svc.ActivateVersion(context.Background(), other))
+	cfg, err = config.Load()
+	require.NoError(t, err)
+	require.Equal(t, version, cfg.Core.Version)
 }

@@ -787,7 +787,7 @@
   "core.manage_here": "Use the Core menu to manage this hosted core.",
   "core.help.runtime": "Start / stop the managed core",
   "cli.core.short": "Install and manage the Mihomo core",
-  "cli.core.version": "Stable release tag (install defaults to the bundled verified version)",
+  "cli.core.version": "Release tag, e.g. v1.19.33 or Prerelease-Alpha (install defaults to the bundled verified version)",
   "cli.core.file": "Local executable to import",
   "cli.core.sha256": "Independently verified local executable SHA-256",
   "cli.setup.short": "Install the verified core and create a DIRECT configuration",
@@ -865,7 +865,7 @@
   "core.error_title": "Action incomplete · retry or check settings",
   "core.navigation_help": "↑↓ Select · Enter Run · ←→ / 1–3 Switch section · Wheel Scroll · ? Help",
   "core.service_help": "↑↓ Select · Enter Run · Esc Back. Stop the core before installing the background service.",
-  "core.version_input": "Version (for example v1.19.33)",
+  "core.version_input": "Release tag (e.g. v1.19.33 / Prerelease-Alpha)",
   "core.desc.setup": "Download, configure and start automatically. No subscription is needed for direct connections.",
   "core.desc.profile": "Enter a subscription URL or local config path to import and use it.",
   "core.desc.start": "Start the core with your saved configuration.",
@@ -914,7 +914,7 @@
   "core.catalog.activate": "[a] Use this version (may restart)",
   "core.catalog.download_hint": "Downloading keeps the current core running. Activate the version separately.",
   "core.catalog.unverified": "A trusted checksum is unavailable. Refresh or import an independently verified local file.",
-  "core.catalog.empty": "No compatible stable versions found yet. Retry or press t to find a version.",
+  "core.catalog.empty": "No compatible versions found yet. Retry or press t to find a version.",
   "core.catalog.fallback": "Showing a cached or bundled version. Press r to query official releases.",
   "core.catalog.refresh": "[r] Refresh",
   "core.catalog.help": "↑↓ / Wheel Browse & load · Enter Download · a Activate · t Find · l Import · g Update · b Rollback",
@@ -942,5 +942,9 @@
   "core.binary_path": "Binary path",
   "core.config_path": "Config path",
   "core.controller_address": "Controller",
-  "core.mixed_port_label": "Proxy port"
+  "core.mixed_port_label": "Proxy port",
+  "core.catalog.prerelease": "Prerelease",
+  "core.task.complete": "Task completed",
+  "core.task.cancelled": "Task cancelled",
+  "core.task.close": "Enter / Esc Close"
 }

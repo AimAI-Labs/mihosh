@@ -194,35 +194,11 @@ func (s State) layout(width, height int) pageLayout {
 		labels = append(labels, style.Render(label))
 	}
 	parts := []string{panel(i18n.T("core.heading"), strings.Join(labels, "│"), width), ""}
-	if s.Busy && !(s.tab == 1 && s.task == "releases" && s.catalog.loaded) {
-		progress := i18n.T("core.action."+s.task) + " · " + i18n.T("core.busy")
-		if s.Progress.Route != "" {
-			route := "direct"
-			if strings.HasPrefix(s.Progress.Route, "proxy:") {
-				route = "proxy"
-			} else if strings.HasPrefix(s.Progress.Route, "accelerator:") {
-				route = "accelerator"
-			}
-			progress += "\n" + i18n.T("core.route."+route)
-		}
-		if s.Progress.Downloaded > 0 {
-			progress += fmt.Sprintf(" %.1f MiB", float64(s.Progress.Downloaded)/(1<<20))
-			if s.Progress.Total > 0 {
-				progress += fmt.Sprintf(" / %.1f MiB", float64(s.Progress.Total)/(1<<20))
-			}
-		}
-		if s.Progress.BytesPerSecond > 0 {
-			progress += fmt.Sprintf(" · %.1f KiB/s", float64(s.Progress.BytesPerSecond)/1024)
-		}
-		if s.Progress.Total > 0 {
-			fraction := min(1.0, max(0.0, float64(s.Progress.Downloaded)/float64(s.Progress.Total)))
-			cells := max(1, min(30, width-12))
-			filled := int(fraction * float64(cells))
-			progress += "\n" + strings.Repeat("━", filled) + strings.Repeat("─", cells-filled) + fmt.Sprintf(" %.0f%%", fraction*100)
-		}
+	if s.Busy && !downloadTask(s.task) && !(s.tab == 1 && s.task == "releases" && s.catalog.loaded) {
+		progress := s.progressText(width)
 		parts = append(parts, panel(i18n.T("core.task"), wrap(progress, width-4)+"\n"+muted.Render(i18n.T("core.cancel")), width), "")
 	}
-	if s.Err != nil {
+	if s.Err != nil && !s.taskDialog {
 		detail := strings.Split(wrap(s.Err.Error(), width-4), "\n")
 		if s.tab == 1 && len(detail) > 2 {
 			detail = detail[:2]
@@ -319,5 +295,9 @@ func (s State) Render(width, height int) string {
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], width, "…")
 	}
-	return common.OverlayHelpAtBottomRight(strings.Join(lines, "\n"), s.inlineHelp(width), width, height)
+	base := common.OverlayHelpAtBottomRight(strings.Join(lines, "\n"), s.inlineHelp(width), width, height)
+	if s.taskDialog {
+		return s.overlayTask(base, width, height)
+	}
+	return base
 }

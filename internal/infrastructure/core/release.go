@@ -15,7 +15,12 @@ import (
 
 const releaseAPI = "https://api.github.com/repos/MetaCubeX/mihomo/releases/"
 
-var validTag = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+$`)
+var stableTag = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+$`)
+var validTag = regexp.MustCompile(`^(v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?|(alpha|beta)-[0-9a-f]{7,40})$`)
+
+func validReleaseTag(tag string) bool {
+	return validTag.MatchString(tag) || tag == "Prerelease-Alpha" || tag == "Prerelease-Beta"
+}
 
 type Asset struct {
 	Name   string `json:"name"`
@@ -38,8 +43,8 @@ type Release struct {
 func (f *Fetcher) Release(ctx context.Context, tag string) (Release, error) {
 	endpoint := releaseAPI + "latest"
 	if tag != "" && tag != "latest" {
-		if !validTag.MatchString(tag) {
-			return Release{}, errors.New("invalid stable release tag")
+		if !validReleaseTag(tag) {
+			return Release{}, errors.New("invalid release tag")
 		}
 		endpoint = releaseAPI + "tags/" + url.PathEscape(tag)
 	}
@@ -49,8 +54,8 @@ func (f *Fetcher) Release(ctx context.Context, tag string) (Release, error) {
 		if err := json.Unmarshal(data, &r); err != nil {
 			return errors.New("invalid release JSON")
 		}
-		if !validTag.MatchString(r.Tag) || r.Draft || r.Prerelease || len(r.Assets) == 0 {
-			return errors.New("invalid stable release metadata")
+		if !validReleaseTag(r.Tag) || r.Draft || len(r.Assets) == 0 || ((tag == "" || tag == "latest") && (r.Prerelease || !stableTag.MatchString(r.Tag))) {
+			return errors.New("invalid release metadata")
 		}
 		if tag != "" && tag != "latest" && r.Tag != tag {
 			return errors.New("release tag mismatch")
@@ -92,7 +97,7 @@ func validateReleaseAssets(r Release) error {
 const ReleasePageSize = 10
 
 // ReleasePage retains only assets for the requested platform, keeping each page bounded.
-// HasNext follows the unfiltered GitHub page, so alpha or incompatible entries do not
+// HasNext follows the unfiltered GitHub page, so incompatible entries do not
 // prematurely terminate browsing.
 type ReleasePage struct {
 	Page     int       `json:"page"`
@@ -114,7 +119,7 @@ func (f *Fetcher) Releases(ctx context.Context, page int, goos, arch string) (Re
 		candidate := ReleasePage{Page: page, HasNext: len(releases) == ReleasePageSize, Releases: []Release{}}
 		seen := make(map[string]bool)
 		for _, r := range releases {
-			if r.Draft || r.Prerelease || !validTag.MatchString(r.Tag) {
+			if r.Draft || !validReleaseTag(r.Tag) {
 				continue
 			}
 			if len(r.Assets) == 0 {
@@ -166,13 +171,61 @@ func (r Release) SelectAsset(goos, arch string) (Asset, error) {
 	if goos == "windows" {
 		ext = ".zip"
 	}
-	name := "mihomo-" + goos + "-" + platform + "-" + r.Tag + ext
-	for _, a := range r.Assets {
-		if a.Name == name {
-			return a, nil
+	platforms := []string{platform}
+	if arch == "amd64" {
+		platforms = append(platforms, "amd64-v1")
+	}
+	for _, platform := range platforms {
+		prefix := "mihomo-" + goos + "-" + platform + "-"
+		var match Asset
+		for _, a := range r.Assets {
+			if !strings.HasPrefix(a.Name, prefix) || !strings.HasSuffix(a.Name, ext) {
+				continue
+			}
+			version := strings.TrimSuffix(strings.TrimPrefix(a.Name, prefix), ext)
+			if !validTag.MatchString(version) {
+				continue
+			}
+			channel := strings.TrimPrefix(r.Tag, "Prerelease-")
+			if r.Tag != version && !(r.Prerelease && (channel == "Alpha" || channel == "Beta") && strings.HasPrefix(version, strings.ToLower(channel)+"-")) {
+				continue
+			}
+			if match.Name != "" {
+				return Asset{}, errors.New("ambiguous compatible release assets")
+			}
+			match = a
+		}
+		if match.Name != "" {
+			return match, nil
 		}
 	}
 	return Asset{}, fmt.Errorf("no compatible asset for %s/%s", goos, arch)
+}
+
+// Version identifies the executable build, including the commit of rolling releases.
+// The upstream Prerelease-Alpha tag is reused; installation directories must not be.
+func (r Release) Version() string {
+	if validTag.MatchString(r.Tag) {
+		return r.Tag
+	}
+	for _, goos := range []string{"linux", "windows"} {
+		for _, arch := range []string{"amd64", "arm64"} {
+			if asset, err := r.SelectAsset(goos, arch); err == nil {
+				ext := ".gz"
+				if goos == "windows" {
+					ext = ".zip"
+				}
+				name := strings.TrimSuffix(asset.Name, ext)
+				for _, platform := range []string{"amd64-compatible", "amd64-v1", "arm64"} {
+					prefix := "mihomo-" + goos + "-" + platform + "-"
+					if strings.HasPrefix(name, prefix) {
+						return strings.TrimPrefix(name, prefix)
+					}
+				}
+			}
+		}
+	}
+	return r.Tag
 }
 
 func (r Release) TrustedDigest(asset Asset, pinned map[string]string) (string, error) {

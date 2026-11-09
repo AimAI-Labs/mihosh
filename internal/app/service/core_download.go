@@ -101,7 +101,7 @@ func (s *CoreService) Install(ctx context.Context, r coreinfra.Release, notify f
 	// Installation does not take ownership of an existing external instance.
 	return config.Update(func(latest *config.Config) error {
 		if latest.Core.Version == "" {
-			latest.Core.Version = r.Tag
+			latest.Core.Version = r.Version()
 		}
 		return nil
 	})
@@ -173,5 +173,5 @@ func (s *CoreService) Upgrade(ctx context.Context, notify func(coreinfra.Progres
 	if err = s.Install(ctx, release, notify); err != nil {
 		return err
 	}
-	return s.UpgradeVersion(ctx, release.Tag)
+	return s.UpgradeVersion(ctx, release.Version())
 }

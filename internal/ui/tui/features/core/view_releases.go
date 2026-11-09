@@ -21,13 +21,30 @@ type releaseControl struct {
 }
 
 func (s State) releaseBadge(r coreinfra.Release) string {
-	if s.Status.Mode == "managed" && s.Status.Version == r.Tag {
+	if s.Status.Mode == "managed" && s.Status.Version == r.Version() {
 		return i18n.T("core.catalog.current")
 	}
-	if s.releaseInstalled(r.Tag) {
+	if s.releaseInstalled(r.Version()) {
 		return i18n.T("core.catalog.installed")
 	}
+	if r.Prerelease {
+		return i18n.T("core.catalog.prerelease")
+	}
 	return i18n.T("core.catalog.stable")
+}
+
+func (s State) releaseColor(r coreinfra.Release) lipgloss.Color {
+	t := theme.Current()
+	if s.Status.Mode == "managed" && s.Status.Version == r.Version() {
+		return t.Success
+	}
+	if s.releaseInstalled(r.Version()) {
+		return t.Info
+	}
+	if r.Prerelease {
+		return t.Warning
+	}
+	return t.Foreground
 }
 
 func releaseInfo(r coreinfra.Release) string {
@@ -50,11 +67,11 @@ func (s State) releaseDetails(width int, compact bool, budget int) (string, []re
 		return panel(i18n.T("core.catalog.selection"), wrap(i18n.T("core.catalog.empty"), width-4), width), nil
 	}
 	dense := budget < 12 || (compact && budget < 9)
-	heading := r.Tag + " · " + s.releaseBadge(r)
+	heading := r.Version() + " · " + s.releaseBadge(r)
 	if dense {
 		heading += " · " + releaseInfo(r)
 	}
-	rows := []string{lipgloss.NewStyle().Foreground(t.Primary).Bold(true).Render(ansi.Truncate(heading, width-4, "…"))}
+	rows := []string{lipgloss.NewStyle().Foreground(s.releaseColor(r)).Bold(true).Render(ansi.Truncate(heading, width-4, "…"))}
 	if !dense {
 		rows = append(rows, releaseInfo(r))
 	}
@@ -79,7 +96,7 @@ func (s State) releaseDetails(width int, compact bool, budget int) (string, []re
 		}
 		rows = append(rows, style.Render(ansi.Truncate(text, width-4, "…")))
 	}
-	installed := s.releaseInstalled(r.Tag)
+	installed := s.releaseInstalled(r.Version())
 	verified := false
 	if len(r.Assets) > 0 {
 		_, err := r.TrustedDigest(r.Assets[0], coreinfra.PinnedDigests())
@@ -90,7 +107,7 @@ func (s State) releaseDetails(width int, compact bool, budget int) (string, []re
 		download = "core.catalog.downloaded"
 	}
 	button("install", i18n.T(download), !installed && verified)
-	button("activate", i18n.T("core.catalog.activate"), installed && !(s.Status.Mode == "managed" && s.Status.Version == r.Tag))
+	button("activate", i18n.T("core.catalog.activate"), installed && !(s.Status.Mode == "managed" && s.Status.Version == r.Version()))
 	if !dense {
 		rows = append(rows, strings.Split(muted.Render(wrap(i18n.T("core.catalog.download_hint"), width-4)), "\n")...)
 	}
@@ -148,7 +165,7 @@ func (s State) releaseLayout(width, height int, parts []string, result pageLayou
 	footerHeight := 3
 	detailBudget := height - top - footerHeight
 	if !wide {
-		detailBudget -= 5 // one visible release and a separating line
+		detailBudget -= 4 // one visible release and a separating line
 	}
 	left, controls := s.releaseDetails(leftWidth, !wide, detailBudget)
 	listHeight := height - top - footerHeight
@@ -157,7 +174,7 @@ func (s State) releaseLayout(width, height int, parts []string, result pageLayou
 		listY += lipgloss.Height(left) + 1
 		listHeight -= lipgloss.Height(left) + 1
 	}
-	visible := max(1, (listHeight-2)/2)
+	visible := max(1, listHeight-2)
 	result.listRows = visible
 	start := s.releaseStart(visible)
 	var rows []string
@@ -177,12 +194,13 @@ func (s State) releaseLayout(width, height int, parts []string, result pageLayou
 		if i == s.selected {
 			marker = "› "
 		}
-		label := ansi.Truncate(marker+r.Tag+"  ["+s.releaseBadge(r)+"]", rightWidth-4, "…")
+		label := ansi.Truncate(marker+r.Version()+"  ["+s.releaseBadge(r)+"] · "+releaseInfo(r), rightWidth-4, "…")
+		label = lipgloss.NewStyle().Foreground(s.releaseColor(r)).Render(label)
 		if i == s.selected {
-			label = selected.Render(common.PadString(label, rightWidth-4))
+			label = selected.Foreground(s.releaseColor(r)).Render(common.PadString(label, rightWidth-4))
 		}
-		result.releases = append(result.releases, actionHit{x: listX + 1, y: listY + len(rows) + 1, width: rightWidth - 2, height: 2, index: i})
-		rows = append(rows, label, muted.Render(ansi.Truncate("  "+releaseInfo(r), rightWidth-4, "…")))
+		result.releases = append(result.releases, actionHit{x: listX + 1, y: listY + len(rows) + 1, width: rightWidth - 2, height: 1, index: i})
+		rows = append(rows, label)
 	}
 	right := panel(i18n.T("core.catalog.title"), strings.Join(rows, "\n"), rightWidth)
 	if wide {
