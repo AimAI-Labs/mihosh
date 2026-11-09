@@ -73,15 +73,30 @@ func validProxy(raw string) (*url.URL, error) {
 // Only canonical URLs belonging to the official repository may enter the gateway chain.
 func validateSource(raw string) error {
 	u, err := url.Parse(raw)
-	if err != nil || u.Scheme != "https" || u.User != nil || u.Port() != "" || u.Fragment != "" || u.RawQuery != "" {
+	if err != nil || u.Scheme != "https" || u.User != nil || u.Port() != "" || u.Fragment != "" {
 		return errors.New("invalid official Mihomo URL")
 	}
 	switch u.Hostname() {
 	case "api.github.com":
+		if u.Path == "/repos/MetaCubeX/mihomo/releases" {
+			q, err := url.ParseQuery(u.RawQuery)
+			page, pageErr := strconv.Atoi(q.Get("page"))
+			if err == nil && len(q) == 2 && len(q["page"]) == 1 && len(q["per_page"]) == 1 &&
+				q.Get("per_page") == strconv.Itoa(ReleasePageSize) && pageErr == nil && page >= 1 {
+				return nil
+			}
+			return errors.New("invalid release list query")
+		}
+		if u.RawQuery != "" {
+			return errors.New("unexpected release query")
+		}
 		if strings.HasPrefix(u.Path, "/repos/MetaCubeX/mihomo/releases/") {
 			return nil
 		}
 	case "github.com":
+		if u.RawQuery != "" {
+			return errors.New("unexpected asset query")
+		}
 		if strings.HasPrefix(u.Path, "/MetaCubeX/mihomo/releases/download/") {
 			return nil
 		}

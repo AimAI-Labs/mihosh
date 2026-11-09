@@ -61,6 +61,21 @@ func (s *CoreService) Release(ctx context.Context, tag string, notify func(corei
 	}
 	return release, nil
 }
+
+// Releases queries one page without installing, activating or changing the runtime.
+func (s *CoreService) Releases(ctx context.Context, page int, notify func(coreinfra.Progress)) (coreinfra.ReleasePage, error) {
+	cfg, err := loadCoreConfig()
+	if err != nil {
+		return coreinfra.ReleasePage{}, err
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	unregister := context.AfterFunc(s.lifetime, cancel)
+	defer unregister()
+	fetcher := coreFetcher(cfg, notify)
+	fetcher.RunningProxy = managedDownloadProxy(cfg)
+	return fetcher.Releases(ctx, page, runtime.GOOS, runtime.GOARCH)
+}
 func (s *CoreService) Install(ctx context.Context, r coreinfra.Release, notify func(coreinfra.Progress)) error {
 	if !s.mu.TryLock() {
 		return errors.New("another core operation is active")

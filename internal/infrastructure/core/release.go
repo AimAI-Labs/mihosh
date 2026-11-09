@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -24,13 +25,14 @@ type Asset struct {
 }
 
 type Release struct {
-	FetchedAt  time.Time `json:"fetched_at"`
-	Tag        string    `json:"tag_name"`
-	Prerelease bool      `json:"prerelease"`
-	Draft      bool      `json:"draft"`
-	Assets     []Asset   `json:"assets"`
-	Route      string    `json:"route"`
-	Trusted    bool      `json:"trusted"`
+	PublishedAt time.Time `json:"published_at"`
+	FetchedAt   time.Time `json:"fetched_at"`
+	Tag         string    `json:"tag_name"`
+	Prerelease  bool      `json:"prerelease"`
+	Draft       bool      `json:"draft"`
+	Assets      []Asset   `json:"assets"`
+	Route       string    `json:"route"`
+	Trusted     bool      `json:"trusted"`
 }
 
 func (f *Fetcher) Release(ctx context.Context, tag string) (Release, error) {
@@ -53,19 +55,8 @@ func (f *Fetcher) Release(ctx context.Context, tag string) (Release, error) {
 		if tag != "" && tag != "latest" && r.Tag != tag {
 			return errors.New("release tag mismatch")
 		}
-		seen := make(map[string]bool)
-		for _, a := range r.Assets {
-			if a.Name == "" || strings.ContainsAny(a.Name, "/\\") || seen[a.Name] || a.Size < 0 {
-				return errors.New("invalid release asset")
-			}
-			if err := validateSource(a.URL); err != nil {
-				return err
-			}
-			u, _ := url.Parse(a.URL)
-			if u.Host != "github.com" || u.Path != "/MetaCubeX/mihomo/releases/download/"+r.Tag+"/"+a.Name {
-				return errors.New("release asset URL mismatch")
-			}
-			seen[a.Name] = true
+		if err := validateReleaseAssets(r); err != nil {
+			return err
 		}
 		release = r
 		return nil
@@ -77,6 +68,84 @@ func (f *Fetcher) Release(ctx context.Context, tag string) (Release, error) {
 	release.Route = route.Name
 	release.Trusted = route.Trusted()
 	return release, nil
+}
+
+// validateReleaseAssets is shared by single-release lookups and the release browser.
+func validateReleaseAssets(r Release) error {
+	seen := make(map[string]bool)
+	for _, a := range r.Assets {
+		if a.Name == "" || strings.ContainsAny(a.Name, "/\\") || seen[a.Name] || a.Size < 0 {
+			return errors.New("invalid release asset")
+		}
+		if err := validateSource(a.URL); err != nil {
+			return err
+		}
+		u, _ := url.Parse(a.URL)
+		if u.Host != "github.com" || u.Path != "/MetaCubeX/mihomo/releases/download/"+r.Tag+"/"+a.Name {
+			return errors.New("release asset URL mismatch")
+		}
+		seen[a.Name] = true
+	}
+	return nil
+}
+
+const ReleasePageSize = 10
+
+// ReleasePage retains only assets for the requested platform, keeping each page bounded.
+// HasNext follows the unfiltered GitHub page, so alpha or incompatible entries do not
+// prematurely terminate browsing.
+type ReleasePage struct {
+	Page     int       `json:"page"`
+	HasNext  bool      `json:"has_next"`
+	Releases []Release `json:"releases"`
+}
+
+func (f *Fetcher) Releases(ctx context.Context, page int, goos, arch string) (ReleasePage, error) {
+	if page < 1 {
+		return ReleasePage{}, errors.New("invalid release page")
+	}
+	endpoint := strings.TrimSuffix(releaseAPI, "/") + "?per_page=" + strconv.Itoa(ReleasePageSize) + "&page=" + strconv.Itoa(page)
+	var result ReleasePage
+	_, route, err := f.Metadata(ctx, endpoint, func(data []byte) error {
+		var releases []Release
+		if err := json.Unmarshal(data, &releases); err != nil || releases == nil || len(releases) > ReleasePageSize {
+			return errors.New("invalid release list JSON")
+		}
+		candidate := ReleasePage{Page: page, HasNext: len(releases) == ReleasePageSize, Releases: []Release{}}
+		seen := make(map[string]bool)
+		for _, r := range releases {
+			if r.Draft || r.Prerelease || !validTag.MatchString(r.Tag) {
+				continue
+			}
+			if len(r.Assets) == 0 {
+				continue
+			}
+			if err := validateReleaseAssets(r); err != nil {
+				return err
+			}
+			if seen[r.Tag] {
+				return errors.New("duplicate release tag")
+			}
+			seen[r.Tag] = true
+			asset, err := r.SelectAsset(goos, arch)
+			if err != nil {
+				continue
+			}
+			r.Assets = []Asset{asset}
+			candidate.Releases = append(candidate.Releases, r)
+		}
+		result = candidate
+		return nil
+	})
+	if err != nil {
+		return ReleasePage{}, err
+	}
+	for i := range result.Releases {
+		result.Releases[i].FetchedAt = time.Now().UTC()
+		result.Releases[i].Route = route.Name
+		result.Releases[i].Trusted = route.Trusted()
+	}
+	return result, nil
 }
 
 // SelectAsset uses baseline amd64 builds, avoiding unverified CPU instructions.
