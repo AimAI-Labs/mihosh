@@ -100,7 +100,7 @@ func (s State) IsThemeSelected() bool {
 
 // FetchMihomoVersion 返回一个拉取 Mihomo 版本信息的 Cmd
 func FetchMihomoVersion(client *api.Client) tea.Cmd {
-	return func() tea.Msg {
+	return messages.CoreRequest(client, func(client *api.Client) tea.Msg {
 		if client == nil {
 			return messages.MihomoVersionMsg{Version: "unknown"}
 		}
@@ -109,7 +109,7 @@ func FetchMihomoVersion(client *api.Client) tea.Cmd {
 			return messages.MihomoVersionMsg{Version: "unknown"}
 		}
 		return messages.MihomoVersionMsg{Version: info.Version}
-	}
+	})
 }
 
 // ApplyMihomoVersion 应用版本信息

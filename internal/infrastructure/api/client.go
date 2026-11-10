@@ -25,6 +25,7 @@ type Client struct {
 	baseURL    string
 	secret     string
 	httpClient *http.Client
+	generation uint64
 }
 
 // noProxyTransport 屏蔽系统环境变量代理（如 http_proxy/https_proxy），
@@ -54,7 +55,21 @@ func (c *Client) UpdateEndpoint(baseURL, secret string) {
 	c.mu.Lock()
 	c.baseURL = baseURL
 	c.secret = secret
+	c.generation++
 	c.mu.Unlock()
+}
+
+// Snapshot binds a logical operation to one controller without duplicating its transport.
+func (c *Client) Snapshot() *Client {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return &Client{baseURL: c.baseURL, secret: c.secret, httpClient: c.httpClient, generation: c.generation}
+}
+
+func (c *Client) Generation() uint64 {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.generation
 }
 
 // ensureScheme 为 baseURL 补 http:// 前缀（若无 http:///https://）。

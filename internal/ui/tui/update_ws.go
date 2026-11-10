@@ -66,6 +66,11 @@ func reloadConfigCmd(client interface {
 
 func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case messages.CoreHTTPMsg:
+		if m.client == nil || msg.Generation != m.client.Generation() {
+			return m, nil
+		}
+		return m.handleWSMessages(msg.Payload)
 	case messages.CoreOwnerChangedMsg:
 		m.reloadStoredConfig()
 		update := coreTargetReconnect

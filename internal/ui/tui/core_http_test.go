@@ -1,0 +1,160 @@
+package tui
+
+import (
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
+	"testing"
+
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/stretchr/testify/require"
+)
+
+func TestLateHTTPCompletionsCannotAffectCurrentTarget(t *testing.T) {
+	for _, payload := range []tea.Msg{
+		messages.GroupsMsg{Groups: map[string]model.Group{"late": {Name: "late"}}, OrderedNames: []string{"late"}},
+		messages.ProxiesMsg{"late": {Name: "late"}},
+		messages.ConfigModeMsg{Mode: "global"},
+		messages.ConnectionsMsg{Resp: &model.ConnectionsResponse{}},
+		messages.AutoRefreshMsg{Result: messages.AutoRefreshResult{Mode: "global"}},
+		messages.MihomoConfigMsg{Config: &model.MihomoConfig{ExternalController: "old-controller"}},
+		messages.ErrMsg{Err: errors.New("old controller failed")},
+	} {
+		for _, action := range []string{"switch", "restart", "switch-back"} {
+			t.Run(action+"/"+httpPayloadName(payload), func(t *testing.T) {
+				m, _ := targetTestModel(t)
+				cmd := messages.CoreRequest(m.client, func(*api.Client) tea.Msg { return payload })
+				old := m.client.EndpointSnapshot()
+				endpoint := old
+				if action != "restart" {
+					endpoint.ExternalController = "new-controller"
+				}
+				m.updateCoreTarget(endpoint, coreTargetReconnect)
+				if action == "switch-back" {
+					m.updateCoreTarget(old, coreTargetReconnect)
+				}
+				generation := m.client.Generation()
+				updated, follow := m.Update(cmd())
+				next := updated.(Model)
+				require.Nil(t, follow)
+				require.Nil(t, next.err)
+				require.Equal(t, generation, next.client.Generation())
+				require.NotContains(t, next.nodesState.Groups, "late")
+				require.NotContains(t, next.nodesState.Proxies, "late")
+				require.Empty(t, next.nodesState.Mode)
+				require.False(t, next.autoRefreshSynced)
+			})
+		}
+	}
+}
+
+func httpPayloadName(msg tea.Msg) string {
+	switch msg.(type) {
+	case messages.GroupsMsg:
+		return "groups"
+	case messages.ProxiesMsg:
+		return "proxies"
+	case messages.ConfigModeMsg:
+		return "mode"
+	case messages.ConnectionsMsg:
+		return "connections"
+	case messages.AutoRefreshMsg:
+		return "auto-refresh"
+	case messages.MihomoConfigMsg:
+		return "config"
+	default:
+		return "error"
+	}
+}
+
+func TestCurrentHTTPCompletionStillApplies(t *testing.T) {
+	m, _ := targetTestModel(t)
+	cmd := messages.CoreRequest(m.client, func(*api.Client) tea.Msg {
+		return messages.GroupsMsg{Groups: map[string]model.Group{"current": {Name: "current"}}, OrderedNames: []string{"current"}}
+	})
+	updated, _ := m.Update(cmd())
+	require.Contains(t, updated.(Model).nodesState.Groups, "current")
+}
+
+func TestControllerReadCommandsBindTargetBeforeExecution(t *testing.T) {
+	var requestsA, requestsB atomic.Int32
+	a := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestsA.Add(1)
+		switch r.URL.Path {
+		case "/proxies":
+			w.Write([]byte(`{"proxies":{"group":{"type":"Selector","all":["DIRECT"],"now":"DIRECT"}}}`))
+		case "/configs":
+			w.Write([]byte(`{"mode":"rule"}`))
+		case "/connections":
+			w.Write([]byte(`{"connections":[]}`))
+		case "/rules":
+			w.Write([]byte(`{"rules":[]}`))
+		case "/memory":
+			w.Write([]byte(`{"inuse":42}`))
+		case "/version":
+			w.Write([]byte(`{"version":"controller-a"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer a.Close()
+	b := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { requestsB.Add(1); http.Error(w, "wrong target", 500) }))
+	defer b.Close()
+	for _, makeCommand := range []struct {
+		name string
+		make func(*api.Client) tea.Cmd
+	}{
+		{"groups", nodes.FetchGroups}, {"proxies", nodes.FetchProxies}, {"mode", nodes.FetchConfigMode},
+		{"connections", connections.FetchConnections}, {"rules", rules.FetchRules},
+		{"version", settings.FetchMihomoVersion}, {"memory", fetchMemory},
+		{"auto-refresh", func(c *api.Client) tea.Cmd { return fetchAutoRefresh(c, nodes.State{}) }},
+	} {
+		t.Run(makeCommand.name, func(t *testing.T) {
+			m, _ := targetTestModel(t)
+			m.client = api.NewClient(config.MihomoEndpoint{ExternalController: a.URL}, 1000)
+			before := requestsA.Load()
+			cmd := makeCommand.make(m.client)
+			m.client.UpdateEndpoint(b.URL, "new-secret")
+			result, ok := cmd().(messages.CoreHTTPMsg)
+			require.True(t, ok)
+			require.Less(t, result.Generation, m.client.Generation())
+			require.Greater(t, requestsA.Load(), before)
+			require.Zero(t, requestsB.Load())
+			_, failed := result.Payload.(messages.ErrMsg)
+			require.False(t, failed)
+		})
+	}
+}
+
+func TestAutoRefreshKeepsOneTargetAcrossRequests(t *testing.T) {
+	var client *api.Client
+	var requestsB atomic.Int32
+	b := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { requestsB.Add(1); http.Error(w, "wrong target", 500) }))
+	defer b.Close()
+	a := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/proxies" {
+			client.UpdateEndpoint(b.URL, "new-secret")
+			w.Write([]byte(`{"proxies":{}}`))
+		} else {
+			w.Write([]byte(`{"mode":"rule"}`))
+		}
+	}))
+	defer a.Close()
+	client = api.NewClient(config.MihomoEndpoint{ExternalController: a.URL}, 1000)
+	cmd := fetchAutoRefresh(client, nodes.State{})
+	result := cmd().(messages.CoreHTTPMsg)
+	refresh, ok := result.Payload.(messages.AutoRefreshMsg)
+	require.True(t, ok)
+	require.Equal(t, "rule", refresh.Result.Mode)
+	require.Zero(t, requestsB.Load())
+	require.Less(t, result.Generation, client.Generation())
+}

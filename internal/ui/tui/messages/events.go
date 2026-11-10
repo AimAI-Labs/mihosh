@@ -364,4 +364,10 @@ type CoreWSMsg struct {
 	Payload    any
 }
 
+// CoreHTTPMsg carries the generation captured when the controller read was scheduled.
+type CoreHTTPMsg struct {
+	Generation uint64
+	Payload    any
+}
+
 type CoreOwnerChangedMsg struct{ Action string }

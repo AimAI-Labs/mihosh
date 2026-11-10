@@ -187,6 +187,9 @@ func (m Model) topNavActive() bool {
 func (m Model) checkCoreConnection() tea.Cmd {
 	epoch := m.connectionEpoch
 	client := m.client
+	if client != nil {
+		client = client.Snapshot()
+	}
 	return func() tea.Msg {
 		version, err := client.GetVersion()
 		if err != nil {

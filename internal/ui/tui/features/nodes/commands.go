@@ -11,23 +11,23 @@ import (
 )
 
 func FetchGroups(client *api.Client) tea.Cmd {
-	return func() tea.Msg {
+	return messages.CoreRequest(client, func(client *api.Client) tea.Msg {
 		groups, orderedNames, err := client.GetGroups()
 		if err != nil {
 			return messages.ErrMsg{Err: err}
 		}
 		return messages.GroupsMsg{Groups: groups, OrderedNames: orderedNames}
-	}
+	})
 }
 
 func FetchProxies(client *api.Client) tea.Cmd {
-	return func() tea.Msg {
+	return messages.CoreRequest(client, func(client *api.Client) tea.Msg {
 		proxies, err := client.GetProxies()
 		if err != nil {
 			return messages.ErrMsg{Err: err}
 		}
 		return messages.ProxiesMsg(proxies)
-	}
+	})
 }
 
 func SelectProxy(client *api.Client, group, proxy string) tea.Cmd {
@@ -46,7 +46,7 @@ func TestProxy(client *api.Client, name, testURL string, timeout int) tea.Cmd {
 				msg = messages.TestDoneMsg{Name: name, Delay: -1, Err: fmt.Errorf("panic in TestProxy: %v", r), TestURL: testURL}
 			}
 		}()
-		
+
 		if client == nil {
 			return messages.TestDoneMsg{Name: name, Delay: -1, Err: fmt.Errorf("client is nil"), TestURL: testURL}
 		}
@@ -87,13 +87,13 @@ func LaunchBatchTests(client *api.Client, testURL string, timeout int, pending [
 }
 
 func FetchConfigMode(client *api.Client) tea.Cmd {
-	return func() tea.Msg {
+	return messages.CoreRequest(client, func(client *api.Client) tea.Msg {
 		configs, err := client.GetConfigs()
 		if err != nil {
 			return messages.ErrMsg{Err: err}
 		}
 		return messages.ConfigModeMsg{Mode: configs.Mode}
-	}
+	})
 }
 
 func UpdateConfigMode(client *api.Client, mode string) tea.Cmd {

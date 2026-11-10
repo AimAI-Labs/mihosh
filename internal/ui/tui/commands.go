@@ -13,14 +13,14 @@ import (
 
 // fetchMemory 获取当前内存使用量
 func fetchMemory(client *api.Client) tea.Cmd {
-	return func() tea.Msg {
+	return messages.CoreRequest(client, func(client *api.Client) tea.Msg {
 		mem, err := client.GetMemory()
 		if err != nil {
 			// 内存获取失败不报错，返回0
 			return messages.MemoryWSMsg{Memory: 0}
 		}
 		return messages.MemoryWSMsg{Memory: mem.Inuse}
-	}
+	})
 }
 
 // fetchConnectionsAndMemory 同时获取连接和内存数据

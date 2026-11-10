@@ -27,9 +27,11 @@ func (m *Model) updateCoreTarget(endpoint config.MihomoEndpoint, update coreTarg
 	if reset || update != coreTargetSync {
 		m.connectionEpoch++
 		m.connectionReady = false
+		if m.client != nil {
+			m.client.UpdateEndpoint(endpoint.ExternalController, endpoint.Secret)
+		}
 	}
 	if reset {
-		m.client.UpdateEndpoint(endpoint.ExternalController, endpoint.Secret)
 		if m.wsClient != nil {
 			m.wsClient.UpdateEndpoint(endpoint.ExternalController, endpoint.Secret)
 		}

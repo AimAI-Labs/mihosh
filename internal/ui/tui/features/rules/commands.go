@@ -12,7 +12,7 @@ import (
 
 // FetchRules 获取规则列表，并从配置文件合并 no-resolve 标记。
 func FetchRules(client *api.Client) tea.Cmd {
-	return func() tea.Msg {
+	return messages.CoreRequest(client, func(client *api.Client) tea.Msg {
 		rules, err := client.GetRules()
 		if err != nil {
 			return messages.ErrMsg{Err: err}
@@ -31,7 +31,7 @@ func FetchRules(client *api.Client) tea.Cmd {
 		}
 
 		return messages.RulesMsg(rules.Rules)
-	}
+	})
 }
 
 // camelToConfigType 将 Mihomo API 返回的 CamelCase 类型名转换为配置文件中使用的大写横杠分隔格式。

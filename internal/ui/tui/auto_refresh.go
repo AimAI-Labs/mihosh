@@ -11,7 +11,7 @@ import (
 )
 
 func fetchAutoRefresh(client *api.Client, current nodes.State) tea.Cmd {
-	return func() tea.Msg {
+	return messages.CoreRequest(client, func(client *api.Client) tea.Msg {
 		proxies, err := client.GetProxies()
 		if err != nil {
 			return messages.ErrMsg{Err: err}
@@ -28,7 +28,7 @@ func fetchAutoRefresh(client *api.Client, current nodes.State) tea.Cmd {
 			Mode:         configs.Mode,
 		}
 		return messages.AutoRefreshMsg{Result: result, Changed: detectAutoRefreshChange(current, result)}
-	}
+	})
 }
 
 func groupsFromProxies(proxies map[string]model.Proxy) (map[string]model.Group, []string) {

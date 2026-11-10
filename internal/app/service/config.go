@@ -75,9 +75,9 @@ func (s *ConfigService) SetConfigValue(key, value string) error {
 // 路径通过 GetMihomoConfigPath() 解析（Linux 下优先用 systemctl -d 参数）。
 // 始终从磁盘读取，不依赖 API（API 响应可能含运行时变化，文件才是真实来源）。
 func (s *ConfigService) FetchMihomoConfig(client *api.Client) tea.Cmd {
-	return func() tea.Msg {
+	return messages.CoreRequest(client, func(_ *api.Client) tea.Msg {
 		return s.fetchMihomoConfigFromFile(nil)
-	}
+	})
 }
 
 // fetchMihomoConfigFromFile 从 YAML 文件读取 Mihomo 配置的 5 个托管字段。

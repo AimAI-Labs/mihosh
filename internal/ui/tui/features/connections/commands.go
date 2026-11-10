@@ -15,13 +15,13 @@ import (
 )
 
 func FetchConnections(client *api.Client) tea.Cmd {
-	return func() tea.Msg {
+	return messages.CoreRequest(client, func(client *api.Client) tea.Msg {
 		conns, err := client.GetConnections()
 		if err != nil {
 			return messages.ErrMsg{Err: err}
 		}
 		return messages.ConnectionsMsg{Resp: conns}
-	}
+	})
 }
 
 // CloseConnection 关闭单个连接
