@@ -941,6 +941,7 @@
   "core.inline.help": "Help",
   "core.binary_path": "Binary path",
   "core.path_unavailable": "Unavailable",
+  "core.dialog.confirm": "Confirm",
   "core.config_path": "Config path",
   "core.controller_address": "Controller",
   "core.mixed_port_label": "Proxy port",

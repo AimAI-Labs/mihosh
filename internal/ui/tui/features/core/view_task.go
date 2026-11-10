@@ -70,6 +70,11 @@ func (s State) overlayTask(base string, width, height int) string {
 	}
 	body = strings.Join(lines, "\n") + "\n" + ansi.Truncate(hint, max(1, popupWidth-4), "…")
 	popup := common.RenderBorderedPanel(i18n.T("core.task"), body, popupWidth, color, color)
+	return overlayPopup(base, popup, width, height, popupWidth)
+}
+
+func overlayPopup(base, popup string, width, height, popupWidth int) string {
+	popupWidth = min(popupWidth, width)
 	popupLines := strings.Split(popup, "\n")
 	popupHeight := min(height, len(popupLines))
 	x, y := max(0, (width-popupWidth)/2), max(0, (height-popupHeight)/2)
@@ -81,9 +86,9 @@ func (s State) overlayTask(base string, width, height int) string {
 		baseLines[i] = lipgloss.NewStyle().Faint(true).Render(baseLines[i])
 	}
 	for i := 0; i < popupHeight; i++ {
-		left := common.PadString(ansi.Cut(baseLines[y+i], 0, x), x)
+		left := common.PadString(ansi.Truncate(ansi.Cut(baseLines[y+i], 0, x), x, ""), x)
 		right := ansi.Cut(baseLines[y+i], x+popupWidth, width)
-		baseLines[y+i] = left + ansi.Truncate(popupLines[i], popupWidth, "") + right
+		baseLines[y+i] = ansi.Truncate(left+ansi.Truncate(popupLines[i], popupWidth, "")+right, width, "")
 	}
 	return strings.Join(baseLines[:height], "\n")
 }

@@ -2,17 +2,13 @@ package core
 
 import (
 	"context"
-	"net"
 	"runtime"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
-	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -30,6 +26,9 @@ type State struct {
 	args              []string
 	fields            []textinput.Model
 	focus             int
+	choice            int
+	formSelection     int
+	formScroll        int
 	scroll            int
 	tab               int
 	selected          int
@@ -125,9 +124,21 @@ func (s State) begin(action string) (State, tea.Cmd) {
 		case "service":
 			err = svc.ServiceAction(ctx, args[0])
 		case "system-proxy":
-			err = svc.SetSystemProxy(ctx, !status.SystemProxy)
+			enabled := !status.SystemProxy
+			if len(args) > 0 {
+				enabled, err = strconv.ParseBool(args[0])
+			}
+			if err == nil {
+				err = svc.SetSystemProxy(ctx, enabled)
+			}
 		case "tun":
-			err = svc.SetTUN(ctx, !status.TUN)
+			enabled := !status.TUN
+			if len(args) > 0 {
+				enabled, err = strconv.ParseBool(args[0])
+			}
+			if err == nil {
+				err = svc.SetTUN(ctx, enabled)
+			}
 		case "recover":
 			err = svc.RecoverNetwork(ctx)
 		case "check", "release":
@@ -261,41 +272,33 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		if s.taskDialog {
 			return s, nil
 		}
-		if msg.X < 0 || msg.X >= msg.Width || msg.Y < 0 || msg.Y >= msg.Height-1 {
-			return s, nil
+		if s.Editing {
+			return s.clickForm(msg)
 		}
-		if s.Editing && s.form != "service" {
+		if msg.X < 0 || msg.X >= msg.Width || msg.Y < 0 || msg.Y >= msg.Height-1 {
 			return s, nil
 		}
 		page := s.layout(msg.Width, max(1, msg.Height-1))
 		y := msg.Y + s.viewportOffset(page, max(1, msg.Height-1))
-		if !s.Editing {
-			for _, hit := range page.tabs {
-				if msg.X >= hit.x && msg.X < hit.x+hit.width && y == hit.y {
-					return s.openTab(hit.index)
-				}
+		for _, hit := range page.tabs {
+			if msg.X >= hit.x && msg.X < hit.x+hit.width && y == hit.y {
+				return s.openTab(hit.index)
 			}
 		}
-		if !s.Editing && s.tab == 1 {
+		if s.tab == 1 {
 			return s.clickReleasePage(page, msg.X, msg.Y)
 		}
 		for _, hit := range page.actions {
 			if msg.X >= hit.x && msg.X < hit.x+hit.width && y >= hit.y && y < hit.y+hit.height {
 				s.selected = hit.index
-				if s.Editing {
-					return s.submitService()
-				}
 				return s.choose(s.actions()[hit.index].action)
 			}
 		}
 	case messages.PageMouseScrollMsg:
-		if s.taskDialog {
+		if s.taskDialog || s.Editing {
 			return s, nil
 		}
-		if s.Editing && s.form != "service" {
-			return s, nil
-		}
-		if !s.Editing && s.tab == 1 {
+		if s.tab == 1 {
 			return s.scrollReleasePage(msg)
 		}
 		page := s.layout(msg.Width, max(1, msg.Height-1))
@@ -345,11 +348,11 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case "h":
 			return s.editForm("service")
 		case "y":
-			return s.begin("system-proxy")
+			return s.choose("system-proxy")
 		case "n":
-			return s.begin("tun")
+			return s.choose("tun")
 		case "c":
-			return s.begin("recover")
+			return s.choose("recover")
 		case "up", "k":
 			s.selected = max(0, s.selected-1)
 			s.followSelection = true
@@ -389,7 +392,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case "i":
 			return s.begin("install")
 		case "m":
-			return s.begin("configure")
+			return s.choose("configure")
 		case "s":
 			return s.begin("start")
 		case "x":
@@ -400,196 +403,13 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	}
 	return s, nil
 }
-func (s State) editForm(kind string) (State, tea.Cmd) {
-	if s.Busy {
-		return s, nil
-	}
-	s.Err = nil
-	if kind == "service" {
-		s.form, s.Editing = kind, true
-		s.selected, s.scroll = 0, 0
-		s.followSelection = true
-		return s, nil
-	}
-	if kind != "network" {
-		s.form = kind
-		s.Editing = true
-		s.focus = 0
-		count := 1
-		if kind == "import" || kind == "external" {
-			count = 3
-		}
-		if kind == "ports" || kind == "profile" {
-			count = 2
-		}
-
-		s.fields = make([]textinput.Model, count)
-		for i := range s.fields {
-			s.fields[i] = textinput.New()
-			s.fields[i].CharLimit = 2048
-			s.fields[i].Width = 50
-		}
-		switch kind {
-		case "profile":
-			s.fields[0].SetValue(i18n.T("core.profile_default"))
-			s.fields[1].EchoMode = textinput.EchoPassword
-		case "version":
-			s.fields[0].SetValue(s.Release.Tag)
-		case "import":
-			s.fields[1].SetValue(s.Release.Tag)
-		case "external":
-			cfg, _ := config.Load()
-			if cfg != nil {
-				s.fields[0].SetValue(cfg.Core.ExternalController)
-				s.fields[1].SetValue(cfg.Core.ExternalSecret)
-			}
-			s.fields[1].EchoMode = textinput.EchoPassword
-			s.fields[2].SetValue("7890")
-			if cfg != nil && cfg.Core.ExternalMixedPort > 0 {
-				s.fields[2].SetValue(strconv.Itoa(cfg.Core.ExternalMixedPort))
-			}
-		case "ports":
-			endpoint := config.ResolveMihomoEndpoint()
-			s.fields[0].SetValue("9090")
-			if _, port, e := net.SplitHostPort(endpoint.ExternalController); e == nil {
-				s.fields[0].SetValue(port)
-			}
-			s.fields[1].SetValue(strconv.Itoa(endpoint.MixedPort))
-		}
-		s.fields[0].Focus()
-		return s, textinput.Blink
-	}
-	s.form = "network"
-	cfg, err := config.Load()
-	if err != nil {
-		c := config.DefaultConfig
-		cfg = &c
-	}
-	s.Editing = true
-	s.focus = 0
-	s.fields = make([]textinput.Model, 3)
-	for i := range s.fields {
-		s.fields[i] = textinput.New()
-		s.fields[i].CharLimit = 2048
-		s.fields[i].Width = 50
-	}
-	s.fields[0].SetValue(cfg.Core.Proxy)
-	s.fields[0].EchoMode = textinput.EchoPassword
-	gateways := cfg.Core.Accelerators
-	if gateways == nil {
-		gateways = coreinfra.DefaultAccelerators()
-	}
-	var urls []string
-	for _, a := range gateways {
-		urls = append(urls, a.URL)
-	}
-	s.fields[1].SetValue(strings.Join(urls, ","))
-	timeout := cfg.Core.DownloadTimeoutSeconds
-	if timeout == 0 {
-		timeout = 600
-	}
-	s.fields[2].SetValue(strconv.Itoa(timeout))
-	s.fields[0].Focus()
-	return s, textinput.Blink
-}
-func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
-	if s.form == "service" {
-		switch msg.String() {
-		case "esc":
-			s.Editing = false
-			s.selected, s.scroll = 0, 0
-		case "up", "k":
-			s.selected = max(0, s.selected-1)
-			s.followSelection = true
-		case "down", "j":
-			s.selected = min(len(serviceActions)-1, s.selected+1)
-			s.followSelection = true
-		case "enter":
-			return s.submitService()
-		}
-		return s, nil
-	}
-	switch msg.String() {
-	case "esc":
-		s.Editing = false
-		s.fields = nil
-		return s, nil
-	case "tab", "shift+tab":
-		s.fields[s.focus].Blur()
-		delta := 1
-		if msg.String() == "shift+tab" {
-			delta = -1
-		}
-		s.focus = (s.focus + delta + len(s.fields)) % len(s.fields)
-		return s, s.fields[s.focus].Focus()
-	case "enter":
-		if s.form != "network" {
-			s.args = nil
-			for _, f := range s.fields {
-				value := strings.TrimSpace(f.Value())
-				if s.form == "external" && len(s.args) == 1 {
-					value = f.Value()
-				}
-
-				s.args = append(s.args, value)
-			}
-			action := "release"
-			if s.form == "import" {
-				action = "import"
-			}
-			if s.form == "external" {
-				action = "connect"
-			}
-			if s.form == "ports" {
-				action = "ports"
-			}
-			if s.form == "profile" {
-				action = "profile"
-			}
-			s.Editing = false
-			s.fields = nil
-			return s.begin(action)
-		}
-		gateways := []coreinfra.Accelerator{}
-		for _, raw := range strings.Split(s.fields[1].Value(), ",") {
-			if raw = strings.TrimSpace(raw); raw != "" {
-				gateways = append(gateways, coreinfra.Accelerator{URL: raw, Metadata: true, Asset: true})
-			}
-		}
-		timeout, err := strconv.Atoi(s.fields[2].Value())
-		if err != nil {
-			s.Err = err
-			return s, nil
-		}
-		err = s.svc.SaveNetwork(s.fields[0].Value(), gateways, timeout)
-		s.Err = err
-		if err == nil {
-			s.Editing = false
-			s.fields = nil
-		}
-		return s, nil
-	}
-	var cmd tea.Cmd
-	s.fields[s.focus], cmd = s.fields[s.focus].Update(msg)
-	return s, cmd
-}
-
-func (s State) submitService() (State, tea.Cmd) {
-	s.args = []string{serviceActions[s.selected]}
-	s.Editing = false
-	s.selected, s.scroll = 0, 0
-	return s.begin("service")
-}
-
 func (s State) OperationID() uint64 { return s.generation }
 
 func (s State) Leave() State {
 	s.taskDialog = false
-	if s.Editing && s.form == "service" {
-		s.selected, s.scroll = 0, 0
+	if s.Editing {
+		s = s.closeForm()
 	}
-	s.Editing = false
-	s.fields = nil
 	s.args = nil
 	return s
 }

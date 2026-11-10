@@ -254,18 +254,20 @@ func (s State) formLayout(width int) pageLayout {
 	lines := strings.Split(wrap(i18n.T("core.desc."+s.form), width-4), "\n")
 	lines = append(lines, "")
 	focusY := 0
+	var hits []actionHit
 	for i, key := range labels {
 		if i == s.focus {
 			focusY = len(lines) + 2
 		}
 		field := s.fields[i]
 		field.Width = max(1, width-8)
+		hits = append(hits, actionHit{x: 2, y: len(lines) + 2, width: width - 4, height: 1, index: i})
 		lines = append(lines, i18n.T(key), field.View(), "")
 	}
 	if s.Err != nil {
 		lines = append(lines, lipgloss.NewStyle().Foreground(t.Danger).Render(wrap(s.Err.Error(), width-4)))
 	}
-	return pageLayout{content: panel(i18n.T("core.action."+s.form), strings.Join(lines, "\n"), width), focusY: focusY}
+	return pageLayout{content: panel(i18n.T("core.action."+s.form), strings.Join(lines, "\n"), width), focusY: focusY, actions: hits}
 }
 
 func (s State) viewportOffset(page pageLayout, height int) int {
@@ -290,6 +292,12 @@ func (s State) viewportOffset(page pageLayout, height int) int {
 func (s State) Render(width, height int) string {
 	if width <= 0 || height <= 0 {
 		return ""
+	}
+	if s.Editing {
+		background := s
+		background.Editing, background.Err = false, nil
+		background.selected, background.scroll = s.formSelection, s.formScroll
+		return s.overlayForm(background.Render(width, height), width, height)
 	}
 	contentHeight := max(1, height-1)
 	page := s.layout(width, contentHeight)

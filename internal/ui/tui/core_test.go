@@ -126,3 +126,30 @@ func TestCoreDownloadModalBlocksGlobalNavigationAndMouse(t *testing.T) {
 		}
 	}
 }
+
+func TestCoreSettingsDialogsBlockGlobalNavigationAndMouse(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	svc := service.NewCoreService()
+	defer svc.Close()
+	for _, shortcut := range []string{"e", "h", "y", "n", "p", "m", "c"} {
+		s := corepage.NewState(svc)
+		s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
+		s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(shortcut)})
+		m := Model{currentPage: layout.PageCore, coreState: s, width: 120, height: 30}
+		for _, key := range []string{"r", "?", "q"} {
+			next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
+			if next.(Model).currentPage != layout.PageCore || next.(Model).showHelp || !next.(Model).coreState.Editing || next.(Model).coreState.Busy {
+				t.Fatal("global key escaped the settings dialog")
+			}
+		}
+		for _, mouse := range []tea.MouseMsg{
+			{X: 5, Y: 1, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress},
+			{X: 5, Y: 1, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress},
+		} {
+			next, cmd := m.Update(mouse)
+			if next.(Model).currentPage != layout.PageCore || !next.(Model).coreState.Editing || cmd != nil {
+				t.Fatal("mouse navigation escaped the settings dialog")
+			}
+		}
+	}
+}

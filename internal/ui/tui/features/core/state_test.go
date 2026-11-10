@@ -75,8 +75,13 @@ func TestServiceFormAndNetworkActionsRemainInCoreState(t *testing.T) {
 	}
 	s = s.Leave()
 	s, cmd = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	if !s.Editing || s.form != "system-proxy" || s.Busy || cmd != nil {
+		t.Fatal("system proxy selector must open before applying a change")
+	}
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRight})
+	s, cmd = s.Update(coreKey("enter"))
 	if !s.Busy || cmd == nil {
-		t.Fatal("system proxy action missing")
+		t.Fatal("confirmed system proxy change was not queued")
 	}
 	s.Close()
 }

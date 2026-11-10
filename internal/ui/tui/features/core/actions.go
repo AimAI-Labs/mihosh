@@ -53,7 +53,7 @@ func (s State) actions() []actionItem {
 
 func (s State) choose(action string) (State, tea.Cmd) {
 	switch action {
-	case "network", "version", "import", "ports", "external", "profile", "service":
+	case "network", "version", "import", "ports", "external", "profile", "service", "system-proxy", "tun", "configure", "recover":
 		return s.editForm(action)
 	default:
 		return s.begin(action)
