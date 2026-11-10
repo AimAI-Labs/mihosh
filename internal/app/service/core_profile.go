@@ -146,11 +146,11 @@ func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopp
 	if err != nil {
 		return ActivateResult{}, err
 	}
-	data, mergeErr := profile.GenerateAndWriteForUIDIgnoreMergeErrorWithPreserve(uid, path)
-	if len(data) == 0 {
-		return ActivateResult{}, profile.ErrRawNotFound
+	generated, err := profile.GenerateForUID(uid, path)
+	if err != nil {
+		return ActivateResult{}, err
 	}
-	data, err = sanitizeManagedInbound(data)
+	data, err := sanitizeManagedInbound(generated.Data)
 	if err != nil {
 		return ActivateResult{}, err
 	}
@@ -258,7 +258,7 @@ func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopp
 	if err = os.Remove(journal); err != nil {
 		return rollback(err)
 	}
-	return ActivateResult{BackupName: backup, MergeErr: mergeErr}, nil
+	return ActivateResult{BackupName: backup, MergeErr: generated.MergeErr}, nil
 }
 
 // ImportProfile reuses the subscription store while keeping first-time configuration

@@ -115,3 +115,83 @@ func TestUpgradeCannotSilentlySelectAnOlderRelease(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "v2.0.0", cfg.Core.Version)
 }
+
+func TestProfileActivationPreservesGenerationErrors(t *testing.T) {
+	for _, mode := range []string{"external", "managed"} {
+		for _, failure := range []string{"missing-raw", "invalid-raw", "invalid-current"} {
+			t.Run(mode+"/"+failure, func(t *testing.T) {
+				svc, uid, _ := prepareManagedProfile(t)
+				require.NoError(t, config.Update(func(cfg *config.Config) error { cfg.Core.Mode = mode; return nil }))
+				path, err := config.GetMihomoConfigPath()
+				require.NoError(t, err)
+				switch failure {
+				case "missing-raw":
+					raw, err := profile.RawPath(uid)
+					require.NoError(t, err)
+					require.NoError(t, os.Remove(raw))
+				case "invalid-raw":
+					require.NoError(t, profile.WriteRaw(uid, []byte("proxies: [\n")))
+				case "invalid-current":
+					require.NoError(t, os.WriteFile(path, []byte("external-controller: [\n"), 0600))
+				}
+				before, err := os.ReadFile(path)
+				require.NoError(t, err)
+				if mode == "managed" {
+					_, err = svc.ApplyProfile(context.Background(), uid, false)
+				} else {
+					_, err = NewProfileService(nil).Activate(uid)
+				}
+				require.Error(t, err)
+				switch failure {
+				case "missing-raw":
+					require.ErrorIs(t, err, profile.ErrRawNotFound)
+				case "invalid-raw":
+					require.NotErrorIs(t, err, profile.ErrRawNotFound)
+					require.Contains(t, err.Error(), "解析订阅原始配置失败")
+				case "invalid-current":
+					require.NotErrorIs(t, err, profile.ErrRawNotFound)
+					require.Contains(t, err.Error(), "解析现有 mihomo 配置失败")
+				}
+				after, err := os.ReadFile(path)
+				require.NoError(t, err)
+				require.Equal(t, before, after)
+				cfg, err := config.Load()
+				require.NoError(t, err)
+				require.Empty(t, cfg.ActiveSub)
+			})
+		}
+	}
+}
+
+func TestProfileActivationKeepsMergeWarning(t *testing.T) {
+	for _, mode := range []string{"external", "managed"} {
+		t.Run(mode, func(t *testing.T) {
+			svc, uid, _ := prepareManagedProfile(t)
+			require.NoError(t, config.Update(func(cfg *config.Config) error { cfg.Core.Mode = mode; return nil }))
+			path, err := config.GetMihomoConfigPath()
+			require.NoError(t, err)
+			if mode == "external" {
+				// An unchanged external target exercises successful activation without a controller.
+				raw, err := profile.ReadRaw(uid)
+				require.NoError(t, err)
+				data, err := profile.GenerateYAMLWithPreserve(raw, nil, path)
+				require.NoError(t, err)
+				require.NoError(t, os.WriteFile(path, data, 0600))
+			}
+			merge, err := profile.MergePath()
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(merge, []byte("rules: [\n"), 0600))
+			var result ActivateResult
+			if mode == "managed" {
+				result, err = svc.ApplyProfile(context.Background(), uid, false)
+			} else {
+				result, err = NewProfileService(nil).Activate(uid)
+			}
+			require.NoError(t, err)
+			require.Error(t, result.MergeErr)
+			cfg, err := config.Load()
+			require.NoError(t, err)
+			require.Equal(t, uid, cfg.ActiveSub)
+		})
+	}
+}

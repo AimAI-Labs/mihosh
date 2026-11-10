@@ -256,11 +256,11 @@ func (s *ProfileService) Activate(uid string) (ActivateResult, error) {
 	}
 
 	// 2. 生成（merge 损坏时降级；保留现有 mihomo 配置中的托管字段）
-	data, mergeErr := profile.GenerateAndWriteForUIDIgnoreMergeErrorWithPreserve(uid, mihomoPath)
-	if len(data) == 0 {
-		// raw.yaml 尚未拉取（最常见），给出可操作的提示。
-		return ActivateResult{}, profile.ErrRawNotFound
+	generated, err := profile.GenerateForUID(uid, mihomoPath)
+	if err != nil {
+		return ActivateResult{}, err
 	}
+	data := generated.Data
 
 	// 3. 配置未变更时跳过写盘与重载。
 	// yaml.v3 序列化确定性保证：相同 raw+merge 生成字节一致。
@@ -271,7 +271,7 @@ func (s *ProfileService) Activate(uid string) (ActivateResult, error) {
 		if err := s.SetActiveSub(uid); err != nil {
 			_ = err
 		}
-		return ActivateResult{MergeErr: mergeErr}, nil
+		return ActivateResult{MergeErr: generated.MergeErr}, nil
 	}
 
 	// 4. 备份现有 config.yaml
@@ -300,7 +300,7 @@ func (s *ProfileService) Activate(uid string) (ActivateResult, error) {
 		_ = err
 	}
 
-	return ActivateResult{BackupName: backupName, MergeErr: mergeErr}, nil
+	return ActivateResult{BackupName: backupName, MergeErr: generated.MergeErr}, nil
 }
 
 // ===== 内部辅助 =====

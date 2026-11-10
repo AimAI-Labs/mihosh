@@ -268,8 +268,9 @@ func TestProfileService_ActivateSkipsUnchangedConfig(t *testing.T) {
 	mihomoDir := filepath.Join(home, ".config", "mihomo")
 	require.NoError(t, os.MkdirAll(mihomoDir, 0755))
 	mihomoPath := filepath.Join(mihomoDir, "config.yaml")
-	expected, err := profile.GenerateAndWriteForUIDIgnoreMergeError(p.UID)
+	generated, err := profile.GenerateForUID(p.UID, "")
 	require.NoError(t, err)
+	expected := generated.Data
 	require.NotEmpty(t, expected)
 	require.NoError(t, os.WriteFile(mihomoPath, expected, 0644))
 

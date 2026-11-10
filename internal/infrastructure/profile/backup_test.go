@@ -106,6 +106,7 @@ func TestBackup_RotateKeepsNewest(t *testing.T) {
 
 func writeTargetConfig(t *testing.T, dir, content string) string {
 	t.Helper()
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	target := filepath.Join(dir, "config.yaml")
 	require.NoError(t, os.WriteFile(target, []byte(content), 0644))
 	return target

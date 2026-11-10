@@ -1,14 +1,6 @@
 package profile
 
-// generate.go — 生成最终配置 + 备份 + 写入。
-//
-// 流程（对应 spec §1 数据流的第 3~5 步）：
-//   1. ApplyMerge(raw, merge) → final yaml.Node；
-//   2. 序列化为 2 空格缩进 YAML；
-//   3. （备份与写入由 GenerateAndWrite 完成，备份策略见 backup.go）
-//
-// 本文件只负责「合并 → 序列化 → 写入目标文件」。
-// 备份与 rotate 在 backup.go。
+// generate.go — 订阅配置生成与原子写入；备份和激活由调用方编排。
 
 import (
 	"bytes"
@@ -54,11 +46,14 @@ func MergeManagedFieldOverrideKeys() ([]string, error) {
 // readManagedFieldsFromFile 从现有配置文件读取托管字段
 func readManagedFieldsFromFile(path string) (map[string]*yaml.Node, error) {
 	managed := make(map[string]*yaml.Node)
-	if !FileExists(path) {
+	if path == "" {
 		return managed, nil
 	}
 
 	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return managed, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("读取现有 mihomo 配置失败: %w", err)
 	}
@@ -165,68 +160,26 @@ func WriteFinal(targetPath string, data []byte) error {
 	return atomicWrite(targetPath, data, 0644)
 }
 
-// GenerateAndWriteForUID 针对某订阅完成「读 raw → 读 merge → 合并 → 序列化」。
-// 返回最终 YAML 字节。不写入目标文件（写入与备份由 service 层编排）。
-//
-// raw.yaml 不存在时返回 ErrRawNotFound。
-func GenerateAndWriteForUID(uid string) ([]byte, error) {
-	raw, err := ReadRaw(uid)
-	if err != nil {
-		return nil, err
-	}
-	merge, err := ReadMergeNode()
-	if err != nil {
-		// merge 语法错误：跳过覆写，调用方决定是否警告。
-		// 此处返回错误以便上层给出明确提示；上层可捕获后用 nil merge 重试。
-		return nil, err
-	}
-	return GenerateYAML(raw, merge)
+// GeneratedConfig 包含有效配置和已降级忽略的覆写警告。
+type GeneratedConfig struct {
+	Data     []byte
+	MergeErr error
 }
 
-// GenerateAndWriteForUIDIgnoreMergeError 与 GenerateAndWriteForUID 类似，
-// 但当 merge 解析失败时忽略覆写（用空 merge），返回最终字节与一个 merge 错误（可空）。
-// 供 Activate 流程在 merge 损坏时降级使用。
-//
-// 返回约定（调用方 Activate 用 len(data)==0 判定致命失败）：
-//   - raw 不存在或序列化失败：返回 (nil, _)（视为致命，data 为空）；
-//   - 仅 merge 解析失败：返回 (data, mergeErr)（data 为用空 merge 生成的字节，mergeErr 用于警告）；
-//   - 全部成功：返回 (data, nil)。
-func GenerateAndWriteForUIDIgnoreMergeError(uid string) (data []byte, mergeErr error) {
+// GenerateForUID 读取并生成订阅配置，不写入目标文件。
+// managedPath 为空时不保留当前配置字段；致命错误与覆写警告分别返回。
+func GenerateForUID(uid, managedPath string) (GeneratedConfig, error) {
 	raw, err := ReadRaw(uid)
 	if err != nil {
-		return nil, nil
+		return GeneratedConfig{}, err
 	}
 	merge, mergeErr := ReadMergeNode()
 	if mergeErr != nil {
 		merge = nil // 降级：忽略覆写
 	}
-	data, err = GenerateYAML(raw, merge)
+	data, err := GenerateYAMLWithPreserve(raw, merge, managedPath)
 	if err != nil {
-		return nil, mergeErr
+		return GeneratedConfig{}, err
 	}
-	return data, mergeErr
-}
-
-// GenerateAndWriteForUIDIgnoreMergeErrorWithPreserve 与 GenerateAndWriteForUIDIgnoreMergeError 类似，
-// 但会从现有 mihomo 配置文件中保留托管字段，避免它们被订阅覆盖。
-func GenerateAndWriteForUIDIgnoreMergeErrorWithPreserve(uid string, managedPath string) (data []byte, mergeErr error) {
-	raw, err := ReadRaw(uid)
-	if err != nil {
-		return nil, nil
-	}
-	merge, mergeErr := ReadMergeNode()
-	if mergeErr != nil {
-		merge = nil // 降级：忽略覆写
-	}
-	data, err = GenerateYAMLWithPreserve(raw, merge, managedPath)
-	if err != nil {
-		return nil, mergeErr
-	}
-	return data, mergeErr
-}
-
-// FileExists 判断路径是否存在（文件或目录）。
-func FileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
+	return GeneratedConfig{Data: data, MergeErr: mergeErr}, nil
 }
