@@ -76,6 +76,8 @@ func (s *CoreService) Status() (CoreStatus, error) {
 	}
 	if state.Mode == "managed" && state.Version != "" {
 		state.BinaryPath, _ = coreinfra.BinaryPath(root, state.Version, runtime.GOOS)
+	} else if state.Mode != "managed" {
+		state.BinaryPath = host.LocalCoreExecutable(endpoint.ExternalController)
 	}
 	state.Runtime = cfg.Core.Runtime
 	if state.Runtime == "" {

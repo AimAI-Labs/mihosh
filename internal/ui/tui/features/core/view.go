@@ -121,10 +121,14 @@ func (s State) overview(width int) string {
 		if s.Status.Mode != "managed" {
 			version = value(s.externalVersion)
 		}
+		binaryPath := s.Status.BinaryPath
+		if binaryPath == "" {
+			binaryPath = i18n.T("core.path_unavailable")
+		}
 		rows = rows[:1]
 		for _, field := range []struct{ key, value string }{
 			{"core.version", version},
-			{"core.binary_path", value(s.Status.BinaryPath)},
+			{"core.binary_path", binaryPath},
 			{"core.config_path", value(s.Status.ConfigPath)},
 			{"core.controller_address", value(s.Status.Controller)},
 		} {

@@ -252,4 +252,11 @@ func TestDailyOverviewShowsCoreDetailsWithoutGuidance(t *testing.T) {
 	if !strings.Contains(view, "v9.8.7") || strings.Contains(view, "v1.2.3") {
 		t.Fatal("external overview did not use the connected core version")
 	}
+	if !strings.Contains(view, "/core/mihomo") {
+		t.Fatal("external executable path is not visible")
+	}
+	s.Status.BinaryPath = ""
+	if !strings.Contains(ansi.Strip(s.overview(70)), i18n.T("core.path_unavailable")) {
+		t.Fatal("unavailable executable path is not explained")
+	}
 }

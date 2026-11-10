@@ -940,6 +940,7 @@
   "core.inline.cancel": "Cancel",
   "core.inline.help": "Help",
   "core.binary_path": "Binary path",
+  "core.path_unavailable": "Unavailable",
   "core.config_path": "Config path",
   "core.controller_address": "Controller",
   "core.mixed_port_label": "Proxy port",
