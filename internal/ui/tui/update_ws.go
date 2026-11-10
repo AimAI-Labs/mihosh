@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"time"
 
@@ -69,13 +68,12 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.CoreOwnerChangedMsg:
 		m.reloadStoredConfig()
-		m.connectionEpoch++
+		update := coreTargetReconnect
 		if msg.Action == "stop" {
-			m.connectionChecked = true
-			m.connectionReady = false
-			return m, tea.Batch(m.listenCoreOwner(), m.coreState.Refresh())
+			update = coreTargetStopped
 		}
-		return m, tea.Batch(m.listenCoreOwner(), m.coreState.Refresh(), m.checkCoreConnection())
+		cmd := m.updateCoreTarget(config.ResolveMihomoEndpoint(), update)
+		return m, tea.Batch(m.listenCoreOwner(), m.coreState.Refresh(), cmd)
 	case messages.CoreWSMsg:
 		if m.wsClient == nil || msg.Generation != m.wsClient.Generation() {
 			return m, listenWSMessages(m.wsCtx, m.wsMsgChan)
@@ -107,42 +105,8 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.coreState, cmd = m.coreState.Update(msg)
 		if result, ok := msg.(messages.CoreOperationMsg); ok && result.Err == nil {
-			switch result.Action {
-			case "configure", "start", "stop", "setup", "connect", "external", "ports", "activate", "rollback", "restart", "upgrade", "profile", "service-install", "service-uninstall", "service-start", "service-stop", "service-restart", "tun":
-				m.connectionEpoch++
-			}
-			m.reloadStoredConfig()
-		}
-		if result, ok := msg.(messages.CoreOperationMsg); ok && result.Err == nil && (result.Action == "service-start" || result.Action == "service-restart" || result.Action == "tun" || result.Action == "restart" || result.Action == "upgrade" || result.Action == "activate" || result.Action == "rollback") {
-			return m, tea.Batch(cmd, m.checkCoreConnection())
-		}
-		if result, ok := msg.(messages.CoreOperationMsg); ok && result.Err == nil && (result.Action == "configure" || result.Action == "start" || result.Action == "setup" || result.Action == "external" || result.Action == "connect" || result.Action == "ports" || result.Action == "profile") {
-			endpoint := config.ResolveMihomoEndpoint()
-			reset := false
-			if m.client != nil {
-				old := m.client.EndpointSnapshot()
-				reset = old.ExternalController != endpoint.ExternalController || old.Secret != endpoint.Secret
-			}
-			m.reloadClients(endpoint.ExternalController, endpoint.Secret)
-			path, _ := config.GetMihomoConfigPathForWrite()
-			changed := messages.CoreTargetChangedMsg{Reset: reset, ConfigPath: path, ProxyURL: config.MixedPortToProxyURL(endpoint.MixedPort)}
-			m.rulesState, _ = m.rulesState.Update(changed)
-			m.connsState, _ = m.connsState.Update(changed)
-			m.nodesState, _ = m.nodesState.Update(changed)
-			m.logsState, _ = m.logsState.Update(changed)
-			if reset && m.chartData != nil {
-				*m.chartData = *model.NewChartData(common.ChartPoints)
-			}
-			if result.Action == "start" || result.Action == "setup" || result.Action == "profile" {
-				return m, tea.Batch(cmd, m.checkCoreConnection())
-			}
-		}
-		if result, ok := msg.(messages.CoreOperationMsg); ok && (result.Action == "stop" || result.Action == "external" || result.Action == "connect" || result.Action == "service-stop" || result.Action == "service-uninstall") && result.Err == nil {
-			m.connectionChecked = true
-			m.connectionReady = false
-			if result.Action == "external" || result.Action == "connect" {
-				return m, tea.Batch(cmd, m.checkCoreConnection())
-			}
+			targetCmd := m.coreOperationCompleted(result.Action)
+			return m, tea.Batch(cmd, targetCmd)
 		}
 
 		return m, cmd
@@ -428,12 +392,13 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// 并把 mixed-port 派生的代理地址同步到 connections。
 		m.settingsState = m.settingsState.ApplyMihomoConfig(&msg)
 		if msg.Config != nil {
-			m.reloadClients(msg.Config.ExternalController, msg.Config.Secret)
-			m.connsState = m.connsState.UpdateProxyAddr(config.MixedPortToProxyURL(msg.Config.MixedPort))
+			cmd := m.updateCoreTarget(config.MihomoEndpoint{ExternalController: msg.Config.ExternalController, Secret: msg.Config.Secret, MixedPort: msg.Config.MixedPort}, coreTargetSync)
 			m.err = nil
+			return m, cmd
 		}
 
 	case messages.MihomoConfigSavedMsg:
+		var targetCmd tea.Cmd
 		// Mihomo 配置项已保存（写 YAML + 热重载）：toast 提示 + 重新拉取运行时配置。
 		// external-controller/secret/mixed-port 变更后重新解析 endpoint 热刷新 client/wsClient。
 		if msg.Err != nil && !msg.WriteOK {
@@ -442,8 +407,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			// YAML 写入成功：即使 reload 失败也刷新端点（修改 external-controller 后旧端口不可达是预期行为）
 			endpoint := config.ResolveMihomoEndpoint()
-			m.reloadClients(endpoint.ExternalController, endpoint.Secret)
-			m.connsState = m.connsState.UpdateProxyAddr(config.MixedPortToProxyURL(endpoint.MixedPort))
+			targetCmd = m.updateCoreTarget(endpoint, coreTargetSync)
 			if msg.Err != nil {
 				// reload 失败但 YAML 已保存，提示用户配置已保存但需重启内核生效
 				m.notice = i18n.T("settings.toast.mihomo_save_reload_warn")
@@ -453,7 +417,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.noticeTicks = autoRefreshNoticeTicks
 			m.err = nil
 		}
-		return m, tea.Batch(m.fetchNodes(), m.configSvc.FetchMihomoConfig(m.client))
+		return m, tea.Batch(targetCmd, m.fetchNodes(), m.configSvc.FetchMihomoConfig(m.client))
 
 	case messages.ThemeChangedMsg:
 		// 主题已切换，触发重绘（View 会读取新主题色）
@@ -636,19 +600,6 @@ func (m Model) autoRefreshInterval() int {
 		return 0
 	}
 	return m.config.AutoRefreshInterval
-}
-
-// reloadClients 把 api.Client 与 WSClient 的端点更新为新值。
-// api.Client 立即生效（后续 DoRequest 读新值）；
-// WSClient 主动断开旧连接，由 connectStream 在下一轮用新端点重连。
-// 不重建对象：所有引用 m.client / m.wsClient 的页面状态自动获得新端点。
-func (m Model) reloadClients(apiAddress, secret string) {
-	if m.client != nil {
-		m.client.UpdateEndpoint(apiAddress, secret)
-	}
-	if m.wsClient != nil {
-		m.wsClient.UpdateEndpoint(apiAddress, secret)
-	}
 }
 
 // fetchNodes 批量拉取节点信息（用于端点切换后刷新）。
