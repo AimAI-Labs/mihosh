@@ -6,6 +6,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/muesli/termenv"
 )
 
@@ -32,5 +33,53 @@ func TestRenderHelpPage_LatencyColors(t *testing.T) {
 	}
 	if !strings.Contains(output, expectedRedDot) {
 		t.Errorf("expected output to contain red dot %q", expectedRedDot)
+	}
+}
+
+func TestVersionHelpContainsMovedDetailsAndCanScrollToEveryNote(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	for _, language := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(language)
+		ctx := HelpContext{CurrentPage: PageCore, CoreReleases: true, CorePlatform: "linux/amd64", CoreAsset: "mihomo-linux-amd64-compatible-v1.20.10.gz"}
+		sections := buildHelpSections(ctx)
+		var allNotes string
+		for _, section := range sections {
+			allNotes += strings.Join(section.notes, "\n")
+		}
+		for _, want := range []string{ctx.CorePlatform, ctx.CoreAsset, i18n.T("core.catalog.download_hint"), i18n.T("core.desc.activate"), i18n.T("core.catalog.more_hint"), i18n.T("core.catalog.fallback")} {
+			if !strings.Contains(allNotes, want) {
+				t.Fatalf("help lost moved information: %q", want)
+			}
+		}
+		for _, width := range []int{24, 80, 120} {
+			ctx.ScrollOffset = 0
+			_, limit := renderScrollablePopup(width, 24, ctx)
+			if limit == 0 {
+				t.Fatal("fixture should require scrolling")
+			}
+			var state State
+			var seen string
+			for offset := 0; offset <= limit; offset++ {
+				ctx.ScrollOffset = state.Offset()
+				view := ansi.Strip(renderPopup(width, 24, ctx))
+				if lipgloss.Height(view) > 24 {
+					t.Fatal("help exceeds terminal height")
+				}
+				for _, line := range strings.Split(view, "\n") {
+					if lipgloss.Width(line) > width {
+						t.Fatal("help exceeds terminal width")
+					}
+				}
+				seen += view
+				state = state.Scroll(1, width, 24, ctx)
+			}
+			if !strings.Contains(seen, "mihomo") || !strings.Contains(seen, "linux/") {
+				t.Fatal("selected asset details cannot be reached by scrolling")
+			}
+			if state.Offset() != limit || state.Scroll(-limit-10, width, 24, ctx).Offset() != 0 {
+				t.Fatal("help scrolling is not bounded")
+			}
+		}
 	}
 }

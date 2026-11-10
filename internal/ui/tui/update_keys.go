@@ -4,6 +4,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/help"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
@@ -60,6 +61,17 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "esc", "q", "?":
 			m.showHelp = false
+			m.helpState = help.State{}
+			return m, nil
+		case "up", "k", "down", "j", "pgup", "pgdown":
+			delta := 1
+			if msg.String() == "pgup" || msg.String() == "pgdown" {
+				delta = max(1, m.height/2)
+			}
+			if msg.String() == "up" || msg.String() == "k" || msg.String() == "pgup" {
+				delta = -delta
+			}
+			m.helpState = m.helpState.Scroll(delta, m.width, m.height, m.buildHelpContext())
 			return m, nil
 		}
 		if key.Matches(msg, common.Keys.Quit) {
@@ -114,6 +126,7 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	// 全局帮助
 	if msg.String() == "?" {
+		m.helpState = help.State{}
 		m.showHelp = true
 		return m, nil
 	}

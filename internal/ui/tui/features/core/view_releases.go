@@ -2,7 +2,6 @@ package core
 
 import (
 	"fmt"
-	"runtime"
 	"strings"
 
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
@@ -105,30 +104,17 @@ func (s State) releaseRow(r coreinfra.Release, marker string, c releaseColumns, 
 	return ansi.Truncate(row, width, "…")
 }
 
-func (s State) releaseDetails(width int, compact bool, budget int) (string, []releaseControl) {
+func (s State) releaseDetails(width int, budget int) (string, []releaseControl) {
 	t := theme.Current()
 	muted := lipgloss.NewStyle().Foreground(t.Muted)
 	r, ok := s.selectedRelease()
 	if !ok {
 		return panel(i18n.T("core.catalog.selection"), wrap(i18n.T("core.catalog.empty"), width-4), width), nil
 	}
-	dense := budget < 12 || (compact && budget < 9)
 	heading := r.Version() + " · " + s.releaseBadge(r)
-	if dense {
-		heading += " · " + releaseInfo(r)
-	}
 	rows := []string{lipgloss.NewStyle().Foreground(s.releaseColor(r)).Bold(true).Render(ansi.Truncate(heading, width-4, "…"))}
-	if !dense {
-		rows = append(rows, releaseInfo(r))
-	}
-	if !compact && !dense {
-		rows = append(rows, i18n.T("core.catalog.platform")+": "+runtime.GOOS+"/"+runtime.GOARCH)
-		if len(r.Assets) > 0 {
-			rows = append(rows, strings.Split(muted.Render(wrap(r.Assets[0].Name, width-4)), "\n")...)
-		}
-	}
-	if !dense {
-		rows = append(rows, "")
+	if budget >= 6 {
+		rows = append(rows, ansi.Truncate(releaseInfo(r), width-4, "…"))
 	}
 	var controls []releaseControl
 	if budget < 5 {
@@ -154,14 +140,8 @@ func (s State) releaseDetails(width int, compact bool, budget int) (string, []re
 	}
 	button("install", i18n.T(download), !installed && verified)
 	button("activate", i18n.T("core.catalog.activate"), installed && !(s.Status.Mode == "managed" && s.Status.Version == r.Version()))
-	if !dense {
-		rows = append(rows, strings.Split(muted.Render(wrap(i18n.T("core.catalog.download_hint"), width-4)), "\n")...)
-	}
 	if !verified && !installed {
 		warning := i18n.T("core.catalog.unverified")
-		if dense {
-			warning = ansi.Truncate(warning, width-4, "…")
-		}
 		lines := strings.Split(lipgloss.NewStyle().Foreground(t.Warning).Render(wrap(warning, width-4)), "\n")
 		rows = append(rows, lines[:min(len(lines), max(0, budget-len(rows)-2))]...)
 	}
@@ -194,7 +174,7 @@ func (s State) releaseLayout(width, height int, parts []string, result pageLayou
 	top := lipgloss.Height(strings.Join(parts, "\n"))
 	caption := i18n.Tf("core.catalog.loaded", s.releaseCount())
 	if s.catalog.loaded {
-		status := "core.catalog.more_hint"
+		status := ""
 		if !s.catalog.page.HasNext {
 			status = "core.catalog.complete"
 		}
@@ -203,17 +183,19 @@ func (s State) releaseLayout(width, height int, parts []string, result pageLayou
 		} else if s.Busy && s.task == "releases" {
 			status = "core.catalog.loading"
 		}
-		caption += " · " + i18n.T(status)
+		if status != "" {
+			caption += " · " + i18n.T(status)
+		}
 	}
 	if !s.catalog.loaded {
-		caption = i18n.T("core.catalog.fallback")
+		caption = i18n.T("core.catalog.cached")
 	}
 	footerHeight := 3
 	detailBudget := height - top - footerHeight
 	if !wide {
 		detailBudget -= 4 // one visible release and a separating line
 	}
-	left, controls := s.releaseDetails(leftWidth, !wide, detailBudget)
+	left, controls := s.releaseDetails(leftWidth, detailBudget)
 	listHeight := height - top - footerHeight
 	listY, listX := top, 0
 	if !wide {

@@ -509,3 +509,41 @@ func TestReleaseColumnsAlignMixedVersionsAndHideOptionalMetadata(t *testing.T) {
 		}
 	}
 }
+
+func TestReleasePageKeepsEssentialInformationAndFailuresWithoutStaticHints(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	for _, language := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(language)
+		s := releaseFixture(t)
+		view := ansi.Strip(s.Render(120, 30))
+		for _, hint := range []string{"core.catalog.platform", "core.catalog.download_hint", "core.catalog.more_hint"} {
+			if strings.Contains(view, i18n.T(hint)) {
+				t.Fatalf("static explanation remains on the page: %s", hint)
+			}
+		}
+		if strings.Contains(view, s.Release.Assets[0].Name) {
+			t.Fatal("asset filename remains on the page")
+		}
+		for _, want := range []string{s.Release.Version(), "2026-10-10", "12.0 MiB", i18n.T("core.catalog.download"), i18n.T("core.catalog.activate"), i18n.Tf("core.catalog.loaded", 10)} {
+			if !strings.Contains(view, want) {
+				t.Fatalf("essential information missing: %s", want)
+			}
+		}
+		r := s.Release
+		r.Trusted = false
+		s = s.applyReleaseLookup(r)
+		s.Err = errors.New("release query failed")
+		s.catalog.failed = true
+		view = ansi.Strip(s.Render(120, 30))
+		for _, want := range []string{"release query failed", i18n.T("core.catalog.unverified"), i18n.T("core.catalog.load_failed")} {
+			if !strings.Contains(strings.ReplaceAll(view, "\n", ""), want) && !strings.Contains(view, want) {
+				// Check the panel separately to avoid the adjacent list splitting wrapped text.
+				detail, _ := s.releaseDetails(120, 25)
+				if !strings.Contains(ansi.Strip(detail), want) {
+					t.Fatalf("operation failure was hidden: %s", want)
+				}
+			}
+		}
+	}
+}

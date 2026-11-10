@@ -5,7 +5,16 @@ import (
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"runtime"
 )
+
+func (s State) ReleaseHelpDetails() (platform, asset string) {
+	platform = runtime.GOOS + "/" + runtime.GOARCH
+	if r, ok := s.selectedRelease(); ok && len(r.Assets) > 0 {
+		asset = r.Assets[0].Name
+	}
+	return platform, asset
+}
 
 func (s State) inlineHelp(width int) string {
 	hints := []common.InlineHelpHint{

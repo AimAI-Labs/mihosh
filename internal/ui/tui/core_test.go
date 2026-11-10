@@ -153,3 +153,38 @@ func TestCoreSettingsDialogsBlockGlobalNavigationAndMouse(t *testing.T) {
 		}
 	}
 }
+
+func TestCoreVersionHelpUsesSelectedAssetAndCapturesScrolling(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	i18n.Init()
+	svc := service.NewCoreService()
+	defer svc.Close()
+	s := corepage.NewState(svc)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
+	r := coreinfra.PinnedRelease()
+	r.Assets = []coreinfra.Asset{{Name: "selected-mihomo-build.gz"}}
+	s, _ = s.Update(messages.CoreOperationMsg{ID: s.OperationID(), Action: "releases", Releases: &coreinfra.ReleasePage{Page: 1, Releases: []coreinfra.Release{r}}})
+	defer s.Close()
+	m := Model{currentPage: layout.PageCore, coreState: s, width: 80, height: 24}
+	ctx := m.buildHelpContext()
+	if !ctx.CoreReleases || ctx.CoreAsset != "selected-mihomo-build.gz" || ctx.CorePlatform == "" {
+		t.Fatal("help context did not use the selected release")
+	}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updated.(Model)
+	if !m.showHelp || m.helpState.Offset() != 1 || m.coreState.OperationID() != s.OperationID() {
+		t.Fatal("help scroll reached the underlying release page")
+	}
+	updated, _ = m.Update(tea.MouseMsg{X: 5, Y: 1, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
+	m = updated.(Model)
+	if !m.showHelp || m.helpState.Offset() != 2 || m.currentPage != layout.PageCore {
+		t.Fatal("help wheel escaped to global navigation")
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+	if m.showHelp || m.helpState.Offset() != 0 {
+		t.Fatal("closing help retained its scroll state")
+	}
+}

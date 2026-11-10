@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/help"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
@@ -19,6 +20,13 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		// 左键点击任意位置关闭弹窗
 		if isMouseLeftPress(msg) {
 			m.showHelp = false
+			m.helpState = help.State{}
+		} else if isMouseWheelUp(msg) || isMouseWheelDown(msg) {
+			delta := 1
+			if isMouseWheelUp(msg) {
+				delta = -1
+			}
+			m.helpState = m.helpState.Scroll(delta, m.width, m.height, m.buildHelpContext())
 		}
 		return m, nil
 	}

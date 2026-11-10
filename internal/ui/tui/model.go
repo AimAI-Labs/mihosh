@@ -7,6 +7,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/guide"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/help"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/logs"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
@@ -88,6 +89,7 @@ type Model struct {
 	settingsState settings.State
 	guideState    guide.State
 	coreState     corepage.State
+	helpState     help.State
 
 	// 自动更新
 	updateInfo       *model.UpdateInfo

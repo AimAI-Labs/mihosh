@@ -31,6 +31,9 @@ const (
 type HelpContext struct {
 	CurrentPage  int // 当前页面（PageNodes / PageConnections / ...）
 	CoreReleases bool
+	CorePlatform string
+	CoreAsset    string
+	ScrollOffset int
 
 	// 连接页子状态
 	ConnViewMode int  // ConnViewTraffic / ConnViewActive / ConnViewHistory
@@ -71,6 +74,7 @@ type keybinding struct {
 type section struct {
 	title    string
 	bindings []keybinding
+	notes    []string
 }
 
 // buildHelpSections 根据当前上下文动态构建帮助分区
@@ -124,6 +128,17 @@ func buildHelpSections(ctx HelpContext) []section {
 				{"1–3", i18n.T("core.help.sections")},
 				{"Esc", i18n.T("core.cancel")},
 			}})
+			details := []string{i18n.T("core.catalog.platform") + ": " + ctx.CorePlatform}
+			if ctx.CoreAsset != "" {
+				details = append(details, i18n.T("core.catalog.asset")+": "+ctx.CoreAsset)
+			}
+			sections = append(sections,
+				section{title: i18n.T("core.catalog.selection"), notes: details},
+				section{title: i18n.T("core.catalog.help.instructions"), notes: []string{
+					i18n.T("core.catalog.download_hint"), i18n.T("core.desc.activate"),
+					i18n.T("core.catalog.more_hint"), i18n.T("core.catalog.fallback"),
+				}},
+			)
 			break
 		}
 		sections = append(sections, section{title: i18n.T("menu.core"), bindings: []keybinding{
@@ -476,6 +491,9 @@ func buildSubSections(ctx HelpContext) []section {
 //  2. 渲染弹窗本体，并计算居中偏移量
 //  3. 逐行用 ansi.Cut 截取底层的左侧和右侧，将弹窗内容嵌入中间
 func OverlayHelpPopup(base string, width, height int, ctx HelpContext) string {
+	if width <= 0 || height <= 0 {
+		return ""
+	}
 	// ── 1. 暗化底层 ──
 	baseLines := strings.Split(base, "\n")
 	for len(baseLines) < height {
@@ -523,7 +541,7 @@ func OverlayHelpPopup(base string, width, height int, ctx HelpContext) string {
 		}
 
 		rightPart := ansi.Cut(dimmed[y], leftOffset+popupWidth, width)
-		dimmed[y] = leftPart + pl + rightPart
+		dimmed[y] = ansi.Truncate(leftPart+pl+rightPart, width, "")
 	}
 
 	return strings.Join(dimmed, "\n")
@@ -531,14 +549,19 @@ func OverlayHelpPopup(base string, width, height int, ctx HelpContext) string {
 
 // renderPopup 渲染帮助弹窗（无背景色，使用终端默认背景）
 func renderPopup(termWidth, termHeight int, ctx HelpContext) string {
+	popup, _ := renderScrollablePopup(termWidth, termHeight, ctx)
+	return popup
+}
+
+func renderScrollablePopup(termWidth, termHeight int, ctx HelpContext) (string, int) {
+	if termWidth <= 0 || termHeight <= 0 {
+		return "", 0
+	}
 	// ── 动态构建帮助分区 ──
 	helpSections := buildHelpSections(ctx)
 
-	// ── 计算每列内容行数（用于智能布局）──
+	// Measure the rendered cards, including wrapped descriptions and notes.
 	sectionHeights := make([]int, len(helpSections))
-	for i, sec := range helpSections {
-		sectionHeights[i] = len(sec.bindings) + 2 // title + bindings + spacing
-	}
 
 	// ── 弹窗尺寸 ──
 	popupWidth := termWidth * 88 / 100
@@ -548,6 +571,7 @@ func renderPopup(termWidth, termHeight int, ctx HelpContext) string {
 	if popupWidth < 60 {
 		popupWidth = 60
 	}
+	popupWidth = min(popupWidth, termWidth)
 
 	popupHeight := termHeight * 85 / 100
 	if popupHeight > 42 {
@@ -556,12 +580,10 @@ func renderPopup(termWidth, termHeight int, ctx HelpContext) string {
 	if popupHeight < 20 {
 		popupHeight = 20
 	}
+	popupHeight = min(popupHeight, termHeight)
 
 	// 内容区宽度 = 弹窗宽度 - 边框(2) - 内边距(左右各2=4)
-	innerWidth := popupWidth - 6
-	if innerWidth < 30 {
-		innerWidth = 30
-	}
+	innerWidth := max(1, popupWidth-6)
 
 	// ── 智能列数：根据 section 数量和可用宽度决定 ──
 	maxCols := 3
@@ -586,15 +608,17 @@ func renderPopup(termWidth, termHeight int, ctx HelpContext) string {
 	if gap < 1 {
 		gap = 1
 	}
-	titleLine := title + strings.Repeat(" ", gap) + closeHint
+	titleLine := ansi.Truncate(title+strings.Repeat(" ", gap)+closeHint, innerWidth, "")
 
 	divider := lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render(strings.Repeat("─", innerWidth))
 
 	// ── 各分区卡片 ──
-	colW := innerWidth/cols - 1
+	colW := max(1, innerWidth/cols-1)
 	cards := make([]string, 0, len(helpSections))
-	for _, sec := range helpSections {
-		cards = append(cards, renderSection(sec, colW))
+	for i, sec := range helpSections {
+		card := renderSection(sec, colW)
+		cards = append(cards, card)
+		sectionHeights[i] = lipgloss.Height(card)
 	}
 
 	// ── 按高度贪心分配列（避免内容高度差异过大）──
@@ -607,33 +631,32 @@ func renderPopup(termWidth, termHeight int, ctx HelpContext) string {
 		body = lipgloss.JoinHorizontal(lipgloss.Top, colContents...)
 	}
 
-	// ── 组装并限高 ──
-	content := lipgloss.JoinVertical(lipgloss.Left, titleLine, divider, "", body)
-
-	contentLines := strings.Split(content, "\n")
-	maxLines := popupHeight - 4 // 边框2 + 内边距上下各1
-	if maxLines < 4 {
-		maxLines = 4
+	// Keep the title and hint fixed while scrolling all explanatory content.
+	bodyLines := strings.Split(body, "\n")
+	budget := max(1, popupHeight-8)
+	limit := max(0, len(bodyLines)-budget)
+	offset := max(0, min(ctx.ScrollOffset, limit))
+	bodyLines = bodyLines[offset:min(len(bodyLines), offset+budget)]
+	for len(bodyLines) < budget {
+		bodyLines = append(bodyLines, "")
 	}
-	if len(contentLines) > maxLines {
-		contentLines = contentLines[:maxLines]
-		contentLines = append(contentLines,
-			lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render(i18n.T("help.more_hint")),
-		)
-	}
-	for len(contentLines) < maxLines {
-		contentLines = append(contentLines, "")
-	}
-	content = strings.Join(contentLines, "\n")
+	hint := ansi.Truncate(i18n.T("help.scroll_hint"), innerWidth, "")
+	content := lipgloss.JoinVertical(lipgloss.Left, titleLine, divider, "", strings.Join(bodyLines, "\n"),
+		lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render(hint))
 
 	// ── 弹窗外壳：圆角边框，无背景色 ──
 	popupStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(common.TokyoBlue()).
 		Padding(1, 2).
-		Width(popupWidth)
+		Width(max(1, popupWidth-2))
 
-	return popupStyle.Render(content)
+	lines := strings.Split(popupStyle.Render(content), "\n")
+	lines = lines[:min(len(lines), termHeight)]
+	for i := range lines {
+		lines[i] = ansi.Truncate(lines[i], termWidth, "")
+	}
+	return strings.Join(lines, "\n"), limit
 }
 
 // distributeCardsToColumns 将卡片按高度贪心分配到指定列数，每列固定宽度并左对齐
@@ -686,11 +709,15 @@ func renderSection(sec section, width int) string {
 	if width < 38 {
 		keyWidth = 12
 	}
+	keyWidth = min(keyWidth, max(1, width/2))
 	keyStyle := lipgloss.NewStyle().Foreground(common.TokyoYellow()).Width(keyWidth)
 	descStyle := lipgloss.NewStyle().Foreground(common.Dim())
 
 	var lines []string
-	lines = append(lines, sectionStyle.Render(sec.title))
+	lines = append(lines, sectionStyle.Render(ansi.Wrap(sec.title, max(1, width), "")))
+	for _, note := range sec.notes {
+		lines = append(lines, descStyle.Render(ansi.Wrap(note, max(1, width), "")))
+	}
 
 	for _, b := range sec.bindings {
 		k := b.key
@@ -708,11 +735,23 @@ func renderSection(sec section, width int) string {
 			default:
 				dot = "●"
 			}
-			lines = append(lines, "  "+dot+" "+descStyle.Render(desc))
+			description := strings.ReplaceAll(ansi.Wrap(desc, max(1, width-4), ""), "\n", "\n    ")
+			lines = append(lines, "  "+dot+" "+descStyle.Render(description))
 			continue
 		}
 
-		lines = append(lines, "  "+keyStyle.Render(k)+descStyle.Render(desc))
+		keyLines := strings.Split(ansi.Wrap(k, keyWidth, ""), "\n")
+		descLines := strings.Split(ansi.Wrap(desc, max(1, width-keyWidth-2), ""), "\n")
+		for i := 0; i < max(len(keyLines), len(descLines)); i++ {
+			key, description := "", ""
+			if i < len(keyLines) {
+				key = keyLines[i]
+			}
+			if i < len(descLines) {
+				description = descLines[i]
+			}
+			lines = append(lines, "  "+keyStyle.Render(key)+descStyle.Render(description))
+		}
 	}
 
 	lines = append(lines, "") // 分区间距
