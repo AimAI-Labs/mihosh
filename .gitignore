@@ -54,6 +54,7 @@ docs/proposals/*
 
 docs/fumadocs/*.tsbuildinfo
 
+.agents/
 skills-lock.json
 
 
