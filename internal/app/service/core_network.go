@@ -393,46 +393,41 @@ func (s *CoreService) SetTUN(ctx context.Context, enabled bool) error {
 	if err = validateNetworkCandidate(ctx, root, cfg.Core.Version, candidate); err != nil {
 		return err
 	}
-	wasRunning := s.process != nil
-	if wasRunning {
-		if err = s.stopLocked(); err != nil {
-			return err
-		}
-	}
-	rollback := func(cause error) error {
-		restoreErr := recoverNetworkChange(root)
-		var restartErr error
-		if wasRunning && restoreErr == nil {
-			restartErr = s.start(context.Background(), true)
-		}
-		return errors.Join(cause, restoreErr, restartErr)
-	}
-	record, _ := json.Marshal(networkChange{Config: old, TUN: cfg.Core.TUN})
-	journal := filepath.Join(root, "runtime", "network-change.json")
-	if err = privateWrite(journal, record); err != nil {
-		if wasRunning {
-			_ = s.start(context.Background(), true)
-		}
+	return s.replaceCore(ctx, &tunReplacement{root: root, previous: networkChange{Config: old, TUN: cfg.Core.TUN}, candidate: candidate, enabled: enabled})
+}
+
+type tunReplacement struct {
+	root      string
+	previous  networkChange
+	candidate []byte
+	enabled   bool
+	journaled bool
+}
+
+func (c *tunReplacement) apply(_ bool) error {
+	record, err := json.Marshal(c.previous)
+	if err != nil {
 		return err
 	}
-	if err = privateWrite(path, candidate); err != nil {
-		return rollback(err)
+	if err = privateWrite(filepath.Join(c.root, "runtime", "network-change.json"), record); err != nil {
+		return err
 	}
-	if err = config.Update(func(latest *config.Config) error { latest.Core.TUN = enabled; return nil }); err != nil {
-		return rollback(err)
+	c.journaled = true
+	if err = privateWrite(filepath.Join(c.root, "runtime", "config.yaml"), c.candidate); err != nil {
+		return err
 	}
-	if wasRunning {
-		if err = s.start(ctx, true); err != nil {
-			return rollback(err)
-		}
+	return config.Update(func(latest *config.Config) error { latest.Core.TUN = c.enabled; return nil })
+}
+
+func (c *tunReplacement) commit() error {
+	return os.Remove(filepath.Join(c.root, "runtime", "network-change.json"))
+}
+
+func (c *tunReplacement) restore() error {
+	if !c.journaled {
+		return nil
 	}
-	if err = os.Remove(journal); err != nil {
-		if wasRunning {
-			_ = s.stopLocked()
-		}
-		return rollback(err)
-	}
-	return nil
+	return recoverNetworkChange(c.root)
 }
 
 func validateNetworkCandidate(ctx context.Context, root, version string, data []byte) error {

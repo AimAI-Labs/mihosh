@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -90,54 +89,47 @@ func (s *CoreService) activateVersion(ctx context.Context, version string, upgra
 			}
 		}
 	}
-	wasRunning := s.process != nil
-	if wasRunning {
-		select {
-		case <-s.done:
-			wasRunning = false
-			s.stopLocked()
-		default:
-		}
-	}
-	if wasRunning {
-		if err = s.stopLocked(); err != nil {
-			return err
-		}
-	}
+	return s.replaceCore(ctx, &versionReplacement{previous: old, version: version})
+}
+
+type versionReplacement struct {
+	previous config.CoreConfig
+	version  string
+	running  bool
+	applied  bool
+}
+
+func (c *versionReplacement) apply(running bool) error {
+	c.running = running
 	pending := ""
-	if wasRunning {
-		pending = old.Version
+	if running {
+		pending = c.previous.Version
 	}
-	if err = config.Update(func(latest *config.Config) error {
-		latest.Core.Version = version
-		latest.Core.PreviousVersion = old.Version
+	err := config.Update(func(latest *config.Config) error {
+		latest.Core.Version = c.version
+		latest.Core.PreviousVersion = c.previous.Version
 		latest.Core.PendingVersion = pending
 		return nil
-	}); err != nil {
-		if wasRunning {
-			_ = s.start(context.Background(), true)
-		}
-		return err
-	}
-	if !wasRunning {
+	})
+	c.applied = err == nil
+	return err
+}
+
+func (c *versionReplacement) commit() error {
+	if !c.running {
 		return nil
 	}
-	if err = s.start(ctx, true); err == nil {
-		err = config.Update(func(latest *config.Config) error { latest.Core.PendingVersion = ""; return nil })
-		if err == nil {
-			return nil
-		}
-		s.stopLocked()
+	return config.Update(func(latest *config.Config) error { latest.Core.PendingVersion = ""; return nil })
+}
+
+func (c *versionReplacement) restore() error {
+	if !c.applied {
+		return nil
 	}
-	restoreErr := config.Update(func(latest *config.Config) error {
-		latest.Core.Version = old.Version
-		latest.Core.PreviousVersion = old.PreviousVersion
-		latest.Core.PendingVersion = old.PendingVersion
+	return config.Update(func(latest *config.Config) error {
+		latest.Core.Version = c.previous.Version
+		latest.Core.PreviousVersion = c.previous.PreviousVersion
+		latest.Core.PendingVersion = c.previous.PendingVersion
 		return nil
 	})
-	var restartErr error
-	if restoreErr == nil {
-		restartErr = s.start(context.Background(), true)
-	}
-	return errors.Join(fmt.Errorf("candidate core failed: %w", err), restoreErr, restartErr)
 }
