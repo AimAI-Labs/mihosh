@@ -459,3 +459,53 @@ func TestReleaseRowColorsDistinguishVersionStatesAcrossThemes(t *testing.T) {
 		}
 	}
 }
+
+func TestReleaseColumnsAlignMixedVersionsAndHideOptionalMetadata(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	for _, language := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(language)
+		s := releaseFixture(t)
+		r, _ := s.releaseAt(1)
+		r.Tag, r.Prerelease = "alpha-478af2a", true
+		r.Assets = nil
+		if err := s.catalog.store.put(1, r); err != nil {
+			t.Fatal(err)
+		}
+		s.Status = service.CoreStatus{Mode: "managed", Version: s.Release.Version()}
+		for _, width := range []int{28, 44, 70} {
+			columns := s.releaseColumns(0, 3, width)
+			statusAt, dateAt, sizeAt := -1, -1, -1
+			for i := range 3 {
+				r, _ := s.releaseAt(i)
+				row := s.releaseRow(r, "  ", columns, width)
+				if lipgloss.Width(row) > width || !strings.Contains(row, "["+s.releaseBadge(r)+"]") {
+					t.Fatalf("%s width %d: status lost or row overflow: %q", language, width, row)
+				}
+				at := lipgloss.Width(row[:strings.Index(row, "[")])
+				if statusAt >= 0 && at != statusAt {
+					t.Fatalf("status columns do not align: %q", row)
+				}
+				statusAt = at
+				date, size := releaseMetadata(r)
+				for _, field := range []struct {
+					text string
+					want bool
+					at   *int
+				}{{date, width >= 44, &dateAt}, {size, width >= 70, &sizeAt}} {
+					index := strings.Index(row, field.text)
+					if (index >= 0) != field.want {
+						t.Fatalf("%s width %d: incorrect metadata visibility: %q", language, width, row)
+					}
+					if index >= 0 {
+						at := lipgloss.Width(row[:index])
+						if *field.at >= 0 && at != *field.at {
+							t.Fatalf("metadata columns do not align: %q", row)
+						}
+						*field.at = at
+					}
+				}
+			}
+		}
+	}
+}

@@ -47,7 +47,7 @@ func (s State) releaseColor(r coreinfra.Release) lipgloss.Color {
 	return t.Foreground
 }
 
-func releaseInfo(r coreinfra.Release) string {
+func releaseMetadata(r coreinfra.Release) (string, string) {
 	date := i18n.T("core.catalog.date_unknown")
 	if !r.PublishedAt.IsZero() {
 		date = r.PublishedAt.Format("2006-01-02")
@@ -56,7 +56,53 @@ func releaseInfo(r coreinfra.Release) string {
 	if len(r.Assets) > 0 && r.Assets[0].Size > 0 {
 		size = fmt.Sprintf("%.1f MiB", float64(r.Assets[0].Size)/(1<<20))
 	}
+	return date, size
+}
+
+func releaseInfo(r coreinfra.Release) string {
+	date, size := releaseMetadata(r)
 	return date + " · " + size
+}
+
+type releaseColumns struct {
+	version, status, date, size int
+}
+
+// Measure only visible rows: the catalogue can contain all upstream history.
+func (s State) releaseColumns(start, end, width int) releaseColumns {
+	var c releaseColumns
+	for i := start; i < end; i++ {
+		r, ok := s.releaseAt(i)
+		if !ok {
+			continue
+		}
+		date, size := releaseMetadata(r)
+		c.version = max(c.version, lipgloss.Width(r.Version()))
+		c.status = max(c.status, lipgloss.Width("["+s.releaseBadge(r)+"]"))
+		c.date = max(c.date, lipgloss.Width(date))
+		c.size = max(c.size, lipgloss.Width(size))
+	}
+	if 2+c.version+2+c.status+2+c.date+2+c.size > width {
+		c.size = 0
+	}
+	if 2+c.version+2+c.status+2+c.date > width {
+		c.date = 0
+	}
+	c.version = max(1, min(c.version, width-2-2-c.status))
+	return c
+}
+
+func (s State) releaseRow(r coreinfra.Release, marker string, c releaseColumns, width int) string {
+	date, size := releaseMetadata(r)
+	row := marker + common.PadString(ansi.Truncate(r.Version(), c.version, "…"), c.version) + "  " +
+		common.PadString("["+s.releaseBadge(r)+"]", c.status)
+	if c.date > 0 {
+		row += "  " + common.PadString(date, c.date)
+	}
+	if c.size > 0 {
+		row += "  " + common.PadString(size, c.size)
+	}
+	return ansi.Truncate(row, width, "…")
 }
 
 func (s State) releaseDetails(width int, compact bool, budget int) (string, []releaseControl) {
@@ -185,6 +231,7 @@ func (s State) releaseLayout(width, height int, parts []string, result pageLayou
 	if wide {
 		listX = leftWidth
 	}
+	columns := s.releaseColumns(start, min(count, start+visible), rightWidth-4)
 	for i := start; i < min(count, start+visible); i++ {
 		r, ok := s.releaseAt(i)
 		if !ok {
@@ -194,7 +241,7 @@ func (s State) releaseLayout(width, height int, parts []string, result pageLayou
 		if i == s.selected {
 			marker = "› "
 		}
-		label := ansi.Truncate(marker+r.Version()+"  ["+s.releaseBadge(r)+"] · "+releaseInfo(r), rightWidth-4, "…")
+		label := s.releaseRow(r, marker, columns, rightWidth-4)
 		label = lipgloss.NewStyle().Foreground(s.releaseColor(r)).Render(label)
 		if i == s.selected {
 			label = selected.Foreground(s.releaseColor(r)).Render(common.PadString(label, rightWidth-4))
