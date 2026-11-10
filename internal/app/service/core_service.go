@@ -143,6 +143,10 @@ func (s *CoreService) Serve(ctx context.Context, ready func()) error {
 	return s.Wait(ctx)
 }
 func (s *CoreService) forward(ctx context.Context, action, value string) (bool, error) {
+	return s.forwardControl(ctx, action, value, nil)
+}
+
+func (s *CoreService) forwardControl(ctx context.Context, action, value string, activation *ActivateResult) (bool, error) {
 	s.mu.Lock()
 	owned := s.process != nil || s.daemon
 	token := s.controlOwner.Token
@@ -159,7 +163,7 @@ func (s *CoreService) forward(ctx context.Context, action, value string) (bool, 
 	if json.Unmarshal(data, &owner) == nil && owner.Token == token && owner.Token != "" {
 		return false, nil
 	}
-	err = s.Control(ctx, action, value)
+	err = s.sendControl(ctx, action, value, activation)
 	if errors.Is(err, ErrNoCoreOwner) {
 		return false, nil
 	}

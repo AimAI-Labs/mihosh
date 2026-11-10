@@ -94,18 +94,19 @@ func recoverManagedProfile(root string) error {
 // ApplyProfile is serialized with core installation and process operations. A journal
 // preserves the last committed configuration across interruption of the apply step.
 func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopped bool) (ActivateResult, error) {
-	if forwarded, err := s.forward(ctx, "profile", uid); forwarded {
-		return ActivateResult{}, err
+	var result ActivateResult
+	if forwarded, err := s.forwardControl(ctx, "profile", uid, &result); forwarded {
+		return result, err
 	}
 	if startIfStopped && s.usesService() {
 		if err := s.Start(ctx); err != nil {
 			return ActivateResult{}, err
 		}
-		forwarded, err := s.forward(ctx, "profile", uid)
+		forwarded, err := s.forwardControl(ctx, "profile", uid, &result)
 		if !forwarded && err == nil {
 			err = errors.New("background core owner disappeared before applying the subscription")
 		}
-		return ActivateResult{}, err
+		return result, err
 	}
 	ctx, cancelOperation := s.operationContext(ctx)
 	defer cancelOperation()

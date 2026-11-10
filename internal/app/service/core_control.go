@@ -31,6 +31,12 @@ type coreControlRequest struct {
 	Version string `json:"version,omitempty"`
 }
 
+type coreControlResponse struct {
+	Result       string `json:"result"`
+	BackupName   string `json:"backup_name,omitempty"`
+	MergeWarning string `json:"merge_warning,omitempty"`
+}
+
 // startControl runs only in a session that successfully started its own child. It
 // provides local lifecycle coordination, not an API for managing arbitrary processes.
 // The caller holds s.mu. The bearer token is unrelated to the Mihomo API secret.
@@ -78,6 +84,7 @@ func (s *CoreService) startControl(root string) error {
 			return
 		}
 		var err error
+		var activation ActivateResult
 		switch request.Action {
 		case "status":
 			_, err = s.Status()
@@ -92,7 +99,7 @@ func (s *CoreService) startControl(root string) error {
 		case "rollback":
 			err = s.ActivateVersion(r.Context(), "")
 		case "profile":
-			_, err = s.ApplyProfile(r.Context(), request.Version, false)
+			activation, err = s.ApplyProfile(r.Context(), request.Version, false)
 		case "system-proxy", "tun":
 			if request.Version != "on" && request.Version != "off" {
 				http.Error(w, "invalid network setting", 400)
@@ -113,7 +120,11 @@ func (s *CoreService) startControl(root string) error {
 			return
 		}
 		s.notifyOwner(request.Action)
-		json.NewEncoder(w).Encode(map[string]string{"result": "ok"})
+		response := coreControlResponse{Result: "ok", BackupName: activation.BackupName}
+		if activation.MergeErr != nil {
+			response.MergeWarning = activation.MergeErr.Error()
+		}
+		json.NewEncoder(w).Encode(response)
 	})
 	data, _ := json.Marshal(owner)
 	if err = privateWrite(filepath.Join(root, "runtime", "owner.json"), data); err != nil {
@@ -149,6 +160,10 @@ func removeOwner(root, token string) {
 // Control routes a command to the private local owner. It never falls back to
 // scanning or signalling unrelated OS processes.
 func (s *CoreService) Control(ctx context.Context, action, version string) error {
+	return s.sendControl(ctx, action, version, nil)
+}
+
+func (s *CoreService) sendControl(ctx context.Context, action, version string, activation *ActivateResult) error {
 	root, err := config.GetConfigDir()
 	if err != nil {
 		return err
@@ -194,6 +209,19 @@ func (s *CoreService) Control(ctx context.Context, action, version string) error
 			return errors.New(result["error"])
 		}
 		return fmt.Errorf("local core owner returned HTTP %d", resp.StatusCode)
+	}
+	if activation != nil {
+		var response coreControlResponse
+		if err := json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&response); err != nil {
+			return fmt.Errorf("invalid local core profile response: %w", err)
+		}
+		if response.Result != "ok" {
+			return errors.New("invalid local core profile response")
+		}
+		activation.BackupName = response.BackupName
+		if response.MergeWarning != "" {
+			activation.MergeErr = errors.New(response.MergeWarning)
+		}
 	}
 	return nil
 }
