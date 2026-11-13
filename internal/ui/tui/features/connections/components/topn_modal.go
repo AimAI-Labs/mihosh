@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -14,43 +15,14 @@ func ResolveTopNModalBounds(items []TopNItem, width, height, scroll int) (left, 
 	if width <= 0 || height <= 0 {
 		return 0, 0, 0, 0
 	}
-
 	modal := buildTopNModal(items, width, height, scroll)
-	modalWidth := lipgloss.Width(modal)
-	modalHeight := lipgloss.Height(modal)
-
-	containerHeight := height
-	if containerHeight < 1 {
-		containerHeight = 1
-	}
-
-	leftGap := width - modalWidth
-	if leftGap < 0 {
-		leftGap = 0
-	}
-	topGap := containerHeight - modalHeight
-	if topGap < 0 {
-		topGap = 0
-	}
-
-	left = leftGap / 2
-	top = topGap / 2
-	right = left + modalWidth
-	bottom = top + modalHeight
-	return left, top, right, bottom
+	return dialog.New(modal, width, height).Bounds()
 }
 
 // RenderTopNModal 渲染吞吐量全量排行弹窗。
 func RenderTopNModal(items []TopNItem, width, height, scroll int) string {
 	modal := buildTopNModal(items, width, height, scroll)
-
-	return lipgloss.Place(
-		width,
-		height,
-		lipgloss.Center,
-		lipgloss.Center,
-		modal,
-	)
+	return dialog.New(modal, width, height).View()
 }
 
 func buildTopNModal(items []TopNItem, width, height, scroll int) string {

@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
@@ -491,60 +492,8 @@ func buildSubSections(ctx HelpContext) []section {
 //  2. 渲染弹窗本体，并计算居中偏移量
 //  3. 逐行用 ansi.Cut 截取底层的左侧和右侧，将弹窗内容嵌入中间
 func OverlayHelpPopup(base string, width, height int, ctx HelpContext) string {
-	if width <= 0 || height <= 0 {
-		return ""
-	}
-	// ── 1. 暗化底层 ──
-	baseLines := strings.Split(base, "\n")
-	for len(baseLines) < height {
-		baseLines = append(baseLines, "")
-	}
-	if len(baseLines) > height {
-		baseLines = baseLines[:height]
-	}
-
-	faint := lipgloss.NewStyle().Faint(true)
-	dimmed := make([]string, height)
-	for i, l := range baseLines {
-		dimmed[i] = faint.Render(l)
-	}
-
-	// ── 2. 弹窗居中计算 ──
 	popup := renderPopup(width, height, ctx)
-	popupLines := strings.Split(popup, "\n")
-	popupHeight := len(popupLines)
-	if popupHeight == 0 {
-		return strings.Join(dimmed, "\n")
-	}
-
-	popupWidth := lipgloss.Width(popupLines[0])
-	leftOffset := (width - popupWidth) / 2
-	if leftOffset < 0 {
-		leftOffset = 0
-	}
-	topOffset := (height - popupHeight) / 2
-	if topOffset < 0 {
-		topOffset = 0
-	}
-
-	// ── 3. 弹窗行嵌入暗化底层 ──
-	for i, pl := range popupLines {
-		y := topOffset + i
-		if y >= height {
-			break
-		}
-
-		leftPart := ansi.Cut(dimmed[y], 0, leftOffset)
-		leftW := lipgloss.Width(leftPart)
-		if leftW < leftOffset {
-			leftPart += strings.Repeat(" ", leftOffset-leftW)
-		}
-
-		rightPart := ansi.Cut(dimmed[y], leftOffset+popupWidth, width)
-		dimmed[y] = ansi.Truncate(leftPart+pl+rightPart, width, "")
-	}
-
-	return strings.Join(dimmed, "\n")
+	return dialog.New(popup, width, height).Clipped().Overlay(base, true)
 }
 
 // renderPopup 渲染帮助弹窗（无背景色，使用终端默认背景）

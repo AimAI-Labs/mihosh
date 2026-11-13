@@ -14,9 +14,9 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 )
 
 const (
@@ -399,65 +399,14 @@ const (
 	deleteModalWidth  = 54
 )
 
-// overlayDim 底层暗化 + 弹窗居中嵌入的通用实现。
-func overlayDim(background string, modal string, width, height int) string {
-	baseLines := strings.Split(background, "\n")
-	for len(baseLines) < height {
-		baseLines = append(baseLines, "")
-	}
-	if len(baseLines) > height {
-		baseLines = baseLines[:height]
-	}
-	faint := lipgloss.NewStyle().Faint(true)
-	dimmed := make([]string, height)
-	for i, l := range baseLines {
-		dimmed[i] = faint.Render(l)
-	}
-
-	modalLines := strings.Split(modal, "\n")
-	if len(modalLines) == 0 {
-		return strings.Join(dimmed, "\n")
-	}
-	modalWidth := lipgloss.Width(modalLines[0])
-	leftOffset := (width - modalWidth) / 2
-	if leftOffset < 0 {
-		leftOffset = 0
-	}
-	topOffset := subHeaderHeight + 1
-	if topOffset < 0 {
-		topOffset = 0
-	}
-	if topOffset+len(modalLines) > height {
-		topOffset = height - len(modalLines)
-		if topOffset < 0 {
-			topOffset = 0
-		}
-	}
-
-	for i, pl := range modalLines {
-		y := topOffset + i
-		if y >= height {
-			break
-		}
-		leftPart := ansi.Cut(dimmed[y], 0, leftOffset)
-		leftW := lipgloss.Width(leftPart)
-		if leftW < leftOffset {
-			leftPart += strings.Repeat(" ", leftOffset-leftW)
-		}
-		rightPart := ansi.Cut(dimmed[y], leftOffset+modalWidth, width)
-		dimmed[y] = leftPart + pl + rightPart
-	}
-	return strings.Join(dimmed, "\n")
-}
-
 // ===== 添加/编辑表单（共用渲染） =====
 
 func renderAddFormOverlay(background string, state PageState, width, height int) string {
-	return overlayDim(background, buildAddFormModal(state, width, height), width, height)
+	return dialog.New(buildAddFormModal(state, width, height), width, height).Below(subHeaderHeight+1).Overlay(background, true)
 }
 
 func renderEditFormOverlay(background string, state PageState, width, height int) string {
-	return overlayDim(background, buildEditFormModal(state, width, height), width, height)
+	return dialog.New(buildEditFormModal(state, width, height), width, height).Below(subHeaderHeight+1).Overlay(background, true)
 }
 
 func buildAddFormModal(state PageState, width, height int) string {
@@ -559,32 +508,13 @@ func resolveFormBounds(state PageState, width, height int) (left, top, right, bo
 	} else {
 		modal = buildAddFormModal(state, width, height)
 	}
-	modalWidth := lipgloss.Width(modal)
-	modalHeight := lipgloss.Height(modal)
-	leftGap := width - modalWidth
-	if leftGap < 0 {
-		leftGap = 0
-	}
-	left = leftGap / 2
-	top = subHeaderHeight + 1
-	if top < 0 {
-		top = 0
-	}
-	if top+modalHeight > height {
-		top = height - modalHeight
-		if top < 0 {
-			top = 0
-		}
-	}
-	right = left + modalWidth
-	bottom = top + modalHeight
-	return
+	return dialog.New(modal, width, height).Below(subHeaderHeight + 1).Bounds()
 }
 
 // ===== 删除确认 =====
 
 func renderDeleteConfirmOverlay(background string, state PageState, width, height int) string {
-	return overlayDim(background, buildDeleteConfirmModal(state, width, height), width, height)
+	return dialog.New(buildDeleteConfirmModal(state, width, height), width, height).Below(subHeaderHeight+1).Overlay(background, true)
 }
 
 func buildDeleteConfirmModal(state PageState, width, height int) string {

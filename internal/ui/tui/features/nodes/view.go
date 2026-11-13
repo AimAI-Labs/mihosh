@@ -6,9 +6,9 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -95,7 +95,7 @@ func RenderNodesPage(state PageState) string {
 
 	if state.ShowTestDetail {
 		modal := buildTestResultModal(state)
-		mainContent = overlayCenter(mainContent, modal, state.Width, state.Height)
+		mainContent = dialog.New(modal, state.Width, state.Height).Overlay(mainContent, false)
 	}
 	// 始终显示右下角内联帮助提示面板
 	mainContent = renderNodesInlineHelp(mainContent, state)
@@ -228,8 +228,6 @@ func buildTestResultDetailLines(results []TestResultEntry, width int) []string {
 	return lines
 }
 
-
-
 func wrapWithPrefix(prefix, text string, width int) []string {
 	prefixWidth := displayWidth(prefix)
 	if width <= prefixWidth {
@@ -291,64 +289,4 @@ func wrapByDisplayWidth(text string, width int) []string {
 	}
 
 	return lines
-}
-
-// overlayCenter 将弹窗字符串居中叠加在底层页面上
-func overlayCenter(base, overlay string, width, height int) string {
-	baseLines := strings.Split(base, "\n")
-	overlayLines := strings.Split(overlay, "\n")
-
-	// 补齐底层行数到 height
-	for len(baseLines) < height {
-		baseLines = append(baseLines, "")
-	}
-
-	overlayH := len(overlayLines)
-	overlayW := 0
-	for _, l := range overlayLines {
-		if w := displayWidth(l); w > overlayW {
-			overlayW = w
-		}
-	}
-
-	// 计算叠加起始位置（居中）
-	startRow := (height - overlayH) / 2
-	if startRow < 0 {
-		startRow = 0
-	}
-	startCol := (width - overlayW) / 2
-	if startCol < 0 {
-		startCol = 0
-	}
-
-	result := make([]string, len(baseLines))
-	copy(result, baseLines)
-
-	for i, ol := range overlayLines {
-		row := startRow + i
-		if row >= len(result) {
-			break
-		}
-		bl := result[row]
-
-		olWidth := displayWidth(ol)
-		blWidth := displayWidth(bl)
-
-		// 截取底层行左侧
-		leftPart := ansi.Cut(bl, 0, startCol)
-		lw := displayWidth(leftPart)
-		if lw < startCol {
-			leftPart += strings.Repeat(" ", startCol-lw)
-		}
-
-		// 截取底层行右侧
-		rightPart := ""
-		if blWidth > startCol+olWidth {
-			rightPart = ansi.Cut(bl, startCol+olWidth, blWidth)
-		}
-
-		result[row] = leftPart + ol + rightPart
-	}
-
-	return strings.Join(result, "\n")
 }

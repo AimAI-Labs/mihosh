@@ -5,6 +5,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
@@ -63,7 +64,7 @@ func (s State) formDialog(width, height int) (pageLayout, int) {
 	page.content = strings.Join(append(append([]string{lines[0]}, body...),
 		common.TokyoBlueStyle().Render("│ ")+common.PadString(ansi.Truncate(s.inlineHelp(popupWidth-3), popupWidth-4, ""), popupWidth-4)+common.TokyoBlueStyle().Render(" │"),
 		lines[len(lines)-1]), "\n")
-	x, y := max(0, (width-popupWidth)/2), max(0, (height-lipgloss.Height(page.content))/2)
+	x, y, _, _ := dialog.New(page.content, width, height).Clipped().Bounds()
 	for i := range page.actions {
 		hit := &page.actions[i]
 		hit.y -= offset
@@ -86,8 +87,8 @@ func (s State) formDialog(width, height int) (pageLayout, int) {
 }
 
 func (s State) overlayForm(base string, width, height int) string {
-	page, popupWidth := s.formDialog(width, height)
-	return overlayPopup(base, page.content, width, height, popupWidth)
+	page, _ := s.formDialog(width, height)
+	return dialog.New(page.content, width, height).Clipped().Overlay(base, true)
 }
 
 func (s State) clickForm(msg messages.PageMouseClickMsg) (State, tea.Cmd) {

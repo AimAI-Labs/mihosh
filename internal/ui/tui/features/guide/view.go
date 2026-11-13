@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -128,11 +129,5 @@ func (s State) Render(width, height int) string {
 		Width(dialogWidth).
 		Render(body)
 
-	return lipgloss.Place(
-		width,
-		height,
-		lipgloss.Center,
-		lipgloss.Center,
-		dialogBox,
-	)
+	return dialog.New(dialogBox, width, height).View()
 }

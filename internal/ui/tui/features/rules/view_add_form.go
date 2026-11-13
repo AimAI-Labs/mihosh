@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 )
 
 // ============================================================
@@ -49,64 +49,8 @@ func computeAddFormLayout(state PageState, width, height int) addFormLayout {
 
 // renderAddRuleOverlay 渲染添加规则弹窗叠加层（同 renderTypeFilterOverlay 结构）。
 func renderAddRuleOverlay(background string, state PageState, width, height int) string {
-	// ── 1. 暗化底层 ──
-	baseLines := strings.Split(background, "\n")
-	for len(baseLines) < height {
-		baseLines = append(baseLines, "")
-	}
-	if len(baseLines) > height {
-		baseLines = baseLines[:height]
-	}
-
-	faint := lipgloss.NewStyle().Faint(true)
-	dimmed := make([]string, height)
-	for i, l := range baseLines {
-		dimmed[i] = faint.Render(l)
-	}
-
-	// ── 2. 弹窗从顶部开始计算 ──
 	modal := buildAddRuleModal(state, width, height)
-	modalLines := strings.Split(modal, "\n")
-	modalHeight := len(modalLines)
-	if modalHeight == 0 {
-		return strings.Join(dimmed, "\n")
-	}
-
-	modalWidth := lipgloss.Width(modalLines[0])
-	leftOffset := (width - modalWidth) / 2
-	if leftOffset < 0 {
-		leftOffset = 0
-	}
-	topOffset := rulesHeaderHeight + 1 // 从规则头部下方开始，避免视觉疲劳
-	if topOffset < 0 {
-		topOffset = 0
-	}
-	// 确保弹窗底部不会超出屏幕
-	if topOffset+modalHeight > height {
-		topOffset = height - modalHeight
-		if topOffset < 0 {
-			topOffset = 0
-		}
-	}
-
-	// ── 3. 弹窗行嵌入暗化底层 ──
-	for i, pl := range modalLines {
-		y := topOffset + i
-		if y >= height {
-			break
-		}
-
-		leftPart := ansi.Cut(dimmed[y], 0, leftOffset)
-		leftW := lipgloss.Width(leftPart)
-		if leftW < leftOffset {
-			leftPart += strings.Repeat(" ", leftOffset-leftW)
-		}
-
-		rightPart := ansi.Cut(dimmed[y], leftOffset+modalWidth, width)
-		dimmed[y] = leftPart + pl + rightPart
-	}
-
-	return strings.Join(dimmed, "\n")
+	return dialog.New(modal, width, height).Below(rulesHeaderHeight+1).Overlay(background, true)
 }
 
 // buildAddRuleModal 渲染添加规则弹窗本体（无暗化背景）。
@@ -309,26 +253,5 @@ func ResolveAddFormBounds(state PageState, width, height int) (left, top, right,
 		return 0, 0, 0, 0
 	}
 	modal := buildAddRuleModal(state, width, height)
-	modalWidth := lipgloss.Width(modal)
-	modalHeight := lipgloss.Height(modal)
-
-	leftGap := width - modalWidth
-	if leftGap < 0 {
-		leftGap = 0
-	}
-	left = leftGap / 2
-	top = rulesHeaderHeight + 1
-	if top < 0 {
-		top = 0
-	}
-	// 确保弹窗底部不会超出屏幕
-	if top+modalHeight > height {
-		top = height - modalHeight
-		if top < 0 {
-			top = 0
-		}
-	}
-	right = left + modalWidth
-	bottom = top + modalHeight
-	return left, top, right, bottom
+	return dialog.New(modal, width, height).Below(rulesHeaderHeight + 1).Bounds()
 }

@@ -2,6 +2,7 @@ package components
 
 import (
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -49,5 +50,5 @@ func RenderConnectionDetailImmersive(
 		content = lipgloss.JoinVertical(lipgloss.Left, leftPanel, "", rightPanel)
 	}
 
-	return content
+	return dialog.New(content, width, height).Below(0).View()
 }

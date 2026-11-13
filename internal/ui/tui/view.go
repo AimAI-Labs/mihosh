@@ -6,11 +6,11 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/help"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 )
 
 // View 渲染视图
@@ -200,7 +200,7 @@ func overlayErrorPopup(base string, width, height int, errText string) string {
 	popup := common.RenderBorderedPanel(title, body, popupWidth, common.TokyoRed(), common.TokyoRed())
 
 	// ── 3. 弹窗居中合并 ──
-	return overlayPopup(base, popup, width, height, popupWidth)
+	return dialog.New(popup, width, height).Overlay(base, true)
 }
 
 // overlayUpdateDialog 将更新弹窗完整弹窗居中叠加在 base 页面之上
@@ -263,54 +263,5 @@ func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo,
 	popup := common.RenderBorderedPanel(title, finalBody, popupWidth, borderColor, borderColor)
 
 	// ── 3. 弹窗居中合并 ──
-	return overlayPopup(base, popup, width, height, popupWidth)
-}
-
-// overlayPopup 将已渲染的 popup 弹窗居中叠加在暗化的 base 页面之上
-func overlayPopup(base, popup string, width, height, popupWidth int) string {
-	// ── 1. 暗化底层 ──
-	baseLines := strings.Split(base, "\n")
-	for len(baseLines) < height {
-		baseLines = append(baseLines, "")
-	}
-	if len(baseLines) > height {
-		baseLines = baseLines[:height]
-	}
-
-	faint := lipgloss.NewStyle().Faint(true)
-	dimmed := make([]string, height)
-	for i, l := range baseLines {
-		dimmed[i] = faint.Render(l)
-	}
-
-	// ── 2. 弹窗居中合并 ──
-	popupLines := strings.Split(popup, "\n")
-	popupHeight := len(popupLines)
-
-	leftOffset := (width - popupWidth) / 2
-	if leftOffset < 0 {
-		leftOffset = 0
-	}
-	topOffset := (height - popupHeight) / 2
-	if topOffset < 0 {
-		topOffset = 0
-	}
-
-	for i, pl := range popupLines {
-		y := topOffset + i
-		if y >= height {
-			break
-		}
-
-		leftPart := ansi.Cut(dimmed[y], 0, leftOffset)
-		leftW := lipgloss.Width(leftPart)
-		if leftW < leftOffset {
-			leftPart += strings.Repeat(" ", leftOffset-leftW)
-		}
-
-		rightPart := ansi.Cut(dimmed[y], leftOffset+popupWidth, width)
-		dimmed[y] = leftPart + pl + rightPart
-	}
-
-	return strings.Join(dimmed, "\n")
+	return dialog.New(popup, width, height).Overlay(base, true)
 }
