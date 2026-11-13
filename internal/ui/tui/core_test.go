@@ -102,27 +102,33 @@ func TestCoreReleaseCatalogueSurvivesPageChangeAndGlobalRefresh(t *testing.T) {
 	}
 }
 
-func TestCoreDownloadModalBlocksGlobalNavigationAndMouse(t *testing.T) {
+func TestCoreDownloadTaskAllowsGlobalNavigationAndMouse(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	svc := service.NewCoreService()
 	defer svc.Close()
 	s := corepage.NewState(svc)
 	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
 	defer s.Close()
-	m := Model{currentPage: layout.PageCore, coreState: s, width: 120, height: 30}
-	for _, key := range []tea.KeyMsg{{Type: tea.KeyTab}, {Type: tea.KeyRunes, Runes: []rune("r")}, {Type: tea.KeyRunes, Runes: []rune("?")}} {
-		next, cmd := m.Update(key)
-		if next.(Model).currentPage != layout.PageCore || next.(Model).showHelp || cmd != nil {
-			t.Fatal("global key escaped the download modal")
-		}
+	m := Model{currentPage: layout.PageCore, coreSvc: svc, coreState: s, width: 120, height: 30}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if updated.(Model).currentPage == layout.PageCore || !updated.(Model).coreState.Busy {
+		t.Fatal("running download blocked global keyboard navigation or lost its state")
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
+	if !updated.(Model).showHelp {
+		t.Fatal("running download blocked help")
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	if updated.(Model).coreState.OperationID() != s.OperationID() || !updated.(Model).coreState.Busy {
+		t.Fatal("global refresh started a second task")
 	}
 	for _, mouse := range []tea.MouseMsg{
 		{X: 5, Y: 1, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress},
 		{X: 5, Y: 1, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress},
 	} {
-		next, cmd := m.Update(mouse)
-		if next.(Model).currentPage != layout.PageCore || cmd != nil {
-			t.Fatal("mouse navigation escaped the download modal")
+		next, _ := m.Update(mouse)
+		if next.(Model).currentPage == layout.PageCore || !next.(Model).coreState.Busy {
+			t.Fatal("running download blocked global mouse navigation or lost its state")
 		}
 	}
 }
@@ -169,6 +175,9 @@ func TestCoreVersionHelpUsesSelectedAssetAndCapturesScrolling(t *testing.T) {
 	ctx := m.buildHelpContext()
 	if !ctx.CoreReleases || ctx.CoreAsset != "selected-mihomo-build.gz" || ctx.CorePlatform == "" {
 		t.Fatal("help context did not use the selected release")
+	}
+	if len(ctx.CoreReleaseNotes) < 3 || !strings.Contains(ctx.CoreReleaseNotes[0], r.Version()) {
+		t.Fatal("help context did not include selected version details and catalogue status")
 	}
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
 	m = updated.(Model)

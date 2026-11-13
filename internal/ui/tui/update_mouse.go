@@ -45,9 +45,6 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if m.currentPage == layout.PageCore && m.coreState.TaskModal() {
-		return m, nil
-	}
 	if m.currentPage == layout.PageCore && m.coreState.Editing {
 		pageX, pageY, pageWidth, pageHeight, ok := m.resolveMainPageMouseHit(msg.X, msg.Y)
 		if ok && isMouseLeftPress(msg) {

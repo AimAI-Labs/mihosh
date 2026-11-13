@@ -225,7 +225,7 @@ func TestCoreHelpStaysAtBottomRightWhileScrolling(t *testing.T) {
 				t.Fatalf("%s %d: help is not fixed at bottom right: %q", language, width, lines)
 			}
 			if lipgloss.Width(lines[15]) != width-1 {
-				t.Fatalf("help does not align with right margin: %q", lines[15])
+				t.Fatalf("help row does not fill the footer: %q", lines[15])
 			}
 		}
 	}

@@ -7,15 +7,13 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
 
-func downloadTask(action string) bool {
-	return action == "install" || action == "upgrade" || action == "setup"
-}
+// Reserve the same space while idle so tasks never move the viewport.
+const footerHeight = 4
 
 func (s State) progressText(width int) string {
 	progress := i18n.T("core.action."+s.task) + " · " + i18n.T("core.busy")
@@ -46,13 +44,15 @@ func (s State) progressText(width int) string {
 	return progress
 }
 
-func (s State) overlayTask(base string, width, height int) string {
+func (s State) footer(width, height int) string {
 	t := theme.Current()
-	popupWidth := min(width, min(76, max(24, width*2/3)))
-	body := s.progressText(popupWidth)
+	width = max(1, width-1)
+	body := ""
 	color := t.Primary
-	hint := i18n.T("core.cancel")
-	if !s.Busy {
+	showTask := s.task != "" && s.task != "releases"
+	if s.Busy && showTask {
+		body = i18n.T("core.task") + " · " + s.progressText(width)
+	} else if !s.Busy && (showTask || s.Err != nil) {
 		body = i18n.T("core.task.complete")
 		color = t.Success
 		if errors.Is(s.Err, context.Canceled) {
@@ -60,35 +60,29 @@ func (s State) overlayTask(base string, width, height int) string {
 		} else if s.Err != nil {
 			body, color = s.Err.Error(), t.Danger
 		}
-		hint = i18n.T("core.task.close")
+		if showTask {
+			body = i18n.T("core.action."+s.task) + " · " + body
+		}
 	}
-	lines := strings.Split(wrap(body, max(1, popupWidth-4)), "\n")
-	budget := max(1, height-4)
-	if len(lines) > budget {
+	if !s.Busy && s.tab == 1 && s.catalog.failed {
+		caption := i18n.T("core.catalog.load_failed")
+		if body == "" {
+			body, color = caption, t.Warning
+		} else if !strings.Contains(body, caption) {
+			body += "\n" + caption
+		}
+	}
+	budget := min(footerHeight-1, max(0, height-1))
+	lines := strings.Split(wrap(body, width), "\n")
+	if len(lines) > budget && budget > 0 {
 		lines = lines[:budget]
-		lines[budget-1] = ansi.Truncate(lines[budget-1], max(1, popupWidth-5), "") + "…"
+		lines[budget-1] = ansi.Truncate(lines[budget-1], max(0, width-1), "") + "…"
 	}
-	body = strings.Join(lines, "\n") + "\n" + ansi.Truncate(hint, max(1, popupWidth-4), "…")
-	popup := common.RenderBorderedPanel(i18n.T("core.task"), body, popupWidth, color, color)
-	return overlayPopup(base, popup, width, height, popupWidth)
-}
-
-func overlayPopup(base, popup string, width, height, popupWidth int) string {
-	popupWidth = min(popupWidth, width)
-	popupLines := strings.Split(popup, "\n")
-	popupHeight := min(height, len(popupLines))
-	x, y := max(0, (width-popupWidth)/2), max(0, (height-popupHeight)/2)
-	baseLines := strings.Split(base, "\n")
-	for len(baseLines) < height {
-		baseLines = append(baseLines, "")
+	lines = append(make([]string, max(0, budget-len(lines))), lines...)
+	lines = lines[:budget]
+	for i := range lines {
+		lines[i] = lipgloss.NewStyle().Width(width).Align(lipgloss.Right).Foreground(color).Render(ansi.Truncate(lines[i], width, "…"))
 	}
-	for i := range baseLines {
-		baseLines[i] = lipgloss.NewStyle().Faint(true).Render(baseLines[i])
-	}
-	for i := 0; i < popupHeight; i++ {
-		left := common.PadString(ansi.Truncate(ansi.Cut(baseLines[y+i], 0, x), x, ""), x)
-		right := ansi.Cut(baseLines[y+i], x+popupWidth, width)
-		baseLines[y+i] = ansi.Truncate(left+ansi.Truncate(popupLines[i], popupWidth, "")+right, width, "")
-	}
-	return strings.Join(baseLines[:height], "\n")
+	help := lipgloss.NewStyle().Width(width).Align(lipgloss.Right).Render(s.inlineHelp(width + 1))
+	return strings.Join(append(lines, help), "\n")
 }

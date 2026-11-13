@@ -16,7 +16,7 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 	if s.Busy || s.Editing {
 		return s, nil
 	}
-	s.Err = nil
+	s.Err, s.task = nil, ""
 	s.formSelection, s.formScroll = s.selected, s.scroll
 	s.form, s.Editing, s.choice = kind, true, 0
 	s.fields, s.args = nil, nil

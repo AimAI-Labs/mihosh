@@ -240,7 +240,7 @@ func (s State) releaseAction(action string) (State, tea.Cmd) {
 			}
 			if _, err := r.TrustedDigest(r.Assets[0], coreinfra.PinnedDigests()); err != nil {
 				s.Err = errors.New(i18n.T("core.catalog.unverified"))
-				s.task, s.taskDialog = "install", true
+				s.task = "install"
 				return s, nil
 			}
 		} else if !installed || (s.Status.Mode == "managed" && s.Status.Version == r.Version()) {
@@ -261,12 +261,6 @@ func (s State) releaseInstalled(tag string) bool {
 }
 
 func (s State) updateReleaseKeys(msg tea.KeyMsg) (State, tea.Cmd, bool) {
-	if s.Busy && (s.task != "releases" || !s.catalog.loaded) {
-		switch msg.String() {
-		case "up", "k", "down", "j", "home", "end", "enter", "i", "a", "v", "r", "pgup", "[", "pgdown", "]":
-			return s, nil, true
-		}
-	}
 	var cmd tea.Cmd
 	switch msg.String() {
 	case "up", "k":

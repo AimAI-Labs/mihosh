@@ -176,7 +176,6 @@ func (s State) overview(width int) string {
 func (s State) layout(width, height int) pageLayout {
 	width = max(24, width)
 	t := theme.Current()
-	muted := lipgloss.NewStyle().Foreground(t.Muted)
 	if s.Editing && s.form != "service" {
 		return s.formLayout(width)
 	}
@@ -198,20 +197,6 @@ func (s State) layout(width, height int) pageLayout {
 		labels = append(labels, style.Render(label))
 	}
 	parts := []string{panel(i18n.T("core.heading"), strings.Join(labels, "│"), width), ""}
-	if s.Busy && !downloadTask(s.task) && !(s.tab == 1 && s.task == "releases" && s.catalog.loaded) {
-		progress := s.progressText(width)
-		parts = append(parts, panel(i18n.T("core.task"), wrap(progress, width-4)+"\n"+muted.Render(i18n.T("core.cancel")), width), "")
-	}
-	if s.Err != nil && !s.taskDialog {
-		detail := strings.Split(wrap(s.Err.Error(), width-4), "\n")
-		if s.tab == 1 && len(detail) > 2 {
-			detail = detail[:2]
-			detail[1] = ansi.Truncate(detail[1], width-5, "") + "…"
-		} else if len(detail) > 6 {
-			detail = append(detail[:6], "…")
-		}
-		parts = append(parts, common.RenderBorderedPanel(i18n.T("core.error_title"), strings.Join(detail, "\n"), width, t.Danger, t.Danger), "")
-	}
 	if s.tab == 1 {
 		return s.releaseLayout(width, height, parts, result)
 	}
@@ -299,7 +284,8 @@ func (s State) Render(width, height int) string {
 		background.selected, background.scroll = s.formSelection, s.formScroll
 		return s.overlayForm(background.Render(width, height), width, height)
 	}
-	contentHeight := max(1, height-1)
+	footer := s.footer(width, height)
+	contentHeight := max(1, height-lipgloss.Height(footer))
 	page := s.layout(width, contentHeight)
 	lines := strings.Split(page.content, "\n")
 	offset := s.viewportOffset(page, contentHeight)
@@ -307,9 +293,5 @@ func (s State) Render(width, height int) string {
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], width, "…")
 	}
-	base := common.OverlayHelpAtBottomRight(strings.Join(lines, "\n"), s.inlineHelp(width), width, height)
-	if s.taskDialog {
-		return s.overlayTask(base, width, height)
-	}
-	return base
+	return common.OverlayHelpAtBottomRight(strings.Join(lines, "\n"), footer, width, height)
 }

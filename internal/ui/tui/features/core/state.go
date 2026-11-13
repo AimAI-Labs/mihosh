@@ -37,7 +37,6 @@ type State struct {
 	externalVersion   string
 	connectionChecked bool
 	task              string
-	taskDialog        bool
 	cancel            context.CancelFunc
 	updates           chan coreinfra.Progress
 	generation        uint64
@@ -77,13 +76,6 @@ func (s State) begin(action string) (State, tea.Cmd) {
 	}
 	s.Busy = true
 	s.task = action
-	s.taskDialog = downloadTask(action)
-	if !s.taskDialog {
-		s.scroll = 0
-	}
-	if !s.taskDialog && (action != "releases" || !s.catalog.loaded) {
-		s.followSelection = false
-	}
 	s.Err = nil
 	s.Progress = coreinfra.Progress{}
 	s.generation++
@@ -250,11 +242,12 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		s.Busy = false
 		s.cancel = nil
 		s.Err = msg.Err
-		if msg.Action == "releases" && msg.Err != nil {
-			s.catalog.failed = true
-		}
-		if msg.Err != nil && !s.taskDialog {
-			s.scroll, s.followSelection = 0, false
+		if msg.Action == "releases" {
+			if msg.Err != nil {
+				s.catalog.failed = true
+			} else {
+				s.task = ""
+			}
 		}
 		if msg.Release != nil {
 			if msg.Action == "release" || msg.Action == "check" {
@@ -273,17 +266,15 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		}
 		return s, s.Refresh()
 	case messages.PageMouseClickMsg:
-		if s.taskDialog {
-			return s, nil
-		}
 		if s.Editing {
 			return s.clickForm(msg)
 		}
-		if msg.X < 0 || msg.X >= msg.Width || msg.Y < 0 || msg.Y >= msg.Height-1 {
+		contentHeight := max(1, msg.Height-footerHeight)
+		if msg.X < 0 || msg.X >= msg.Width || msg.Y < 0 || msg.Y >= contentHeight {
 			return s, nil
 		}
-		page := s.layout(msg.Width, max(1, msg.Height-1))
-		y := msg.Y + s.viewportOffset(page, max(1, msg.Height-1))
+		page := s.layout(msg.Width, contentHeight)
+		y := msg.Y + s.viewportOffset(page, contentHeight)
 		for _, hit := range page.tabs {
 			if msg.X >= hit.x && msg.X < hit.x+hit.width && y == hit.y {
 				return s.openTab(hit.index)
@@ -299,39 +290,26 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			}
 		}
 	case messages.PageMouseScrollMsg:
-		if s.taskDialog || s.Editing {
+		if s.Editing {
 			return s, nil
 		}
 		if s.tab == 1 {
 			return s.scrollReleasePage(msg)
 		}
-		page := s.layout(msg.Width, max(1, msg.Height-1))
-		s.scroll = s.viewportOffset(page, max(1, msg.Height-1))
+		contentHeight := max(1, msg.Height-footerHeight)
+		page := s.layout(msg.Width, contentHeight)
+		s.scroll = s.viewportOffset(page, contentHeight)
 		s.followSelection = false
 		if msg.Up {
 			s.scroll = max(0, s.scroll-1)
 		} else {
-			s.scroll = min(max(0, lipgloss.Height(page.content)-max(1, msg.Height-1)), s.scroll+1)
+			s.scroll = min(max(0, lipgloss.Height(page.content)-contentHeight), s.scroll+1)
 		}
 		return s, nil
 	case tea.KeyMsg:
-		if s.taskDialog {
-			switch msg.String() {
-			case "esc":
-				if s.Busy {
-					if s.cancel != nil {
-						s.cancel()
-					}
-				} else {
-					s.taskDialog, s.Err = false, nil
-					s.Progress = coreinfra.Progress{}
-				}
-			case "enter":
-				if !s.Busy {
-					s.taskDialog, s.Err = false, nil
-					s.Progress = coreinfra.Progress{}
-				}
-			}
+		if !s.Editing && !s.Busy && (s.task != "" || s.Err != nil) && (msg.String() == "enter" || msg.String() == "esc") {
+			s.task, s.Err = "", nil
+			s.Progress = coreinfra.Progress{}
 			return s, nil
 		}
 		if s.Editing {
@@ -410,12 +388,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 func (s State) OperationID() uint64 { return s.generation }
 
 func (s State) Leave() State {
-	s.taskDialog = false
 	if s.Editing {
 		s = s.closeForm()
 	}
 	s.args = nil
 	return s
 }
-
-func (s State) TaskModal() bool { return s.taskDialog }

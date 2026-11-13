@@ -127,6 +127,7 @@ func (m Model) buildHelpContext() help.HelpContext {
 		CoreReleases:       m.coreState.BrowsingReleases(),
 		CorePlatform:       platform,
 		CoreAsset:          asset,
+		CoreReleaseNotes:   m.coreState.ReleaseHelpNotes(),
 		ScrollOffset:       m.helpState.Offset(),
 		ConnViewMode:       m.connsState.ViewMode(),
 		ConnDetail:         m.connsState.DetailMode(),

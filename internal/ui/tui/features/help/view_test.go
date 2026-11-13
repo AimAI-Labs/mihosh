@@ -42,12 +42,13 @@ func TestVersionHelpContainsMovedDetailsAndCanScrollToEveryNote(t *testing.T) {
 	for _, language := range []string{"zh-CN", "en-US"} {
 		i18n.SetLanguageOverride(language)
 		ctx := HelpContext{CurrentPage: PageCore, CoreReleases: true, CorePlatform: "linux/amd64", CoreAsset: "mihomo-linux-amd64-compatible-v1.20.10.gz"}
+		ctx.CoreReleaseNotes = []string{"v1.20.10", "2026-10-10 · 12.0 MiB", i18n.Tf("core.catalog.loaded", 10)}
 		sections := buildHelpSections(ctx)
 		var allNotes string
 		for _, section := range sections {
 			allNotes += strings.Join(section.notes, "\n")
 		}
-		for _, want := range []string{ctx.CorePlatform, ctx.CoreAsset, i18n.T("core.catalog.download_hint"), i18n.T("core.desc.activate"), i18n.T("core.catalog.more_hint"), i18n.T("core.catalog.fallback")} {
+		for _, want := range append(ctx.CoreReleaseNotes, ctx.CorePlatform, ctx.CoreAsset, i18n.T("core.catalog.download_hint"), i18n.T("core.desc.activate"), i18n.T("core.catalog.more_hint"), i18n.T("core.catalog.fallback"), i18n.T("core.catalog.unverified")) {
 			if !strings.Contains(allNotes, want) {
 				t.Fatalf("help lost moved information: %q", want)
 			}

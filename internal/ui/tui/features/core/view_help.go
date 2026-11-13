@@ -16,6 +16,14 @@ func (s State) ReleaseHelpDetails() (platform, asset string) {
 	return platform, asset
 }
 
+func (s State) ReleaseHelpNotes() []string {
+	var notes []string
+	if r, ok := s.selectedRelease(); ok {
+		notes = append(notes, r.Version()+" · "+s.releaseBadge(r), releaseInfo(r))
+	}
+	return append(notes, s.releaseCaption())
+}
+
 func (s State) inlineHelp(width int) string {
 	hints := []common.InlineHelpHint{
 		{Key: "←→", Desc: i18n.T("core.inline.sections")},
@@ -41,13 +49,17 @@ func (s State) inlineHelp(width int) string {
 			hints = hints[1:]
 			hints[0].Desc = i18n.T("core.inline.run")
 		}
-	} else if s.Busy {
-		hints = []common.InlineHelpHint{{Key: "Esc", Desc: i18n.T("core.inline.cancel")}}
 	}
 	help := common.InlineHelpHint{Key: "?", Desc: i18n.T("core.inline.help")}
-	if s.Editing || s.taskDialog {
+	if s.Editing {
 		help = common.InlineHelpHint{Key: "Esc", Desc: i18n.T("core.inline.cancel")}
 		hints = hints[:max(0, len(hints)-1)]
+	} else if s.Busy {
+		hints = hints[:2]
+		help = common.InlineHelpHint{Key: "Esc", Desc: i18n.T("core.inline.cancel")}
+	} else if s.task != "" || s.Err != nil {
+		hints = hints[:2]
+		help = common.InlineHelpHint{Key: "Enter/Esc", Desc: i18n.T("core.inline.dismiss")}
 	}
 	for len(hints) > 0 && lipgloss.Width(common.FormatInlineHintRow(append(hints, help))) > width-1 {
 		hints = hints[:len(hints)-1]

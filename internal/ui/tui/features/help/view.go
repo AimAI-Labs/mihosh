@@ -30,11 +30,12 @@ const (
 
 // HelpContext 帮助弹窗所需的当前界面上下文
 type HelpContext struct {
-	CurrentPage  int // 当前页面（PageNodes / PageConnections / ...）
-	CoreReleases bool
-	CorePlatform string
-	CoreAsset    string
-	ScrollOffset int
+	CurrentPage      int // 当前页面（PageNodes / PageConnections / ...）
+	CoreReleases     bool
+	CorePlatform     string
+	CoreAsset        string
+	CoreReleaseNotes []string
+	ScrollOffset     int
 
 	// 连接页子状态
 	ConnViewMode int  // ConnViewTraffic / ConnViewActive / ConnViewHistory
@@ -129,7 +130,8 @@ func buildHelpSections(ctx HelpContext) []section {
 				{"1–3", i18n.T("core.help.sections")},
 				{"Esc", i18n.T("core.cancel")},
 			}})
-			details := []string{i18n.T("core.catalog.platform") + ": " + ctx.CorePlatform}
+			details := append([]string{}, ctx.CoreReleaseNotes...)
+			details = append(details, i18n.T("core.catalog.platform")+": "+ctx.CorePlatform)
 			if ctx.CoreAsset != "" {
 				details = append(details, i18n.T("core.catalog.asset")+": "+ctx.CoreAsset)
 			}
@@ -137,6 +139,7 @@ func buildHelpSections(ctx HelpContext) []section {
 				section{title: i18n.T("core.catalog.selection"), notes: details},
 				section{title: i18n.T("core.catalog.help.instructions"), notes: []string{
 					i18n.T("core.catalog.download_hint"), i18n.T("core.desc.activate"),
+					i18n.T("core.catalog.unverified"),
 					i18n.T("core.catalog.more_hint"), i18n.T("core.catalog.fallback"),
 				}},
 			)

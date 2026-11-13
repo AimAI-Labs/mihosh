@@ -61,7 +61,7 @@ func TestVersionTabQueriesListWithoutInstallingOrSwitching(t *testing.T) {
 		page.Releases = append(page.Releases, r)
 	}
 	s, _ = s.Update(messages.CoreOperationMsg{ID: old, Action: "releases", Releases: &page})
-	if s.Busy || !s.catalog.loaded || s.Release.Tag != "v1.20.10" || s.releaseCount() != 10 {
+	if s.Busy || s.task != "" || !s.catalog.loaded || s.Release.Tag != "v1.20.10" || s.releaseCount() != 10 {
 		t.Fatal("release list did not become selectable")
 	}
 	s, cmd = s.Update(coreKey("down"))
@@ -141,7 +141,7 @@ func TestVersionManualLookupIsSelectableAndBounded(t *testing.T) {
 	}
 }
 
-func TestVersionListMouseSelectionDownloadAndNavigationMatchRenderedPositions(t *testing.T) {
+func TestVersionListMouseSelectionAndDownloadMatchRenderedPositions(t *testing.T) {
 	i18n.Init()
 	t.Cleanup(func() { i18n.SetLanguageOverride("") })
 	for _, lang := range []string{"zh-CN", "en-US"} {
@@ -157,29 +157,17 @@ func TestVersionListMouseSelectionDownloadAndNavigationMatchRenderedPositions(t 
 					if next.selected != 1 || next.Release.Tag != "v1.20.9" || next.Busy || cmd != nil {
 						t.Fatalf("%s %d: row click did not select without downloading", lang, width)
 					}
+					next, cmd = next.Update(coreKey("enter"))
+					if !next.Busy || next.task != "install" || next.Release.Tag != "v1.20.9" || cmd == nil {
+						t.Fatalf("%s %d: Enter did not download the clicked version", lang, width)
+					}
+					next.cancel()
 					found = true
 					break
 				}
 			}
 			if !found {
 				t.Fatalf("%s %d: list is not visible:\n%s", lang, width, view)
-			}
-			for _, target := range []struct{ key, action string }{{"core.catalog.download", "install"}, {"core.catalog.load_more", "releases"}} {
-				found = false
-				for y, line := range strings.Split(view, "\n") {
-					if at := strings.Index(line, i18n.T(target.key)); at >= 0 {
-						next, cmd := s.Update(messages.PageMouseClickMsg{X: lipgloss.Width(line[:at]), Y: y, Width: width, Height: 30})
-						if !next.Busy || next.task != target.action || cmd == nil {
-							t.Fatalf("%s %d: click on %s did not queue %s", lang, width, target.key, target.action)
-						}
-						next.cancel()
-						found = true
-						break
-					}
-				}
-				if !found {
-					t.Fatalf("%s %d: %s is not visible:\n%s", lang, width, target.key, view)
-				}
 			}
 		}
 	}
@@ -234,9 +222,62 @@ func TestVersionListRemainsUsableAfterQueryFailureOnSmallTerminals(t *testing.T)
 			s := releaseFixture(t)
 			s.Err = errors.New(strings.Repeat("query failed; try another route. ", 10))
 			view := ansi.Strip(s.Render(width, 24))
-			for _, want := range []string{"› v1.20.10", i18n.T("core.catalog.refresh")} {
+			for _, want := range []string{"› v1.20.10", "Enter/Esc " + i18n.T("core.inline.dismiss")} {
 				if !strings.Contains(view, want) {
 					t.Fatalf("%s %d: failed-query view hides %q:\n%s", lang, width, want, view)
+				}
+			}
+		}
+	}
+}
+
+func TestReleaseTaskStatusStaysInFooterWithoutNavigationLabels(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	for _, language := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(language)
+		for _, width := range []int{24, 80, 100, 120} {
+			for _, height := range []int{8, 16, 28} {
+				for _, status := range []string{"", "core.catalog.loading", "core.catalog.load_failed"} {
+					s := releaseFixture(t)
+					s.Busy = status == "core.catalog.loading"
+					s.catalog.failed = status == "core.catalog.load_failed"
+					if status != "" {
+						s.task = "releases"
+					}
+					if s.catalog.failed {
+						s.Err = errors.New(i18n.T(status))
+					}
+					view := ansi.Strip(s.Render(width, height))
+					lines := strings.Split(view, "\n")
+					hint := "? " + i18n.T("core.inline.help")
+					if s.Busy {
+						hint = "Esc " + i18n.T("core.inline.cancel")
+					} else if s.task != "" {
+						hint = "Enter/Esc " + i18n.T("core.inline.dismiss")
+					}
+					if len(lines) != height || !strings.HasSuffix(lines[height-1], hint) {
+						t.Fatalf("%s %dx%d: task controls moved away from the bottom right", language, width, height)
+					}
+					for _, line := range lines {
+						if lipgloss.Width(line) > width {
+							t.Fatalf("%s %dx%d: release footer exceeds terminal width", language, width, height)
+						}
+					}
+					for _, key := range []string{"core.catalog.load_more", "core.catalog.refresh", "core.catalog.retry", "core.action.releases"} {
+						if strings.Contains(view, i18n.T(key)) {
+							t.Fatalf("removed navigation label remains visible: %s", key)
+						}
+					}
+					footer := strings.Join(lines[height-4:height-1], "\n")
+					if s.Busy && strings.TrimSpace(footer) != "" {
+						t.Fatal("background catalogue load displayed a task notice")
+					}
+					if s.catalog.failed && width >= 80 {
+						if !strings.Contains(footer, i18n.T(status)) {
+							t.Fatalf("%s %dx%d: task status is missing from footer", language, width, height)
+						}
+					}
 				}
 			}
 		}
@@ -384,13 +425,19 @@ func TestInitialModelCloseCleansUpLatestLazySnapshot(t *testing.T) {
 func TestReleaseRowsUseOneLineAndPreserveMouseBounds(t *testing.T) {
 	i18n.Init()
 	s := releaseFixture(t)
-	for _, width := range []int{80, 120} {
+	for _, width := range []int{24, 80, 100, 120} {
 		page := s.layout(width, 29)
+		if strings.Contains(ansi.Strip(page.content), i18n.T("core.catalog.selection")) {
+			t.Fatal("selected version card remains visible")
+		}
 		if len(page.releases) < 2 {
 			t.Fatal("release rows are not visible")
 		}
 		lines := strings.Split(ansi.Strip(page.content), "\n")
 		for i, hit := range page.releases {
+			if lipgloss.Width(lines[hit.y]) != width || hit.x != 1 || hit.width != width-2 {
+				t.Fatal("release list does not use the full available width")
+			}
 			if hit.height != 1 || (i > 0 && hit.y != page.releases[i-1].y+1) {
 				t.Fatal("release rows still consume two lines")
 			}
@@ -417,6 +464,7 @@ func TestPrereleaseLookupDoesNotEnterStableCatalogue(t *testing.T) {
 		}
 	}
 }
+
 func TestPrereleaseCacheDoesNotEnterStableCatalogue(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("MIHOSH_CONFIG_DIR", root)
@@ -539,7 +587,7 @@ func TestReleasePageKeepsEssentialInformationAndFailuresWithoutStaticHints(t *te
 		i18n.SetLanguageOverride(language)
 		s := releaseFixture(t)
 		view := ansi.Strip(s.Render(120, 30))
-		for _, hint := range []string{"core.catalog.platform", "core.catalog.download_hint", "core.catalog.more_hint"} {
+		for _, hint := range []string{"core.catalog.platform", "core.catalog.download_hint", "core.catalog.more_hint", "core.catalog.unverified", "core.catalog.complete", "core.catalog.cached"} {
 			if strings.Contains(view, i18n.T(hint)) {
 				t.Fatalf("static explanation remains on the page: %s", hint)
 			}
@@ -547,9 +595,18 @@ func TestReleasePageKeepsEssentialInformationAndFailuresWithoutStaticHints(t *te
 		if strings.Contains(view, s.Release.Assets[0].Name) {
 			t.Fatal("asset filename remains on the page")
 		}
-		for _, want := range []string{s.Release.Version(), "2026-10-10", "12.0 MiB", i18n.T("core.catalog.download"), i18n.T("core.catalog.activate"), i18n.Tf("core.catalog.loaded", 10)} {
+		if strings.Contains(view, i18n.Tf("core.catalog.loaded", 10)) {
+			t.Fatal("loaded version statistics remain on the page")
+		}
+		for _, want := range []string{s.Release.Version(), i18n.T("core.inline.download"), i18n.T("core.inline.activate")} {
 			if !strings.Contains(view, want) {
 				t.Fatalf("essential information missing: %s", want)
+			}
+		}
+		notes := strings.Join(s.ReleaseHelpNotes(), "\n")
+		for _, want := range []string{s.Release.Version(), "2026-10-10", "12.0 MiB", i18n.Tf("core.catalog.loaded", 10)} {
+			if !strings.Contains(notes, want) {
+				t.Fatalf("selected version help lost %q", want)
 			}
 		}
 		r := s.Release
@@ -558,13 +615,9 @@ func TestReleasePageKeepsEssentialInformationAndFailuresWithoutStaticHints(t *te
 		s.Err = errors.New("release query failed")
 		s.catalog.failed = true
 		view = ansi.Strip(s.Render(120, 30))
-		for _, want := range []string{"release query failed", i18n.T("core.catalog.unverified"), i18n.T("core.catalog.load_failed")} {
-			if !strings.Contains(strings.ReplaceAll(view, "\n", ""), want) && !strings.Contains(view, want) {
-				// Check the panel separately to avoid the adjacent list splitting wrapped text.
-				detail, _ := s.releaseDetails(120, 25)
-				if !strings.Contains(ansi.Strip(detail), want) {
-					t.Fatalf("operation failure was hidden: %s", want)
-				}
+		for _, want := range []string{"release query failed", i18n.T("core.catalog.load_failed")} {
+			if !strings.Contains(view, want) {
+				t.Fatalf("operation failure was hidden: %s", want)
 			}
 		}
 	}

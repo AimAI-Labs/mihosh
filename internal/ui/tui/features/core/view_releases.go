@@ -104,48 +104,24 @@ func (s State) releaseRow(r coreinfra.Release, marker string, c releaseColumns, 
 	return ansi.Truncate(row, width, "…")
 }
 
-func (s State) releaseDetails(width int, budget int) (string, []releaseControl) {
-	t := theme.Current()
-	muted := lipgloss.NewStyle().Foreground(t.Muted)
-	r, ok := s.selectedRelease()
-	if !ok {
-		return panel(i18n.T("core.catalog.selection"), wrap(i18n.T("core.catalog.empty"), width-4), width), nil
+func (s State) releaseCaption() string {
+	if !s.catalog.loaded {
+		return i18n.T("core.catalog.cached")
 	}
-	heading := r.Version() + " · " + s.releaseBadge(r)
-	rows := []string{lipgloss.NewStyle().Foreground(s.releaseColor(r)).Bold(true).Render(ansi.Truncate(heading, width-4, "…"))}
-	if budget >= 6 {
-		rows = append(rows, ansi.Truncate(releaseInfo(r), width-4, "…"))
+	caption := i18n.Tf("core.catalog.loaded", s.releaseCount())
+	status := ""
+	if !s.catalog.page.HasNext {
+		status = "core.catalog.complete"
 	}
-	var controls []releaseControl
-	if budget < 5 {
-		return panel(i18n.T("core.catalog.selection"), strings.Join(rows, "\n"), width), nil
+	if s.catalog.failed {
+		status = "core.catalog.load_failed"
+	} else if s.Busy && s.task == "releases" {
+		status = "core.catalog.loading"
 	}
-	button := func(action, text string, enabled bool) {
-		style := muted
-		if enabled && !s.Busy {
-			style = lipgloss.NewStyle().Foreground(t.Primary).Background(t.Selected).Bold(true)
-			controls = append(controls, releaseControl{actionHit: actionHit{x: 1, y: len(rows) + 1, width: width - 2, height: 1}, action: action})
-		}
-		rows = append(rows, style.Render(ansi.Truncate(text, width-4, "…")))
+	if status != "" {
+		caption += " · " + i18n.T(status)
 	}
-	installed := s.releaseInstalled(r.Version())
-	verified := false
-	if len(r.Assets) > 0 {
-		_, err := r.TrustedDigest(r.Assets[0], coreinfra.PinnedDigests())
-		verified = err == nil
-	}
-	download := "core.catalog.download"
-	if installed {
-		download = "core.catalog.downloaded"
-	}
-	button("install", i18n.T(download), !installed && verified)
-	button("activate", i18n.T("core.catalog.activate"), installed && !(s.Status.Mode == "managed" && s.Status.Version == r.Version()))
-	if !verified && !installed {
-		warning := i18n.T("core.catalog.unverified")
-		lines := strings.Split(lipgloss.NewStyle().Foreground(t.Warning).Render(wrap(warning, width-4)), "\n")
-		rows = append(rows, lines[:min(len(lines), max(0, budget-len(rows)-2))]...)
-	}
-	return panel(i18n.T("core.catalog.selection"), strings.Join(rows, "\n"), width), controls
+	return caption
 }
 
 func (s State) releaseStart(visible int) int {
@@ -163,57 +139,17 @@ func (s State) releaseStart(visible int) int {
 
 func (s State) releaseLayout(width, height int, parts []string, result pageLayout) pageLayout {
 	t := theme.Current()
-	muted := lipgloss.NewStyle().Foreground(t.Muted)
 	selected := lipgloss.NewStyle().Foreground(t.Primary).Background(t.Selected).Bold(true)
-	leftWidth, rightWidth := width, width
-	wide := width >= 100
-	if wide {
-		leftWidth = width * 43 / 100
-		rightWidth = width - leftWidth
-	}
 	top := lipgloss.Height(strings.Join(parts, "\n"))
-	caption := i18n.Tf("core.catalog.loaded", s.releaseCount())
-	if s.catalog.loaded {
-		status := ""
-		if !s.catalog.page.HasNext {
-			status = "core.catalog.complete"
-		}
-		if s.catalog.failed {
-			status = "core.catalog.load_failed"
-		} else if s.Busy && s.task == "releases" {
-			status = "core.catalog.loading"
-		}
-		if status != "" {
-			caption += " · " + i18n.T(status)
-		}
-	}
-	if !s.catalog.loaded {
-		caption = i18n.T("core.catalog.cached")
-	}
-	footerHeight := 3
-	detailBudget := height - top - footerHeight
-	if !wide {
-		detailBudget -= 4 // one visible release and a separating line
-	}
-	left, controls := s.releaseDetails(leftWidth, detailBudget)
-	listHeight := height - top - footerHeight
-	listY, listX := top, 0
-	if !wide {
-		listY += lipgloss.Height(left) + 1
-		listHeight -= lipgloss.Height(left) + 1
-	}
-	visible := max(1, listHeight-2)
+	visible := max(1, height-top-2)
 	result.listRows = visible
 	start := s.releaseStart(visible)
 	var rows []string
 	count := s.releaseCount()
 	if count == 0 {
-		rows = append(rows, strings.Split(wrap(i18n.T("core.catalog.empty"), rightWidth-4), "\n")...)
+		rows = append(rows, strings.Split(wrap(i18n.T("core.catalog.empty"), width-4), "\n")...)
 	}
-	if wide {
-		listX = leftWidth
-	}
-	columns := s.releaseColumns(start, min(count, start+visible), rightWidth-4)
+	columns := s.releaseColumns(start, min(count, start+visible), width-4)
 	for i := start; i < min(count, start+visible); i++ {
 		r, ok := s.releaseAt(i)
 		if !ok {
@@ -223,73 +159,31 @@ func (s State) releaseLayout(width, height int, parts []string, result pageLayou
 		if i == s.selected {
 			marker = "› "
 		}
-		label := s.releaseRow(r, marker, columns, rightWidth-4)
+		label := s.releaseRow(r, marker, columns, width-4)
 		label = lipgloss.NewStyle().Foreground(s.releaseColor(r)).Render(label)
 		if i == s.selected {
-			label = selected.Foreground(s.releaseColor(r)).Render(common.PadString(label, rightWidth-4))
+			label = selected.Foreground(s.releaseColor(r)).Render(common.PadString(label, width-4))
 		}
-		result.releases = append(result.releases, actionHit{x: listX + 1, y: listY + len(rows) + 1, width: rightWidth - 2, height: 1, index: i})
+		result.releases = append(result.releases, actionHit{x: 1, y: top + len(rows) + 1, width: width - 2, height: 1, index: i})
 		rows = append(rows, label)
 	}
-	right := panel(i18n.T("core.catalog.title"), strings.Join(rows, "\n"), rightWidth)
-	if wide {
-		parts = append(parts, lipgloss.JoinHorizontal(lipgloss.Top, left, right))
-	} else {
-		parts = append(parts, left, "", right)
-	}
-	for i := range controls {
-		controls[i].y += top
-	}
-	result.controls = controls
-	// Append to one continuous list; loading/retry controls remain below the viewport.
-	navY := lipgloss.Height(strings.Join(parts, "\n")) + 1
-	more, refresh := i18n.T("core.catalog.load_more"), i18n.T("core.catalog.refresh")
-	moreAction := "next"
-	if s.catalog.failed {
-		more, moreAction = i18n.T("core.catalog.retry"), "retry"
-	}
-	var buttons []string
-	x := 0
-	for _, control := range []struct {
-		text, action string
-		enabled      bool
-	}{{more, moreAction, s.catalog.page.HasNext || s.catalog.failed}, {refresh, "refresh", true}} {
-		style := muted
-		if control.enabled && !s.Busy {
-			style = lipgloss.NewStyle().Foreground(t.Primary)
-			result.controls = append(result.controls, releaseControl{actionHit: actionHit{x: x, y: navY, width: lipgloss.Width(control.text), height: 1}, action: control.action})
-		}
-		buttons = append(buttons, style.Render(control.text))
-		x += lipgloss.Width(control.text) + 2
-	}
-	parts = append(parts, "", strings.Join(buttons, "  "), muted.Render(caption))
+	parts = append(parts, panel(i18n.T("core.catalog.title"), strings.Join(rows, "\n"), width))
 	result.content = strings.Join(parts, "\n")
 	return result
 }
 
 func (s State) clickReleasePage(page pageLayout, x, y int) (State, tea.Cmd) {
-	if s.Busy && s.task != "releases" {
-		return s, nil
-	}
 	for _, hit := range page.releases {
 		if x >= hit.x && x < hit.x+hit.width && y >= hit.y && y < hit.y+hit.height {
 			next := s.selectRelease(hit.index)
 			return next.maybeLoadMore()
 		}
 	}
-	for _, control := range page.controls {
-		if x >= control.x && x < control.x+control.width && y == control.y {
-			return s.releaseAction(control.action)
-		}
-	}
 	return s, nil
 }
 
 func (s State) scrollReleasePage(msg messages.PageMouseScrollMsg) (State, tea.Cmd) {
-	if s.Busy && s.task != "releases" {
-		return s, nil
-	}
-	page := s.layout(msg.Width, max(1, msg.Height-1))
+	page := s.layout(msg.Width, max(1, msg.Height-footerHeight))
 	s.catalog.scroll = s.releaseStart(page.listRows)
 	if msg.Up {
 		s.catalog.scroll = max(0, s.catalog.scroll-1)
