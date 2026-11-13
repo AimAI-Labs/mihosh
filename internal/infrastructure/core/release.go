@@ -40,6 +40,10 @@ type Release struct {
 	Trusted     bool      `json:"trusted"`
 }
 
+func (r Release) IsStable() bool {
+	return !r.Draft && !r.Prerelease && stableTag.MatchString(r.Tag)
+}
+
 func (f *Fetcher) Release(ctx context.Context, tag string) (Release, error) {
 	endpoint := releaseAPI + "latest"
 	if tag != "" && tag != "latest" {
@@ -54,7 +58,7 @@ func (f *Fetcher) Release(ctx context.Context, tag string) (Release, error) {
 		if err := json.Unmarshal(data, &r); err != nil {
 			return errors.New("invalid release JSON")
 		}
-		if !validReleaseTag(r.Tag) || r.Draft || len(r.Assets) == 0 || ((tag == "" || tag == "latest") && (r.Prerelease || !stableTag.MatchString(r.Tag))) {
+		if !validReleaseTag(r.Tag) || r.Draft || len(r.Assets) == 0 || ((tag == "" || tag == "latest") && !r.IsStable()) {
 			return errors.New("invalid release metadata")
 		}
 		if tag != "" && tag != "latest" && r.Tag != tag {
@@ -96,8 +100,8 @@ func validateReleaseAssets(r Release) error {
 
 const ReleasePageSize = 10
 
-// ReleasePage retains only assets for the requested platform, keeping each page bounded.
-// HasNext follows the unfiltered GitHub page, so incompatible entries do not
+// ReleasePage retains stable releases and only assets for the requested platform.
+// HasNext follows the unfiltered GitHub page, so filtered entries do not
 // prematurely terminate browsing.
 type ReleasePage struct {
 	Page     int       `json:"page"`
@@ -119,7 +123,7 @@ func (f *Fetcher) Releases(ctx context.Context, page int, goos, arch string) (Re
 		candidate := ReleasePage{Page: page, HasNext: len(releases) == ReleasePageSize, Releases: []Release{}}
 		seen := make(map[string]bool)
 		for _, r := range releases {
-			if r.Draft || !validReleaseTag(r.Tag) {
+			if !r.IsStable() {
 				continue
 			}
 			if len(r.Assets) == 0 {

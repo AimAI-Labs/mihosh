@@ -1,9 +1,11 @@
 package core
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -400,22 +402,42 @@ func TestReleaseRowsUseOneLineAndPreserveMouseBounds(t *testing.T) {
 	}
 }
 
-func TestPrereleaseDownloadAndActivationUseExecutableBuildVersion(t *testing.T) {
-	s := releaseFixture(t)
-	r := coreinfra.Release{Tag: "Prerelease-Alpha", Prerelease: true, Trusted: true, Assets: []coreinfra.Asset{{Name: "mihomo-linux-amd64-compatible-alpha-478af2a.gz", Digest: "sha256:" + strings.Repeat("a", 64)}}}
-	s = s.applyReleaseLookup(r)
-	s, cmd := s.releaseAction("install")
-	defer s.Close()
-	if !s.Busy || !s.TaskModal() || s.Release.Version() != "alpha-478af2a" || cmd == nil {
-		t.Fatal("alpha cannot be downloaded from the catalogue")
+func TestPrereleaseLookupDoesNotEnterStableCatalogue(t *testing.T) {
+	for _, release := range []coreinfra.Release{
+		{Tag: "Prerelease-Alpha", Prerelease: true},
+		{Tag: "Prerelease-Beta", Prerelease: true},
+		{Tag: "v1.21.0-rc.1"},
+		{Tag: "v1.21.0", Prerelease: true},
+	} {
+		s := releaseFixture(t).selectRelease(3)
+		selected := s.Release.Tag
+		s, _ = s.Update(messages.CoreOperationMsg{ID: s.generation, Action: "release", Release: &release})
+		if s.releaseCount() != 10 || s.selected != 3 || s.Release.Tag != selected || s.catalog.lookup != nil {
+			t.Fatalf("lookup added a non-stable release to the catalogue: %s", release.Tag)
+		}
 	}
-	s, _ = s.Update(messages.CoreOperationMsg{ID: s.generation, Action: "install"})
-	s, _ = s.Update(coreKey("esc"))
-	s.Status.Installed = []string{"alpha-478af2a"}
-	s, cmd = s.releaseAction("activate")
+}
+func TestPrereleaseCacheDoesNotEnterStableCatalogue(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("MIHOSH_CONFIG_DIR", root)
+	cached := coreinfra.PinnedRelease()
+	cached.Prerelease = true
+	data, err := json.Marshal(cached)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "core"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "core", "release-cache.json"), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	svc := service.NewCoreService()
+	defer svc.Close()
+	s := NewState(svc)
 	defer s.Close()
-	if !s.Busy || s.task != "activate" || cmd == nil {
-		t.Fatal("downloaded alpha build is not available for activation")
+	if release, ok := s.selectedRelease(); !ok || release.Prerelease || release.Draft || release.Tag != coreinfra.PinnedRelease().Tag {
+		t.Fatalf("cached prerelease entered the catalogue: %+v", release)
 	}
 }
 

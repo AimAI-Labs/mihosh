@@ -76,6 +76,9 @@ func (s State) releaseIndex(tag string) (int, bool) {
 }
 
 func (s State) applyReleaseLookup(r coreinfra.Release) State {
+	if !r.IsStable() {
+		return s
+	}
 	s.Release = r
 	if s.catalog.store != nil {
 		if index, found := s.catalog.store.find(r.Tag); found {

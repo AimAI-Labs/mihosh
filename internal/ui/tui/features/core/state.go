@@ -46,6 +46,9 @@ type State struct {
 
 func NewState(svc *service.CoreService) State {
 	release := svc.CachedRelease()
+	if !release.IsStable() {
+		release = coreinfra.PinnedRelease()
+	}
 	if asset, err := release.SelectAsset(runtime.GOOS, runtime.GOARCH); err == nil {
 		release.Assets = []coreinfra.Asset{asset}
 	}
@@ -254,9 +257,10 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			s.scroll, s.followSelection = 0, false
 		}
 		if msg.Release != nil {
-			s.Release = *msg.Release
 			if msg.Action == "release" || msg.Action == "check" {
 				s = s.applyReleaseLookup(*msg.Release)
+			} else {
+				s.Release = *msg.Release
 			}
 		}
 		if msg.Releases != nil {

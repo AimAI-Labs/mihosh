@@ -235,15 +235,16 @@ func TestReleasePaginationDoesNotRelaxProxyOrAcceleratorValidation(t *testing.T)
 	}
 }
 
-func TestReleaseListAndLookupIncludePrereleases(t *testing.T) {
+func TestReleaseListOnlyIncludesStableVersionsAndKeepsExplicitLookup(t *testing.T) {
 	alpha := catalogRelease("Prerelease-Alpha", "linux-amd64-compatible")
 	alpha.Prerelease = true
 	alpha.Assets[0].Name = "mihomo-linux-amd64-compatible-alpha-478af2a.gz"
 	alpha.Assets[0].URL = "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/" + alpha.Assets[0].Name
 	rc := catalogRelease("v1.20.0-rc.1", "linux-amd64-compatible")
-	rc.Prerelease = true
+	marked := catalogRelease("v1.18.0", "linux-amd64-compatible")
+	marked.Prerelease = true
 	stable := catalogRelease("v1.19.0", "linux-amd64-compatible")
-	list, _ := json.Marshal([]Release{alpha, rc, stable})
+	list, _ := json.Marshal([]Release{alpha, rc, marked, stable})
 	f := testFetcher(t, func(_ Route, req *http.Request) (int, string, error) {
 		if strings.Contains(req.URL.Path, "/tags/") || strings.HasSuffix(req.URL.Path, "/latest") {
 			data, _ := json.Marshal(alpha)
@@ -252,11 +253,17 @@ func TestReleaseListAndLookupIncludePrereleases(t *testing.T) {
 		return 200, string(list), nil
 	})
 	page, err := f.Releases(context.Background(), 1, "linux", "amd64")
-	if err != nil || len(page.Releases) != 3 {
-		t.Fatalf("prereleases missing: %+v %v", page, err)
+	if err != nil || len(page.Releases) != 1 || page.Releases[0].Tag != stable.Tag || page.HasNext {
+		t.Fatalf("list includes non-stable releases: %+v %v", page, err)
 	}
-	if got := page.Releases[0].Version(); got != "alpha-478af2a" {
-		t.Fatalf("rolling tag did not resolve its executable version: %s", got)
+	prereleases := make([]Release, ReleasePageSize)
+	for i := range prereleases {
+		prereleases[i] = alpha
+	}
+	list, _ = json.Marshal(prereleases)
+	page, err = f.Releases(context.Background(), 2, "linux", "amd64")
+	if err != nil || len(page.Releases) != 0 || !page.HasNext || page.Page != 2 {
+		t.Fatalf("filtered prerelease page ended browsing: %+v %v", page, err)
 	}
 	lookup, err := f.Release(context.Background(), "Prerelease-Alpha")
 	if err != nil || lookup.Version() != "alpha-478af2a" {
