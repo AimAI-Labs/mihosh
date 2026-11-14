@@ -111,6 +111,7 @@ func (s *CoreService) ServiceAction(ctx context.Context, action string) error {
 		return config.Update(func(latest *config.Config) error { latest.Core.Runtime = "session"; return nil })
 	}
 	if action == "start" || action == "restart" {
+		s.processLogs.Store(false)
 		for {
 			if err = s.Control(ctx, "status", ""); err == nil {
 				endpoint := config.ResolveMihomoEndpoint()
@@ -166,6 +167,9 @@ func (s *CoreService) forwardControl(ctx context.Context, action, value string, 
 	err = s.sendControl(ctx, action, value, activation)
 	if errors.Is(err, ErrNoCoreOwner) {
 		return false, nil
+	}
+	if err == nil {
+		s.processLogs.Store(false)
 	}
 	return true, err
 }

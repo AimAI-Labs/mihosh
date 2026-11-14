@@ -23,7 +23,9 @@ type State struct {
 	logHead  int // 写入位置
 	logCount int // 已写入总数（上限 LogsCap）
 
-	cachedLogs []model.LogEntry // 缓存的日志列表，避免每帧分配
+	cachedLogs     []model.LogEntry // 缓存的日志列表，避免每帧分配
+	coreLogCursor  uint64
+	coreLogPending string
 
 	// 过滤日志索引（预分配容量避免动态增长）
 	filteredLogIndices []int
@@ -104,6 +106,7 @@ func (s State) AppendLog(logType, payload string) State {
 }
 
 func (s State) ClearLogs() State {
+	s.coreLogPending = ""
 	s.logHead = 0
 	s.logCount = 0
 	s.filteredLogIndices = s.filteredLogIndices[:0] // 保留底层数组，避免重新分配
@@ -155,9 +158,12 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.CoreTargetChangedMsg:
 		if msg.Reset {
+			s.coreLogPending = ""
 			return s.ClearLogs(), nil
 		}
 		return s, nil
+	case messages.CoreProcessLogsMsg:
+		return s.applyProcessLogs(msg), nil
 	case messages.PageResizeMsg:
 		return s.UpdateMaxHScrollOffset(msg.Width, msg.Height), nil
 	case messages.PageMouseScrollMsg:

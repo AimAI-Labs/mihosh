@@ -92,6 +92,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.coreState, _ = m.coreState.Update(msg)
 		m.connectionChecked = true
 		m.connectionReady = msg.Err == nil
+		m.syncProcessLogs()
 		if msg.Err != nil {
 			m.currentPage = layout.PageCore
 			return m, nil
@@ -111,9 +112,13 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.coreState, cmd = m.coreState.Update(msg)
 		if result, ok := msg.(messages.CoreOperationMsg); ok && result.Err == nil {
 			targetCmd := m.coreOperationCompleted(result.Action)
+			m.syncProcessLogs()
 			return m, tea.Batch(cmd, targetCmd)
 		}
 
+		if _, ok := msg.(messages.CoreOperationMsg); ok {
+			m.syncProcessLogs()
+		}
 		return m, cmd
 
 	case messages.ShowGuideModalMsg:
@@ -197,7 +202,9 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case messages.LogsWSMsg:
-		m.logsState = m.logsState.AppendLog(msg.LogType, msg.Payload)
+		if !m.usesProcessLogs() {
+			m.logsState = m.logsState.AppendLog(msg.LogType, msg.Payload)
+		}
 		if m.currentPage == layout.PageSettings && m.settingsState.ActiveTab() == 1 {
 			pw, ph := m.getPageSize()
 			m.settingsState = m.settingsState.SyncSysStatus(pw, ph, m.config, m.logsState.GetSysLogs())
@@ -312,6 +319,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case messages.AutoRefreshTickMsg:
+		m.syncProcessLogs()
 		interval := m.autoRefreshInterval()
 		m.advanceAutoRefreshTransientState()
 		if interval <= 0 {

@@ -347,6 +347,12 @@ type CoreOperationMsg struct {
 }
 type CoreProgressTickMsg struct{ ID uint64 }
 
+type CoreProcessLogsMsg struct {
+	Start  uint64
+	Output string
+	Flush  bool
+}
+
 type CoreConnectionMsg struct {
 	Version string
 	Epoch   uint64

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
@@ -34,6 +35,8 @@ type CoreService struct {
 	shutdown       context.CancelFunc
 	releaseLock    func()
 	logs           coreinfra.LogBuffer
+	logging        atomic.Bool
+	processLogs    atomic.Bool
 	releaseJob     func()
 	mu             sync.Mutex
 	process        *exec.Cmd

@@ -107,7 +107,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // onPageChange 页面切换处理
 func (m *Model) onPageChange() tea.Cmd {
 	m.err = nil
-	if m.connectionChecked && !m.connectionReady && m.currentPage != layout.PageCore && m.currentPage != layout.PageSub && m.currentPage != layout.PageSettings {
+	if m.connectionChecked && !m.connectionReady && m.currentPage != layout.PageCore && m.currentPage != layout.PageSub && m.currentPage != layout.PageSettings && m.currentPage != layout.PageLogs {
 		return nil
 	}
 	switch m.currentPage {
@@ -117,6 +117,7 @@ func (m *Model) onPageChange() tea.Cmd {
 		m.connsState = m.connsState.ResetPrevConnIDs()
 		return tea.Batch(connections.FetchConnections(m.client), connTick())
 	case layout.PageLogs:
+		m.syncProcessLogs()
 		return logsTick()
 	case layout.PageRules:
 		return rules.FetchRules(m.client)

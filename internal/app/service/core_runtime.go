@@ -20,11 +20,15 @@ import (
 
 func (s *CoreService) Start(ctx context.Context) error {
 	if s.usesService() {
+		s.processLogs.Store(false)
 		return s.ServiceAction(ctx, "start")
 	}
 	if cfg, err := loadCoreConfig(); err == nil && cfg.Core.Mode == "managed" {
 		if forwarded, err := s.forward(ctx, "status", ""); forwarded && err == nil {
 			if _, err = api.NewClient(config.ResolveMihomoEndpoint(), 500).GetVersion(); err == nil {
+				if !s.logging.Load() {
+					s.processLogs.Store(false)
+				}
 				return nil
 			}
 		}
@@ -128,13 +132,15 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 	if _, err = os.Stat(binary); err != nil {
 		return err
 	}
-	validationCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	validation := exec.CommandContext(validationCtx, binary, "-t", "-d", filepath.Dir(path), "-f", path)
-	coreinfra.ConfigureProcess(validation)
-	err = validation.Run()
-	cancel()
+	raw, err := os.ReadFile(path)
 	if err != nil {
-		return errors.New("managed core configuration validation failed")
+		return err
+	}
+	if err = validateManagedProfile(ctx, binary, path, path, raw); err != nil {
+		err = fmt.Errorf("managed core configuration validation failed: %w", err)
+		s.processLogs.Store(true)
+		_, _ = fmt.Fprintf(&s.logs, "level=error msg=%q\n", err.Error())
+		return err
 	}
 	endpoint := config.ResolveMihomoEndpoint()
 	data, err := config.ReadMihomoYAML(path)
@@ -184,10 +190,13 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 		stop()
 		return errors.New("cannot start managed core")
 	}
+	s.logging.Store(true)
+	s.processLogs.Store(true)
 	releaseJob, err := coreinfra.AttachProcess(cmd)
 	if err != nil {
 		stop()
 		_ = cmd.Wait()
+		s.logging.Store(false)
 		return errors.New("cannot attach managed core lifecycle")
 	}
 	s.releaseJob = releaseJob
@@ -199,7 +208,9 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 	s.done = make(chan error, 1)
 	done := s.done
 	go func() {
-		done <- cmd.Wait()
+		err := cmd.Wait()
+		s.logging.Store(false)
+		done <- err
 		close(done)
 		s.mu.Lock()
 		current := s.done == done

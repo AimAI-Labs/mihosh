@@ -41,8 +41,10 @@ func TestForwardedProfileKeepsActivationResult(t *testing.T) {
 			require.NoError(t, owner.startControl(root))
 			caller := NewCoreService()
 			t.Cleanup(caller.Close)
+			caller.processLogs.Store(true)
 			result, err := caller.ApplyProfile(context.Background(), uid, false)
 			require.NoError(t, err)
+			require.False(t, caller.UsesProcessLogs(), "forwarded owners must keep their WebSocket logs")
 			require.NotEmpty(t, result.BackupName)
 			require.FileExists(t, filepath.Join(root, "config-backups", result.BackupName))
 			if warning {
@@ -102,8 +104,10 @@ func TestForwardedProfileAfterServiceStartKeepsWarning(t *testing.T) {
 	caller := NewCoreService()
 	t.Cleanup(caller.Close)
 	caller.services = manager
+	caller.processLogs.Store(true)
 	result, err := caller.ApplyProfile(context.Background(), uid, true)
 	require.NoError(t, err)
+	require.False(t, caller.UsesProcessLogs())
 	require.Equal(t, []string{"start"}, manager.actions)
 	require.NotEmpty(t, result.BackupName)
 	require.Error(t, result.MergeErr)
