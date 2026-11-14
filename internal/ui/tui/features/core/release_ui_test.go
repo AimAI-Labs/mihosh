@@ -4,11 +4,37 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
+
+func TestReleaseColumnsStayAlignedWhenCurrentVersionScrollsAway(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	for _, language := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(language)
+		s := releaseFixture(t)
+		s.Status = service.CoreStatus{Mode: "managed", Version: s.Release.Version()}
+		first := s.releaseColumns(0, 4, 70)
+		later := s.releaseColumns(1, 5, 70)
+		if first != later {
+			t.Fatalf("%s: columns shifted after current version scrolled away: %+v %+v", language, first, later)
+		}
+		current := s.releaseRow(s.Release, "› ", first, 70)
+		stable, _ := s.releaseAt(1)
+		row := s.releaseRow(stable, "  ", later, 70)
+		for _, token := range []string{"[", "2026-10-", "12.0 MiB"} {
+			left := lipgloss.Width(current[:strings.Index(current, token)])
+			right := lipgloss.Width(row[:strings.Index(row, token)])
+			if left != right {
+				t.Fatalf("%s: %q misaligned: %q / %q", language, token, current, row)
+			}
+		}
+	}
+}
 
 func TestReleaseHelpKeepsEnterAndScrollbarFollowsViewport(t *testing.T) {
 	i18n.Init()

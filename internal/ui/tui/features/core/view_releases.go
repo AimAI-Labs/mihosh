@@ -70,6 +70,14 @@ type releaseColumns struct {
 // Measure only visible rows: the catalogue can contain all upstream history.
 func (s State) releaseColumns(start, end, width int) releaseColumns {
 	var c releaseColumns
+	// Keep status columns steady when the current release scrolls out of view.
+	statusWidth := 0
+	for _, key := range []string{"current", "installed", "prerelease", "stable"} {
+		statusWidth = max(statusWidth, lipgloss.Width("["+i18n.T("core.catalog."+key)+"]"))
+	}
+	if s.Status.Mode == "managed" {
+		c.version = lipgloss.Width(s.Status.Version)
+	}
 	for i := start; i < end; i++ {
 		r, ok := s.releaseAt(i)
 		if !ok {
@@ -81,6 +89,7 @@ func (s State) releaseColumns(start, end, width int) releaseColumns {
 		c.date = max(c.date, lipgloss.Width(date))
 		c.size = max(c.size, lipgloss.Width(size))
 	}
+	c.status = max(c.status, min(statusWidth, max(0, width-4-c.version)))
 	if 2+c.version+2+c.status+2+c.date+2+c.size > width {
 		c.size = 0
 	}
