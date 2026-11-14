@@ -274,7 +274,7 @@ func TestReleaseTaskStatusStaysInFooterWithoutNavigationLabels(t *testing.T) {
 						t.Fatal("background catalogue load displayed a task notice")
 					}
 					if s.catalog.failed && width >= 80 {
-						if !strings.Contains(footer, i18n.T(status)) {
+						if !strings.Contains(lines[height-1], i18n.T(status)) {
 							t.Fatalf("%s %dx%d: task status is missing from footer", language, width, height)
 						}
 					}

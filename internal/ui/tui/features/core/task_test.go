@@ -160,8 +160,8 @@ func TestTaskFooterResultsAndTerminalBounds(t *testing.T) {
 						}
 						if result == nil || errors.Is(result, context.Canceled) {
 							lines := strings.Split(ansi.Strip(view), "\n")
-							if !strings.HasSuffix(lines[height-2], i18n.T("core.action.install")+" · "+want) {
-								t.Fatal("short task result is not anchored at the bottom right above the controls")
+							if !strings.HasPrefix(lines[height-1], i18n.T("core.action.install")+" · "+want) || !strings.HasSuffix(lines[height-1], "Enter/Esc "+i18n.T("core.inline.dismiss")) {
+								t.Fatal("task result and controls do not share the bottom row")
 							}
 						}
 					}

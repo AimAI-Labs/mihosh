@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
@@ -74,6 +75,8 @@ func (s State) footer(width, height int) string {
 	}
 	budget := min(footerHeight-1, max(0, height-1))
 	lines := strings.Split(wrap(body, width), "\n")
+	notice := lines[0]
+	lines = lines[1:]
 	if len(lines) > budget && budget > 0 {
 		lines = lines[:budget]
 		lines[budget-1] = ansi.Truncate(lines[budget-1], max(0, width-1), "") + "…"
@@ -81,8 +84,19 @@ func (s State) footer(width, height int) string {
 	lines = append(make([]string, max(0, budget-len(lines))), lines...)
 	lines = lines[:budget]
 	for i := range lines {
-		lines[i] = lipgloss.NewStyle().Width(width).Align(lipgloss.Right).Foreground(color).Render(ansi.Truncate(lines[i], width, "…"))
+		lines[i] = lipgloss.NewStyle().Width(width).Foreground(color).Render(ansi.Truncate(lines[i], width, "…"))
 	}
-	help := lipgloss.NewStyle().Width(width).Align(lipgloss.Right).Render(s.inlineHelp(width + 1))
-	return strings.Join(append(lines, help), "\n")
+	helpWidth := width
+	if notice != "" {
+		control := common.InlineHelpHint{Key: "Enter/Esc", Desc: i18n.T("core.inline.dismiss")}
+		if s.Busy || s.Editing {
+			control = common.InlineHelpHint{Key: "Esc", Desc: i18n.T("core.inline.cancel")}
+		}
+		helpWidth = min(width, max(width/2, lipgloss.Width(common.FormatInlineHintRow([]common.InlineHelpHint{control}))))
+	}
+	help := s.inlineHelp(helpWidth + 1)
+	leftWidth := max(0, width-lipgloss.Width(help)-2)
+	left := lipgloss.NewStyle().Foreground(color).Render(ansi.Truncate(notice, leftWidth, "…"))
+	row := common.PadString(left, max(0, width-lipgloss.Width(help))) + help
+	return strings.Join(append(lines, row), "\n")
 }
