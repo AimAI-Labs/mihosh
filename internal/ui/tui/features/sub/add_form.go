@@ -30,11 +30,12 @@ const (
 
 // addForm 添加订阅表单。
 type addForm struct {
-	nameField   textinput.Model
-	srcField    textarea.Model
-	fieldCursor int
-	kindRemote  bool // true=remote, false=local
-	errMsg      string
+	nameField    textinput.Model
+	srcField     textarea.Model
+	fieldCursor  int
+	kindRemote   bool // true=remote, false=local
+	kindExplicit bool
+	errMsg       string
 }
 
 // newAddForm 构造初始空表单，焦点在名称字段。
@@ -74,6 +75,7 @@ func (f *addForm) cycleField(dir int) {
 // toggleKind 切换来源类型（仅在 kind 字段聚焦时有效）。
 func (f *addForm) toggleKind() {
 	f.kindRemote = !f.kindRemote
+	f.kindExplicit = true
 	// 切换类型时更新占位符提示
 	if f.kindRemote {
 		f.srcField.Placeholder = i18n.T("sub.add_placeholder_src_remote")
@@ -107,13 +109,30 @@ func (f addForm) validate() (bool, string) {
 	if src == "" {
 		return false, "sub.add_err_src"
 	}
+	if f.kindExplicit && (profile.ParseSourceKind(src) == profile.SourceRemote) != f.kindRemote {
+		return false, "sub.add_err_kind"
+	}
 	return true, ""
 }
 
-// buildSource 根据当前输入构造 SubSource（自动判断类型）。
+func (f *addForm) resize(width, height int) {
+	_, fieldWidth, sourceHeight := formDimensions(width, height)
+	f.nameField.Width = fieldWidth
+	f.nameField.SetCursor(f.nameField.Position())
+	f.srcField.SetWidth(fieldWidth)
+	f.srcField.SetHeight(sourceHeight)
+}
+
+// buildSource keeps automatic detection until the user explicitly selects a type.
 func (f addForm) buildSource() profile.SubSource {
 	val := strings.TrimSpace(f.srcField.Value())
-	kind := profile.ParseSourceKind(val) // 自动判断，覆盖手动切换
+	kind := profile.ParseSourceKind(val)
+	if f.kindExplicit {
+		kind = profile.SourceLocal
+		if f.kindRemote {
+			kind = profile.SourceRemote
+		}
+	}
 	src := profile.SubSource{Kind: kind}
 	if kind == profile.SourceRemote {
 		src.URL = val
@@ -171,8 +190,16 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 		form.cycleField(-1)
 
 	case msg.String() == "up":
+		if form.isSrcField() {
+			form.srcField, cmd = form.srcField.Update(msg)
+			return form, false, cmd, false
+		}
 		form.cycleField(-1)
 	case msg.String() == "down":
+		if form.isSrcField() {
+			form.srcField, cmd = form.srcField.Update(msg)
+			return form, false, cmd, false
+		}
 		form.cycleField(1)
 
 	case key.Matches(msg, common.Keys.Left):
@@ -213,6 +240,9 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 			form.nameField, c = form.nameField.Update(msg)
 		} else if form.isSrcField() {
 			form.srcField, c = form.srcField.Update(msg)
+			if !form.kindExplicit {
+				form.kindRemote = profile.ParseSourceKind(strings.TrimSpace(form.srcField.Value())) == profile.SourceRemote
+			}
 		}
 		form.errMsg = ""
 		return form, false, c, false

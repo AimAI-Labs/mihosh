@@ -17,6 +17,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 const (
@@ -85,7 +86,16 @@ func RenderSubPage(state PageState) string {
 		result = renderDeleteConfirmOverlay(result, state, state.Width, state.Height)
 	}
 
-	return renderInlineHelp(result, state)
+	result = renderInlineHelp(result, state)
+	if (state.ShowAddForm || state.ShowEditForm) && state.Width > 0 && state.Height > 0 {
+		lines := strings.Split(result, "\n")
+		lines = lines[:min(len(lines), state.Height)]
+		for i := range lines {
+			lines[i] = ansi.Truncate(lines[i], state.Width, "")
+		}
+		result = strings.Join(lines, "\n")
+	}
+	return result
 }
 
 func renderHeader(stats, searchBox string, width int) string {
@@ -315,6 +325,11 @@ func renderInlineHelp(page string, state PageState) string {
 	if len(hints) == 0 {
 		return page
 	}
+	if state.ShowAddForm || state.ShowEditForm {
+		for len(hints) > 1 && lipgloss.Width(common.FormatInlineHintRow(hints)) > state.Width-1 {
+			hints = hints[:len(hints)-1]
+		}
+	}
 	body := common.FormatInlineHintRow(hints)
 	return common.OverlayHelpAtBottomRight(page, body, state.Width, state.Height)
 }
@@ -328,9 +343,9 @@ func buildHints(state PageState) []common.InlineHelpHint {
 	}
 	if state.ShowAddForm || state.ShowEditForm {
 		return []common.InlineHelpHint{
-			{Key: "↑↓/Tab", Desc: i18n.T("help.sub_add.field")},
 			{Key: "↵", Desc: i18n.T("help.sub_add.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.sub_add.cancel")},
+			{Key: "Tab", Desc: i18n.T("help.sub_add.field")},
 		}
 	}
 	if state.FilterMode {
@@ -359,18 +374,38 @@ func buildHints(state PageState) []common.InlineHelpHint {
 // ============================================================
 
 const (
-	addFormModalWidth = 54
-	deleteModalWidth  = 54
+	deleteModalWidth = 54
 )
+
+func formLabelWidth() int {
+	width := 0
+	for _, key := range []string{"sub.add_field_name", "sub.add_field_kind", "sub.add_field_src"} {
+		width = max(width, common.DisplayWidth(i18n.T(key)))
+	}
+	return width
+}
+
+func formDimensions(width, height int) (modalWidth, fieldWidth, sourceHeight int) {
+	if width <= 0 {
+		width = 80
+	}
+	if height <= 0 {
+		height = 24
+	}
+	modalWidth = max(24, min(76, width-4))
+	fieldWidth = max(1, modalWidth-4-formLabelWidth()-1)
+	sourceHeight = max(1, min(6, height-7))
+	return
+}
 
 // ===== 添加/编辑表单（共用渲染） =====
 
 func renderAddFormOverlay(background string, state PageState, width, height int) string {
-	return dialog.New(buildAddFormModal(state, width, height), width, height).Below(subHeaderHeight+1).Overlay(background, true)
+	return dialog.New(buildAddFormModal(state, width, height), width, max(1, height-1)).Below(subHeaderHeight+1).Clipped().Overlay(background, true)
 }
 
 func renderEditFormOverlay(background string, state PageState, width, height int) string {
-	return dialog.New(buildEditFormModal(state, width, height), width, height).Below(subHeaderHeight+1).Overlay(background, true)
+	return dialog.New(buildEditFormModal(state, width, height), width, max(1, height-1)).Below(subHeaderHeight+1).Clipped().Overlay(background, true)
 }
 
 func buildAddFormModal(state PageState, width, height int) string {
@@ -383,37 +418,33 @@ func buildEditFormModal(state PageState, width, height int) string {
 
 // buildFormModal 渲染订阅表单弹窗（添加/编辑共用，仅标题不同）。
 func buildFormModal(title string, form addForm, width, height int) string {
-	modalWidth := addFormModalWidth
-	if modalWidth > width-4 {
-		modalWidth = width - 4
-	}
-	if modalWidth < 30 {
-		modalWidth = 30
-	}
+	modalWidth, fieldWidth, _ := formDimensions(width, height)
+	form.resize(width, height)
 	innerWidth := modalWidth - 4
-	if innerWidth < 10 {
-		innerWidth = 10
-	}
 
 	// 名称行
 	nameRow := renderFieldRow(i18n.T("sub.add_field_name"), form.nameField.View(), form.isNameField(), innerWidth)
 
-	// 类型行（◀ remote ▶）
-	kindLabel := "remote"
-	if !form.kindRemote {
-		kindLabel = "local"
+	var options []string
+	for i, label := range []string{"remote", "local"} {
+		style := common.TokyoMutedStyle()
+		if (i == 0) == form.kindRemote {
+			style = style.Foreground(common.TokyoCyan()).Bold(true)
+		}
+		options = append(options, style.Render(label))
 	}
-	kindVal := fmt.Sprintf("◀ %s ▶", kindLabel)
+	kindVal := strings.Join(options, " │ ")
+	if fieldWidth < common.DisplayWidth("remote │ local") {
+		label := "remote"
+		if !form.kindRemote {
+			label = "local"
+		}
+		kindVal = "◀ " + label + " ▶"
+	}
 	kindRow := renderFieldRow(i18n.T("sub.add_field_kind"), kindVal, form.isKindField(), innerWidth)
 
 	// 来源值行
 	srcLabel := i18n.T("sub.add_field_src")
-	srcLabelWidth := common.DisplayWidth(srcLabel) + 1 // label + space
-	textareaWidth := innerWidth - srcLabelWidth
-	if textareaWidth < 10 {
-		textareaWidth = 10
-	}
-	form.srcField.SetWidth(textareaWidth)
 	srcRow := renderFieldRow(srcLabel, form.srcField.View(), form.isSrcField(), innerWidth)
 
 	// 说明/错误行
@@ -446,7 +477,7 @@ func renderFieldRow(label, value string, focused bool, innerWidth int) string {
 	}
 
 	// 使用 JoinHorizontal 确保多行 value（如 textarea）时，label 只在第一行对齐
-	row := lipgloss.JoinHorizontal(lipgloss.Top, labelStyle.Render(label), " ", value)
+	row := lipgloss.JoinHorizontal(lipgloss.Top, labelStyle.Render(common.PadString(label, formLabelWidth())), " ", value)
 
 	if !focused {
 		return row
@@ -455,7 +486,6 @@ func renderFieldRow(label, value string, focused bool, innerWidth int) string {
 	// 聚焦时使用 Lipgloss 的 Width 属性和 Padding 自动处理多行背景铺满
 	return lipgloss.NewStyle().
 		Background(common.TokyoSelected()).
-		PaddingLeft(1).
 		Width(innerWidth).
 		Render(row)
 }
@@ -472,7 +502,7 @@ func resolveFormBounds(state PageState, width, height int) (left, top, right, bo
 	} else {
 		modal = buildAddFormModal(state, width, height)
 	}
-	return dialog.New(modal, width, height).Below(subHeaderHeight + 1).Bounds()
+	return dialog.New(modal, width, max(1, height-1)).Below(subHeaderHeight + 1).Clipped().Bounds()
 }
 
 // ===== 删除确认 =====

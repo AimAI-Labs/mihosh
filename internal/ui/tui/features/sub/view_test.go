@@ -7,6 +7,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,7 +52,7 @@ func TestRenderSubPage_EmptyList(t *testing.T) {
 	out := RenderSubPage(state)
 	assert.NotEmpty(t, out)
 	// 空列表应显示空提示
-	assert.Contains(t, out, "sub.empty") // i18n key 在无 locale 加载时回退为键名
+	assert.Contains(t, out, i18n.T("sub.empty"))
 }
 
 func TestRenderSubPage_WithSubs(t *testing.T) {
@@ -61,8 +62,7 @@ func TestRenderSubPage_WithSubs(t *testing.T) {
 	require.NotEmpty(t, out)
 
 	// 头部统计行应出现
-	assert.True(t, strings.Contains(out, "sub.stats") || strings.Contains(out, "sub.stats_remote"),
-		"应渲染统计信息")
+	assert.Contains(t, out, i18n.Tf("sub.stats", len(subs)), "应渲染统计信息")
 
 	// 订阅名称应出现在渲染结果中（原样透传）
 	assert.Contains(t, out, "订阅A")
@@ -149,7 +149,7 @@ func TestResolveListItemAt(t *testing.T) {
 
 func TestRelativeTime(t *testing.T) {
 	// 未更新（0）应返回 never_updated 标记
-	assert.Contains(t, relativeTime(0), "never_updated")
+	assert.Equal(t, i18n.T("sub.never_updated"), relativeTime(0))
 	// 过去时间戳应返回某个相对时间描述（非空）
 	assert.NotEmpty(t, relativeTime(1700000000))
 }

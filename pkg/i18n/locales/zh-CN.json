@@ -698,6 +698,7 @@
   "sub.add_src_hint": "URL 以 http(s):// 开头；否则视为本地文件路径",
   "sub.add_err_name": "名称不能为空",
   "sub.add_err_src": "来源不能为空",
+  "sub.add_err_kind": "来源与所选类型不匹配",
 
   "sub.edit_title": "编辑订阅",
   "sub.edited_toast": "已更新订阅",

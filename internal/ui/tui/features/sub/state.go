@@ -36,6 +36,7 @@ type State struct {
 	selected     int
 	scrollTop    int
 	pageHeight   int
+	pageWidth    int
 
 	// 弹窗/输入模式
 	showAddForm    bool
@@ -130,11 +131,21 @@ func (s State) ApplySubs(subs []profile.Profile, active string) State {
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.PageResizeMsg:
+		s.pageWidth = msg.Width
 		s.pageHeight = msg.Height
+		if s.showAddForm {
+			s.addForm.resize(msg.Width, msg.Height)
+		}
+		if s.showEditForm {
+			s.editForm.resize(msg.Width, msg.Height)
+		}
 		s.clampScroll()
 		return s, nil
 	case messages.PageMouseScrollMsg:
 		s.pageHeight = msg.Height
+		if s.showAddForm || s.showEditForm {
+			return s.scrollForm(msg)
+		}
 		return s.HandleMouseScroll(msg.Up), nil
 	case messages.PageMouseClickMsg:
 		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
@@ -177,6 +188,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case msg.String() == "n":
 			s.showAddForm = true
 			s.addForm = newAddForm()
+			s.addForm.resize(s.pageWidth, s.pageHeight)
 		case msg.String() == "d":
 			return s.openDeleteConfirm()
 		case msg.String() == "/":
@@ -284,6 +296,7 @@ func (s State) openEditForm() (State, tea.Cmd) {
 	form.nameField.SetValue(p.Name)
 	form.srcField.SetValue(p.Source.Display())
 	form.kindRemote = p.Source.Kind == profile.SourceRemote
+	form.resize(s.pageWidth, s.pageHeight)
 	// 焦点重新落到名称字段（SetValue 后 textinput 仍处于 Focus 状态）
 	form.focusCurrent()
 	s.showEditForm = true
@@ -353,6 +366,8 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 				s.showEditForm = false
 				s.editUID = ""
 				s.editForm = newAddForm()
+			} else {
+				return s.clickForm(pageX-left-2, pageY-top-1, pageWidth, pageHeight)
 			}
 		}
 		return s, nil
