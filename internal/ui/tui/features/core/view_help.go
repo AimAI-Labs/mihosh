@@ -55,6 +55,9 @@ func (s State) inlineHelp(width int) string {
 	if s.Editing {
 		help = common.InlineHelpHint{Key: "Esc", Desc: i18n.T("core.inline.cancel")}
 		hints = hints[:max(0, len(hints)-1)]
+		if s.Busy && s.form != "network" {
+			hints = []common.InlineHelpHint{{Key: "…", Desc: i18n.T("core.inline.wait")}}
+		}
 	} else if s.Busy {
 		hints = []common.InlineHelpHint{{Key: "←→", Desc: i18n.T("core.inline.sections")}, {Key: "↑↓", Desc: i18n.T("core.inline.select")}}
 		help = common.InlineHelpHint{Key: "Esc", Desc: i18n.T("core.inline.cancel")}

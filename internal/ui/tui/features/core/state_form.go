@@ -13,7 +13,7 @@ import (
 )
 
 func (s State) editForm(kind string) (State, tea.Cmd) {
-	if s.Editing || (s.Busy && kind != "network") {
+	if s.Editing {
 		return s, nil
 	}
 	if !s.Busy {
@@ -116,6 +116,9 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 }
 func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 	s.formFollowFocus = true
+	if s.Busy && s.form != "network" && msg.String() == "enter" {
+		return s, nil
+	}
 	if s.form == "system-proxy" || s.form == "tun" || s.form == "configure" || s.form == "recover" {
 		switch msg.String() {
 		case "esc":
@@ -208,6 +211,9 @@ func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 }
 
 func (s State) submitService() (State, tea.Cmd) {
+	if s.Busy {
+		return s, nil
+	}
 	action := serviceActions[s.selected]
 	s = s.closeForm()
 	s.args = []string{action}
@@ -224,6 +230,9 @@ func (s State) closeForm() State {
 }
 
 func (s State) submitChoice() (State, tea.Cmd) {
+	if s.Busy {
+		return s, nil
+	}
 	action, enabled := s.form, s.choice == 1
 	s = s.closeForm()
 	if action == "system-proxy" || action == "tun" {

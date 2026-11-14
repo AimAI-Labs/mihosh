@@ -940,6 +940,7 @@
   "core.inline.save": "Save",
   "core.inline.cancel": "Cancel",
   "core.inline.dismiss": "Dismiss",
+  "core.inline.wait": "Wait for the current task",
   "core.inline.help": "Help",
   "core.binary_path": "Binary path",
   "core.path_unavailable": "Unavailable",

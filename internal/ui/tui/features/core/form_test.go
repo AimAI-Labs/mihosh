@@ -47,6 +47,49 @@ func TestDownloadAllowsNetworkPreferencesWithoutReplacingActiveTask(t *testing.T
 	}
 }
 
+func TestDownloadAllowsInspectingAdvancedDialogsWithoutConcurrentOperations(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	svc := service.NewCoreService()
+	defer svc.Close()
+	for _, action := range []string{"service", "system-proxy", "tun", "ports", "configure", "recover"} {
+		s := releaseFixture(t)
+		s.svc = svc
+		s, _ = s.begin("install")
+		defer s.Close()
+		id := s.generation
+		s, _ = s.Update(coreKey("3"))
+		s, _ = s.choose(action)
+		if !s.Editing || s.form != action || !s.Busy || s.task != "install" {
+			t.Fatalf("download blocked viewing %s", action)
+		}
+		s, cmd := s.Update(coreKey("enter"))
+		if cmd != nil || !s.Editing || !s.Busy || s.generation != id || s.args != nil {
+			t.Fatal("pending download allowed a concurrent operation")
+		}
+		page, _ := s.formDialog(120, 30)
+		if action == "service" || action == "configure" || action == "recover" {
+			var hit actionHit
+			if action == "service" {
+				hit = page.actions[s.selected]
+			} else {
+				hit = page.controls[0].actionHit
+			}
+			s, cmd = s.Update(messages.PageMouseClickMsg{X: hit.x, Y: hit.y, Width: 120, Height: 30})
+			if cmd != nil || !s.Editing || !s.Busy || s.generation != id || s.args != nil {
+				t.Fatal("mouse confirmation changed the pending download")
+			}
+		}
+		s, _ = s.Update(messages.CoreOperationMsg{ID: id, Action: "install"})
+		if s.Busy || !s.Editing {
+			t.Fatal("download completion closed the inspected dialog")
+		}
+		s, _ = s.Update(coreKey("esc"))
+		if s.Editing || s.task != "install" {
+			t.Fatal("closing settings discarded the download result")
+		}
+	}
+}
+
 func TestAdvancedDialogsCancelWithoutOperationsAndRestoreSelection(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	svc := service.NewCoreService()

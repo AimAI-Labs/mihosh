@@ -940,6 +940,7 @@
   "core.inline.save": "保存",
   "core.inline.cancel": "取消",
   "core.inline.dismiss": "收起结果",
+  "core.inline.wait": "等待当前任务结束",
   "core.inline.help": "帮助",
   "core.binary_path": "内核路径",
   "core.path_unavailable": "无法获取",
