@@ -40,12 +40,13 @@ func (s State) inlineHelp(width int) string {
 			{Key: "Enter", Desc: i18n.T("core.inline.save")},
 			{Key: "Esc", Desc: i18n.T("core.inline.cancel")},
 		}
-		if s.form == "service" {
+		switch s.form {
+		case "service":
 			hints[0] = common.InlineHelpHint{Key: "↑↓", Desc: i18n.T("core.inline.select")}
 			hints[1].Desc = i18n.T("core.inline.run")
-		} else if s.form == "system-proxy" || s.form == "tun" {
+		case "system-proxy", "tun":
 			hints[0] = common.InlineHelpHint{Key: "←→/Tab", Desc: i18n.T("core.inline.select")}
-		} else if s.form == "configure" || s.form == "recover" {
+		case "configure", "recover":
 			hints = hints[1:]
 			hints[0].Desc = i18n.T("core.inline.run")
 		}

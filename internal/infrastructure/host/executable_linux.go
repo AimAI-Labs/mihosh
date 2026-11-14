@@ -39,7 +39,7 @@ func procListenerExecutable(root string, ips []net.IP, port int) string {
 				}
 			}
 		}
-		f.Close()
+		_ = f.Close()
 	}
 	if len(sockets) == 0 {
 		return ""

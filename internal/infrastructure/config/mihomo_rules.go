@@ -492,14 +492,14 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 		return fmt.Errorf(i18n.T("config.file.err_create_temp"), err)
 	}
 	tmpName := tmp.Name()
-	defer os.Remove(tmpName) // Rename 成功后已不存在，忽略错误
+	defer func() { _ = os.Remove(tmpName) }() // Rename 成功后已不存在，忽略错误
 
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return fmt.Errorf(i18n.T("config.file.err_write_temp"), err)
 	}
 	if err := tmp.Sync(); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return fmt.Errorf(i18n.T("config.file.err_sync_temp"), err)
 	}
 	if err := tmp.Close(); err != nil {

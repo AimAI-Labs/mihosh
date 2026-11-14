@@ -10,6 +10,33 @@ import (
 
 var ansiRE = regexp.MustCompile("\x1b\\[[0-9;?]*[ -/]*[@-~]")
 
+func TestDisplayWidthAndTruncateUnicode(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		text  string
+		width int
+	}{
+		{"ascii", "hello", 5},
+		{"chinese", "中文", 4},
+		{"combining", "e\u0301", 1},
+		{"emoji", "👩‍💻", 2},
+		{"flag", "🇨🇳", 2},
+		{"styled", "\x1b[32m中文\x1b[0m", 4},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := DisplayWidth(tt.text); got != tt.width {
+				t.Fatalf("DisplayWidth(%q) = %d, want %d", tt.text, got, tt.width)
+			}
+		})
+	}
+	for _, text := range []string{"中文AB", "👩‍💻AB", "🇨🇳AB"} {
+		got := TruncateDisplay(text, 3)
+		if DisplayWidth(got) != 3 || !strings.HasSuffix(got, "~") {
+			t.Fatalf("TruncateDisplay(%q, 3) = %q, want width 3 ending in ~", text, got)
+		}
+	}
+}
+
 func TestRenderBorderedPanelKeepsEveryLineAtRequestedWidth(t *testing.T) {
 	const width = 48
 

@@ -79,15 +79,15 @@ func TestForwardedProfileAfterServiceStartKeepsWarning(t *testing.T) {
 	require.NoError(t, err)
 	controller := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/version" {
-			w.Write([]byte(`{"version":"v1.2.3"}`))
+			_, _ = w.Write([]byte(`{"version":"v1.2.3"}`))
 		} else {
-			w.Write([]byte(`{"proxies":{}}`))
+			_, _ = w.Write([]byte(`{"proxies":{}}`))
 		}
 	}))
 	defer controller.Close()
 	proxy, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	defer proxy.Close()
+	defer func() { _ = proxy.Close() }()
 	path, err := config.ManagedMihomoConfigPath()
 	require.NoError(t, err)
 	require.NoError(t, config.WriteMihomoField(path, "external-controller", strings.TrimPrefix(controller.URL, "http://")))
@@ -125,7 +125,7 @@ func TestForwardedProfileResponseCompatibility(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				requests.Add(1)
 				w.WriteHeader(entry.status)
-				w.Write([]byte(entry.body))
+				_, _ = w.Write([]byte(entry.body))
 			}))
 			defer server.Close()
 			root, err := config.GetConfigDir()

@@ -157,10 +157,6 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// 分发到页面子状态
 	return m.dispatchToPage(msg)
-
-	// ── 数据消息：分发到子状态 ──
-
-	return m, nil
 }
 
 // dispatchToPage 将消息分发到当前页面子状态

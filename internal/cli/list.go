@@ -118,12 +118,16 @@ func renderGroupListJSON(w io.Writer, groups map[string]model.Group, orderedName
 
 func renderGroupListTable(w io.Writer, groups map[string]model.Group, orderedNames []string, proxiesMap map[string]model.Proxy) error {
 	tw := newTabWriter(w)
-	fmt.Fprintln(tw, "GROUP\tTYPE\tCURRENT\tPROXY\tDELAY\tSELECTED")
+	if _, err := fmt.Fprintln(tw, "GROUP\tTYPE\tCURRENT\tPROXY\tDELAY\tSELECTED"); err != nil {
+		return err
+	}
 
 	for _, groupName := range resolveGroupOrder(groups, orderedNames) {
 		group := groups[groupName]
 		if len(group.All) == 0 {
-			fmt.Fprintf(tw, "%s\t%s\t%s\t-\t-\t-\n", group.Name, group.Type, group.Now)
+			if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\t-\t-\t-\n", group.Name, group.Type, group.Now); err != nil {
+				return err
+			}
 			continue
 		}
 
@@ -139,7 +143,9 @@ func renderGroupListTable(w io.Writer, groups map[string]model.Group, orderedNam
 			if proxyName == group.Now {
 				selected = "yes"
 			}
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", group.Name, group.Type, group.Now, proxyName, delay, selected)
+			if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", group.Name, group.Type, group.Now, proxyName, delay, selected); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -147,10 +153,10 @@ func renderGroupListTable(w io.Writer, groups map[string]model.Group, orderedNam
 }
 
 func renderGroupListPlain(w io.Writer, groups map[string]model.Group, orderedNames []string, proxiesMap map[string]model.Proxy) {
-	fmt.Fprintln(w, i18n.T("cli.list.label_groups"))
+	_, _ = fmt.Fprintln(w, i18n.T("cli.list.label_groups"))
 	for _, groupName := range resolveGroupOrder(groups, orderedNames) {
 		group := groups[groupName]
-		fmt.Fprintf(w, "\n[%s] %s (%s: %s)\n", group.Type, group.Name, i18n.T("cli.list.label_current"), group.Now)
+		_, _ = fmt.Fprintf(w, "\n[%s] %s (%s: %s)\n", group.Type, group.Name, i18n.T("cli.list.label_current"), group.Now)
 		for _, proxyName := range group.All {
 			proxy, ok := proxiesMap[proxyName]
 			delay := ""
@@ -164,7 +170,7 @@ func renderGroupListPlain(w io.Writer, groups map[string]model.Group, orderedNam
 			if proxyName == group.Now {
 				marker = " ✓"
 			}
-			fmt.Fprintf(w, "  - %s%s%s\n", proxyName, delay, marker)
+			_, _ = fmt.Fprintf(w, "  - %s%s%s\n", proxyName, delay, marker)
 		}
 	}
 }

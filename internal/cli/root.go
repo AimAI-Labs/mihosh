@@ -70,7 +70,7 @@ func executeRootCommand(root *cobra.Command, stderr io.Writer) int {
 	i18n.Init()
 	localizeCommands()
 	if err := root.Execute(); err != nil {
-		fmt.Fprintln(stderr, renderCommandError(err))
+		_, _ = fmt.Fprintln(stderr, renderCommandError(err))
 		return exitCodeForError(err)
 	}
 	return exitCodeOK

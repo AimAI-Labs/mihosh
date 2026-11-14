@@ -108,41 +108,51 @@ func renderConnectionsJSON(w io.Writer, conns model.ConnectionsResponse) error {
 }
 
 func renderConnectionsTable(w io.Writer, conns model.ConnectionsResponse) error {
-	fmt.Fprintf(w, "ACTIVE_CONNECTIONS: %d\n", len(conns.Connections))
-	fmt.Fprintf(w, "UPLOAD_TOTAL: %s\n", utils.FormatBytes(conns.UploadTotal))
-	fmt.Fprintf(w, "DOWNLOAD_TOTAL: %s\n\n", utils.FormatBytes(conns.DownloadTotal))
+	if _, err := fmt.Fprintf(w, "ACTIVE_CONNECTIONS: %d\n", len(conns.Connections)); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "UPLOAD_TOTAL: %s\n", utils.FormatBytes(conns.UploadTotal)); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "DOWNLOAD_TOTAL: %s\n\n", utils.FormatBytes(conns.DownloadTotal)); err != nil {
+		return err
+	}
 
 	tw := newTabWriter(w)
-	fmt.Fprintln(tw, "SOURCE\tDESTINATION\tCHAIN")
+	if _, err := fmt.Fprintln(tw, "SOURCE\tDESTINATION\tCHAIN"); err != nil {
+		return err
+	}
 	for _, conn := range conns.Connections {
 		chain := "DIRECT"
 		if len(conn.Chains) > 0 {
 			chain = conn.Chains[len(conn.Chains)-1]
 		}
 
-		fmt.Fprintf(tw, "%s:%s\t%s:%s\t%s\n",
+		if _, err := fmt.Fprintf(tw, "%s:%s\t%s:%s\t%s\n",
 			conn.Metadata.SourceIP,
 			conn.Metadata.SourcePort,
 			conn.Metadata.DestinationIP,
 			conn.Metadata.DestinationPort,
 			chain,
-		)
+		); err != nil {
+			return err
+		}
 	}
 	return tw.Flush()
 }
 
 func renderConnectionsPlain(w io.Writer, conns model.ConnectionsResponse) {
-	fmt.Fprintf(w, "%s: %d\n", i18n.T("cli.connections.label_active"), len(conns.Connections))
-	fmt.Fprintf(w, "%s: %s\n", i18n.T("cli.connections.label_upload"), utils.FormatBytes(conns.UploadTotal))
-	fmt.Fprintf(w, "%s: %s\n", i18n.T("cli.connections.label_download"), utils.FormatBytes(conns.DownloadTotal))
-	fmt.Fprintf(w, "\n%s\n", i18n.T("cli.connections.label_list"))
+	_, _ = fmt.Fprintf(w, "%s: %d\n", i18n.T("cli.connections.label_active"), len(conns.Connections))
+	_, _ = fmt.Fprintf(w, "%s: %s\n", i18n.T("cli.connections.label_upload"), utils.FormatBytes(conns.UploadTotal))
+	_, _ = fmt.Fprintf(w, "%s: %s\n", i18n.T("cli.connections.label_download"), utils.FormatBytes(conns.DownloadTotal))
+	_, _ = fmt.Fprintf(w, "\n%s\n", i18n.T("cli.connections.label_list"))
 
 	for _, conn := range conns.Connections {
 		chain := "DIRECT"
 		if len(conn.Chains) > 0 {
 			chain = conn.Chains[len(conn.Chains)-1]
 		}
-		fmt.Fprintf(w, "  %s:%s -> %s:%s [%s]\n",
+		_, _ = fmt.Fprintf(w, "  %s:%s -> %s:%s [%s]\n",
 			conn.Metadata.SourceIP,
 			conn.Metadata.SourcePort,
 			conn.Metadata.DestinationIP,

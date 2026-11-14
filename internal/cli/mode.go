@@ -26,7 +26,9 @@ var modeCmd = &cobra.Command{
 			if err != nil {
 				return wrapNetworkError(fmt.Errorf(i18n.T("cli.mode.err_get")+": %w", err))
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "%s: %s\n", i18n.T("cli.mode.label_current"), configs.Mode)
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s: %s\n", i18n.T("cli.mode.label_current"), configs.Mode); err != nil {
+				return err
+			}
 			return nil
 		}
 
@@ -41,7 +43,9 @@ var modeCmd = &cobra.Command{
 			return wrapNetworkError(fmt.Errorf(i18n.T("cli.mode.err_update")+": %w", err))
 		}
 
-		fmt.Fprintln(cmd.OutOrStdout(), i18n.Tf("cli.mode.success", mode))
+		if _, err := fmt.Fprintln(cmd.OutOrStdout(), i18n.Tf("cli.mode.success", mode)); err != nil {
+			return err
+		}
 		return nil
 	},
 }

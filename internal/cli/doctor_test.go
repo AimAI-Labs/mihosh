@@ -162,3 +162,19 @@ func TestDoctorErrorForReportUsesNetworkKindForFailedChecks(t *testing.T) {
 	require.True(t, errors.As(err, &cmdErr))
 	assert.Equal(t, commandErrorNetwork, cmdErr.kind)
 }
+
+type doctorFailingWriter struct {
+	err error
+}
+
+func (w doctorFailingWriter) Write([]byte) (int, error) { return 0, w.err }
+
+func TestRenderDoctorReportReturnsWriterError(t *testing.T) {
+	want := errors.New("output unavailable")
+	for _, format := range []outputFormat{outputFormatPlain, outputFormatTable, outputFormatJSON} {
+		t.Run(string(format), func(t *testing.T) {
+			err := renderDoctorReport(doctorFailingWriter{err: want}, doctorReport{}, format)
+			require.ErrorIs(t, err, want)
+		})
+	}
+}

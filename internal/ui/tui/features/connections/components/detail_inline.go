@@ -108,16 +108,17 @@ func RenderConnectionDetailInline(conn *model.Connection, width, height int, foc
 
 	// 分配公共字段（手动指定语义化的分组，确保在三列时地址信息独占第三列）
 	var commonRowsPerCol int
-	if cols == 3 {
+	switch cols {
+	case 3:
 		colRows[0] = append(colRows[0], commonRows[0:4]...)  // 基础信息：Network, Type, Rule, Outbound
 		colRows[1] = append(colRows[1], commonRows[4:7]...)  // 流量速度：Duration, Traffic, Speed
 		colRows[2] = append(colRows[2], commonRows[7:11]...) // 地址信息：SrcIP, SrcPort, DstIP, DstPort
 		commonRowsPerCol = 4                                 // 三列时的最大行数
-	} else if cols == 2 {
+	case 2:
 		colRows[0] = append(colRows[0], commonRows[0:6]...)
 		colRows[1] = append(colRows[1], commonRows[6:11]...)
 		commonRowsPerCol = 6
-	} else {
+	default:
 		colRows[0] = append(colRows[0], commonRows...)
 		commonRowsPerCol = 11
 	}

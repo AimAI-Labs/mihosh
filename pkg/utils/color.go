@@ -244,7 +244,7 @@ func GenerateColorVariants(baseHex string, lighterAdj, darkerAdj float64) (light
 }
 
 func ColorStringsEqual(c1, c2 string) bool {
-	return strings.ToUpper(c1) == strings.ToUpper(c2)
+	return strings.EqualFold(c1, c2)
 }
 
 func GetDelayColor(delay int) lipgloss.Color {

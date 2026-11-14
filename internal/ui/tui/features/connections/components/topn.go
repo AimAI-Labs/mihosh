@@ -33,7 +33,6 @@ func RenderTopNSection(items []TopNItem, width int) string {
 	contentWidth := panelWidth - 4
 
 	var lines []string
-	lines = append(lines)
 
 	maxBytes := items[0].TotalBytes // 第一项是最大的
 

@@ -18,8 +18,6 @@ import (
 )
 
 const (
-	asciiMinPrintable = 32
-	asciiMaxPrintable = 127
 
 	// settingsMouseRowsOffset：配置项第一行相对页面内容顶部的 Y 坐标。
 	// 布局：marginTop 空行(1) + 标签栏带边框(3 行: 上边框/内容行/下边框) + 配置面板上边框(1) = 5
@@ -200,11 +198,11 @@ func (s State) HandleMouseScroll(up bool, pageY, pageHeight, actionsPanelBottomY
 	// If we are in the Mihomo tab and the mouse is below the actions panel (where viewport is)
 	if s.activeTab == 1 && s.SysStatus.Supported && pageY > 0 {
 		if pageY > actionsPanelBottomY {
-			var mouseMsg tea.MouseMsg
+			mouseMsg := tea.MouseMsg{Action: tea.MouseActionPress}
 			if up {
-				mouseMsg.Type = tea.MouseWheelUp
+				mouseMsg.Button = tea.MouseButtonWheelUp
 			} else {
-				mouseMsg.Type = tea.MouseWheelDown
+				mouseMsg.Button = tea.MouseButtonWheelDown
 			}
 
 			cmd := s.SysStatus.Update(mouseMsg)
@@ -704,16 +702,6 @@ func nextLanguage(lang string) string {
 		}
 	}
 	return "auto"
-}
-
-func nextLogLevel(level string) string {
-	levels := []string{"info", "warning", "error", "debug", "silent"}
-	for i, l := range levels {
-		if l == level {
-			return levels[(i+1)%len(levels)]
-		}
-	}
-	return levels[0]
 }
 
 func prevLanguage(lang string) string {

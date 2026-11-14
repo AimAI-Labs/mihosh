@@ -91,17 +91,17 @@ func TestControllerReadCommandsBindTargetBeforeExecution(t *testing.T) {
 		requestsA.Add(1)
 		switch r.URL.Path {
 		case "/proxies":
-			w.Write([]byte(`{"proxies":{"group":{"type":"Selector","all":["DIRECT"],"now":"DIRECT"}}}`))
+			_, _ = w.Write([]byte(`{"proxies":{"group":{"type":"Selector","all":["DIRECT"],"now":"DIRECT"}}}`))
 		case "/configs":
-			w.Write([]byte(`{"mode":"rule"}`))
+			_, _ = w.Write([]byte(`{"mode":"rule"}`))
 		case "/connections":
-			w.Write([]byte(`{"connections":[]}`))
+			_, _ = w.Write([]byte(`{"connections":[]}`))
 		case "/rules":
-			w.Write([]byte(`{"rules":[]}`))
+			_, _ = w.Write([]byte(`{"rules":[]}`))
 		case "/memory":
-			w.Write([]byte(`{"inuse":42}`))
+			_, _ = w.Write([]byte(`{"inuse":42}`))
 		case "/version":
-			w.Write([]byte(`{"version":"controller-a"}`))
+			_, _ = w.Write([]byte(`{"version":"controller-a"}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -143,9 +143,9 @@ func TestAutoRefreshKeepsOneTargetAcrossRequests(t *testing.T) {
 	a := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/proxies" {
 			client.UpdateEndpoint(b.URL, "new-secret")
-			w.Write([]byte(`{"proxies":{}}`))
+			_, _ = w.Write([]byte(`{"proxies":{}}`))
 		} else {
-			w.Write([]byte(`{"mode":"rule"}`))
+			_, _ = w.Write([]byte(`{"mode":"rule"}`))
 		}
 	}))
 	defer a.Close()
@@ -162,7 +162,7 @@ func TestAutoRefreshKeepsOneTargetAcrossRequests(t *testing.T) {
 func TestBatchResultsKeepTargetOwnershipAcrossReconnects(t *testing.T) {
 	var wrongRequests atomic.Int32
 	a := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"delay":42}`))
+		_, _ = w.Write([]byte(`{"delay":42}`))
 	}))
 	defer a.Close()
 	b := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

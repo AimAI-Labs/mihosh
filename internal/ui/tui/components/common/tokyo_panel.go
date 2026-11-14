@@ -89,7 +89,6 @@ func RenderTokyoPanel(title, body string, width int) string {
 	maxTitleLen := innerWidth - 6
 	if maxTitleLen > 0 && titleLen > maxTitleLen {
 		title = TruncateDisplay(title, maxTitleLen)
-		titleLen = DisplayWidth(title)
 	}
 
 	// 逐字符填充顶部边框，确保总宽度精确等于 innerWidth+2（含 ╭ 和 ╮）

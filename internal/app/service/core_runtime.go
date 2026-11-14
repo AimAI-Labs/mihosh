@@ -42,7 +42,9 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 	if s.process != nil {
 		select {
 		case <-s.done:
-			s.stopLocked()
+			if err := s.stopLocked(); err != nil {
+				return err
+			}
 		default:
 			return errors.New("managed core is already running")
 		}
@@ -144,13 +146,13 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 		if e != nil {
 			return errors.New("proxy port is already in use")
 		}
-		listener.Close()
+		_ = listener.Close()
 	}
 	listener, e := net.Listen("tcp", endpoint.ExternalController)
 	if e != nil {
 		return errors.New("controller address is already in use")
 	}
-	listener.Close()
+	_ = listener.Close()
 	client := api.NewClient(endpoint, 500)
 	if _, err = client.GetVersion(); err == nil {
 		return errors.New("controller address is already in use; choose another port")
@@ -185,7 +187,7 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 	releaseJob, err := coreinfra.AttachProcess(cmd)
 	if err != nil {
 		stop()
-		cmd.Wait()
+		_ = cmd.Wait()
 		return errors.New("cannot attach managed core lifecycle")
 	}
 	s.releaseJob = releaseJob
@@ -207,8 +209,7 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 		}
 	}()
 	if err = s.startControl(root); err != nil {
-		s.stopLocked()
-		return err
+		return errors.Join(err, s.stopLocked())
 	}
 	timer := time.NewTimer(15 * time.Second)
 	defer timer.Stop()
@@ -217,11 +218,9 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 	for {
 		select {
 		case <-ctx.Done():
-			s.stopLocked()
-			return ctx.Err()
+			return errors.Join(ctx.Err(), s.stopLocked())
 		case <-timer.C:
-			s.stopLocked()
-			return errors.New("managed core did not become ready before timeout")
+			return errors.Join(errors.New("managed core did not become ready before timeout"), s.stopLocked())
 		case <-done:
 			s.process = nil
 			if s.releaseLock != nil {
@@ -238,20 +237,18 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 		case <-ticker.C:
 			if info, versionErr := client.GetVersion(); versionErr == nil {
 				if info.Version != cfg.Core.Version {
-					s.stopLocked()
-					return errors.New("running core version does not match the selected release")
+					return errors.Join(errors.New("running core version does not match the selected release"), s.stopLocked())
 				}
 				proxy, e := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", endpoint.MixedPort), 250*time.Millisecond)
 				if e == nil {
-					proxy.Close()
+					_ = proxy.Close()
 					if cfg.Core.TUN {
 						if _, err = s.network.CaptureTUN(ctx, host.TUNIdentity(root)); err != nil {
 							continue
 						}
 					}
 					if err = s.activateNetwork(ctx, root, cfg); err != nil {
-						s.stopLocked()
-						return err
+						return errors.Join(err, s.stopLocked())
 					}
 					succeeded = true
 					return nil

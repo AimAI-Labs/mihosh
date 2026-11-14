@@ -61,7 +61,7 @@ func (s *ProxyService) GetIPInfo(proxyAddr string) (*model.IPInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var info model.IPInfo
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {

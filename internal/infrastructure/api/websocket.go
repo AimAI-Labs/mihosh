@@ -121,7 +121,7 @@ func (c *WSClient) UpdateEndpoint(baseURL, secret string) {
 	// 进入重连循环，下一轮 buildWSURL 读到新值。
 	c.connsMu.Lock()
 	for key, conn := range c.conns {
-		conn.Close()
+		_ = conn.Close()
 		delete(c.conns, key)
 	}
 	c.connsMu.Unlock()
@@ -248,7 +248,7 @@ func (c *WSClient) Stop() {
 
 	c.connsMu.Lock()
 	for key, conn := range c.conns {
-		conn.Close()
+		_ = conn.Close()
 		delete(c.conns, key)
 	}
 	c.connsMu.Unlock()
@@ -290,7 +290,7 @@ func connectStream[T any](c *WSClient, endpoint string, handler func(T, uint64))
 			}
 		}
 
-		conn, _, err := noProxyWSDialer.Dial(wsURL, nil)
+		conn, _, err := noProxyWSDialer.Dial(wsURL, nil) //nolint:bodyclose // Gorilla owns the handshake response body; DialContext requires no application close.
 		if err != nil {
 			select {
 			case <-c.ctx.Done():
@@ -303,7 +303,7 @@ func connectStream[T any](c *WSClient, endpoint string, handler func(T, uint64))
 		c.mu.RLock()
 		if c.generation != generation {
 			c.mu.RUnlock()
-			conn.Close()
+			_ = conn.Close()
 			continue
 		}
 		c.setConn(endpoint, conn)
@@ -313,7 +313,7 @@ func connectStream[T any](c *WSClient, endpoint string, handler func(T, uint64))
 		for {
 			select {
 			case <-c.ctx.Done():
-				conn.Close()
+				_ = conn.Close()
 				c.setConn(endpoint, nil)
 				return
 			default:

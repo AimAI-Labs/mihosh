@@ -54,7 +54,7 @@ func (s *CoreService) startControl(root string) error {
 	}
 	var secret [32]byte
 	if _, err = rand.Read(secret[:]); err != nil {
-		listener.Close()
+		_ = listener.Close()
 		return err
 	}
 	owner := coreOwner{"http://" + listener.Addr().String(), hex.EncodeToString(secret[:])}
@@ -68,14 +68,14 @@ func (s *CoreService) startControl(root string) error {
 		}
 		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if subtle.ConstantTimeCompare([]byte(token), []byte(owner.Token)) != 1 {
-			http.Error(w, "unauthorized", 401)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 		select {
 		case slots <- struct{}{}:
 			defer func() { <-slots }()
 		default:
-			http.Error(w, "another local control operation is active", 409)
+			http.Error(w, "another local control operation is active", http.StatusConflict)
 			return
 		}
 		var request coreControlRequest
@@ -116,7 +116,7 @@ func (s *CoreService) startControl(root string) error {
 		}
 		if err != nil {
 			w.WriteHeader(http.StatusConflict)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return
 		}
 		s.notifyOwner(request.Action)
@@ -124,11 +124,11 @@ func (s *CoreService) startControl(root string) error {
 		if activation.MergeErr != nil {
 			response.MergeWarning = activation.MergeErr.Error()
 		}
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	})
 	data, _ := json.Marshal(owner)
 	if err = privateWrite(filepath.Join(root, "runtime", "owner.json"), data); err != nil {
-		listener.Close()
+		_ = listener.Close()
 		return err
 	}
 	s.control = server
@@ -201,7 +201,7 @@ func (s *CoreService) sendControl(ctx context.Context, action, version string, a
 		}
 		return fmt.Errorf("%w: owner is unreachable", ErrNoCoreOwner)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		var result map[string]string
 		_ = json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&result)
@@ -246,12 +246,12 @@ func (s *CoreService) Wait(ctx context.Context) error {
 				s.mu.Unlock()
 				continue
 			}
-			s.stopLocked()
+			err := s.stopLocked()
 			s.mu.Unlock()
 			if s.daemon {
-				return errors.New("managed service child exited unexpectedly")
+				return errors.Join(errors.New("managed service child exited unexpectedly"), err)
 			}
-			return nil
+			return err
 		}
 	}
 }

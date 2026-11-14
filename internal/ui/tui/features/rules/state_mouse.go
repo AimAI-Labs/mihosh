@@ -71,7 +71,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		if s.addForm.isProxyPickerOpen() {
 			pageState := s.ToPageState(pageWidth, pageHeight)
 			pLeft, pTop, pRight, pBottom := ResolveProxyPickerBounds(pageState, pageWidth, pageHeight)
-			if !(pageX >= pLeft && pageX < pRight && pageY >= pTop && pageY < pBottom) {
+			if pageX < pLeft || pageX >= pRight || pageY < pTop || pageY >= pBottom {
 				// 点击 picker 外：关闭 picker，保留已选
 				form := s.addForm
 				form.pickerClose()
@@ -127,7 +127,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 			Height:      pageHeight,
 		}
 		left, top, right, bottom := ResolveAddFormBounds(pageState, pageWidth, pageHeight)
-		if !(pageX >= left && pageX < right && pageY >= top && pageY < bottom) {
+		if pageX < left || pageX >= right || pageY < top || pageY >= bottom {
 			s.showAddForm = false
 			s.addForm = newAddForm(s.configPath)
 		}
@@ -144,7 +144,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 			Height:            pageHeight,
 		}
 		left, top, right, bottom := ResolveDeleteConfirmBounds(pageState, pageWidth, pageHeight)
-		if !(pageX >= left && pageX < right && pageY >= top && pageY < bottom) {
+		if pageX < left || pageX >= right || pageY < top || pageY >= bottom {
 			s.showDeleteConfirm = false
 			s.deleteTarget = model.Rule{}
 			s.deleteTargetIndex = 0
@@ -158,7 +158,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		if s.addForm.isProxyPickerOpen() {
 			pageState := s.ToPageState(pageWidth, pageHeight)
 			pLeft, pTop, pRight, pBottom := ResolveProxyPickerBounds(pageState, pageWidth, pageHeight)
-			if !(pageX >= pLeft && pageX < pRight && pageY >= pTop && pageY < pBottom) {
+			if pageX < pLeft || pageX >= pRight || pageY < pTop || pageY >= pBottom {
 				form := s.addForm
 				form.pickerClose()
 				return s.applyEditFormUpdate(form)
@@ -210,7 +210,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 			Height:       pageHeight,
 		}
 		left, top, right, bottom := ResolveEditFormBounds(pageState, pageWidth, pageHeight)
-		if !(pageX >= left && pageX < right && pageY >= top && pageY < bottom) {
+		if pageX < left || pageX >= right || pageY < top || pageY >= bottom {
 			s.showEditForm = false
 			s.addForm = addForm{}
 			s.editOriginIndex = 0

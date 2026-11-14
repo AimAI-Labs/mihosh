@@ -422,10 +422,10 @@ func cardSubtitle(state PageState, group model.Group) string {
 		now = i18n.T("nodes.unknown_node")
 	}
 	style := lipgloss.NewStyle().Foreground(common.TokyoForeground())
-	switch {
-	case now == "REJECT":
+	switch now {
+	case "REJECT":
 		style = common.ErrorStyle()
-	case now == "DIRECT":
+	case "DIRECT":
 		style = common.MutedStyle()
 	default:
 		if color, ok := parseHexColor(now); ok {

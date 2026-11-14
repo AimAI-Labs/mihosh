@@ -104,7 +104,7 @@ func (f *Fetcher) Install(ctx context.Context, root string, r Release, goos, arc
 	if err != nil {
 		return Installation{}, err
 	}
-	defer os.RemoveAll(stage)
+	defer func() { _ = os.RemoveAll(stage) }() // Stale stages are retried by cleanupInstallStages on the next operation.
 	archive := filepath.Join(stage, asset.Name)
 	route, err := f.Download(ctx, asset.URL, archive, digest)
 	if err != nil {
@@ -151,14 +151,14 @@ func extractBinary(ctx context.Context, archive, destination, goos string) error
 		if err != nil {
 			return errors.New("invalid core ZIP archive")
 		}
-		defer z.Close()
+		defer func() { _ = z.Close() }()
 		for _, entry := range z.File {
 			if entry.FileInfo().IsDir() {
 				continue
 			}
 			if entry.Mode()&os.ModeSymlink != 0 || strings.ContainsAny(entry.Name, "/\\") || !strings.HasSuffix(strings.ToLower(entry.Name), ".exe") || reader != nil {
 				if reader != nil {
-					reader.Close()
+					_ = reader.Close()
 				}
 				return errors.New("unexpected ZIP archive entry")
 			}
@@ -178,19 +178,19 @@ func extractBinary(ctx context.Context, archive, destination, goos string) error
 		if err != nil {
 			return err
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 		gz, err := gzip.NewReader(file)
 		if err != nil {
 			return errors.New("invalid core GZIP archive")
 		}
 		reader = gz
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 	file, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0700)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }() // The successful output close is checked below.
 	n, err := io.Copy(file, io.LimitReader(&contextReader{ctx, reader}, MaxAssetBytes+1))
 	if err != nil {
 		return errors.New("core extraction interrupted")
@@ -241,12 +241,12 @@ func Import(ctx context.Context, root, source, tag, expected, goos string) (Inst
 	if err != nil {
 		return Installation{}, err
 	}
-	defer os.RemoveAll(stage)
+	defer func() { _ = os.RemoveAll(stage) }() // Stale stages are retried by cleanupInstallStages on the next operation.
 	src, err := os.Open(source)
 	if err != nil {
 		return Installation{}, err
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 	out, err := os.OpenFile(filepath.Join(stage, BinaryName(goos)), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0700)
 	if err != nil {
 		return Installation{}, err
@@ -283,7 +283,7 @@ func fileDigest(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	hash := sha256.New()
 	n, err := io.Copy(hash, io.LimitReader(file, MaxAssetBytes+1))
 	if err != nil {

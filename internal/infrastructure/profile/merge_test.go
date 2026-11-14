@@ -11,17 +11,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// parseMapping 解析 YAML 字符串为顶层 mapping 节点。
-func parseMapping(t *testing.T, s string) *yaml.Node {
-	t.Helper()
-	var doc yaml.Node
-	require.NoError(t, yaml.Unmarshal([]byte(s), &doc))
-	if doc.Kind == yaml.DocumentNode && len(doc.Content) > 0 {
-		return doc.Content[0]
-	}
-	return &doc
-}
-
 // parseDoc 解析 YAML 字符串为 DocumentNode（含文档层）。
 func parseDoc(t *testing.T, s string) *yaml.Node {
 	t.Helper()

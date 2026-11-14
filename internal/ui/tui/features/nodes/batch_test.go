@@ -41,7 +41,7 @@ func TestNodesBatchRespectsCapacity(t *testing.T) {
 		started <- name
 		select {
 		case <-release[index]:
-			fmt.Fprint(w, `{"delay":42}`)
+			_, _ = fmt.Fprint(w, `{"delay":42}`)
 		case <-r.Context().Done():
 		}
 	}))

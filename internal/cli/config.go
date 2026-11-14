@@ -364,32 +364,76 @@ func renderConfigShow(w io.Writer, cfg *config.Config, configPath string, format
 		return writeJSON(w, payload)
 	case outputFormatTable:
 		tw := newTabWriter(w)
-		fmt.Fprintln(tw, "KEY\tVALUE")
-		fmt.Fprintf(tw, "TEST_URL\t%s\n", cfg.TestURL)
-		fmt.Fprintf(tw, "TIMEOUT_MS\t%d\n", cfg.Timeout)
-		fmt.Fprintf(tw, "AUTO_REFRESH_INTERVAL\t%d\n", cfg.AutoRefreshInterval)
-		fmt.Fprintf(tw, "CONFIG_FILE\t%s\n", configPath)
+		if _, err := fmt.Fprintln(tw, "KEY\tVALUE"); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "TEST_URL\t%s\n", cfg.TestURL); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "TIMEOUT_MS\t%d\n", cfg.Timeout); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "AUTO_REFRESH_INTERVAL\t%d\n", cfg.AutoRefreshInterval); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "CONFIG_FILE\t%s\n", configPath); err != nil {
+			return err
+		}
 		mi := buildMihomoShowInfo(endpoint, mihomoPath)
-		fmt.Fprintf(tw, "%s\t\n", i18n.T("cli.config.show.label_mihomo_conn_table"))
-		fmt.Fprintf(tw, "EXTERNAL_CONTROLLER\t%s\n", mi.ExternalController)
-		fmt.Fprintf(tw, "SECRET\t%s\n", mi.Secret)
-		fmt.Fprintf(tw, "MIXED_PORT\t%d\n", mi.MixedPort)
-		fmt.Fprintf(tw, "PROXY_URL\t%s\n", mi.ProxyURL)
-		fmt.Fprintf(tw, "MIHOMO_CONFIG_FILE\t%s\n", mi.ConfigPath)
+		if _, err := fmt.Fprintf(tw, "%s\t\n", i18n.T("cli.config.show.label_mihomo_conn_table")); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "EXTERNAL_CONTROLLER\t%s\n", mi.ExternalController); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "SECRET\t%s\n", mi.Secret); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "MIXED_PORT\t%d\n", mi.MixedPort); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "PROXY_URL\t%s\n", mi.ProxyURL); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "MIHOMO_CONFIG_FILE\t%s\n", mi.ConfigPath); err != nil {
+			return err
+		}
 		return tw.Flush()
 	case outputFormatPlain:
 		mi := buildMihomoShowInfo(endpoint, mihomoPath)
-		fmt.Fprintln(w, i18n.T("cli.config.show.label_current"))
-		fmt.Fprintf(w, "  %s: %s\n", i18n.T("cli.config.show.label_test_url"), cfg.TestURL)
-		fmt.Fprintf(w, "  %s: %dms\n", i18n.T("cli.config.show.label_timeout"), cfg.Timeout)
-		fmt.Fprintf(w, "  %s: %ds\n", i18n.T("cli.config.show.label_auto_refresh"), cfg.AutoRefreshInterval)
-		fmt.Fprintf(w, "\n%s: %s\n", i18n.T("cli.config.show.label_config_file"), configPath)
-		fmt.Fprintln(w, "\n"+i18n.T("cli.config.show.label_mihomo_conn"))
-		fmt.Fprintf(w, "  External Controller: %s\n", mi.ExternalController)
-		fmt.Fprintf(w, "  %s: %s\n", i18n.T("cli.config.show.label_secret"), mi.Secret)
-		fmt.Fprintf(w, "  Mixed Port: %d\n", mi.MixedPort)
-		fmt.Fprintf(w, "  %s: %s\n", i18n.T("cli.config.show.label_proxy_url"), mi.ProxyURL)
-		fmt.Fprintf(w, "  %s: %s\n", i18n.T("cli.config.show.label_mihomo_config_file"), mi.ConfigPath)
+		if _, err := fmt.Fprintln(w, i18n.T("cli.config.show.label_current")); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "  %s: %s\n", i18n.T("cli.config.show.label_test_url"), cfg.TestURL); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "  %s: %dms\n", i18n.T("cli.config.show.label_timeout"), cfg.Timeout); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "  %s: %ds\n", i18n.T("cli.config.show.label_auto_refresh"), cfg.AutoRefreshInterval); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "\n%s: %s\n", i18n.T("cli.config.show.label_config_file"), configPath); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(w, "\n"+i18n.T("cli.config.show.label_mihomo_conn")); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "  External Controller: %s\n", mi.ExternalController); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "  %s: %s\n", i18n.T("cli.config.show.label_secret"), mi.Secret); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "  Mixed Port: %d\n", mi.MixedPort); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "  %s: %s\n", i18n.T("cli.config.show.label_proxy_url"), mi.ProxyURL); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "  %s: %s\n", i18n.T("cli.config.show.label_mihomo_config_file"), mi.ConfigPath); err != nil {
+			return err
+		}
 		return nil
 	default:
 		return fmt.Errorf(i18n.T("cli.config.show.unsupported_format"), format)

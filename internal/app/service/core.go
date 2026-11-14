@@ -165,7 +165,10 @@ func (s *CoreService) lockCoreMutation(root string) (func(), error) {
 	if s.process != nil {
 		select {
 		case <-s.done:
-			s.stopLocked()
+			if err := s.stopLocked(); err != nil {
+				releaseConfig()
+				return nil, err
+			}
 		default:
 			return releaseConfig, nil
 		}
@@ -185,7 +188,9 @@ func (s *CoreService) operationContext(parent context.Context) (context.Context,
 func (s *CoreService) Close() {
 	s.shutdown()
 	s.mu.Lock()
-	s.stopLocked()
+	if err := s.stopLocked(); err != nil {
+		s.failure = errors.Join(s.failure, err)
+	}
 	cleanup := s.controlCleanup
 	s.mu.Unlock()
 	if cleanup != nil {

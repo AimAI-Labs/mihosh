@@ -60,13 +60,6 @@ func newAddForm() addForm {
 	}
 }
 
-func (f addForm) currentKind() profile.SourceKind {
-	if f.kindRemote {
-		return profile.SourceRemote
-	}
-	return profile.SourceLocal
-}
-
 func (f addForm) isNameField() bool { return f.fieldCursor == addFieldName }
 func (f addForm) isKindField() bool { return f.fieldCursor == addFieldKind }
 func (f addForm) isSrcField() bool  { return f.fieldCursor == addFieldSrc }
@@ -90,13 +83,14 @@ func (f *addForm) toggleKind() {
 }
 
 func (f *addForm) focusCurrent() {
-	if f.fieldCursor == addFieldName {
+	switch f.fieldCursor {
+	case addFieldName:
 		f.nameField.Focus()
 		f.srcField.Blur()
-	} else if f.fieldCursor == addFieldSrc {
+	case addFieldSrc:
 		f.nameField.Blur()
 		f.srcField.Focus()
-	} else {
+	default:
 		f.nameField.Blur()
 		f.srcField.Blur()
 	}

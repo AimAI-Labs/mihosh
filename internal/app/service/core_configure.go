@@ -173,7 +173,9 @@ func (s *CoreService) SetPorts(controllerPort, mixedPort int) error {
 	if s.process != nil {
 		select {
 		case <-s.done:
-			s.stopLocked()
+			if err := s.stopLocked(); err != nil {
+				return err
+			}
 		default:
 			return errors.New("stop the managed core before changing its ports")
 		}

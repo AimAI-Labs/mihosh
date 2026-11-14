@@ -166,12 +166,20 @@ func renderNoCurrentTestOutput(w io.Writer, format outputFormat) error {
 		})
 	case outputFormatTable:
 		tw := newTabWriter(w)
-		fmt.Fprintln(tw, "KEY\tVALUE")
-		fmt.Fprintln(tw, "ACTION\tcurrent")
-		fmt.Fprintln(tw, "FOUND\tfalse")
+		if _, err := fmt.Fprintln(tw, "KEY\tVALUE"); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(tw, "ACTION\tcurrent"); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(tw, "FOUND\tfalse"); err != nil {
+			return err
+		}
 		return tw.Flush()
 	case outputFormatPlain:
-		fmt.Fprintln(w, i18n.T("cli.test.no_current_node"))
+		if _, err := fmt.Fprintln(w, i18n.T("cli.test.no_current_node")); err != nil {
+			return err
+		}
 		return nil
 	default:
 		return fmt.Errorf(i18n.T("cli.test.unsupported_format"), format)
@@ -190,15 +198,33 @@ func renderCurrentTestOutput(w io.Writer, node string, chain []string, ipInfo *m
 		})
 	case outputFormatTable:
 		tw := newTabWriter(w)
-		fmt.Fprintln(tw, "KEY\tVALUE")
-		fmt.Fprintf(tw, "ACTION\t%s\n", actionCurrent)
-		fmt.Fprintf(tw, "NODE\t%s\n", node)
-		fmt.Fprintf(tw, "CHAIN\t%s\n", strings.Join(chain, " -> "))
-		fmt.Fprintf(tw, "IP\t%s\n", ipInfo.IP)
-		fmt.Fprintf(tw, "COUNTRY\t%s (%s)\n", ipInfo.Country, ipInfo.CountryCode)
-		fmt.Fprintf(tw, "CITY\t%s\n", ipInfo.City)
-		fmt.Fprintf(tw, "ASN\t%s\n", ipInfo.AS)
-		fmt.Fprintf(tw, "ORG\t%s\n", ipInfo.Org)
+		if _, err := fmt.Fprintln(tw, "KEY\tVALUE"); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "ACTION\t%s\n", actionCurrent); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "NODE\t%s\n", node); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "CHAIN\t%s\n", strings.Join(chain, " -> ")); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "IP\t%s\n", ipInfo.IP); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "COUNTRY\t%s (%s)\n", ipInfo.Country, ipInfo.CountryCode); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "CITY\t%s\n", ipInfo.City); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "ASN\t%s\n", ipInfo.AS); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "ORG\t%s\n", ipInfo.Org); err != nil {
+			return err
+		}
 		return tw.Flush()
 	case outputFormatPlain:
 		const contentWidth = 50
@@ -208,15 +234,33 @@ func renderCurrentTestOutput(w io.Writer, node string, chain []string, ipInfo *m
 			labelWidth = 8
 		}
 
-		fmt.Fprintln(w, "┌"+strings.Repeat("─", contentWidth+2)+"┐")
-		fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_node"), node, labelWidth, contentWidth))
-		fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_chain"), strings.Join(chain, " -> "), labelWidth, contentWidth))
-		fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_ip"), ipInfo.IP, labelWidth, contentWidth))
-		fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_country"), fmt.Sprintf("%s (%s)", ipInfo.Country, ipInfo.CountryCode), labelWidth, contentWidth))
-		fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_city"), ipInfo.City, labelWidth, contentWidth))
-		fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_asn"), ipInfo.AS, labelWidth, contentWidth))
-		fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_org"), ipInfo.Org, labelWidth, contentWidth))
-		fmt.Fprintln(w, "└"+strings.Repeat("─", contentWidth+2)+"┘")
+		if _, err := fmt.Fprintln(w, "┌"+strings.Repeat("─", contentWidth+2)+"┐"); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_node"), node, labelWidth, contentWidth)); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_chain"), strings.Join(chain, " -> "), labelWidth, contentWidth)); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_ip"), ipInfo.IP, labelWidth, contentWidth)); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_country"), fmt.Sprintf("%s (%s)", ipInfo.Country, ipInfo.CountryCode), labelWidth, contentWidth)); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_city"), ipInfo.City, labelWidth, contentWidth)); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_asn"), ipInfo.AS, labelWidth, contentWidth)); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(w, boxLine(i18n.T("cli.test.label_org"), ipInfo.Org, labelWidth, contentWidth)); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(w, "└"+strings.Repeat("─", contentWidth+2)+"┘"); err != nil {
+			return err
+		}
 		return nil
 	default:
 		return fmt.Errorf(i18n.T("cli.test.unsupported_format"), format)
@@ -233,13 +277,23 @@ func renderNodeTestOutput(w io.Writer, node string, delay int, format outputForm
 		})
 	case outputFormatTable:
 		tw := newTabWriter(w)
-		fmt.Fprintln(tw, "KEY\tVALUE")
-		fmt.Fprintf(tw, "ACTION\t%s\n", actionNode)
-		fmt.Fprintf(tw, "NODE\t%s\n", node)
-		fmt.Fprintf(tw, "DELAY_MS\t%d\n", delay)
+		if _, err := fmt.Fprintln(tw, "KEY\tVALUE"); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "ACTION\t%s\n", actionNode); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "NODE\t%s\n", node); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "DELAY_MS\t%d\n", delay); err != nil {
+			return err
+		}
 		return tw.Flush()
 	case outputFormatPlain:
-		fmt.Fprintln(w, i18n.Tf("cli.test.success_node", node, delay))
+		if _, err := fmt.Fprintln(w, i18n.Tf("cli.test.success_node", node, delay)); err != nil {
+			return err
+		}
 		return nil
 	default:
 		return fmt.Errorf(i18n.T("cli.test.unsupported_format"), format)
@@ -256,13 +310,23 @@ func renderGroupTestOutput(w io.Writer, group string, format outputFormat) error
 		})
 	case outputFormatTable:
 		tw := newTabWriter(w)
-		fmt.Fprintln(tw, "KEY\tVALUE")
-		fmt.Fprintf(tw, "ACTION\t%s\n", actionGroup)
-		fmt.Fprintf(tw, "GROUP\t%s\n", group)
-		fmt.Fprintln(tw, "STATUS\tcompleted")
+		if _, err := fmt.Fprintln(tw, "KEY\tVALUE"); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "ACTION\t%s\n", actionGroup); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "GROUP\t%s\n", group); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(tw, "STATUS\tcompleted"); err != nil {
+			return err
+		}
 		return tw.Flush()
 	case outputFormatPlain:
-		fmt.Fprintln(w, i18n.Tf("cli.test.success_group", group))
+		if _, err := fmt.Fprintln(w, i18n.Tf("cli.test.success_group", group)); err != nil {
+			return err
+		}
 		return nil
 	default:
 		return fmt.Errorf(i18n.T("cli.test.unsupported_format"), format)
@@ -325,10 +389,9 @@ func fitText(s string, maxWidth int) string {
 		return "…"
 	}
 
-	rs := []rune(s)
 	current := 0
 	var out []rune
-	for _, r := range rs {
+	for _, r := range s {
 		w := runewidth.RuneWidth(r)
 		if current+w > maxWidth-1 {
 			break

@@ -38,13 +38,23 @@ func renderVersion(w io.Writer, format outputFormat) error {
 		})
 	case outputFormatTable:
 		tw := newTabWriter(w)
-		fmt.Fprintln(tw, "KEY\tVALUE")
-		fmt.Fprintf(tw, "VERSION\t%s\n", model.Version)
-		fmt.Fprintf(tw, "COMMIT\t%s\n", model.Commit)
-		fmt.Fprintf(tw, "DATE\t%s\n", model.Date)
+		if _, err := fmt.Fprintln(tw, "KEY\tVALUE"); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "VERSION\t%s\n", model.Version); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "COMMIT\t%s\n", model.Commit); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(tw, "DATE\t%s\n", model.Date); err != nil {
+			return err
+		}
 		return tw.Flush()
 	default:
-		fmt.Fprintf(w, "mihosh %s (commit: %s, built: %s)\n", model.Version, model.Commit, model.Date)
+		if _, err := fmt.Fprintf(w, "mihosh %s (commit: %s, built: %s)\n", model.Version, model.Commit, model.Date); err != nil {
+			return err
+		}
 		return nil
 	}
 }

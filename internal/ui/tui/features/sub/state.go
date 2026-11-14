@@ -347,7 +347,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		if (s.showAddForm || s.showEditForm) && !s.showDeleteConf {
 			ps := s.ToPageState(pageWidth, pageHeight)
 			left, top, right, bottom := resolveFormBounds(ps, pageWidth, pageHeight)
-			if !(pageX >= left && pageX < right && pageY >= top && pageY < bottom) {
+			if pageX < left || pageX >= right || pageY < top || pageY >= bottom {
 				s.showAddForm = false
 				s.addForm = newAddForm()
 				s.showEditForm = false

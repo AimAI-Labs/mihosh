@@ -62,7 +62,7 @@ func TestUpdate_MouseMessages(t *testing.T) {
 
 	// Help popup intercepts mouse clicks
 	m.showHelp = true
-	msg := tea.MouseMsg{X: 10, Y: 10, Type: tea.MouseLeft, Action: tea.MouseActionPress}
+	msg := tea.MouseMsg{X: 10, Y: 10, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress}
 	newM, _ := m.Update(msg)
 	newModel := newM.(Model)
 	if newModel.showHelp {
@@ -86,7 +86,7 @@ func TestUpdate_MouseMessages(t *testing.T) {
 	}
 
 	// Click on top nav
-	msg = tea.MouseMsg{X: 10, Y: 0, Type: tea.MouseLeft, Action: tea.MouseActionPress}
+	msg = tea.MouseMsg{X: 10, Y: 0, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress}
 	newM, _ = newModel.Update(msg)
 	newModel = newM.(Model)
 	if newModel.currentPage != layout.PageNodes {

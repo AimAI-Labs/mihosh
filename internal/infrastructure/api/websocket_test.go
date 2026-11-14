@@ -23,25 +23,25 @@ func TestWSClient_StartStopAndHandlers(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 
 		switch {
 		case strings.Contains(r.URL.Path, "/memory"):
 			data := MemoryData{Inuse: 1024, OSLimit: 2048}
 			msg, _ := json.Marshal(data)
-			conn.WriteMessage(websocket.TextMessage, msg)
+			_ = conn.WriteMessage(websocket.TextMessage, msg)
 		case strings.Contains(r.URL.Path, "/traffic"):
 			data := TrafficData{Up: 100, Down: 200}
 			msg, _ := json.Marshal(data)
-			conn.WriteMessage(websocket.TextMessage, msg)
+			_ = conn.WriteMessage(websocket.TextMessage, msg)
 		case strings.Contains(r.URL.Path, "/connections"):
 			data := ConnectionsData{DownloadTotal: 500}
 			msg, _ := json.Marshal(data)
-			conn.WriteMessage(websocket.TextMessage, msg)
+			_ = conn.WriteMessage(websocket.TextMessage, msg)
 		case strings.Contains(r.URL.Path, "/logs"):
 			data := LogData{Type: "info", Payload: "test log"}
 			msg, _ := json.Marshal(data)
-			conn.WriteMessage(websocket.TextMessage, msg)
+			_ = conn.WriteMessage(websocket.TextMessage, msg)
 		}
 
 		// Keep connection open until client closes it
@@ -121,7 +121,7 @@ func TestWSClient_Reconnection(t *testing.T) {
 		mu.Unlock()
 
 		// Immediately close to trigger reconnection logic
-		conn.Close()
+		_ = conn.Close()
 	}))
 	defer ts.Close()
 
@@ -152,7 +152,7 @@ func TestWSClient_UpdateEndpoint(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		for {
 			if _, _, err := conn.ReadMessage(); err != nil {
 				break
@@ -166,7 +166,7 @@ func TestWSClient_UpdateEndpoint(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		for {
 			if _, _, err := conn.ReadMessage(); err != nil {
 				break
@@ -176,7 +176,7 @@ func TestWSClient_UpdateEndpoint(t *testing.T) {
 	defer ts2.Close()
 
 	client := NewWSClient(ts1.URL, "secret1")
-	client.Start(context.Background())
+	_ = client.Start(context.Background())
 
 	// give it a moment to connect
 	time.Sleep(100 * time.Millisecond)

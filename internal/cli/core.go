@@ -153,8 +153,12 @@ func writeCoreResult(out io.Writer, format outputFormat, result any) error {
 	case service.CoreStatus:
 		if format == outputFormatTable {
 			w := newTabWriter(out)
-			fmt.Fprintln(w, "MODE\tVERSION\tRUNNING\tINSTALLED\tRUNTIME\tSERVICE\tAUTOSTART\tSYSTEM_PROXY\tTUN\tRECOVERY")
-			fmt.Fprintf(w, "%s\t%s\t%t\t%s\t%s\t%t\t%t\t%t\t%t\t%t\n", value.Mode, value.Version, value.Running, strings.Join(value.Installed, ","), value.Runtime, value.ServiceInstalled, value.AutoStart, value.SystemProxy, value.TUN, value.RecoveryPending)
+			if _, err := fmt.Fprintln(w, "MODE\tVERSION\tRUNNING\tINSTALLED\tRUNTIME\tSERVICE\tAUTOSTART\tSYSTEM_PROXY\tTUN\tRECOVERY"); err != nil {
+				return err
+			}
+			if _, err := fmt.Fprintf(w, "%s\t%s\t%t\t%s\t%s\t%t\t%t\t%t\t%t\t%t\n", value.Mode, value.Version, value.Running, strings.Join(value.Installed, ","), value.Runtime, value.ServiceInstalled, value.AutoStart, value.SystemProxy, value.TUN, value.RecoveryPending); err != nil {
+				return err
+			}
 			return w.Flush()
 		}
 		_, err := fmt.Fprintf(out, "%s %s %t %s %s %t %t %t %t %t\n", value.Mode, value.Version, value.Running, strings.Join(value.Installed, ","), value.Runtime, value.ServiceInstalled, value.AutoStart, value.SystemProxy, value.TUN, value.RecoveryPending)
@@ -162,9 +166,13 @@ func writeCoreResult(out io.Writer, format outputFormat, result any) error {
 	case coreinfra.Release:
 		if format == outputFormatTable {
 			w := newTabWriter(out)
-			fmt.Fprintln(w, "VERSION\tASSET\tSIZE\tSHA256\tROUTE")
+			if _, err := fmt.Fprintln(w, "VERSION\tASSET\tSIZE\tSHA256\tROUTE"); err != nil {
+				return err
+			}
 			for _, asset := range value.Assets {
-				fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\n", value.Tag, asset.Name, asset.Size, asset.Digest, value.Route)
+				if _, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\n", value.Tag, asset.Name, asset.Size, asset.Digest, value.Route); err != nil {
+					return err
+				}
 			}
 			return w.Flush()
 		}
@@ -177,8 +185,12 @@ func writeCoreResult(out io.Writer, format outputFormat, result any) error {
 	case map[string]string:
 		if format == outputFormatTable {
 			w := newTabWriter(out)
-			fmt.Fprintln(w, "ACTION\tSTAGE\tVERSION\tROUTE\tRESULT")
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", value["action"], value["stage"], value["version"], value["route"], value["result"])
+			if _, err := fmt.Fprintln(w, "ACTION\tSTAGE\tVERSION\tROUTE\tRESULT"); err != nil {
+				return err
+			}
+			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", value["action"], value["stage"], value["version"], value["route"], value["result"]); err != nil {
+				return err
+			}
 			return w.Flush()
 		}
 		_, err := fmt.Fprintf(out, "%s %s %s %s %s\n", value["action"], value["stage"], value["version"], value["route"], value["result"])

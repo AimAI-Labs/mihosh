@@ -80,12 +80,12 @@ func (s *CoreService) ServiceAction(ctx context.Context, action string) error {
 			if e != nil {
 				return e
 			}
-			defer input.Close()
+			defer func() { _ = input.Close() }()
 			output, e := os.CreateTemp(dir, ".service-install-*")
 			if e != nil {
 				return e
 			}
-			defer os.Remove(output.Name())
+			defer func() { _ = os.Remove(output.Name()) }()
 			_, copyErr := io.Copy(output, input)
 			syncErr := output.Sync()
 			closeErr := output.Close()
@@ -117,7 +117,7 @@ func (s *CoreService) ServiceAction(ctx context.Context, action string) error {
 				if _, err = api.NewClient(endpoint, 500).GetVersion(); err == nil {
 					connection, dialErr := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", endpoint.MixedPort), 250*time.Millisecond)
 					if dialErr == nil {
-						connection.Close()
+						_ = connection.Close()
 						return nil
 					}
 				}

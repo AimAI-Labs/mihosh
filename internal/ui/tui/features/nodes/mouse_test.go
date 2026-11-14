@@ -53,7 +53,7 @@ func TestHandleMouseLeft_ProxyDoubleClickExecutesSwitch(t *testing.T) {
 		t.Fatalf("expected nil cmd for first click")
 	}
 
-	next, cmd = next.HandleMouseLeft(x, y, 78, 24)
+	_, cmd = next.HandleMouseLeft(x, y, 78, 24)
 	if cmd == nil {
 		t.Fatalf("expected non-nil cmd for proxy double click")
 	}

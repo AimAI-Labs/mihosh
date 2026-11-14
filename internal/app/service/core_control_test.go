@@ -52,6 +52,6 @@ func TestLocalControlRejectsWrongToken(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer incorrect-token")
 	response, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	require.Equal(t, http.StatusUnauthorized, response.StatusCode)
 }

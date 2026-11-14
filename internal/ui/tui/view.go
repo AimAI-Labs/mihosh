@@ -25,10 +25,6 @@ func (m Model) View() string {
 	if contentHeight < common.MinContentHeight {
 		contentHeight = common.MinContentHeight
 	}
-	mainWidth := m.width
-	if mainWidth < common.MinMainWidth {
-		mainWidth = common.MinMainWidth
-	}
 
 	// ── 顶部导航 ──
 	topNav := layout.RenderTopNav(m.currentPage, m.width, layout.TopNavRefreshStatus{

@@ -57,7 +57,7 @@ func TestCoreRealBackgroundAndNetworkGuard(t *testing.T) {
 		l, e := net.Listen("tcp", "127.0.0.1:0")
 		require.NoError(t, e)
 		port := l.Addr().(*net.TCPAddr).Port
-		l.Close()
+		_ = l.Close()
 		return port
 	}
 	require.NoError(t, frontend.SetPorts(freePort(), freePort()))

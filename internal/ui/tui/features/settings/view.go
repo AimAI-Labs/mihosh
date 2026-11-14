@@ -378,7 +378,7 @@ func renderSettingItem(state PageState, index int, key string, label string, wid
 		Foreground(common.TokyoMuted()).
 		PaddingRight(1)
 
-	selectedLabelStyle := labelStyle.Copy().
+	selectedLabelStyle := labelStyle.
 		Foreground(common.TokyoCyan()).
 		Bold(true)
 
@@ -560,9 +560,6 @@ func renderLogLevelTabs(current string, editMode bool) string {
 	modes := []string{"info", "warning", "error", "debug", "silent"}
 	return renderEnumTabs(current, modes, editMode)
 }
-
-// settingsTabBarHeight 标签栏（带圆角边框）的渲染高度：上边框 / 内容行 / 下边框。
-const settingsTabBarHeight = 3
 
 // settingsTabBarContentY 标签栏内容行（可点击行）相对页面内容顶部的 Y 坐标。
 // 布局：上边框(0) → 内容行位于 pageY=1。

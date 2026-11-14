@@ -191,7 +191,7 @@ func (r Release) SelectAsset(goos, arch string) (Asset, error) {
 				continue
 			}
 			channel := strings.TrimPrefix(r.Tag, "Prerelease-")
-			if r.Tag != version && !(r.Prerelease && (channel == "Alpha" || channel == "Beta") && strings.HasPrefix(version, strings.ToLower(channel)+"-")) {
+			if r.Tag != version && (!r.Prerelease || channel != "Alpha" && channel != "Beta" || !strings.HasPrefix(version, strings.ToLower(channel)+"-")) {
 				continue
 			}
 			if match.Name != "" {

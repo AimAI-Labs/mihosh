@@ -125,9 +125,9 @@ func writeProxyOn(stdout, stderr io.Writer, addr string) {
 	state, current := detectProxyState()
 	switch state {
 	case proxyStateFull:
-		fmt.Fprintln(stderr, proxySuccessStyle().Render(i18n.Tf("cli.proxy.already_on", current)))
+		_, _ = fmt.Fprintln(stderr, proxySuccessStyle().Render(i18n.Tf("cli.proxy.already_on", current)))
 	case proxyStatePartial:
-		fmt.Fprintln(stderr, proxyHintStyle().Render(i18n.Tf("cli.proxy.partial_on", addr)))
+		_, _ = fmt.Fprintln(stderr, proxyHintStyle().Render(i18n.Tf("cli.proxy.partial_on", addr)))
 	}
 
 	// eval 语句 → stdout。
@@ -140,9 +140,9 @@ func writeProxyOff(stdout, stderr io.Writer) {
 	state, current := detectProxyState()
 	switch state {
 	case proxyStateNone:
-		fmt.Fprintln(stderr, proxySuccessStyle().Render(i18n.T("cli.proxy.not_on")))
+		_, _ = fmt.Fprintln(stderr, proxySuccessStyle().Render(i18n.T("cli.proxy.not_on")))
 	default: // Full 或 Partial 都提示"即将关闭"。
-		fmt.Fprintln(stderr, proxyHintStyle().Render(i18n.Tf("cli.proxy.will_off", current)))
+		_, _ = fmt.Fprintln(stderr, proxyHintStyle().Render(i18n.Tf("cli.proxy.will_off", current)))
 	}
 
 	// 总是输出 unset 语句（幂等：未设置时 unset 也无副作用）。
@@ -153,10 +153,10 @@ func writeProxyOff(stdout, stderr io.Writer) {
 // bash 与 zsh 的 export/unset 语法完全兼容，输出统一。
 func renderProxyOnStatements(w io.Writer, addr, noProxy string) {
 	for _, name := range proxyEnvVars {
-		fmt.Fprintf(w, "export %s=%s\n", name, shellQuote(addr))
+		_, _ = fmt.Fprintf(w, "export %s=%s\n", name, shellQuote(addr))
 	}
 	for _, name := range noProxyEnvVars {
-		fmt.Fprintf(w, "export %s=%s\n", name, shellQuote(noProxy))
+		_, _ = fmt.Fprintf(w, "export %s=%s\n", name, shellQuote(noProxy))
 	}
 }
 
@@ -164,7 +164,7 @@ func renderProxyOnStatements(w io.Writer, addr, noProxy string) {
 func renderProxyOffStatements(w io.Writer) {
 	allVars := append(append([]string{}, proxyEnvVars...), noProxyEnvVars...)
 	for _, name := range allVars {
-		fmt.Fprintf(w, "unset %s\n", name)
+		_, _ = fmt.Fprintf(w, "unset %s\n", name)
 	}
 }
 

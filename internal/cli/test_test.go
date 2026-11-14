@@ -24,18 +24,18 @@ func TestCurrentNodeAndChainUseOneSnapshot(t *testing.T) {
 		switch {
 		case r.URL.IsAbs():
 			// Act as the local outbound-IP proxy too; no external request is sent.
-			io.WriteString(w, `{"query":"203.0.113.1","status":"success"}`)
+			_, _ = io.WriteString(w, `{"query":"203.0.113.1","status":"success"}`)
 		case r.URL.Path == "/proxies":
 			snapshots.Add(1)
-			io.WriteString(w, `{"proxies":{"GLOBAL":{"now":"Proxy","all":["Proxy"]},"Proxy":{"now":"first","all":["first"]},"first":{}}}`)
+			_, _ = io.WriteString(w, `{"proxies":{"GLOBAL":{"now":"Proxy","all":["Proxy"]},"Proxy":{"now":"first","all":["first"]},"first":{}}}`)
 		case r.URL.Path == "/proxies/first/delay":
-			io.WriteString(w, `{"delay":42}`)
+			_, _ = io.WriteString(w, `{"delay":42}`)
 		case strings.HasPrefix(r.URL.Path, "/proxies/"):
 			individual.Add(1)
 			if strings.HasSuffix(r.URL.Path, "/GLOBAL") {
-				io.WriteString(w, `{"now":"changed-after-test"}`)
+				_, _ = io.WriteString(w, `{"now":"changed-after-test"}`)
 			} else {
-				io.WriteString(w, `{}`)
+				_, _ = io.WriteString(w, `{}`)
 			}
 		default:
 			http.Error(w, "unexpected request", http.StatusBadRequest)

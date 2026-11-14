@@ -130,7 +130,7 @@ func RunService(ctx context.Context, _ string, run func(context.Context, func())
 		}
 		conn, err := net.Dial("unixgram", address)
 		if err == nil {
-			defer conn.Close()
+			defer func() { _ = conn.Close() }()
 			_, _ = conn.Write([]byte("READY=1"))
 		}
 	})
