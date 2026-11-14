@@ -8,6 +8,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -393,4 +394,9 @@ func (s State) Leave() State {
 	}
 	s.args = nil
 	return s
+}
+
+// InputCapture declares which input belongs to the current page mode.
+func (s State) InputCapture() common.InputCapture {
+	return common.InputCapture{Active: s.Editing, Help: s.Editing}
 }

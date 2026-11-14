@@ -865,3 +865,8 @@ func (s *State) ResolveActiveGroupName() string {
 	}
 	return ""
 }
+
+// InputCapture declares which input belongs to the current page mode.
+func (s State) InputCapture() common.InputCapture {
+	return common.InputCapture{Active: s.NodeFilterMode, Interrupt: s.NodeFilterMode}
+}

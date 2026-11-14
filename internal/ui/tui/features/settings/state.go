@@ -962,3 +962,8 @@ func (s State) SyncSysStatus(width, height int, cfg *config.Config, sysLogs []mo
 
 	return s
 }
+
+// InputCapture declares which input belongs to the current page mode.
+func (s State) InputCapture() common.InputCapture {
+	return common.InputCapture{Active: s.editMode, Interrupt: s.editMode}
+}

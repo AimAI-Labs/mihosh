@@ -121,19 +121,13 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.currentPage == layout.PageCore && m.coreState.Editing {
-		return m.dispatchToPage(msg)
-	}
-	// 全局帮助
-	if msg.String() == "?" {
+	capture := m.pageInputCapture()
+	if msg.String() == "?" && !capture.Help {
 		m.helpState = help.State{}
 		m.showHelp = true
 		return m, nil
 	}
-
-	// 输入捕获模式：当前页面正在编辑/过滤时，优先分发按键到页面，
-	// 避免全局快捷键（如 q/r/a/t/s/c）拦截输入字符。
-	if m.isInputCapturing() {
+	if capture.Active && (msg.String() != "ctrl+c" || capture.Interrupt) {
 		return m.dispatchToPage(msg)
 	}
 
@@ -221,25 +215,23 @@ func (m Model) dispatchToPage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// isInputCapturing 判断当前页面是否处于会捕获按键的输入/过滤模式。
-// 处于这些模式时，所有按键必须分发到页面用于文本输入或弹窗操作，
-// 避免被全局快捷键（q/r/a/t/s/c 等）拦截。
-func (m Model) isInputCapturing() bool {
+// pageInputCapture asks the page to own its mode-specific input rules.
+func (m Model) pageInputCapture() common.InputCapture {
 	switch m.currentPage {
 	case layout.PageCore:
-		return m.coreState.Editing
+		return m.coreState.InputCapture()
 	case layout.PageNodes:
-		return m.nodesState.NodeFilterMode
+		return m.nodesState.InputCapture()
 	case layout.PageConnections:
-		return m.connsState.FilterMode()
+		return m.connsState.InputCapture()
 	case layout.PageLogs:
-		return m.logsState.FilterMode()
+		return m.logsState.InputCapture()
 	case layout.PageRules:
-		return m.rulesState.FilterMode() || m.rulesState.ShowTypeFilter() || m.rulesState.ShowAddForm() || m.rulesState.ShowDeleteConfirm()
+		return m.rulesState.InputCapture()
 	case layout.PageSub:
-		return m.subState.Querying()
+		return m.subState.InputCapture()
 	case layout.PageSettings:
-		return m.settingsState.IsEditing()
+		return m.settingsState.InputCapture()
 	}
-	return false
+	return common.InputCapture{}
 }

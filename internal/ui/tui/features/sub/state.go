@@ -462,3 +462,8 @@ func (s *State) updateFiltered() {
 		s.filteredIdx = append(s.filteredIdx, i)
 	}
 }
+
+// InputCapture declares which input belongs to the current page mode.
+func (s State) InputCapture() common.InputCapture {
+	return common.InputCapture{Active: s.Querying(), Interrupt: s.Querying()}
+}
