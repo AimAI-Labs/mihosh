@@ -31,6 +31,8 @@ type State struct {
 	choice            int
 	formSelection     int
 	formScroll        int
+	dialogScroll      int
+	formFollowFocus   bool
 	scroll            int
 	tab               int
 	selected          int
@@ -293,7 +295,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		}
 	case messages.PageMouseScrollMsg:
 		if s.Editing {
-			return s, nil
+			return s.scrollForm(msg)
 		}
 		if s.tab == 1 {
 			return s.scrollReleasePage(msg)

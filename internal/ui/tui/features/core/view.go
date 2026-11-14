@@ -18,13 +18,14 @@ type actionHit struct {
 }
 
 type pageLayout struct {
-	content  string
-	actions  []actionHit
-	tabs     []actionHit
-	focusY   int
-	releases []actionHit
-	controls []releaseControl
-	listRows int
+	content                 string
+	actions                 []actionHit
+	tabs                    []actionHit
+	focusY                  int
+	releases                []actionHit
+	controls                []releaseControl
+	listRows                int
+	scrollOffset, maxScroll int
 }
 
 func wrap(text string, width int) string {

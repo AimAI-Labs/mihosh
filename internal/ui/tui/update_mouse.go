@@ -47,6 +47,10 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if m.pageInputCapture().Active {
 		pageX, pageY, pageWidth, pageHeight, ok := m.resolveMainPageMouseHit(msg.X, msg.Y)
 		if !ok {
+			if m.currentPage == layout.PageCore && isMouseLeftPress(msg) {
+				pageWidth, pageHeight = m.getPageSize()
+				return m.dispatchToPage(messages.PageMouseClickMsg{X: -1, Y: -1, Width: pageWidth, Height: pageHeight})
+			}
 			return m, nil
 		}
 		switch {

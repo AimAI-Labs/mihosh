@@ -58,7 +58,17 @@ func (s State) formDialog(width, height int) (pageLayout, int) {
 	lines := strings.Split(page.content, "\n")
 	budget := max(1, height-5)
 	body := lines[1 : len(lines)-1]
-	offset := max(0, min(page.focusY-budget, len(body)-budget))
+	page.maxScroll = max(0, len(body)-budget)
+	offset := max(0, min(s.dialogScroll, page.maxScroll))
+	if s.formFollowFocus {
+		if page.focusY-1 < offset {
+			offset = max(0, page.focusY-1)
+		}
+		if page.focusY > offset+budget {
+			offset = min(page.maxScroll, page.focusY-budget)
+		}
+	}
+	page.scrollOffset = offset
 	body = body[offset:min(len(body), offset+budget)]
 	// Retain the frame and a fixed hint when scrolling a tall form or menu.
 	page.content = strings.Join(append(append([]string{lines[0]}, body...),
@@ -92,10 +102,14 @@ func (s State) overlayForm(base string, width, height int) string {
 }
 
 func (s State) clickForm(msg messages.PageMouseClickMsg) (State, tea.Cmd) {
-	if msg.X < 0 || msg.X >= msg.Width || msg.Y < 0 || msg.Y >= msg.Height {
+	if msg.Width <= 0 || msg.Height <= 0 {
 		return s, nil
 	}
 	page, _ := s.formDialog(msg.Width, msg.Height)
+	left, top, right, bottom := dialog.New(page.content, msg.Width, msg.Height).Clipped().Bounds()
+	if msg.X < left || msg.X >= right || msg.Y < top || msg.Y >= bottom {
+		return s.closeForm(), nil
+	}
 	for _, hit := range page.actions {
 		if msg.X >= hit.x && msg.X < hit.x+hit.width && msg.Y >= hit.y && msg.Y < hit.y+hit.height {
 			if s.form == "service" {
@@ -104,6 +118,7 @@ func (s State) clickForm(msg messages.PageMouseClickMsg) (State, tea.Cmd) {
 			}
 			s.fields[s.focus].Blur()
 			s.focus = hit.index
+			s.formFollowFocus = true
 			return s, s.fields[s.focus].Focus()
 		}
 	}
@@ -117,5 +132,20 @@ func (s State) clickForm(msg messages.PageMouseClickMsg) (State, tea.Cmd) {
 			return s, nil
 		}
 	}
+	return s, nil
+}
+
+func (s State) scrollForm(msg messages.PageMouseScrollMsg) (State, tea.Cmd) {
+	page, _ := s.formDialog(msg.Width, msg.Height)
+	left, top, right, bottom := dialog.New(page.content, msg.Width, msg.Height).Clipped().Bounds()
+	if msg.X < left || msg.X >= right || msg.Y < top || msg.Y >= bottom {
+		return s, nil
+	}
+	delta := 1
+	if msg.Up {
+		delta = -1
+	}
+	s.dialogScroll = max(0, min(page.maxScroll, page.scrollOffset+delta))
+	s.formFollowFocus = false
 	return s, nil
 }

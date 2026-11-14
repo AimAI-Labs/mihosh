@@ -153,7 +153,7 @@ func TestCoreSettingsDialogsBlockGlobalNavigationAndMouse(t *testing.T) {
 			{X: 5, Y: 1, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress},
 		} {
 			next, cmd := m.Update(mouse)
-			if next.(Model).currentPage != layout.PageCore || !next.(Model).coreState.Editing || cmd != nil {
+			if next.(Model).currentPage != layout.PageCore || next.(Model).coreState.Editing == isMouseLeftPress(mouse) || cmd != nil {
 				t.Fatal("mouse navigation escaped the settings dialog")
 			}
 		}

@@ -20,6 +20,7 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 		s.Err, s.task = nil, ""
 	}
 	s.formErr = nil
+	s.dialogScroll, s.formFollowFocus = 0, true
 	s.formSelection, s.formScroll = s.selected, s.scroll
 	s.form, s.Editing, s.choice = kind, true, 0
 	s.fields, s.args = nil, nil
@@ -114,6 +115,7 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 	return s, textinput.Blink
 }
 func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
+	s.formFollowFocus = true
 	if s.form == "system-proxy" || s.form == "tun" || s.form == "configure" || s.form == "recover" {
 		switch msg.String() {
 		case "esc":
@@ -217,6 +219,7 @@ func (s State) closeForm() State {
 	s.Editing, s.form = false, ""
 	s.fields, s.args, s.formErr = nil, nil, nil
 	s.focus, s.choice, s.formSelection, s.formScroll = 0, 0, 0, 0
+	s.dialogScroll, s.formFollowFocus = 0, false
 	return s
 }
 

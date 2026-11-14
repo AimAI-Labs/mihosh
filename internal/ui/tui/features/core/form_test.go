@@ -118,10 +118,10 @@ func TestAdvancedDialogsPreserveBackgroundAndMouseMatchesVisibleControls(t *test
 					if width == 120 && height == 30 && !strings.Contains(strings.Split(view, "\n")[1], i18n.T("core.tab.advanced")) {
 						t.Fatal("dialog replaced the original page")
 					}
-					// Clicking a background tab must not leave or execute an action.
-					next, cmd := s.Update(messages.PageMouseClickMsg{X: 3, Y: 1, Width: width, Height: height})
-					if next.tab != 2 || !next.Editing || next.Busy || cmd != nil {
-						t.Fatal("background tab received the click")
+					// Outside clicks dismiss without activating the page underneath.
+					next, cmd := s.Update(messages.PageMouseClickMsg{X: 0, Y: 0, Width: width, Height: height})
+					if next.tab != 2 || next.Editing || next.Busy || cmd != nil {
+						t.Fatal("outside click did not dismiss safely")
 					}
 					page, _ := s.formDialog(width, height)
 					if action == "service" {
@@ -142,6 +142,52 @@ func TestAdvancedDialogsPreserveBackgroundAndMouseMatchesVisibleControls(t *test
 						t.Fatal("visible dialog action did not execute")
 					}
 				}
+			}
+		}
+	}
+}
+
+func TestCoreDialogsScrollIndependentlyAndRestoreParentOnOutsideClick(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	i18n.Init()
+	svc := service.NewCoreService()
+	defer svc.Close()
+	for _, action := range []string{"network", "profile", "external", "service"} {
+		for _, width := range []int{24, 80, 120} {
+			s := NewState(svc).selectTab(2)
+			s.selected, s.scroll = 1, 3
+			s, _ = s.editForm(action)
+			parentScroll := s.scroll
+			before, _ := s.formDialog(width, 10)
+			wheel := messages.PageMouseScrollMsg{X: width / 2, Y: 5, Width: width, Height: 10}
+			s, _ = s.Update(wheel)
+			after, _ := s.formDialog(width, 10)
+			if before.maxScroll <= 0 || after.scrollOffset != before.scrollOffset+1 || s.scroll != parentScroll || s.Busy {
+				t.Fatalf("%s %d: dialog did not scroll independently", action, width)
+			}
+			for range 100 {
+				s, _ = s.Update(wheel)
+			}
+			after, _ = s.formDialog(width, 10)
+			if after.scrollOffset != after.maxScroll {
+				t.Fatal("dialog did not clamp at its end")
+			}
+			if action == "service" {
+				s, _ = s.Update(coreKey("down"))
+			} else {
+				s, _ = s.Update(tea.KeyMsg{Type: tea.KeyTab})
+			}
+			after, _ = s.formDialog(width, 10)
+			focus := s.focus
+			if action == "service" {
+				focus = s.selected
+			}
+			if after.actions[focus].height == 0 {
+				t.Fatal("keyboard focus remained outside the scrolled dialog")
+			}
+			s, cmd := s.Update(messages.PageMouseClickMsg{X: 0, Y: 0, Width: width, Height: 10})
+			if s.Editing || s.selected != 1 || s.scroll != 3 || s.fields != nil || s.dialogScroll != 0 || cmd != nil {
+				t.Fatal("outside close did not restore and clear dialog state")
 			}
 		}
 	}
