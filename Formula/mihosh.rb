@@ -1,26 +1,26 @@
 class Mihosh < Formula
   desc "Terminal UI management tool for mihomo"
   homepage "https://github.com/AimAI-Labs/mihosh"
-  version "2.0.0-rc.1"
+  version "2.0.0-rc.2"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/AimAI-Labs/mihosh/releases/download/v2.0.0-rc.1/mihosh-darwin-arm64.tar.gz"
-      sha256 "840a39fdd52a84ba190d024208b80615f3ed025f060d0e4f5fd8ac27577b352e"
+      url "https://github.com/AimAI-Labs/mihosh/releases/download/v2.0.0-rc.2/mihosh-darwin-arm64.tar.gz"
+      sha256 "96327ebb55ae549641ae95d89d88e1f7f3cbaa5af4535d95574cdeb6af951b97"
     else
-      url "https://github.com/AimAI-Labs/mihosh/releases/download/v2.0.0-rc.1/mihosh-darwin-amd64.tar.gz"
-      sha256 "657d9178abaf214f23c8289b8662c2875ae80b3bd892e61b982cce7c504ea4b3"
+      url "https://github.com/AimAI-Labs/mihosh/releases/download/v2.0.0-rc.2/mihosh-darwin-amd64.tar.gz"
+      sha256 "a7d1a126ff4f761d8b09a34179afd48c71ba3d7bbf43f0ff7d36a47c73eecd10"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/AimAI-Labs/mihosh/releases/download/v2.0.0-rc.1/mihosh-linux-arm64.tar.gz"
-      sha256 "de4411cf3102003a1b8505a64c53985dbbc433d4972bd1d70d8680e16d33844a"
+      url "https://github.com/AimAI-Labs/mihosh/releases/download/v2.0.0-rc.2/mihosh-linux-arm64.tar.gz"
+      sha256 "a824e99e9ec9b394e90c1f210607aa6062fe9bef736873c773b275455db22351"
     else
-      url "https://github.com/AimAI-Labs/mihosh/releases/download/v2.0.0-rc.1/mihosh-linux-amd64.tar.gz"
-      sha256 "baa13f06224507a3d10eea414113bcf05687900c4a2c3f120f2ec3b6a0e7c2ec"
+      url "https://github.com/AimAI-Labs/mihosh/releases/download/v2.0.0-rc.2/mihosh-linux-amd64.tar.gz"
+      sha256 "f2473965bbf0bf3d1eeaa5983a113a66a144d9b24215ee6501e1cbf1eb05791e"
     end
   end
 
