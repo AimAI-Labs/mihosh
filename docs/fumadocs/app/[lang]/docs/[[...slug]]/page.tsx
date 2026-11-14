@@ -11,6 +11,7 @@ import { notFound } from 'next/navigation';
 import { getMDXComponents } from '@/components/mdx';
 import type { Metadata } from 'next';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
+import { Card } from 'fumadocs-ui/components/card';
 import { gitConfig } from '@/lib/shared';
 
 export default async function Page(props: {
@@ -22,6 +23,9 @@ export default async function Page(props: {
 
   const MDX = page.data.body;
   const markdownUrl = getPageMarkdownUrl(page).url;
+  const MDXLink = createRelativeLink(source, page);
+  const localizeHref = (href?: string) =>
+    href?.replace(/^\/docs(?=\/|[?#]|$)/, `/${params.lang}/docs`);
 
   return (
     <DocsPage toc={page.data.toc} full={page.data.full}>
@@ -38,7 +42,12 @@ export default async function Page(props: {
         <MDX
           components={getMDXComponents({
             // this allows you to link to other pages with relative file paths
-            a: createRelativeLink(source, page),
+            a: ({ href, ...props }) => (
+              <MDXLink {...props} href={localizeHref(href)} />
+            ),
+            Card: (props: React.ComponentProps<typeof Card>) => (
+              <Card {...props} href={localizeHref(props.href)} />
+            ),
           })}
         />
       </DocsBody>
