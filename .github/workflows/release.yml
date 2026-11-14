@@ -154,11 +154,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          if git diff --quiet -- Formula/mihosh.rb; then
+          git add Formula/mihosh.rb
+          if git diff --cached --quiet -- Formula/mihosh.rb; then
             echo "Homebrew formula is already up to date."
             exit 0
           fi
 
-          git add Formula/mihosh.rb
           git commit -m "Update mihosh to ${GITHUB_REF_NAME}"
           git push origin HEAD:${DEFAULT_BRANCH}
