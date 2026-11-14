@@ -360,7 +360,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 					s.editValue = ""
 					s.editCursor = 0
 					if boolVal != s.mihomoConfig.AllowLan {
-						return s, tea.Batch(s.configSvc.SaveMihomoConfigField(s.client, "allow-lan", boolVal), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+						return s, tea.Batch(SaveMihomoConfigField(s.configSvc, s.client, "allow-lan", boolVal), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 					}
 					return s, nil
 				}
@@ -371,7 +371,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 					s.editValue = ""
 					s.editCursor = 0
 					if level != s.mihomoConfig.LogLevel {
-						return s, tea.Batch(s.configSvc.SaveMihomoConfigField(s.client, "log-level", level), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+						return s, tea.Batch(SaveMihomoConfigField(s.configSvc, s.client, "log-level", level), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 					}
 					return s, nil
 				}
@@ -420,14 +420,14 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 			if val, ok := resolveEnumMouseTarget(pageX, []string{"true", "false"}); ok {
 				boolVal := val == "true"
 				if boolVal != s.mihomoConfig.AllowLan {
-					return s, tea.Batch(s.configSvc.SaveMihomoConfigField(s.client, "allow-lan", boolVal), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+					return s, tea.Batch(SaveMihomoConfigField(s.configSvc, s.client, "allow-lan", boolVal), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 				}
 			}
 		}
 		if settingKey == "log-level" {
 			if level, ok := resolveEnumMouseTarget(pageX, []string{"info", "warning", "error", "debug", "silent"}); ok {
 				if level != s.mihomoConfig.LogLevel {
-					return s, tea.Batch(s.configSvc.SaveMihomoConfigField(s.client, "log-level", level), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+					return s, tea.Batch(SaveMihomoConfigField(s.configSvc, s.client, "log-level", level), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 				}
 			}
 		}
@@ -458,7 +458,7 @@ func (s State) handleEditMode(msg tea.KeyMsg) (State, tea.Cmd) {
 				val := s.editValue == "true"
 				s.editMode = false
 				s.editValue = ""
-				return s, tea.Batch(s.configSvc.SaveMihomoConfigField(s.client, "allow-lan", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+				return s, tea.Batch(SaveMihomoConfigField(s.configSvc, s.client, "allow-lan", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 			case msg.String() == "left", msg.String() == "right", msg.String() == "tab":
 				if s.editValue == "true" {
 					s.editValue = "false"
@@ -478,7 +478,7 @@ func (s State) handleEditMode(msg tea.KeyMsg) (State, tea.Cmd) {
 				val := s.editValue
 				s.editMode = false
 				s.editValue = ""
-				return s, tea.Batch(s.configSvc.SaveMihomoConfigField(s.client, "log-level", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+				return s, tea.Batch(SaveMihomoConfigField(s.configSvc, s.client, "log-level", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 			case msg.String() == "left":
 				matched := false
 				for i, l := range levels {
@@ -578,7 +578,7 @@ func (s State) handleEditMode(msg tea.KeyMsg) (State, tea.Cmd) {
 			s.editMode = false
 			s.editValue = ""
 			s.editCursor = 0
-			return s, tea.Batch(s.configSvc.SaveMihomoConfigField(s.client, settingKey, val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+			return s, tea.Batch(SaveMihomoConfigField(s.configSvc, s.client, settingKey, val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
 		}
 
 		if err := s.configSvc.SetConfigValue(settingKey, s.editValue); err != nil {

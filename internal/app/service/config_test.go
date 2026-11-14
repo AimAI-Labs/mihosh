@@ -1,12 +1,16 @@
 package service
 
 import (
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 )
 
 func managedConfigFile(t *testing.T, contents string) string {
@@ -49,40 +53,98 @@ func TestConfigReadRetainsDefaultFallback(t *testing.T) {
 	}
 }
 
-func TestConfigService_SaveMihomoConfigField_Success(t *testing.T) {
-	// We can't fully test success without mocking the file system and API client easily,
-	// but we can at least invoke it to make sure it doesn't panic.
-	s := NewConfigService()
-	cmd := s.SaveMihomoConfigField(nil, "test_key", "test_value")
-	if cmd == nil {
-		t.Fatal("expected a tea.Cmd, got nil")
+func TestConfigSaveWriteAndApplyOutcomes(t *testing.T) {
+	failure := errors.New("injected failure")
+	for _, tc := range []struct {
+		name                          string
+		pathErr, writeErr, restartErr error
+		status                        int
+		nilClient                     bool
+		writeOK, applied, wantErr     bool
+		order                         []string
+	}{
+		{"path failure", failure, nil, nil, 204, false, false, false, true, []string{"path"}},
+		{"write failure", nil, failure, nil, 204, false, false, false, true, []string{"path", "write"}},
+		{"restart success", nil, nil, nil, 500, false, true, true, false, []string{"path", "write", "restart"}},
+		{"fallback success", nil, nil, failure, 204, false, true, true, false, []string{"path", "write", "restart", "reload"}},
+		{"all apply methods fail", nil, nil, failure, 500, false, true, false, true, []string{"path", "write", "restart", "reload"}},
+		{"offline file-only save", nil, nil, failure, 204, true, true, false, false, []string{"path", "write", "restart"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			events := make(chan string, 4)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				events <- "reload"
+				if r.Method != http.MethodPut || r.URL.Path != "/configs" || r.URL.Query().Get("force") != "true" {
+					t.Errorf("unexpected apply request: %s %s", r.Method, r.URL)
+				}
+				w.WriteHeader(tc.status)
+			}))
+			defer server.Close()
+			client := api.NewClient(config.MihomoEndpoint{ExternalController: server.URL}, 1000)
+			if tc.nilClient {
+				client = nil
+			}
+			s := NewConfigService()
+			s.mihomoConfigPath = func() (string, error) { events <- "path"; return "config.yaml", tc.pathErr }
+			s.writeMihomoField = func(path, key string, value interface{}) error {
+				events <- "write"
+				if path != "config.yaml" || key != "mixed-port" || value != 7891 {
+					t.Errorf("write arguments changed: %s %s %v", path, key, value)
+				}
+				return tc.writeErr
+			}
+			s.restartMihomo = func() error { events <- "restart"; return tc.restartErr }
+			result := s.SaveMihomoConfigField(client, "mixed-port", 7891)
+			if result.WriteOK != tc.writeOK || result.Applied != tc.applied || (result.Err != nil) != tc.wantErr {
+				t.Fatalf("unexpected outcome: %+v", result)
+			}
+			var order []string
+			for len(events) > 0 {
+				order = append(order, <-events)
+			}
+			if !reflect.DeepEqual(order, tc.order) {
+				t.Fatalf("side effects=%v, want %v", order, tc.order)
+			}
+			if (tc.pathErr != nil || tc.writeErr != nil) && !errors.Is(result.Err, failure) {
+				t.Fatal("write/path error lost its cause")
+			}
+		})
 	}
-
-	// Invoking the returned tea.Msg would write to the actual config path or fail
-	// depending on the environment, so we just check it returns a function
-	// and doesn't crash on construction.
 }
 
-func TestConfigService_SaveMihomoConfigField_FirstLaunchWritesYAML(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("HOME", tempDir)
-	t.Setenv("USERPROFILE", tempDir)
-	t.Setenv("APPDATA", tempDir)
-	isolateMihomoDiscovery(t)
-
-	s := NewConfigService()
-	cmd := s.SaveMihomoConfigField(nil, "external-controller", "127.0.0.1:9090")
-	requireCmdNotNil := func() messages.MihomoConfigSavedMsg {
-		msg := cmd()
-		savedMsg, ok := msg.(messages.MihomoConfigSavedMsg)
-		if !ok {
-			t.Fatalf("expected MihomoConfigSavedMsg, got %T", msg)
-		}
-		return savedMsg
+func TestConfigFirstWriteSurvivesApplyFailure(t *testing.T) {
+	path := managedConfigFile(t, "")
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
 	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "offline", http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+	s := NewConfigService()
+	s.restartMihomo = func() error { return errors.New("restart unavailable") }
+	client := api.NewClient(config.MihomoEndpoint{ExternalController: server.URL}, 1000)
+	result := s.SaveMihomoConfigField(client, "external-controller", "127.0.0.1:9191")
+	if !result.WriteOK || result.Applied || result.Err == nil {
+		t.Fatalf("partial save lost its write fact: %+v", result)
+	}
+	data, err := config.ReadMihomoYAML(path)
+	if err != nil || data["external-controller"] != "127.0.0.1:9191" {
+		t.Fatalf("first write was not preserved: %v, %v", data, err)
+	}
+}
 
-	saved := requireCmdNotNil()
-	if !saved.WriteOK {
-		t.Errorf("expected WriteOK to be true on first launch save, got false (err: %v)", saved.Err)
+func TestConfigReloadRetainsAPIOnlyPolicy(t *testing.T) {
+	for _, status := range []int{http.StatusNoContent, http.StatusServiceUnavailable} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(status) }))
+		client := api.NewClient(config.MihomoEndpoint{ExternalController: server.URL}, 1000)
+		s := NewConfigService()
+		s.restartMihomo = func() error { t.Fatal("CLI reload attempted a service restart"); return nil }
+		s.writeMihomoField = func(string, string, interface{}) error { t.Fatal("reload attempted another write"); return nil }
+		result := s.ReloadMihomoConfig(client, "already-edited.yaml")
+		server.Close()
+		if !result.WriteOK || result.Applied != (status == http.StatusNoContent) || (result.Err == nil) != result.Applied {
+			t.Fatalf("unexpected API-only outcome: %+v", result)
+		}
 	}
 }

@@ -164,9 +164,9 @@ func reloadMihomoCore(configPath string) error {
 	}
 
 	client := loadClient(cfg)
-	if err := client.ReloadConfig(configPath); err != nil {
+	if result := service.NewConfigService().ReloadMihomoConfig(client, configPath); result.Err != nil {
 		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
-		fmt.Println(warnStyle.Render(i18n.Tf("cli.config.edit.reload_fail", err)))
+		fmt.Println(warnStyle.Render(i18n.Tf("cli.config.edit.reload_fail", result.Err)))
 		fmt.Println(warnStyle.Render(i18n.T("cli.config.edit.reload_fail_hint")))
 		return nil
 	}

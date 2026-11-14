@@ -8,16 +8,29 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 // ConfigService 配置管理服务
-type ConfigService struct{}
+type ConfigService struct {
+	mihomoConfigPath func() (string, error)
+	writeMihomoField func(string, string, interface{}) error
+	restartMihomo    func() error
+}
+
+// MihomoConfigSaveResult separates persisted data from runtime application.
+type MihomoConfigSaveResult struct {
+	WriteOK bool
+	Applied bool
+	Err     error
+}
 
 // NewConfigService 创建配置服务
 func NewConfigService() *ConfigService {
-	return &ConfigService{}
+	return &ConfigService{
+		mihomoConfigPath: config.GetMihomoConfigPathForWrite,
+		writeMihomoField: config.WriteMihomoField,
+		restartMihomo:    config.RestartMihomoService,
+	}
 }
 
 // LoadConfig 加载配置
@@ -95,35 +108,40 @@ func (s *ConfigService) ReadMihomoConfig() *model.MihomoConfig {
 	return mihomoCfg
 }
 
-// SaveMihomoConfigField 将单个字段写入 mihomo 物理配置文件并使其生效。
-// 流程：写 YAML -> systemctl restart（确保所有变更生效，含端口等不可热重载字段）。
-// 非 Linux 或 systemctl 不可用时降级为 API 热重载。
-func (s *ConfigService) SaveMihomoConfigField(client *api.Client, key string, value interface{}) tea.Cmd {
-	return func() tea.Msg {
-		path, err := config.GetMihomoConfigPathForWrite()
-		if err != nil {
-			return messages.MihomoConfigSavedMsg{Err: err}
-		}
-
-		if err := config.WriteMihomoField(path, key, value); err != nil {
-			return messages.MihomoConfigSavedMsg{Err: fmt.Errorf("write yaml failed: %w", err)}
-		}
-
-		// 优先 systemctl restart：确保端口等不可热重载字段也能生效
-		if err := config.RestartMihomoService(); err == nil {
-			return messages.MihomoConfigSavedMsg{WriteOK: true}
-		}
-
-		// 降级：API 热重载（非 Linux 或 systemctl 不可用时）
-		if client != nil {
-			if err := client.ReloadConfig(path); err != nil {
-				return messages.MihomoConfigSavedMsg{
-					Err:     fmt.Errorf("systemctl restart and API reload both failed: %w", err),
-					WriteOK: true,
-				}
-			}
-		}
-
-		return messages.MihomoConfigSavedMsg{WriteOK: true}
+// SaveMihomoConfigField writes YAML, then tries the legacy service restart before API reload.
+func (s *ConfigService) SaveMihomoConfigField(client *api.Client, key string, value interface{}) MihomoConfigSaveResult {
+	path, err := s.mihomoConfigPath()
+	if err != nil {
+		return MihomoConfigSaveResult{Err: err}
 	}
+	if err := s.writeMihomoField(path, key, value); err != nil {
+		return MihomoConfigSaveResult{Err: fmt.Errorf("write yaml failed: %w", err)}
+	}
+	return s.applyMihomoConfig(client, path, true)
+}
+
+// ReloadMihomoConfig applies an already-written file using the CLI's API-only policy.
+func (s *ConfigService) ReloadMihomoConfig(client *api.Client, path string) MihomoConfigSaveResult {
+	return s.applyMihomoConfig(client, path, false)
+}
+
+func (s *ConfigService) applyMihomoConfig(client *api.Client, path string, restartFirst bool) MihomoConfigSaveResult {
+	result := MihomoConfigSaveResult{WriteOK: true}
+	if restartFirst && s.restartMihomo() == nil {
+		result.Applied = true
+		return result
+	}
+	// An offline save retains the existing file-only success semantics.
+	if client == nil {
+		return result
+	}
+	if err := client.ReloadConfig(path); err != nil {
+		result.Err = err
+		if restartFirst {
+			result.Err = fmt.Errorf("systemctl restart and API reload both failed: %w", err)
+		}
+		return result
+	}
+	result.Applied = true
+	return result
 }

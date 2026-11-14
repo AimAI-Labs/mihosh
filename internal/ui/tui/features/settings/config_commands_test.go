@@ -32,3 +32,17 @@ func TestConfigReadAdapterBindsTargetAndKeepsFileMessage(t *testing.T) {
 		t.Fatal("nil-client read no longer produces file/default configuration")
 	}
 }
+
+func TestConfigWriteAdapterReportsWriteFailure(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	cfg := config.DefaultConfig
+	cfg.Core.Mode, cfg.Core.ExternalController = "external", "remote-controller"
+	if err := config.Save(&cfg); err != nil {
+		t.Fatal(err)
+	}
+	command := SaveMihomoConfigField(service.NewConfigService(), nil, "mixed-port", 7891)
+	result, ok := command().(messages.MihomoConfigSavedMsg)
+	if !ok || result.WriteOK || result.Err == nil {
+		t.Fatalf("write adapter lost failure semantics: %+v", result)
+	}
+}

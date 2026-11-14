@@ -2,14 +2,55 @@ package cli
 
 import (
 	"bytes"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	configpkg "github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCLIConfigReloadKeepsSuccessAndWarningOutput(t *testing.T) {
+	for _, status := range []int{http.StatusNoContent, http.StatusServiceUnavailable} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+			var requests atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests.Add(1)
+				if r.Method != http.MethodPut || r.URL.Path != "/configs" {
+					t.Errorf("unexpected reload request: %s %s", r.Method, r.URL)
+				}
+				w.WriteHeader(status)
+			}))
+			defer server.Close()
+			cfg := configpkg.DefaultConfig
+			cfg.Core.Mode, cfg.Core.ExternalController = "external", server.URL
+			require.NoError(t, configpkg.Save(&cfg))
+			out, err := os.CreateTemp(t.TempDir(), "reload-output")
+			require.NoError(t, err)
+			saved := os.Stdout
+			os.Stdout = out
+			t.Cleanup(func() { os.Stdout = saved; out.Close() })
+			require.NoError(t, reloadMihomoCore("already-edited.yaml"), "reload failure remains a warning after editing")
+			require.EqualValues(t, 1, requests.Load())
+			_, err = out.Seek(0, io.SeekStart)
+			require.NoError(t, err)
+			output, err := io.ReadAll(out)
+			require.NoError(t, err)
+			if status == http.StatusNoContent {
+				require.Contains(t, string(output), i18n.T("cli.config.edit.reload_success"))
+			} else {
+				require.Contains(t, string(output), i18n.T("cli.config.edit.reload_fail_hint"))
+			}
+		})
+	}
+}
 
 // isolateHostMihomoDiscovery 用空的 ps/systemctl 屏蔽宿主机环境，
 // 避免自动发现命中开发机上真实运行的 mihomo（Windows 不走进程发现）。
