@@ -54,10 +54,9 @@ const (
 )
 
 // NewState 初始化节点状态
-func NewState(client *api.Client, proxySvc *service.ProxyService, testURL string, timeout int) State {
+func NewState(client *api.Client, testURL string, timeout int) State {
 	return State{
 		client:   client,
-		proxySvc: proxySvc,
 		testURL:  testURL,
 		timeout:  timeout,
 	}
@@ -66,7 +65,6 @@ func NewState(client *api.Client, proxySvc *service.ProxyService, testURL string
 // State 节点页面完整状态
 type State struct {
 	client     *api.Client
-	proxySvc   *service.ProxyService
 	testURL    string
 	timeout    int
 	Mode       string // 运行模式 "Rule", "Global", "Direct", in mihomo API lowercase.
@@ -76,14 +74,10 @@ type State struct {
 	CurrentProxies []string
 	SelectedGroup  int
 	SelectedProxy  int
-	TestPending    int
-	Testing        bool
-	TestingTarget  string
-	TestAllActive  bool
-	TestAllPending []string
-	TestAllRunning []string
-	TestAllTotal   int
-	TestAllDone    int
+	Testing       bool
+	TestingTarget string
+	testBatch     service.TestBatch
+	batchMode     bool
 	// Ring Buffer for test results (success + failure)
 	TestResultsArr  [testResultCap]TestResultEntry
 	resultHead      int // 写入位置
@@ -202,8 +196,14 @@ func (s State) ToPageState(width, height int) PageState {
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 
 	switch msg := msg.(type) {
- case messages.CoreTargetChangedMsg:
-  if msg.Reset{return NewState(s.client,s.proxySvc,s.testURL,s.timeout),nil};return s,nil
+	case messages.CoreTargetChangedMsg:
+		if msg.Reset {
+			return NewState(s.client, s.testURL, s.timeout), nil
+		}
+		if msg.Invalidate {
+			return s.ResetTesting(), nil
+		}
+		return s, nil
 	case messages.PageMouseScrollMsg:
 		return s.HandleMouseScroll(msg.Up, msg.X, msg.Y, msg.Width, msg.Height), nil
 	case messages.PageMouseClickMsg:
@@ -277,20 +277,16 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	case key.Matches(msg, common.Keys.Test):
 		if len(display) > 0 && s.SelectedProxy < len(display) {
 			proxyName := display[s.SelectedProxy]
-			s = s.StartSingleTest(proxyName)
-			return s, TestProxy(s.client, proxyName, s.testURL, s.timeout)
+			return s.StartSingleTest(proxyName)
 		}
 
 	case key.Matches(msg, common.Keys.TestAll):
 		if len(s.CurrentProxies) > 0 {
-			s.Testing = true
+			s = s.ResetTesting()
 			s.clearTestResults()
 			s.ShowTestDetail = false
-			s.TestAllActive = true
-			s.TestAllPending = append([]string(nil), s.CurrentProxies...)
-			s.TestAllRunning = nil
-			s.TestAllTotal = len(s.CurrentProxies)
-			s.TestAllDone = 0
+			s.testBatch = service.NewTestBatch(s.CurrentProxies)
+			s.batchMode = true
 			return s.LaunchBatchTests()
 		}
 
@@ -608,126 +604,47 @@ func (s State) ApplyProxies(Proxies map[string]model.Proxy) State {
 	return s
 }
 
-// ApplyTestDone 单节点测速完成
-func (s State) ApplyTestDone(name string, delay int, err error, testURL string) State {
-	// 无论成功/失败都写入测速结果 ring buffer
-	entry := TestResultEntry{Name: name, Delay: delay, TestURL: testURL}
-	if err != nil {
-		entry.Error = err.Error()
+// CompleteTest applies one owned result and fills only the newly available slots.
+func (s State) CompleteTest(msg messages.TestDoneMsg) (State, tea.Cmd) {
+	if !s.testBatch.Complete(msg.BatchID, msg.TaskID) {
+		return s, nil
+	}
+	entry := TestResultEntry{Name: msg.Name, Delay: msg.Delay, TestURL: msg.TestURL}
+	if msg.Err != nil {
+		entry.Error = msg.Err.Error()
 	}
 	s.appendTestResult(entry)
-
-	if s.TestAllActive {
-		s.removeRunningTest(name)
-		s.TestAllDone++
-		if s.TestAllDone >= s.TestAllTotal {
-			s.Testing = false
-			s.TestingTarget = ""
-			s.TestAllActive = false
-			s.TestAllPending = nil
-			s.TestAllRunning = nil
-			s.TestAllTotal = 0
-			s.TestAllDone = 0
-			return s
-		}
-		s.Testing = true
-		s.updateBatchTestingTarget()
-		return s
+	if s.testBatch.Active() {
+		return s.LaunchBatchTests()
 	}
-	if s.TestPending > 0 {
-		s.TestPending--
-		if s.TestPending == 0 {
-			s.Testing = false
-			s.TestingTarget = ""
-		}
-	} else {
-		s.Testing = false
-		s.TestingTarget = ""
-	}
-	return s
-}
-
-// ApplyTestAllDone 批量测速完成
-func (s State) ApplyTestAllDone(results map[string]int) State {
-	for name, delay := range results {
-		entry := TestResultEntry{Name: name, Delay: delay}
-		if delay == -1 {
-			entry.Error = "timeout or error"
-		}
-		s.appendTestResult(entry)
-	}
+	s.testBatch.Cancel()
 	s.Testing = false
 	s.TestingTarget = ""
-	s.TestAllActive = false
-	s.TestAllPending = nil
-	s.TestAllRunning = nil
-	s.TestAllTotal = 0
-	s.TestAllDone = 0
-	return s
+	s.batchMode = false
+	return s, FetchProxies(s.client)
 }
 
-// ResetTesting 清空测速状态
+// ResetTesting invalidates queued work and any completion already in flight.
 func (s State) ResetTesting() State {
 	s.Testing = false
 	s.TestingTarget = ""
-	s.TestAllActive = false
-	s.TestAllPending = nil
-	s.TestAllRunning = nil
-	s.TestAllTotal = 0
-	s.TestAllDone = 0
-	s.TestPending = 0
+	s.testBatch.Cancel()
+	s.batchMode = false
 	return s
 }
 
-// launchBatchTests 启动/补位批量测速任务（受并发上限控制）
 func (s State) LaunchBatchTests() (State, tea.Cmd) {
-	if !s.TestAllActive || s.TestAllTotal == 0 {
-		return s, nil
+	var cmds []tea.Cmd
+	for _, task := range s.testBatch.Take() {
+		cmds = append(cmds, TestProxy(s.client, task, s.testURL, s.timeout))
 	}
-
-	slots := model.TestConcurrency - len(s.TestAllRunning)
-	if slots <= 0 || len(s.TestAllPending) == 0 {
-		s.updateBatchTestingTarget()
-		return s, nil
+	s.Testing = s.testBatch.Active()
+	s.TestingTarget = s.testBatch.Current()
+	if s.Testing && s.batchMode {
+		done, total := s.testBatch.Progress()
+		s.TestingTarget = fmt.Sprintf("%s（已完成 %d/%d）", s.TestingTarget, done, total)
 	}
-
-	cmds := make([]tea.Cmd, 0, slots)
-	for i := 0; i < slots && len(s.TestAllPending) > 0; i++ {
-		name := s.TestAllPending[0]
-		s.TestAllPending = s.TestAllPending[1:]
-		s.TestAllRunning = append(s.TestAllRunning, name)
-		cmds = append(cmds, TestProxy(s.client, name, s.testURL, s.timeout))
-	}
-
-	s.Testing = true
-	s.updateBatchTestingTarget()
 	return s, tea.Batch(cmds...)
-}
-
-func (s *State) updateBatchTestingTarget() {
-	if !s.Testing || !s.TestAllActive {
-		return
-	}
-	if len(s.TestAllRunning) == 0 {
-		if len(s.TestAllPending) > 0 {
-			s.TestingTarget = fmt.Sprintf("%s（已完成 %d/%d）", s.TestAllPending[0], s.TestAllDone, s.TestAllTotal)
-		} else {
-			s.TestingTarget = ""
-		}
-		return
-	}
-	s.TestingTarget = fmt.Sprintf("%s（已完成 %d/%d）", s.TestAllRunning[0], s.TestAllDone, s.TestAllTotal)
-}
-
-func (s *State) removeRunningTest(name string) {
-	for i, running := range s.TestAllRunning {
-		if running == name {
-			last := len(s.TestAllRunning) - 1
-			s.TestAllRunning[i] = s.TestAllRunning[last]
-			s.TestAllRunning = s.TestAllRunning[:last]
-			return
-		}
-	}
 }
 
 // updateCurrentProxies 更新当前策略组的节点列表（指针接收者，修改自身）
@@ -805,15 +722,10 @@ func (s *State) getProxyDelayUnsafe(name string) int {
 }
 
 // StartSingleTest 封装单节点测速的状态重置逻辑
-func (s State) StartSingleTest(proxyName string) State {
-	s.Testing = true
-	s.TestingTarget = proxyName
-	s.TestAllActive = false
-	s.TestAllPending = nil
-	s.TestAllRunning = nil
-	s.TestAllTotal = 0
-	s.TestAllDone = 0
-	return s
+func (s State) StartSingleTest(proxyName string) (State, tea.Cmd) {
+	s = s.ResetTesting()
+	s.testBatch = service.NewTestBatch([]string{proxyName})
+	return s.LaunchBatchTests()
 }
 
 // GetActiveProxyAndDelay 获取当前推断的活跃节点及其延时

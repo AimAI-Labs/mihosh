@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
@@ -62,8 +63,10 @@ type State struct {
 	timeout   int
 	chartData *model.ChartData
 	
-	testCtx    context.Context
-	testCancel context.CancelFunc
+	siteBatch       service.TestBatch
+	siteTestIndices []int
+	testCtx         context.Context
+	testCancel      context.CancelFunc
 }
 
 // NewState 初始化连接状态
@@ -119,6 +122,11 @@ func (s *State) CancelTest() {
 		s.testCancel()
 		s.testCancel = nil
 	}
+	s.siteBatch.Cancel()
+	s.siteTestIndices = nil
+	for i := range s.siteTests {
+		s.siteTests[i].Testing = false
+	}
 }
 
 // ToPageState 转换为渲染层所需的 PageState
@@ -167,7 +175,13 @@ func (s State) ToPageState(chartData *model.ChartData, width, height int) PageSt
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.CoreTargetChangedMsg:
-		if msg.Reset { s.CancelTest(); return NewState(msg.ProxyURL, model.DefaultSiteTests(), s.client, s.timeout, s.chartData), nil }
+		if msg.Reset {
+			s.CancelTest()
+			return NewState(msg.ProxyURL, model.DefaultSiteTests(), s.client, s.timeout, s.chartData), nil
+		}
+		if msg.Invalidate {
+			s.CancelTest()
+		}
 		return s.UpdateProxyAddr(msg.ProxyURL), nil
 
 	case messages.PageMouseScrollMsg:
@@ -234,14 +248,11 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case msg.String() == "s":
 			return s.triggerSiteTestByIndex(s.selectedSiteTest, s.timeout)
 		case msg.String() == "S":
-			if len(s.siteTests) > 0 {
-				for i := range s.siteTests {
-					s.siteTests[i].Testing = true
-				}
-				s.CancelTest()
-				s.testCtx, s.testCancel = context.WithCancel(context.Background())
-				return s, TestAllSites(s.testCtx, s.proxyAddr, s.siteTests, s.timeout)
+			indices := make([]int, len(s.siteTests))
+			for i := range indices {
+				indices[i] = i
 			}
+			return s.startSiteTests(indices, s.timeout)
 		case key.Matches(msg, common.Keys.Left):
 			if s.selectedSiteTest > 0 {
 				s.selectedSiteTest--
@@ -327,11 +338,7 @@ func (s State) triggerSiteTestByIndex(idx int, timeout int) (State, tea.Cmd) {
 	if idx < 0 || idx >= len(s.siteTests) {
 		return s, nil
 	}
-	s.CancelTest()
-	s.testCtx, s.testCancel = context.WithCancel(context.Background())
-	site := s.siteTests[idx]
-	s.siteTests[idx].Testing = true
-	return s, TestSiteDelay(s.testCtx, s.proxyAddr, site.Name, site.URL, timeout)
+	return s.startSiteTests([]int{idx}, timeout)
 }
 
 func (s *State) setConnViewMode(mode int) {

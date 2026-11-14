@@ -39,7 +39,6 @@ type Model struct {
 	// 基础设施
 	client     *api.Client
 	config     *config.Config
-	proxySvc   *service.ProxyService
 	configSvc  *service.ConfigService
 	connSvc    *service.ConnectionService
 	profileSvc *service.ProfileService
@@ -112,7 +111,6 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 		theme.SetTheme(cfg.Theme)
 	}
 
-	proxySvc := service.NewProxyService(client, testURL, timeout)
 	configSvc := service.NewConfigService()
 	connSvc := service.NewConnectionService(client)
 	coreSvc := service.NewCoreService()
@@ -136,7 +134,6 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 		coreSvc:              coreSvc,
 		coreState:            corepage.NewState(coreSvc),
 		config:               cfg,
-		proxySvc:             proxySvc,
 		configSvc:            configSvc,
 		connSvc:              connSvc,
 		profileSvc:           profileSvc,
@@ -149,7 +146,7 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 		wsCtx:                wsCtx,
 		wsCancel:             wsCancel,
 		ipResolver:           ipResolver,
-		nodesState:           nodes.NewState(client, proxySvc, testURL, timeout),
+		nodesState:           nodes.NewState(client, testURL, timeout),
 		connsState:           connections.NewState(config.MixedPortToProxyURL(endpoint.MixedPort), model.DefaultSiteTests(), client, timeout, chartData),
 		logsState:            logs.NewState(ipResolver),
 		rulesState:           newRulesState(),

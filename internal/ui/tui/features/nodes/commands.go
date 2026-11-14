@@ -3,7 +3,7 @@ package nodes
 import (
 	"fmt"
 
-	"github.com/AimAI-Labs/mihosh/internal/app/service" // Need for testAllProxies
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
@@ -39,51 +39,26 @@ func SelectProxy(client *api.Client, group, proxy string) tea.Cmd {
 	}
 }
 
-func TestProxy(client *api.Client, name, testURL string, timeout int) tea.Cmd {
-	return func() (msg tea.Msg) {
+func TestProxy(client *api.Client, task service.TestTask, testURL string, timeout int) tea.Cmd {
+	return messages.CoreRequest(client, func(client *api.Client) (msg tea.Msg) {
+		result := messages.TestDoneMsg{Name: task.Name, Delay: -1, TestURL: testURL, BatchID: task.BatchID, TaskID: task.Index}
 		defer func() {
 			if r := recover(); r != nil {
-				msg = messages.TestDoneMsg{Name: name, Delay: -1, Err: fmt.Errorf("panic in TestProxy: %v", r), TestURL: testURL}
+				result.Err = fmt.Errorf("panic in TestProxy: %v", r)
+				result.Delay = -1
 			}
+			msg = result
 		}()
-
 		if client == nil {
-			return messages.TestDoneMsg{Name: name, Delay: -1, Err: fmt.Errorf("client is nil"), TestURL: testURL}
+			result.Err = fmt.Errorf("client is nil")
+			return
 		}
-
-		delay, err := client.TestProxyDelay(name, testURL, timeout)
-		if err != nil {
-			return messages.TestDoneMsg{Name: name, Delay: -1, Err: err, TestURL: testURL}
+		result.Delay, result.Err = client.TestProxyDelay(task.Name, testURL, timeout)
+		if result.Err != nil {
+			result.Delay = -1
 		}
-		return messages.TestDoneMsg{Name: name, Delay: delay, Err: nil, TestURL: testURL}
-	}
-}
-
-func TestGroup(client *api.Client, group, testURL string, timeout int) tea.Cmd {
-	return func() tea.Msg {
-		if err := client.TestGroupDelay(group, testURL, timeout); err != nil {
-			return messages.ErrMsg{Err: err}
-		}
-		return messages.TestDoneMsg{}
-	}
-}
-
-func TestAllProxies(proxySvc *service.ProxyService, proxies []string) tea.Cmd {
-	return func() tea.Msg {
-		results := proxySvc.TestAllProxies(proxies)
-		return messages.TestAllDoneMsg{Results: results}
-	}
-}
-
-func LaunchBatchTests(client *api.Client, testURL string, timeout int, pending []string) tea.Cmd {
-	if len(pending) == 0 {
-		return nil
-	}
-	cmds := make([]tea.Cmd, 0, len(pending))
-	for _, name := range pending {
-		cmds = append(cmds, TestProxy(client, name, testURL, timeout))
-	}
-	return tea.Batch(cmds...)
+		return
+	})
 }
 
 func FetchConfigMode(client *api.Client) tea.Cmd {

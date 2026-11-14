@@ -2,7 +2,6 @@ package tui
 
 import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/help"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 
@@ -85,8 +84,9 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			if exists && activeProxy != "" && !m.nodesState.Testing {
 				// 粗略判断点击区域：假设状态栏左侧宽约 50 个字符 (包含运行状态和节点名称及延时)
 				if msg.X > 8 && msg.X < 50 {
-					m.nodesState = m.nodesState.StartSingleTest(activeProxy)
-					return m, nodes.TestProxy(m.client, activeProxy, m.testURL, m.timeout)
+					var cmd tea.Cmd
+					m.nodesState, cmd = m.nodesState.StartSingleTest(activeProxy)
+					return m, cmd
 				}
 			}
 			// 消费掉底栏的点击事件，防止误触发主页面内容

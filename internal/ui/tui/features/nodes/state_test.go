@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -22,29 +23,26 @@ func TestNodesState_TestAllStartsWithFirstProxyTarget(t *testing.T) {
 	if !strings.Contains(next.TestingTarget, "HK-01") {
 		t.Fatalf("expected TestingTarget contains first proxy, got %q", next.TestingTarget)
 	}
-	if !next.TestAllActive || next.TestAllTotal != 2 || len(next.TestAllRunning) != 2 {
-		t.Fatalf("expected concurrent batch state initialized, active=%v total=%d running=%d", next.TestAllActive, next.TestAllTotal, len(next.TestAllRunning))
+	_, total := next.testBatch.Progress()
+	if !next.testBatch.Active() || total != 2 {
+		t.Fatalf("expected active batch with two tasks, total=%d", total)
 	}
 }
 
 func TestNodesState_ApplyTestDone_AdvancesBatchTarget(t *testing.T) {
-	state := State{
-		Testing:        true,
-		TestingTarget:  "HK-01（已完成 0/2）",
-		TestAllActive:  true,
-		TestAllRunning: []string{"HK-01", "JP-01"},
-		TestAllTotal:   2,
-		TestAllDone:    0,
+	state := State{CurrentProxies: []string{"HK-01", "JP-01"}}
+	state, cmd := state.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	commands := cmd().(tea.BatchMsg)
+	for i, command := range commands {
+		result := command().(messages.TestDoneMsg)
+		result.Delay, result.Err = 123, nil
+		state, _ = state.CompleteTest(result)
+		if i == 0 && (!state.Testing || !strings.Contains(state.TestingTarget, "JP-01")) {
+			t.Fatalf("expected batch to continue with JP-01, target=%q", state.TestingTarget)
+		}
 	}
-
-	state = state.ApplyTestDone("HK-01", 123, nil, "http://test.url")
-	if !state.Testing || !strings.Contains(state.TestingTarget, "JP-01") {
-		t.Fatalf("expected batch to continue with JP-01, got Testing=%v target=%q", state.Testing, state.TestingTarget)
-	}
-
-	state = state.ApplyTestDone("JP-01", 101, nil, "http://test.url")
-	if state.Testing || state.TestingTarget != "" || state.TestAllActive {
-		t.Fatalf("expected batch to finish and clear status, got Testing=%v target=%q active=%v", state.Testing, state.TestingTarget, state.TestAllActive)
+	if state.Testing || state.TestingTarget != "" || state.testBatch.Active() {
+		t.Fatal("expected completed batch to clear testing status")
 	}
 }
 

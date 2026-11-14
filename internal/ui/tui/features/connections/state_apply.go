@@ -59,24 +59,6 @@ func (s State) ApplyConnections(resp *model.ConnectionsResponse) State {
 	return s
 }
 
-// ApplySiteTestResult 应用网站测速结果
-func (s State) ApplySiteTestResult(name string, delay int, err error) State {
-	for i := range s.siteTests {
-		if s.siteTests[i].Name == name {
-			s.siteTests[i].Testing = false
-			if err != nil {
-				s.siteTests[i].Delay = 0
-				s.siteTests[i].Error = "timeout"
-			} else {
-				s.siteTests[i].Delay = delay
-				s.siteTests[i].Error = ""
-			}
-			break
-		}
-	}
-	return s
-}
-
 // ApplyConnectionClosed 处理单连接关闭后的索引调整
 func (s State) ApplyConnectionClosed() State {
 	if s.filterList.Cursor > 0 {

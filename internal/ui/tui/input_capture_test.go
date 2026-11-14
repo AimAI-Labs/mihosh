@@ -22,7 +22,7 @@ func capturedPage(t *testing.T, name string) Model {
 		width: 120, height: 36, config: &config.Config{}, chartData: chart,
 		connsState: connections.NewState("", nil, nil, 0, chart),
 		logsState:  logs.NewState(nil).AppendLog("info", "first").AppendLog("info", "second"),
-		nodesState: nodes.NewState(nil, nil, "", 0), rulesState: newRulesStateWithRules(),
+		nodesState: nodes.NewState(nil, "", 0), rulesState: newRulesStateWithRules(),
 		subState:      sub.NewState(nil).ApplySubs([]profile.Profile{{UID: "a", Name: "first"}, {UID: "b", Name: "second"}}, ""),
 		settingsState: settings.NewState(nil, nil),
 	}

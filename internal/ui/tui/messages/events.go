@@ -54,10 +54,8 @@ type TestDoneMsg struct {
 	Delay   int
 	Err     error
 	TestURL string
-}
-
-type TestAllDoneMsg struct {
-	Results map[string]int
+	BatchID uint64
+	TaskID  int
 }
 
 // ========= Connections Messages =========
@@ -78,9 +76,11 @@ type IPInfoMsg struct {
 }
 
 type SiteTestMsg struct {
-	Name  string
-	Delay int
-	Err   error
+	Name    string
+	Delay   int
+	Err     error
+	BatchID uint64
+	TaskID  int
 }
 
 // ========= Rules Messages =========
@@ -355,6 +355,7 @@ type CoreConnectionMsg struct {
 
 type CoreTargetChangedMsg struct {
 	Reset      bool
+	Invalidate bool // In-flight requests are stale even when the endpoint is unchanged.
 	ConfigPath string
 	ProxyURL   string
 }

@@ -158,3 +158,60 @@ func TestAutoRefreshKeepsOneTargetAcrossRequests(t *testing.T) {
 	require.Zero(t, requestsB.Load())
 	require.Less(t, result.Generation, client.Generation())
 }
+
+func TestBatchResultsKeepTargetOwnershipAcrossReconnects(t *testing.T) {
+	var wrongRequests atomic.Int32
+	a := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"delay":42}`))
+	}))
+	defer a.Close()
+	b := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		wrongRequests.Add(1)
+		http.Error(w, "wrong target", http.StatusInternalServerError)
+	}))
+	defer b.Close()
+	for _, action := range []string{"sync", "restart", "switch", "switch-back"} {
+		t.Run(action, func(t *testing.T) {
+			m, _ := targetTestModel(t)
+			m.client = api.NewClient(config.MihomoEndpoint{ExternalController: a.URL}, 1000)
+			m.nodesState = nodes.NewState(m.client, "http://test.invalid", 1000)
+			var nodeCmd, siteCmd tea.Cmd
+			m.nodesState, nodeCmd = m.nodesState.StartSingleTest("node")
+			m.connsState = connections.NewState("", []model.SiteTest{{Name: "site", URL: a.URL}}, m.client, 1000, nil)
+			m.connsState, siteCmd = m.connsState.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("S")})
+			endpoint := m.client.EndpointSnapshot()
+			update := coreTargetSync
+			if action != "sync" {
+				update = coreTargetReconnect
+			}
+			if action == "switch" || action == "switch-back" {
+				endpoint.ExternalController = b.URL
+			}
+			m.updateCoreTarget(endpoint, update)
+			if action == "switch-back" {
+				endpoint.ExternalController = a.URL
+				m.updateCoreTarget(endpoint, coreTargetReconnect)
+			}
+			for _, command := range []tea.Cmd{nodeCmd, siteCmd} {
+				result := command()
+				_, bound := result.(messages.CoreHTTPMsg)
+				require.True(t, bound, "batch command must bind to a target before execution")
+				updated, follow := m.Update(result)
+				m = updated.(Model)
+				if action != "sync" {
+					require.Nil(t, follow, "stale completion must not schedule a refill or refresh")
+				}
+			}
+			if action == "sync" {
+				require.Len(t, m.nodesState.TestResults(), 1)
+			} else {
+				require.Empty(t, m.nodesState.TestResults())
+			}
+			require.False(t, m.nodesState.Testing, "reconnect must not leave an abandoned batch active")
+			for _, site := range m.connsState.ToPageState(nil, 100, 30).SiteTests {
+				require.False(t, site.Testing)
+			}
+			require.Zero(t, wrongRequests.Load())
+		})
+	}
+}

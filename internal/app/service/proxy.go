@@ -2,7 +2,6 @@ package service
 
 import (
 	"encoding/json"
-	"sync"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
@@ -47,37 +46,6 @@ func (s *ProxyService) TestProxyDelay(name string) (int, error) {
 // TestGroupDelay 测试策略组内所有节点延迟
 func (s *ProxyService) TestGroupDelay(group string) error {
 	return s.client.TestGroupDelay(group, s.testURL, s.timeout)
-}
-
-// TestAllProxies 批量测试代理延迟（返回每个代理的测试结果）
-func (s *ProxyService) TestAllProxies(proxies []string) map[string]int {
-	results := make(map[string]int)
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-
-	sem := make(chan struct{}, model.TestConcurrency)
-
-	for _, p := range proxies {
-		wg.Add(1)
-		go func(proxy string) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			delay, err := s.TestProxyDelay(proxy)
-
-			mu.Lock()
-			defer mu.Unlock()
-			if err != nil {
-				results[proxy] = -1 // 失败时记录为 -1
-			} else {
-				results[proxy] = delay
-			}
-		}(p)
-	}
-
-	wg.Wait()
-	return results
 }
 
 // GetNodeChain 获取当前活跃节点链路

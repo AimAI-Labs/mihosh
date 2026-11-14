@@ -273,21 +273,14 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(reenableMouse, reloadConfigCmd(m.client))
 
 	case messages.SiteTestMsg:
-		m.connsState = m.connsState.ApplySiteTestResult(msg.Name, msg.Delay, msg.Err)
+		var cmd tea.Cmd
+		m.connsState, cmd = m.connsState.CompleteSiteTest(msg)
+		return m, cmd
 
 	case messages.TestDoneMsg:
-		m.nodesState = m.nodesState.ApplyTestDone(msg.Name, msg.Delay, msg.Err, msg.TestURL)
-		// 如果是批量测速，需要补位
-		if m.nodesState.TestAllActive {
-			var batchCmd tea.Cmd
-			m.nodesState, batchCmd = m.nodesState.LaunchBatchTests()
-			return m, batchCmd
-		}
-		return m, nodes.FetchProxies(m.client)
-
-	case messages.TestAllDoneMsg:
-		m.nodesState = m.nodesState.ApplyTestAllDone(msg.Results)
-		return m, nodes.FetchProxies(m.client)
+		var cmd tea.Cmd
+		m.nodesState, cmd = m.nodesState.CompleteTest(msg)
+		return m, cmd
 
 	case messages.IPInfoMsg:
 		if msg.Info != nil {

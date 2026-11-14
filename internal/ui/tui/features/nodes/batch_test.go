@@ -56,7 +56,7 @@ func TestNodesBatchRespectsCapacity(t *testing.T) {
 		}
 	})
 	client := api.NewClient(config.MihomoEndpoint{ExternalController: server.URL}, 5000)
-	state := NewState(client, nil, "http://test.invalid", 5000)
+	state := NewState(client, "http://test.invalid", 5000)
 	state.CurrentProxies = names
 	state, cmd := state.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
 	launch := func(cmd tea.Cmd, count int) {
@@ -111,16 +111,54 @@ func TestNodesBatchRespectsCapacity(t *testing.T) {
 		case <-time.After(5 * time.Second):
 			t.Fatal("task did not finish")
 		}
-		state = state.ApplyTestDone(result.Name, result.Delay, result.Err, result.TestURL)
-		state, cmd = state.LaunchBatchTests()
+		state, cmd = state.CompleteTest(result)
 		if completed < total-model.TestConcurrency {
 			launch(cmd, 1)
 			awaitStart()
-		} else if cmd != nil {
+		} else if state.Testing && cmd != nil {
 			t.Fatal("draining batch launched unexpected work")
 		}
 	}
 	if peak.Load() != model.TestConcurrency || active.Load() != 0 || state.Testing {
 		t.Fatalf("peak=%d active=%d testing=%t", peak.Load(), active.Load(), state.Testing)
+	}
+}
+
+func TestNodeRetestRejectsOldAndDuplicateResults(t *testing.T) {
+	state := State{CurrentProxies: make([]string, model.TestConcurrency*5)}
+	state, cmd := state.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	old := cmd().(tea.BatchMsg)[0]().(messages.TestDoneMsg)
+	state, cmd = state.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	commands := cmd().(tea.BatchMsg)
+	state, cmd = state.CompleteTest(old)
+	if done, _ := state.testBatch.Progress(); done != 0 || len(state.TestResults()) != 0 || cmd != nil {
+		t.Fatal("old result advanced a new batch")
+	}
+	result := commands[len(commands)-1]().(messages.TestDoneMsg)
+	state, cmd = state.CompleteTest(result)
+	if done, _ := state.testBatch.Progress(); done != 1 || len(state.TestResults()) != 1 || cmd == nil {
+		t.Fatal("failed out-of-order result did not complete and refill one task")
+	}
+	if state.TestResults()[0].Error == "" {
+		t.Fatal("failed result was not retained")
+	}
+	state, cmd = state.CompleteTest(result)
+	if done, _ := state.testBatch.Progress(); done != 1 || len(state.TestResults()) != 1 || cmd != nil {
+		t.Fatal("duplicate result changed progress or results")
+	}
+	state, cmd = state.StartSingleTest("single")
+	single := cmd().(messages.TestDoneMsg)
+	state, cmd = state.CompleteTest(result)
+	if state.TestingTarget != "single" || cmd != nil {
+		t.Fatal("old batch result completed a new single test")
+	}
+	state, _ = state.CompleteTest(single)
+	if state.Testing || state.TestingTarget != "" || len(state.TestResults()) != 2 {
+		t.Fatal("single test did not finish")
+	}
+	state, _ = state.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	state = state.ResetTesting()
+	if _, cmd := state.LaunchBatchTests(); cmd != nil {
+		t.Fatal("cancelled batch launched waiting tasks")
 	}
 }

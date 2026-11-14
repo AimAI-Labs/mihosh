@@ -37,7 +37,7 @@ func (m *Model) updateCoreTarget(endpoint config.MihomoEndpoint, update coreTarg
 		}
 	}
 	path, _ := config.GetMihomoConfigPathForWrite()
-	changed := messages.CoreTargetChangedMsg{Reset: reset, ConfigPath: path, ProxyURL: config.MixedPortToProxyURL(endpoint.MixedPort)}
+	changed := messages.CoreTargetChangedMsg{Reset: reset, Invalidate: reset || update != coreTargetSync, ConfigPath: path, ProxyURL: config.MixedPortToProxyURL(endpoint.MixedPort)}
 	m.rulesState, _ = m.rulesState.Update(changed)
 	m.connsState, _ = m.connsState.Update(changed)
 	m.nodesState, _ = m.nodesState.Update(changed)

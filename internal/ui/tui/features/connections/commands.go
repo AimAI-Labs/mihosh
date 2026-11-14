@@ -161,14 +161,3 @@ func ConvertToConnectionsResponse(data api.ConnectionsData) *model.ConnectionsRe
 		Connections:   connections,
 	}
 }
-
-// TestAllSites 批量测试所有网站
-func TestAllSites(ctx context.Context, proxyAddr string, sites []model.SiteTest, timeout int) tea.Cmd {
-	return func() tea.Msg {
-		var cmds []tea.Cmd
-		for _, site := range sites {
-			cmds = append(cmds, TestSiteDelay(ctx, proxyAddr, site.Name, site.URL, timeout))
-		}
-		return tea.Batch(cmds...)()
-	}
-}

@@ -5,9 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -26,10 +26,9 @@ func TestNodesState_TestAllDoesNotPanic(t *testing.T) {
 		Secret:             "",
 	}
 	client := api.NewClient(endpoint, 2000)
-	proxySvc := service.NewProxyService(client, "http://www.gstatic.com/generate_204", 2000)
 
 	// 使用 NewState 初始化（和真实 TUI 一致）
-	state := NewState(client, proxySvc, "http://www.gstatic.com/generate_204", 2000)
+	state := NewState(client, "http://www.gstatic.com/generate_204", 2000)
 
 	// 模拟已经加载了节点数据
 	state.GroupNames = []string{"Auto", "Proxy"}
@@ -44,11 +43,11 @@ func TestNodesState_TestAllDoesNotPanic(t *testing.T) {
 	if !nextState.Testing {
 		t.Fatalf("expected Testing=true after pressing a")
 	}
-	if !nextState.TestAllActive {
+	if !nextState.testBatch.Active() {
 		t.Fatalf("expected TestAllActive=true")
 	}
-	if nextState.TestAllTotal != 5 {
-		t.Fatalf("expected TestAllTotal=5, got %d", nextState.TestAllTotal)
+	if _, total := nextState.testBatch.Progress(); total != 5 {
+		t.Fatalf("expected total=5, got %d", total)
 	}
 
 	// 验证 cmd 不为 nil（应该产生了批量测速命令）
@@ -81,20 +80,18 @@ func TestNodesState_TestAllDoesNotPanic(t *testing.T) {
 			}()
 			if subCmd != nil {
 				subMsg := subCmd()
-				t.Logf("sub cmd %d returned: %T", i, subMsg)
+				if bound, ok := subMsg.(messages.CoreHTTPMsg); ok {
+					subMsg = bound.Payload
+				}
+				nextState, _ = nextState.CompleteTest(subMsg.(messages.TestDoneMsg))
 			}
 		}()
-	}
-
-	// 模拟 TestDoneMsg 回来后的处理
-	for _, name := range []string{"HK-01", "JP-01", "SG-01", "US-01", "KR-01"} {
-		nextState = nextState.ApplyTestDone(name, 42, nil, "http://www.gstatic.com/generate_204")
 	}
 
 	if nextState.Testing {
 		t.Fatalf("expected Testing=false after all tests done")
 	}
-	if nextState.TestAllActive {
+	if nextState.testBatch.Active() {
 		t.Fatalf("expected TestAllActive=false after all tests done")
 	}
 
