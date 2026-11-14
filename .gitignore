@@ -51,6 +51,7 @@ docs/fumadocs/skills/
 docs/fumadocs/out/
 
 docs/proposals/*
+docs/refactoring/*
 
 docs/fumadocs/*.tsbuildinfo
 
