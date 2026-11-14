@@ -117,3 +117,20 @@ func TestNodesState_UpdateFilteredProxies(t *testing.T) {
 		t.Fatalf("fuzzy expected HK-01 (index 0), got %d", state.FilteredProxyIndices[0])
 	}
 }
+
+func TestNodeSearchKeepsWholeSubstringAndClearsOnEscape(t *testing.T) {
+	s := State{CurrentProxies: []string{"HK west SG", "HK SG", "other"}, NodeFilterMode: true, NodeFilter: "hk sg"}
+	s.updateFilteredProxies()
+	if len(s.FilteredProxyIndices) != 1 || s.FilteredProxyIndices[0] != 1 {
+		t.Fatalf("node search must match the whole substring: %v", s.FilteredProxyIndices)
+	}
+	s.NodeFilter = "中文"
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	if s.NodeFilter != "中" {
+		t.Fatalf("backspace split a Chinese character: %q", s.NodeFilter)
+	}
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if s.NodeFilterMode || s.NodeFilter != "" || len(s.displayProxies()) != 3 {
+		t.Fatal("node Escape must leave search and clear the query")
+	}
+}

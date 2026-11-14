@@ -131,13 +131,8 @@ func renderSearchBox(filterText string, filterMode bool, engine FilterEngine) st
 	if filterMode {
 		input += inputStyle.Render("█")
 	}
-	var engineIndicator string
-	switch engine {
-	case FilterRegex:
-		engineIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("#A855F7")).Render(" [RE]")
-	case FilterFuzzy:
-		engineIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B")).Render(" [Fuzzy]")
-	}
+	engineIndicator := common.RenderSearchEngineBadge(engine)
+
 	hint := ""
 	if filterText == "" {
 		switch engine {

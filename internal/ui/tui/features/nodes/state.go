@@ -2,7 +2,6 @@ package nodes
 
 import (
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -26,12 +25,12 @@ type TestResultEntry struct {
 	TestURL string // 测试的URL
 }
 
-type FilterEngine int
+type FilterEngine = common.SearchEngine
 
 const (
-	FilterEngineSubstring FilterEngine = iota
-	FilterEngineRegex
-	FilterEngineFuzzy
+	FilterEngineSubstring = common.SearchSubstring
+	FilterEngineRegex = common.SearchRegex
+	FilterEngineFuzzy = common.SearchFuzzy
 )
 
 // ProxySortOrder 节点列表排序方式
@@ -333,22 +332,6 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 // handleNodeFilterMode 搜索输入模式处理
 func (s State) handleNodeFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	switch {
-	case msg.Type == tea.KeyCtrlR:
-		if s.FilterEngine == FilterEngineRegex {
-			s.FilterEngine = FilterEngineSubstring
-		} else {
-			s.FilterEngine = FilterEngineRegex
-		}
-		s.updateFilteredProxies()
-		s.SelectedProxy = 0
-	case msg.Type == tea.KeyCtrlF:
-		if s.FilterEngine == FilterEngineFuzzy {
-			s.FilterEngine = FilterEngineSubstring
-		} else {
-			s.FilterEngine = FilterEngineFuzzy
-		}
-		s.updateFilteredProxies()
-		s.SelectedProxy = 0
 	case key.Matches(msg, common.Keys.Escape):
 		s.NodeFilterMode = false
 		s.NodeFilter = ""
@@ -357,22 +340,10 @@ func (s State) handleNodeFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	case key.Matches(msg, common.Keys.Enter):
 		s.NodeFilterMode = false
 		s.SelectedProxy = 0
-	case key.Matches(msg, common.Keys.Backspace):
-		if len(s.NodeFilter) > 0 {
-			// 正确截断多字节字符
-			runes := []rune(s.NodeFilter)
-			if len(runes) > 0 {
-				s.NodeFilter = string(runes[:len(runes)-1])
-				s.updateFilteredProxies()
-				s.SelectedProxy = 0
-			}
-		}
 	default:
-		input := msg.String()
-		// 接受可打印的单字符（ASCII）或多字节字符（如中文）
-		runes := []rune(input)
-		if len(runes) == 1 && runes[0] >= 32 {
-			s.NodeFilter += input
+		query := common.SearchQuery{Text: s.NodeFilter, Engine: s.FilterEngine}
+		if query.Edit(msg) {
+			s.NodeFilter, s.FilterEngine = query.Text, query.Engine
 			s.updateFilteredProxies()
 			s.SelectedProxy = 0
 		}
@@ -391,34 +362,9 @@ func (s *State) updateFilteredProxies() {
 		return
 	}
 
-	filter := s.NodeFilter
-
-	var re *regexp.Regexp
-	if s.FilterEngine == FilterEngineRegex {
-		var err error
-		re, err = regexp.Compile("(?i)" + filter)
-		if err != nil {
-			// invalid regex, match nothing
-			return
-		}
-	} else if s.FilterEngine == FilterEngineSubstring {
-		filter = strings.ToLower(filter)
-	}
-
+	match := (common.SearchQuery{Text: s.NodeFilter, Engine: s.FilterEngine}).Matcher(common.MatchWholeSubstring)
 	for i, name := range s.CurrentProxies {
-		matched := false
-		switch s.FilterEngine {
-		case FilterEngineRegex:
-			matched = re.MatchString(name)
-		case FilterEngineFuzzy:
-			matched = common.FuzzyMatch(filter, name)
-		case FilterEngineSubstring:
-			fallthrough
-		default:
-			matched = strings.Contains(strings.ToLower(name), filter)
-		}
-
-		if matched {
+		if match(name) {
 			s.FilteredProxyIndices = append(s.FilteredProxyIndices, i)
 		}
 	}

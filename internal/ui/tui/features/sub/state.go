@@ -7,8 +7,6 @@ package sub
 // 「编辑覆写」改为外部编辑器（按 m），不在 TUI 内维护弹窗状态。
 
 import (
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
@@ -64,12 +62,12 @@ func NewState(svc *service.ProfileService) State {
 }
 
 // FilterEngine 订阅搜索匹配引擎（与 rules 页一致语义）。
-type FilterEngine int
+type FilterEngine = common.SearchEngine
 
 const (
-	FilterSubstring FilterEngine = iota
-	FilterRegex
-	FilterFuzzy
+	FilterSubstring = common.SearchSubstring
+	FilterRegex     = common.SearchRegex
+	FilterFuzzy     = common.SearchFuzzy
 )
 
 // ToPageState 转换为渲染层所需的 PageState。
@@ -201,43 +199,16 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 // handleFilterMode 搜索输入模式。
 func (s State) handleFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	switch {
-	case msg.Type == tea.KeyCtrlR:
-		if s.filterEngine == FilterRegex {
-			s.filterEngine = FilterSubstring
-		} else {
-			s.filterEngine = FilterRegex
-		}
-		s.updateFiltered()
-		s.selected = 0
-		s.scrollTop = 0
-	case msg.Type == tea.KeyCtrlF:
-		if s.filterEngine == FilterFuzzy {
-			s.filterEngine = FilterSubstring
-		} else {
-			s.filterEngine = FilterFuzzy
-		}
-		s.updateFiltered()
-		s.selected = 0
-		s.scrollTop = 0
 	case key.Matches(msg, common.Keys.Escape):
 		s.filterMode = false
 	case key.Matches(msg, common.Keys.Enter):
 		s.filterMode = false
 		s.selected = 0
 		s.scrollTop = 0
-	case key.Matches(msg, common.Keys.Backspace):
-		if len(s.filter) > 0 {
-			r := []rune(s.filter)
-			s.filter = string(r[:len(r)-1])
-			s.updateFiltered()
-			s.selected = 0
-			s.scrollTop = 0
-		}
 	default:
-		input := msg.String()
-		r := []rune(input)
-		if len(r) == 1 && r[0] >= 32 {
-			s.filter += input
+		query := common.SearchQuery{Text: s.filter, Engine: s.filterEngine}
+		if query.Edit(msg) {
+			s.filter, s.filterEngine = query.Text, query.Engine
 			s.updateFiltered()
 			s.selected = 0
 			s.scrollTop = 0
@@ -428,44 +399,11 @@ func (s *State) updateFiltered() {
 		return
 	}
 
-	var re *regexp.Regexp
-	var keywords []string
-	switch s.filterEngine {
-	case FilterRegex:
-		var err error
-		re, err = regexp.Compile("(?i)" + s.filter)
-		if err != nil {
-			re = nil
-		}
-	case FilterSubstring:
-		keywords = strings.Fields(strings.ToLower(s.filter))
-	}
-
+	match := (common.SearchQuery{Text: s.filter, Engine: s.filterEngine}).Matcher(common.MatchAllKeywords)
 	for i, p := range s.subs {
-		hay := p.Name + " " + p.Source.Display() + " " + p.Source.Kind.String()
-		switch s.filterEngine {
-		case FilterRegex:
-			if re == nil || !re.MatchString(hay) {
-				continue
-			}
-		case FilterFuzzy:
-			if !common.FuzzyMatch(s.filter, hay) {
-				continue
-			}
-		default:
-			lower := strings.ToLower(hay)
-			all := true
-			for _, kw := range keywords {
-				if !strings.Contains(lower, kw) {
-					all = false
-					break
-				}
-			}
-			if !all {
-				continue
-			}
+		if match(p.Name + " " + p.Source.Display() + " " + p.Source.Kind.String()) {
+			s.filteredIdx = append(s.filteredIdx, i)
 		}
-		s.filteredIdx = append(s.filteredIdx, i)
 	}
 }
 

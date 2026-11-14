@@ -109,6 +109,26 @@ func TestFilter_EmptyShowsAll(t *testing.T) {
 	require.Len(t, s.filteredIdx, 3)
 }
 
+func TestSubscriptionSearchKeepsKeywordsAndQueryOnEscape(t *testing.T) {
+	s := State{filterMode: true, filter: "GROUP remote"}.ApplySubs(sampleSubs(), "")
+	require.Equal(t, []int{2}, s.filteredIdx, "keywords may match different subscription fields")
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	assert.False(t, s.filterMode)
+	assert.Equal(t, "GROUP remote", s.filter)
+	assert.Equal(t, []int{2}, s.filteredIdx)
+	s.filterMode, s.filter = true, "订阅中"
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	assert.Equal(t, "订阅", s.filter)
+	assert.Equal(t, []int{0, 1}, s.filteredIdx)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
+	assert.Equal(t, FilterRegex, s.filterEngine)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyCtrlF})
+	assert.Equal(t, FilterFuzzy, s.filterEngine)
+	s.filter = "["
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
+	assert.Empty(t, s.filteredIdx, "invalid regex matches nothing")
+}
+
 func TestSubFuzzy(t *testing.T) {
 	assert.True(t, common.FuzzyMatch("GC", "Group C"))
 	assert.True(t, common.FuzzyMatch("gc", "Group C")) // 大小写不敏感
