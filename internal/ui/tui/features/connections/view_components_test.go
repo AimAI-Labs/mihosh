@@ -1,12 +1,148 @@
 package connections
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
+	"github.com/charmbracelet/x/ansi"
 )
+
+func TestConnectionListRenderedRowsAndInlineBounds(t *testing.T) {
+	for _, width := range []int{99, 100} {
+		for _, height := range []int{18, 32} {
+			for _, inline := range []bool{false, true} {
+				for _, mode := range []int{ConnViewActive, ConnViewHistory} {
+					for _, filter := range []string{"", "inactive", "editing", "empty-input"} {
+						t.Run(fmt.Sprintf("%d/%d/inline=%t/mode=%d/%s", width, height, inline, mode, filter), func(t *testing.T) {
+							var conns []model.Connection
+							for i := 0; i < 40; i++ {
+								conns = append(conns, model.Connection{ID: fmt.Sprint(i), Metadata: model.Metadata{Host: fmt.Sprintf("example-%02d.test", i)}})
+							}
+							state := PageState{
+								Width: width, Height: height, ViewMode: mode, InlineMode: inline,
+								Connections: &model.ConnectionsResponse{Connections: conns}, ClosedConnections: conns,
+								SelectedIndex: 24, ScrollTop: 18,
+							}
+							if filter != "" {
+								state.FilterText = "example"
+							}
+							if filter == "editing" || filter == "empty-input" {
+								state.FilterMode = true
+							}
+							if filter == "editing" {
+								state.FilterInput = "search: example"
+							}
+							found := 0
+							for y, raw := range strings.Split(RenderConnectionsPage(state), "\n") {
+								line := ansi.Strip(raw)
+								if inline && strings.Contains(line, "╭") && strings.Contains(line, i18n.T("conns.detail.title")) {
+									hit := ResolveMouseHit(state, 1, y)
+									if hit.Target != MouseTargetInlineDetail {
+										t.Fatalf("inline border y=%d: got %+v", y, hit)
+									}
+									if hit := ResolveMouseHit(state, 1, y-1); hit.Target == MouseTargetInlineDetail {
+										t.Fatalf("row before inline detail y=%d belongs to the list", y-1)
+									}
+									break
+								}
+								for i := range conns {
+									if strings.Contains(line, conns[i].Metadata.Host) {
+										found++
+										hit := ResolveMouseHit(state, 0, y)
+										if hit.Target != MouseTargetConnection || hit.Index != i {
+											t.Fatalf("rendered connection[%d] at y=%d: got %+v", i, y, hit)
+										}
+									}
+								}
+							}
+							if found == 0 {
+								t.Fatal("no rendered connection rows checked")
+							}
+						})
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestDetailWheelUsesRenderedPanel(t *testing.T) {
+	for _, width := range []int{99, 100} {
+		for _, height := range []int{20, 36} {
+			for _, focus := range []int{0, 1} {
+				t.Run(fmt.Sprintf("%d/%d/focus=%d", width, height, focus), func(t *testing.T) {
+					state := NewState("", nil, nil, 0, nil)
+					state.connDetailMode = true
+					state.connDetailSnapshot = &model.Connection{ID: "detail"}
+					state.connDetailFocusPanel = focus
+					state.connDetailLeftPanel.ScrollTop = 2
+					state.connDetailRightPanel.ScrollTop = 2
+					lines := strings.Split(RenderConnectionsPage(state.ToPageState(nil, width, height)), "\n")
+					for y, raw := range lines {
+						line := ansi.Strip(raw)
+						if offset := strings.Index(line, i18n.T("conns.detail.title_json")); offset >= 0 {
+							x := ansi.StringWidth(line[:offset])
+							got, _ := state.HandleMouseScroll(true, x, y, width, height)
+							if got.connDetailRightPanel.ScrollTop != 1 || got.connDetailLeftPanel.ScrollTop != 2 || got.connDetailFocusPanel != 1 {
+								t.Fatalf("wheel at JSON title (%d,%d) scrolled wrong panel: left=%d right=%d focus=%d", x, y, got.connDetailLeftPanel.ScrollTop, got.connDetailRightPanel.ScrollTop, got.connDetailFocusPanel)
+							}
+							return
+						}
+					}
+					t.Fatal("JSON panel title not rendered")
+				})
+			}
+		}
+	}
+}
+
+func TestConnectionWheelFollowsPointerInsteadOfInlineFocus(t *testing.T) {
+	state := NewState("", nil, nil, 0, nil)
+	state.connViewMode = ConnViewActive
+	state.inlineDetailMode = true
+	state.Connections = &model.ConnectionsResponse{Connections: []model.Connection{
+		{ID: "one", Metadata: model.Metadata{Host: "wheel-one.test"}},
+		{ID: "two", Metadata: model.Metadata{Host: "wheel-two.test"}},
+	}}
+	state.filterList.Cursor = 1
+	state.inlineDetailPanel.ScrollTop = 2
+	const width, height = 100, 32
+	var rowY, inlineY int
+	for y, line := range strings.Split(RenderConnectionsPage(state.ToPageState(nil, width, height)), "\n") {
+		if strings.Contains(line, "wheel-two.test") && rowY == 0 {
+			rowY = y
+		}
+		if strings.Contains(line, "╭") && strings.Contains(line, i18n.T("conns.detail.title")) {
+			inlineY = y
+		}
+	}
+	if rowY == 0 || inlineY == 0 {
+		t.Fatal("missing rendered list or inline detail")
+	}
+	got, _ := state.HandleMouseScroll(true, 1, inlineY, width, height)
+	if got.inlineDetailPanel.ScrollTop != 1 || got.filterList.Cursor != 1 {
+		t.Fatalf("wheel over inline detail moved list: %+v", got.filterList)
+	}
+	state.inlineDetailFocused = true
+	got, _ = state.HandleMouseScroll(true, 1, rowY, width, height)
+	if got.filterList.Cursor != 0 || got.inlineDetailFocused {
+		t.Fatalf("wheel over list stayed in inline detail: cursor=%d focused=%t", got.filterList.Cursor, got.inlineDetailFocused)
+	}
+}
+
+func TestEmptyConnectionListHasNoInlineHits(t *testing.T) {
+	state := PageState{Width: 99, Height: 24, ViewMode: ConnViewActive, InlineMode: true, Connections: &model.ConnectionsResponse{}}
+	for y := 0; y < state.Height; y++ {
+		hit := ResolveMouseHit(state, 1, y)
+		if hit.Target == MouseTargetConnection || hit.Target == MouseTargetInlineDetail {
+			t.Fatalf("empty list has content hit at y=%d: %+v", y, hit)
+		}
+	}
+}
 
 func TestResolveConnectionsMouseHit_FindsSiteTargetInTrafficTab(t *testing.T) {
 	state := PageState{

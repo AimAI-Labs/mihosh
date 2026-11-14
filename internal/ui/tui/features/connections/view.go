@@ -48,28 +48,7 @@ type PageState struct {
 func RenderConnectionsPage(state PageState) string {
 	// 详情模式优先级最高：渲染沉浸式连接详情（位于模式切换栏下方）
 	if state.DetailMode && state.SelectedConnection != nil {
-		modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width, state.InlineMode)
-		modeSwitchHeight := lipgloss.Height(modeSwitch)
-		// 再减 1 行，用于在详情面板下方预留底栏提示行，
-		// 避免 OverlayHelpAtBottomRight 将提示叠加到详情面板底边框（╰──╯）上。
-		remainingHeight := state.Height - modeSwitchHeight - 2
-		if remainingHeight < 5 {
-			remainingHeight = 5
-		}
-
-		detailView := components.RenderConnectionDetailImmersive(
-			state.SelectedConnection,
-			state.IPInfo,
-			state.Width,
-			remainingHeight,
-			state.DetailLeftScroll,
-			state.DetailRightScroll,
-			state.DetailFocusPanel,
-		)
-
-		// 详情面板下方留 1 行空白，供右下角内联帮助提示使用。
-		mainContent := lipgloss.JoinVertical(lipgloss.Left, modeSwitch, "", detailView, "")
-		return renderConnectionsInlineHelp(mainContent, state)
+		return renderConnectionsInlineHelp(layoutConnectionDetail(state).content, state)
 	}
 
 	if state.TopNModalMode {
@@ -77,23 +56,11 @@ func RenderConnectionsPage(state PageState) string {
 		return renderConnectionsInlineHelp(mainContent, state)
 	}
 
-	// 渲染模式切换组件（带边框）
-	modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width, state.InlineMode)
-
-	// 组装页面
-	var content []string
-	content = append(content, modeSwitch)
-	content = append(content, "")
-
-	// 流量监控 tab：图表 + TopN + 站点卡片（无连接表格）
-	if state.ViewMode == ConnViewTraffic {
-		mainContent := renderTrafficTab(state, content)
-		return renderConnectionsInlineHelp(mainContent, state)
+	if state.ViewMode != ConnViewTraffic {
+		return renderConnectionsInlineHelp(renderConnectionListTab(state), state)
 	}
-
-	// 活跃/历史连接 tab：表格独占
-	mainContent := renderConnectionListTab(state, content)
-	return renderConnectionsInlineHelp(mainContent, state)
+	modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width, state.InlineMode)
+	return renderConnectionsInlineHelp(renderTrafficTab(state, []string{modeSwitch, ""}), state)
 }
 
 // renderTrafficTab 渲染流量监控 tab
@@ -126,154 +93,46 @@ func renderTrafficTab(state PageState, content []string) string {
 }
 
 // renderConnectionListTab 渲染活跃/历史连接 tab（表格独占）
-func renderConnectionListTab(state PageState, content []string) string {
-	// 样式定义 — Tokyo Night
-	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(common.TokyoBlue())
-	isHistory := state.ViewMode == ConnViewHistory
-	var normalStyle lipgloss.Style
-	if isHistory {
-		normalStyle = lipgloss.NewStyle().Foreground(common.TokyoMuted())
-	} else {
-		normalStyle = lipgloss.NewStyle().Foreground(common.TokyoForeground())
+func renderConnectionListTab(state PageState) string {
+	if state.ViewMode == ConnViewActive && state.Connections == nil {
+		return i18n.T("conns.loading")
+	}
+	layout := layoutConnectionList(state)
+	normalStyle := lipgloss.NewStyle().Foreground(common.TokyoForeground())
+	if state.ViewMode == ConnViewHistory {
+		normalStyle = normalStyle.Foreground(common.TokyoMuted())
 	}
 	selectedStyle := lipgloss.NewStyle().Background(common.TokyoSelected()).Foreground(common.TokyoCyan()).Bold(true)
 	dimStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted())
 
-	// 根据视图模式选择数据源
-	var connList []model.Connection
-	if state.ViewMode == ConnViewActive {
-		if state.Connections == nil {
-			return i18n.T("conns.loading")
-		}
-		connList = state.Connections.Connections
-	} else {
-		connList = state.ClosedConnections
-	}
-
-	// 过滤连接
-	filteredConns := filterConnections(connList, state.FilterText)
-
-	// 过滤输入框
-	filterLine := ""
-	if state.FilterMode {
-		filterLine = state.FilterInput
-	} else if state.FilterText != "" {
-		filterLine = dimStyle.Render(i18n.Tf("conns.filter_inactive", state.FilterText))
-	}
-
-	// 表头
-	tableHeader := components.RenderTableHeader(headerStyle, state.Width)
-
-	// 计算使用的行数（表格独占，不含图表/TopN/站点）
-	usedLines := connectionsBaseUsedLines
-	if filterLine != "" {
-		usedLines++
-	}
-
-	// 计算列表可显示的行数
-	maxDisplay := state.Height - usedLines
-	if maxDisplay < 3 {
-		maxDisplay = 3
-	}
-	if usedLines+maxDisplay > state.Height {
-		maxDisplay = state.Height - usedLines
-		if maxDisplay < 1 {
-			maxDisplay = 1
-		}
-	}
-
-	var detailContent string
-	if state.InlineMode && state.ViewMode != ConnViewTraffic && len(filteredConns) > 0 {
-		selectedIdx := state.SelectedIndex
-		if selectedIdx >= len(filteredConns) {
-			selectedIdx = len(filteredConns) - 1
-		}
-		if selectedIdx < 0 {
-			selectedIdx = 0
-		}
-		conn := &filteredConns[selectedIdx]
-
-		detailHeight := maxDisplay / 2
-		if detailHeight < 5 {
-			detailHeight = 5
-		}
-
-		maxDisplay -= detailHeight
-		if maxDisplay < 3 {
-			maxDisplay = 3
-		}
-
-		detailContent = components.RenderConnectionDetailInline(
-			conn, state.Width, detailHeight, state.InlineFocused, state.InlineScroll,
-		)
-	}
-
-	// 连接列表
 	var rows []string
-	if len(filteredConns) == 0 {
+	if len(layout.connections) == 0 {
 		rows = append(rows, dimStyle.Render(i18n.T("conns.empty_active")))
 	} else {
-		selectedIdx := state.SelectedIndex
-		if selectedIdx >= len(filteredConns) {
-			selectedIdx = len(filteredConns) - 1
+		if layout.scrollTop > 0 {
+			rows = append(rows, dimStyle.Render(i18n.Tf("conns.scroll_up", layout.scrollTop)))
 		}
-		if selectedIdx < 0 {
-			selectedIdx = 0
-		}
-
-		scrollTop := state.ScrollTop
-		if selectedIdx >= scrollTop+maxDisplay {
-			scrollTop = selectedIdx - maxDisplay + 1
-		}
-		if selectedIdx < scrollTop {
-			scrollTop = selectedIdx
-		}
-
-		endIdx := scrollTop + maxDisplay
-		if endIdx > len(filteredConns) {
-			endIdx = len(filteredConns)
-		}
-
-		for i := scrollTop; i < endIdx; i++ {
-			conn := filteredConns[i]
-			isSelected := i == selectedIdx
-
-			rowStyle := normalStyle
-			prefix := common.SymbolSelectInactive
-			if isSelected {
-				rowStyle = selectedStyle
-				prefix = common.SymbolSelectActive
+		for i := layout.scrollTop; i < layout.end; i++ {
+			rowStyle, prefix := normalStyle, common.SymbolSelectInactive
+			if i == layout.selected {
+				rowStyle, prefix = selectedStyle, common.SymbolSelectActive
 			}
-
-			row := components.RenderConnectionRow(conn, rowStyle, prefix, state.Width)
-			rows = append(rows, row)
+			rows = append(rows, components.RenderConnectionRow(layout.connections[i], rowStyle, prefix, state.Width))
 		}
-
-		if scrollTop > 0 {
-			rows = append([]string{dimStyle.Render(i18n.Tf("conns.scroll_up", scrollTop))}, rows...)
-		}
-		if endIdx < len(filteredConns) {
-			rows = append(rows, dimStyle.Render(i18n.Tf("conns.scroll_down", len(filteredConns)-endIdx)))
+		if layout.end < len(layout.connections) {
+			rows = append(rows, dimStyle.Render(i18n.Tf("conns.scroll_down", len(layout.connections)-layout.end)))
 		}
 	}
-
-	// 补齐空行以固定列表高度，防止底部详情上移（崩塌）
-	for len(rows) < maxDisplay {
+	for len(rows) < layout.listHeight {
 		rows = append(rows, "")
 	}
-
-	if filterLine != "" {
-		content = append(content, filterLine)
+	content := layout.header + "\n" + strings.Join(rows, "\n")
+	if layout.detailHeight > 0 {
+		content += "\n" + components.RenderConnectionDetailInline(
+			&layout.connections[layout.selected], state.Width, layout.detailHeight, state.InlineFocused, state.InlineScroll,
+		)
 	}
-	content = append(content, tableHeader)
-	content = append(content, common.TableBorderStyle().Render(strings.Repeat("─", max(state.Width-2, 1))))
-	content = append(content, strings.Join(rows, "\n"))
-
-	if detailContent != "" {
-		content = append(content, detailContent)
-	}
-
-	return strings.Join(content, "\n")
+	return content
 }
 
 // filterConnections 过滤连接

@@ -149,37 +149,23 @@ func (s State) HandleMouseLeft(
 // HandleMouseScroll 鼠标滚轮处理
 func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight int) (State, tea.Cmd) {
 	if s.connDetailMode {
-		isRightSide := false
-		if mainWidth >= 100 {
-			// 宽屏布局，左右排布，分界点大概是 mainWidth / 3
-			isRightSide = mainX > (mainWidth / 3)
-		} else {
-			// 窄屏布局，上下排布，分界点大概是 mainHeight / 2
-			isRightSide = mainY > (mainHeight / 2)
-		}
-
-		if up {
-			if isRightSide {
-				s.connDetailRightPanel.HandleMouseScroll(up)
-			} else {
-				s.connDetailLeftPanel.HandleMouseScroll(up)
-			}
-		} else {
-			if isRightSide {
-				s.connDetailRightPanel.HandleMouseScroll(up)
-				s.clampRightScroll()
-			} else {
-				s.connDetailLeftPanel.HandleMouseScroll(up)
+		layout := layoutConnectionDetail(s.ToPageState(s.chartData, mainWidth, mainHeight))
+		panel := layout.detail.PanelAt(mainX, mainY-layout.detailY)
+		switch panel {
+		case 0:
+			s.connDetailLeftPanel.HandleMouseScroll(up)
+			if !up {
 				s.clampLeftScroll()
 			}
+		case 1:
+			s.connDetailRightPanel.HandleMouseScroll(up)
+			if !up {
+				s.clampRightScroll()
+			}
+		default:
+			return s, nil
 		}
-
-		// 根据鼠标位置自动设置焦点
-		if isRightSide {
-			s.connDetailFocusPanel = 1
-		} else {
-			s.connDetailFocusPanel = 0
-		}
+		s.connDetailFocusPanel = panel
 
 		return s, nil
 	}
@@ -189,10 +175,16 @@ func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight in
 		return s, nil
 	}
 
-	if s.inlineDetailFocused {
+	layout := layoutConnectionList(s.ToPageState(s.chartData, mainWidth, mainHeight))
+	if layout.hit(mainX, mainY, mainWidth).Target == MouseTargetInlineDetail {
+		s.inlineDetailFocused = true
 		s.inlineDetailPanel.HandleMouseScroll(up)
 		return s, nil
 	}
+	if mainX < 0 || mainX >= mainWidth || mainY < layout.rowsY || mainY >= layout.rowsY+layout.listHeight {
+		return s, nil
+	}
+	s.inlineDetailFocused = false
 
 	count := s.filteredConnCount()
 	s.filterList.SetItemCount(count)

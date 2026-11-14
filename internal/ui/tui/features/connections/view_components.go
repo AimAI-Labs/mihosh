@@ -11,8 +11,6 @@ import (
 )
 
 const (
-	connectionsBaseUsedLines    = 9 // 模式切换(3) + 间距(1) + 表头(1) + 分隔线(1) + 底部(3)
-	connectionsMinDisplayRows   = 5
 	connectionsSiteCardsTopLine = 2
 	connectionsSiteCardHeight   = 5
 	connectionsSiteCardMinWidth = 12
@@ -42,12 +40,6 @@ const (
 type MouseHit struct {
 	Target MouseTarget
 	Index  int
-}
-
-type connectionsListWindow struct {
-	ScrollTop   int
-	VisibleRows int
-	ShowTopHint bool
 }
 
 // ResolveMouseHit 根据 pageContent 内的坐标定位命中的连接行/网站卡片。
@@ -131,44 +123,10 @@ func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 		return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}
 	}
 
-	// 活跃/历史连接 tab：仅检测连接列表
 	if state.ViewMode == ConnViewActive && state.Connections == nil {
 		return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}
 	}
-
-	line++ // 表头行
-	line++ // 分隔线
-	if state.FilterMode || state.FilterText != "" {
-		line++ // 过滤行
-	}
-
-	filteredConns := filterConnections(connectionsByViewMode(state), state.FilterText)
-	if len(filteredConns) == 0 {
-		return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}
-	}
-
-	window := resolveConnectionsListWindow(state, len(filteredConns))
-	dataStart := line
-	if window.ShowTopHint {
-		dataStart++
-	}
-
-	if pageY >= dataStart && pageY < dataStart+window.VisibleRows {
-		return MouseHit{
-			Target: MouseTargetConnection,
-			Index:  window.ScrollTop + (pageY - dataStart),
-		}
-	}
-
-	maxDisplay, detailHeight := calcConnectionsMaxDisplay(state)
-	listEndLine := line + maxDisplay
-	if state.InlineMode && state.ViewMode != ConnViewTraffic && detailHeight > 0 {
-		if pageY >= listEndLine && pageY < listEndLine+detailHeight {
-			return MouseHit{Target: MouseTargetInlineDetail, Index: -1}
-		}
-	}
-
-	return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}
+	return layoutConnectionList(state).hit(pageX, pageY, state.Width)
 }
 
 func resolveViewModeHit(state PageState, pageX, pageY int) (MouseHit, bool) {
@@ -335,47 +293,6 @@ func resolveSiteTestMouseHit(state PageState, pageX int, siteSectionY int) int {
 	return idx
 }
 
-func resolveConnectionsListWindow(state PageState, total int) connectionsListWindow {
-	if total <= 0 {
-		return connectionsListWindow{}
-	}
-
-	selected := state.SelectedIndex
-	if selected < 0 {
-		selected = 0
-	}
-	if selected >= total {
-		selected = total - 1
-	}
-
-	maxDisplay, _ := calcConnectionsMaxDisplay(state)
-	scrollTop := state.ScrollTop
-	if scrollTop < 0 {
-		scrollTop = 0
-	}
-	if scrollTop >= total {
-		scrollTop = total - 1
-	}
-
-	if selected >= scrollTop+maxDisplay {
-		scrollTop = selected - maxDisplay + 1
-	}
-	if selected < scrollTop {
-		scrollTop = selected
-	}
-
-	endIdx := scrollTop + maxDisplay
-	if endIdx > total {
-		endIdx = total
-	}
-
-	return connectionsListWindow{
-		ScrollTop:   scrollTop,
-		VisibleRows: endIdx - scrollTop,
-		ShowTopHint: scrollTop > 0,
-	}
-}
-
 // calcMaxChartHeight 计算图表区域可用的最大高度。
 // 扣除基础布局、TopN、网站测速、过滤器和连接列表最小行数后，剩余空间给图表。
 func calcMaxChartHeight(state PageState) int {
@@ -397,44 +314,6 @@ func calcMaxChartHeight(state PageState) int {
 	}
 	// 活跃/历史 tab：不渲染图表
 	return 0
-}
-
-func calcConnectionsMaxDisplay(state PageState) (int, int) {
-	// 活跃/历史 tab：表格独占，不计算图表/TopN/站点卡片占用
-	usedLines := connectionsBaseUsedLines
-	if state.FilterMode || state.FilterText != "" {
-		usedLines++
-	}
-
-	maxDisplay := state.Height - usedLines
-	if maxDisplay < 3 {
-		maxDisplay = 3
-	}
-	if usedLines+maxDisplay > state.Height {
-		maxDisplay = state.Height - usedLines
-		if maxDisplay < 1 {
-			maxDisplay = 1
-		}
-	}
-
-	detailHeight := 0
-	// 这里的 len(filteredConns) 判断在实际应用中如果难以获取可以简化，
-	// 但是 view.go 中的逻辑是必须 len(filteredConns) > 0 才渲染 inline detail。
-	// 为了确保点击区域准确，这里假定只要处于 InlineMode 且不是流量模式，就预留。
-	// 因为如果没有连接，整个列表都是空的，也不存在点击问题。
-	if state.InlineMode && state.ViewMode != ConnViewTraffic {
-		detailHeight = maxDisplay / 2
-		if detailHeight < 5 {
-			detailHeight = 5
-		}
-
-		maxDisplay -= detailHeight
-		if maxDisplay < 3 {
-			maxDisplay = 3
-		}
-	}
-
-	return maxDisplay, detailHeight
 }
 
 func connectionsByViewMode(state PageState) []model.Connection {
