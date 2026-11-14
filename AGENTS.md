@@ -12,6 +12,7 @@
 - **栈**: Go 1.25.0, Bubble Tea v1.3, Bubbles, Lipgloss, cobra, viper, gorilla/websocket, ntcharts, bubblezone, selfupdate.
 - **环境**：执行命令前必须判断系统类型（Windows或Linux），使用兼容的命令执行。（win必须使用pwsh.exe前缀执行命令）
 - **构建**：项目使用了mise工具。
+- **构建/测试资源控制（尤其 Linux）**：执行前必须检查可用内存、CPU 负载及已有构建/测试进程；高负载检查默认串行，避免构建、测试和类型检查同时运行。根据实际资源限制并发、worker 数量及进程内存，并确认限制对子进程生效；内存不足或 CPU 持续过载时先停止并调整。完成或中断后清理本次启动的进程，并恢复验证期间临时修改的文件。
 - **命令**: 
   > win下禁止使用类似`2>nul`命令，以防生成nul等保留设备名的文件
   - `mise exec go -- go test ./...` (涉及渲染及逻辑时必须跑测试，不依赖真实服务端环境)
