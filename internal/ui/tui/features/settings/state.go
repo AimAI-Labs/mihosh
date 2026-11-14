@@ -173,7 +173,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 
 		if msg.String() == "r" {
 			s.mihomoLoaded = false
-			return s, tea.Batch(FetchMihomoVersion(s.client), s.configSvc.FetchMihomoConfig(s.client))
+			return s, tea.Batch(FetchMihomoVersion(s.client), FetchMihomoConfig(s.configSvc, s.client))
 		}
 
 		switch {

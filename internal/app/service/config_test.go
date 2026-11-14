@@ -1,35 +1,51 @@
 package service
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 )
 
-func TestConfigService_FetchMihomoConfig_NilClient(t *testing.T) {
-	s := NewConfigService()
-	cmd := s.FetchMihomoConfig(nil)
-	if cmd == nil {
-		t.Fatal("expected a tea.Cmd, got nil")
+func managedConfigFile(t *testing.T, contents string) string {
+	t.Helper()
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	cfg := config.DefaultConfig
+	cfg.Core.Mode = "managed"
+	if err := config.Save(&cfg); err != nil {
+		t.Fatal(err)
 	}
+	path, err := config.ManagedMihomoConfigPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(contents), 0600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
 
-	msg := cmd()
-	configMsg, ok := msg.(messages.MihomoConfigMsg)
-	if !ok {
-		t.Fatalf("expected messages.MihomoConfigMsg, got %T", msg)
+func TestConfigReadUsesFileValues(t *testing.T) {
+	managedConfigFile(t, "external-controller: 127.0.0.1:9191\nsecret: from-file\nmixed-port: 7891\nallow-lan: true\nlog-level: debug\n")
+	result := NewConfigService().ReadMihomoConfig()
+	if result.ExternalController != "127.0.0.1:9191" || result.Secret != "from-file" || result.MixedPort != 7891 || !result.AllowLan || result.LogLevel != "debug" {
+		t.Fatalf("unexpected file configuration: %+v", result)
 	}
+}
 
-	// 始终从 YAML 文件读取，不再依赖 API
-	if !configMsg.FromFile {
-		t.Error("expected FromFile=true (always reads from YAML)")
+func TestConfigReadRetainsDefaultFallback(t *testing.T) {
+	path := managedConfigFile(t, "")
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
 	}
-	// 从文件读取时无 API 错误
-	if configMsg.Err != nil {
-		t.Errorf("expected no error when reading from file, got %v", configMsg.Err)
-	}
-	// 即使 API client 为 nil，Config 也应从 YAML/默认值填充，不为 nil
-	if configMsg.Config == nil {
-		t.Fatal("expected Config to be populated from YAML, got nil")
+	result := NewConfigService().ReadMihomoConfig()
+	if result == nil || result.ExternalController != config.DefaultMihomoEndpoint.ExternalController || result.MixedPort != config.DefaultMihomoEndpoint.MixedPort {
+		t.Fatalf("default fallback changed: %+v", result)
 	}
 }
 
@@ -41,7 +57,7 @@ func TestConfigService_SaveMihomoConfigField_Success(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected a tea.Cmd, got nil")
 	}
-	
+
 	// Invoking the returned tea.Msg would write to the actual config path or fail
 	// depending on the environment, so we just check it returns a function
 	// and doesn't crash on construction.

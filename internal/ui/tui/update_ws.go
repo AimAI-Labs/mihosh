@@ -364,7 +364,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 				nodes.FetchConfigMode(m.client),
 				rules.FetchRules(m.client),
 				settings.FetchMihomoVersion(m.client),
-				m.configSvc.FetchMihomoConfig(m.client),
+				settings.FetchMihomoConfig(m.configSvc, m.client),
 			}
 			if msg.DelayMs > 0 {
 				return m, tea.Sequence(
@@ -415,7 +415,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.noticeTicks = autoRefreshNoticeTicks
 			m.err = nil
 		}
-		return m, tea.Batch(targetCmd, m.fetchNodes(), m.configSvc.FetchMihomoConfig(m.client))
+		return m, tea.Batch(targetCmd, m.fetchNodes(), settings.FetchMihomoConfig(m.configSvc, m.client))
 
 	case messages.ThemeChangedMsg:
 		// 主题已切换，触发重绘（View 会读取新主题色）

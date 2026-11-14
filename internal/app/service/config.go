@@ -71,18 +71,8 @@ func (s *ConfigService) SetConfigValue(key, value string) error {
 	})
 }
 
-// FetchMihomoConfig 从 mihomo 配置文件（YAML）读取 5 个托管字段。
-// 路径通过 GetMihomoConfigPath() 解析（Linux 下优先用 systemctl -d 参数）。
-// 始终从磁盘读取，不依赖 API（API 响应可能含运行时变化，文件才是真实来源）。
-func (s *ConfigService) FetchMihomoConfig(client *api.Client) tea.Cmd {
-	return messages.CoreRequest(client, func(_ *api.Client) tea.Msg {
-		return s.fetchMihomoConfigFromFile(nil)
-	})
-}
-
-// fetchMihomoConfigFromFile 从 YAML 文件读取 Mihomo 配置的 5 个托管字段。
-// 始终从磁盘读取，确保展示的是配置文件实际内容（而非 API 运行时状态）。
-func (s *ConfigService) fetchMihomoConfigFromFile(apiErr error) messages.MihomoConfigMsg {
+// ReadMihomoConfig reads the managed fields from disk, retaining endpoint/default fallbacks.
+func (s *ConfigService) ReadMihomoConfig() *model.MihomoConfig {
 	endpoint := config.ResolveMihomoEndpoint()
 	mihomoCfg := &model.MihomoConfig{
 		ExternalController: endpoint.ExternalController,
@@ -102,11 +92,7 @@ func (s *ConfigService) fetchMihomoConfigFromFile(apiErr error) messages.MihomoC
 		}
 	}
 
-	return messages.MihomoConfigMsg{
-		Config:   mihomoCfg,
-		Err:      apiErr,
-		FromFile: true,
-	}
+	return mihomoCfg
 }
 
 // SaveMihomoConfigField 将单个字段写入 mihomo 物理配置文件并使其生效。

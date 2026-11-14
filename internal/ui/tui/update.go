@@ -123,7 +123,7 @@ func (m *Model) onPageChange() tea.Cmd {
 	case layout.PageSub:
 		return sub.FetchSubs(m.profileSvc)
 	case layout.PageSettings:
-		cmds := []tea.Cmd{settings.FetchMihomoVersion(m.client), m.configSvc.FetchMihomoConfig(m.client)}
+		cmds := []tea.Cmd{settings.FetchMihomoVersion(m.client), settings.FetchMihomoConfig(m.configSvc, m.client)}
 		if m.settingsState.SysStatus.Supported && m.settingsState.ActiveTab() == 1 {
 			cmds = append(cmds, settings.FetchSysStatusCmd())
 		}
@@ -174,7 +174,7 @@ func (m *Model) refreshCurrentPage() tea.Cmd {
 		m.config = cfg
 		return tea.Batch(
 			settings.FetchMihomoVersion(m.client),
-			m.configSvc.FetchMihomoConfig(m.client),
+			settings.FetchMihomoConfig(m.configSvc, m.client),
 		)
 	}
 	return nil
