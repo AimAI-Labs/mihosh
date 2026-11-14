@@ -17,6 +17,26 @@ func sampleRulesForFilter() []model.Rule {
 	}
 }
 
+func TestRuleSearchPreservesTypesAndQueryOnEscape(t *testing.T) {
+	s := State{
+		rules: sampleRulesForFilter(), ruleFilter: "DOMAIN DIRECT", ruleFilterMode: true,
+		selectedTypes: []string{"DOMAIN"},
+	}
+	s.updateFilteredRules()
+	if len(s.filteredRuleIndices) != 1 || s.filteredRuleIndices[0] != 0 {
+		t.Fatalf("keyword/type filtering changed original indices: %v", s.filteredRuleIndices)
+	}
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if s.ruleFilterMode || s.ruleFilter != "DOMAIN DIRECT" || len(s.selectedTypes) != 1 {
+		t.Fatal("Escape must retain the query and type selections")
+	}
+	s.ruleFilter = ""
+	s.updateFilteredRules()
+	if len(s.filteredRuleIndices) != 1 || s.filteredRuleIndices[0] != 0 {
+		t.Fatalf("empty text bypassed type filtering: %v", s.filteredRuleIndices)
+	}
+}
+
 // TestRulesState_FilterEngineToggle 验证过滤输入模式下 Ctrl+R / Ctrl+F 的二态切换。
 // Ctrl+R 在 普通↔正则 间切换；Ctrl+F 在 普通↔模糊 间切换。
 func TestRulesState_FilterEngineToggle(t *testing.T) {

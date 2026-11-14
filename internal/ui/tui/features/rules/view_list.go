@@ -25,14 +25,7 @@ func renderRuleSearchBox(filterText string, filterMode bool, engine FilterEngine
 		input += inputStyle.Render("█")
 	}
 
-	// 引擎徽标（与 nodes 配色一致）
-	var engineIndicator string
-	switch engine {
-	case FilterEngineRegex:
-		engineIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("#A855F7")).Render(" [RE]")
-	case FilterEngineFuzzy:
-		engineIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B")).Render(" [Fuzzy]")
-	}
+	engineIndicator := common.RenderSearchEngineBadge(engine)
 
 	hint := ""
 	if filterText == "" {

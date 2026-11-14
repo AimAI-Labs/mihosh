@@ -10,12 +10,12 @@ import (
 )
 
 // FilterEngine 规则搜索匹配引擎
-type FilterEngine int
+type FilterEngine = common.SearchEngine
 
 const (
-	FilterEngineSubstring FilterEngine = iota // 普通子串（多关键词 AND）
-	FilterEngineRegex                         // 正则匹配
-	FilterEngineFuzzy                         // 模糊匹配（有序子序列）
+	FilterEngineSubstring = common.SearchSubstring
+	FilterEngineRegex     = common.SearchRegex
+	FilterEngineFuzzy     = common.SearchFuzzy
 )
 
 // State 规则页面完整状态

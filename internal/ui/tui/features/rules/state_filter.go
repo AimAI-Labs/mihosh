@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -14,48 +13,16 @@ import (
 // handleRuleFilterMode 规则过滤输入模式
 func (s State) handleRuleFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	switch {
-	case msg.Type == tea.KeyCtrlR:
-		// Ctrl+R 切换 正则↔普通
-		if s.FilterEngine == FilterEngineRegex {
-			s.FilterEngine = FilterEngineSubstring
-		} else {
-			s.FilterEngine = FilterEngineRegex
-		}
-		s.updateFilteredRules()
-		s.selectedRule = 0
-		s.ruleScrollTop = 0
-	case msg.Type == tea.KeyCtrlF:
-		// Ctrl+F 切换 模糊↔普通
-		if s.FilterEngine == FilterEngineFuzzy {
-			s.FilterEngine = FilterEngineSubstring
-		} else {
-			s.FilterEngine = FilterEngineFuzzy
-		}
-		s.updateFilteredRules()
-		s.selectedRule = 0
-		s.ruleScrollTop = 0
 	case key.Matches(msg, common.Keys.Escape):
 		s.ruleFilterMode = false
 	case key.Matches(msg, common.Keys.Enter):
 		s.ruleFilterMode = false
 		s.selectedRule = 0
 		s.ruleScrollTop = 0
-	case key.Matches(msg, common.Keys.Backspace):
-		if len(s.ruleFilter) > 0 {
-			runes := []rune(s.ruleFilter)
-			if len(runes) > 0 {
-				s.ruleFilter = string(runes[:len(runes)-1])
-				s.updateFilteredRules()
-				s.selectedRule = 0
-				s.ruleScrollTop = 0
-			}
-		}
 	default:
-		input := msg.String()
-		// 接受可打印的单字符（ASCII）或多字节字符（如中文）
-		runes := []rune(input)
-		if len(runes) == 1 && runes[0] >= 32 {
-			s.ruleFilter += input
+		query := common.SearchQuery{Text: s.ruleFilter, Engine: s.FilterEngine}
+		if query.Edit(msg) {
+			s.ruleFilter, s.FilterEngine = query.Text, query.Engine
 			s.updateFilteredRules()
 			s.selectedRule = 0
 			s.ruleScrollTop = 0
@@ -119,23 +86,7 @@ func (s *State) updateFilteredRules() {
 		return
 	}
 
-	// 预编译正则 / 预处理子串
-	var re *regexp.Regexp
-	var keywords []string
-	if hasTextFilter {
-		switch s.FilterEngine {
-		case FilterEngineRegex:
-			var err error
-			re, err = regexp.Compile("(?i)" + s.ruleFilter)
-			if err != nil {
-				// 非法正则：文本过滤匹配为空（仍可能因类型过滤保留结果）
-				re = nil
-			}
-		case FilterEngineSubstring:
-			// 普通模式：保留多关键词 AND 语义
-			keywords = strings.Fields(strings.ToLower(s.ruleFilter))
-		}
-	}
+	match := (common.SearchQuery{Text: s.ruleFilter, Engine: s.FilterEngine}).Matcher(common.MatchAllKeywords)
 
 	for i, rule := range s.rules {
 		// 类型过滤检查
@@ -162,29 +113,8 @@ func (s *State) updateFilteredRules() {
 			}
 			// 序号也加入搜索文本（1-based）
 			searchText += " " + strconv.Itoa(i+1)
-			switch s.FilterEngine {
-			case FilterEngineRegex:
-				if re == nil || !re.MatchString(searchText) {
-					continue
-				}
-			case FilterEngineFuzzy:
-				if !common.FuzzyMatch(s.ruleFilter, searchText) {
-					continue
-				}
-			case FilterEngineSubstring:
-				fallthrough
-			default:
-				lower := strings.ToLower(searchText)
-				allMatch := true
-				for _, kw := range keywords {
-					if !strings.Contains(lower, kw) {
-						allMatch = false
-						break
-					}
-				}
-				if !allMatch {
-					continue
-				}
+			if !match(searchText) {
+				continue
 			}
 		}
 
