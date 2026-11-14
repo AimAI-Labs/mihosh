@@ -239,7 +239,21 @@ func (s *ProfileService) Activate(uid string) (ActivateResult, error) {
 	if err != nil {
 		return ActivateResult{}, err
 	}
-	_ = p // UID 已通过 findProfile 校验存在
+	if p.Source.Kind == profile.SourceRemote {
+		rawPath, err := profile.RawPath(uid)
+		if err != nil {
+			return ActivateResult{}, err
+		}
+		if _, err := os.Stat(rawPath); os.IsNotExist(err) {
+			ctx := context.Background()
+			if s.core != nil {
+				ctx = s.core.lifetime
+			}
+			if err := s.FetchProfileContext(ctx, uid); err != nil {
+				return ActivateResult{}, err
+			}
+		}
+	}
 	if cfg, err := config.Load(); err == nil && cfg.Core.Mode == "managed" {
 		if s.core != nil {
 			return s.core.ApplyProfile(context.Background(), uid, true)

@@ -136,7 +136,7 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 	if err != nil {
 		return err
 	}
-	if err = validateManagedProfile(ctx, binary, path, path, raw); err != nil {
+	if err = s.validateConfig(ctx, cfg, binary, path, path, raw); err != nil {
 		err = fmt.Errorf("managed core configuration validation failed: %w", err)
 		s.processLogs.Store(true)
 		_, _ = fmt.Fprintf(&s.logs, "level=error msg=%q\n", err.Error())

@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -105,26 +106,50 @@ func profileValidationOutput(output string, data []byte) string {
 	return output
 }
 
-func validateManagedProfile(ctx context.Context, binary, path, candidate string, data []byte) error {
+type validationOutput struct {
+	buffer      coreinfra.LogBuffer
+	interrupt   func(string) error
+	stop        context.CancelFunc
+	once        sync.Once
+	interrupted error
+}
+
+func (w *validationOutput) Write(p []byte) (int, error) {
+	n, err := w.buffer.Write(p)
+	if w.interrupt != nil {
+		if reason := w.interrupt(w.buffer.String()); reason != nil {
+			w.once.Do(func() { w.interrupted = reason; w.stop() })
+		}
+	}
+	return n, err
+}
+
+func validateManagedProfile(ctx context.Context, binary, path, candidate string, data []byte, interrupt func(string) error) error {
 	validateCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	command := exec.CommandContext(validateCtx, binary, "-t", "-d", filepath.Dir(path), "-f", candidate)
 	coreinfra.ConfigureProcess(command)
-	var output coreinfra.LogBuffer
+	output := validationOutput{interrupt: interrupt, stop: cancel}
 	command.Stdout, command.Stderr = &output, &output
 	command.WaitDelay = time.Second
 	err := command.Run()
-	if validateCtx.Err() != nil {
-		return fmt.Errorf("subscription validation interrupted: %w", validateCtx.Err())
+	if ctx.Err() != nil {
+		return fmt.Errorf("subscription validation interrupted: %w", ctx.Err())
 	}
 	if err == nil {
 		return nil
+	}
+	if output.interrupted != nil {
+		return fmt.Errorf("%w: %s", output.interrupted, profileValidationOutput(output.buffer.String(), data))
+	}
+	if validateCtx.Err() != nil {
+		return fmt.Errorf("subscription validation interrupted: %w", validateCtx.Err())
 	}
 	var exited *exec.ExitError
 	if !errors.As(err, &exited) {
 		return fmt.Errorf("cannot start core validation: %w", err)
 	}
-	if detail := profileValidationOutput(output.String(), data); detail != "" {
+	if detail := profileValidationOutput(output.buffer.String(), data); detail != "" {
 		return fmt.Errorf("candidate subscription failed core validation: %w: %s", err, detail)
 	}
 	return fmt.Errorf("candidate subscription failed core validation: %w", err)
@@ -282,7 +307,7 @@ func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopp
 	if err != nil {
 		return ActivateResult{}, err
 	}
-	if err = validateManagedProfile(ctx, binary, path, candidate.Name(), data); err != nil {
+	if err = s.validateConfig(ctx, cfg, binary, path, candidate.Name(), data); err != nil {
 		return ActivateResult{}, err
 	}
 	if err = ctx.Err(); err != nil {

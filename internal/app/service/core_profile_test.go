@@ -130,19 +130,19 @@ exit 1
 func TestManagedProfileValidationReportsProcessFailures(t *testing.T) {
 	dir := t.TempDir()
 	binary := filepath.Join(dir, "validator")
-	err := validateManagedProfile(context.Background(), binary, filepath.Join(dir, "config.yaml"), "unused", []byte("proxies: []\n"))
+	err := validateManagedProfile(context.Background(), binary, filepath.Join(dir, "config.yaml"), "unused", []byte("proxies: []\n"), nil)
 	require.ErrorIs(t, err, os.ErrNotExist)
 	require.Contains(t, err.Error(), "cannot start core validation")
 
 	require.NoError(t, os.WriteFile(binary, []byte("#!/bin/sh\nexec sleep 30\n"), 0700))
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	err = validateManagedProfile(ctx, binary, filepath.Join(dir, "config.yaml"), "unused", []byte("proxies: []\n"))
+	err = validateManagedProfile(ctx, binary, filepath.Join(dir, "config.yaml"), "unused", []byte("proxies: []\n"), nil)
 	require.ErrorIs(t, err, context.Canceled)
 
 	ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	err = validateManagedProfile(ctx, binary, filepath.Join(dir, "config.yaml"), "unused", []byte("proxies: []\n"))
+	err = validateManagedProfile(ctx, binary, filepath.Join(dir, "config.yaml"), "unused", []byte("proxies: []\n"), nil)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Contains(t, err.Error(), "subscription validation interrupted")
 }

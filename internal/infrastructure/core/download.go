@@ -76,6 +76,9 @@ func validateSource(raw string) error {
 	if err != nil || u.Scheme != "https" || u.User != nil || u.Port() != "" || u.Fragment != "" {
 		return errors.New("invalid official Mihomo URL")
 	}
+	if raw == geoDataAPI || strings.HasPrefix(raw, geoDataURL) && IsGeoDataAsset(strings.TrimPrefix(raw, geoDataURL)) {
+		return nil
+	}
 	switch u.Hostname() {
 	case "api.github.com":
 		if u.Path == "/repos/MetaCubeX/mihomo/releases" {
