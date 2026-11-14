@@ -22,6 +22,23 @@ func (fn roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { ret
 
 const testAssetURL = "https://github.com/MetaCubeX/mihomo/releases/download/v1.2.3/test.gz"
 
+func TestDefaultAcceleratorRoutes(t *testing.T) {
+	f := NewFetcher()
+	f.envProxy = nil
+	for _, metadata := range []bool{false, true} {
+		routes, err := f.routes(testAssetURL, metadata)
+		want := []Route{{Name: "direct"}, {Name: "accelerator:gh-proxy.org", Gateway: "https://gh-proxy.org/"}}
+		if err != nil || !reflect.DeepEqual(routes, want) {
+			t.Fatalf("metadata=%v routes=%v err=%v", metadata, routes, err)
+		}
+	}
+	f.Accelerators = []Accelerator{}
+	routes, err := f.routes(testAssetURL, false)
+	if err != nil || len(routes) != 1 || routes[0].Name != "direct" {
+		t.Fatalf("disabled accelerators: routes=%v err=%v", routes, err)
+	}
+}
+
 func testFetcher(t *testing.T, fn func(Route, *http.Request) (int, string, error)) *Fetcher {
 	t.Helper()
 	f := NewFetcher()

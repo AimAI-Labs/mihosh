@@ -27,7 +27,7 @@ type Accelerator struct {
 }
 
 func DefaultAccelerators() []Accelerator {
-	return []Accelerator{{"https://gh-proxy.org/", true, true}, {"https://gh-proxy.com/", true, true}}
+	return []Accelerator{{"https://gh-proxy.org/", true, true}}
 }
 
 // Progress is a snapshot; consumers should retain only the latest value.
