@@ -77,43 +77,7 @@ func (c *Client) GetGroups() (map[string]model.Group, []string, error) {
 		return nil, nil, err
 	}
 
-	groups := make(map[string]model.Group)
-	for name, proxy := range proxies {
-		// 策略组有 all 字段
-		if len(proxy.All) > 0 {
-			groups[name] = model.Group{
-				Name:    name,
-				Type:    proxy.Type,
-				Now:     proxy.Now,
-				All:     proxy.All,
-				History: proxy.History,
-			}
-		}
-	}
-
-	// 利用 GLOBAL proxy 的 all 字段获取配置文件中的原始顺序
-	var orderedNames []string
-	if global, ok := proxies["GLOBAL"]; ok {
-		for _, name := range global.All {
-			if _, isGroup := groups[name]; isGroup {
-				orderedNames = append(orderedNames, name)
-			}
-		}
-	}
-
-	// 兜底：如果没有 GLOBAL 或顺序不完整，补充遗漏的组
-	if len(orderedNames) != len(groups) {
-		existing := make(map[string]bool, len(orderedNames))
-		for _, name := range orderedNames {
-			existing[name] = true
-		}
-		for name := range groups {
-			if !existing[name] {
-				orderedNames = append(orderedNames, name)
-			}
-		}
-	}
-
+	groups, orderedNames := model.ProxySnapshot(proxies).Groups()
 	return groups, orderedNames, nil
 }
 

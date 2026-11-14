@@ -2,12 +2,53 @@ package cli
 
 import (
 	"bytes"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestListCommandUsesOneProxySnapshot(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/proxies" {
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+			return
+		}
+		if requests.Add(1) == 1 {
+			io.WriteString(w, `{"proxies":{"GLOBAL":{"all":["Select","GLOBAL"]},"Select":{"type":"Selector","now":"first","all":["first"]},"first":{"history":[{"delay":11}]}}}`)
+		} else {
+			io.WriteString(w, `{"proxies":{"GLOBAL":{"all":["Select","GLOBAL"]},"Select":{"type":"Selector","now":"second","all":["second"]},"second":{"history":[{"delay":77}]}}}`)
+		}
+	}))
+	defer server.Close()
+	cfg := config.DefaultConfig
+	cfg.Core.Mode, cfg.Core.ExternalController = "external", server.URL
+	require.NoError(t, config.Save(&cfg))
+	out, err := os.CreateTemp(t.TempDir(), "list-output")
+	require.NoError(t, err)
+	savedOutput, savedStdout := listOutput, os.Stdout
+	listOutput, os.Stdout = "json", out
+	t.Cleanup(func() { listOutput, os.Stdout = savedOutput, savedStdout; out.Close() })
+	require.NoError(t, listCmd.RunE(listCmd, nil))
+	require.EqualValues(t, 1, requests.Load(), "one display must use one proxy snapshot")
+	_, err = out.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+	data, err := io.ReadAll(out)
+	require.NoError(t, err)
+	require.Contains(t, string(data), `"current": "first"`)
+	require.Contains(t, string(data), `"delay_ms": 11`)
+	require.NotContains(t, string(data), "second")
+}
 
 func TestRenderGroupList(t *testing.T) {
 	groups := map[string]model.Group{

@@ -16,7 +16,7 @@ import (
 var listOutput string
 
 var listCmd = &cobra.Command{
-	Use:   "list [--output json|table|plain]",
+	Use: "list [--output json|table|plain]",
 	Example: `  mihosh list
   mihosh list --output table
   mihosh list --output json`,
@@ -34,15 +34,11 @@ var listCmd = &cobra.Command{
 		client := loadClient(cfg)
 		proxySvc := service.NewProxyService(client, cfg.TestURL, cfg.Timeout)
 
-		groups, orderedNames, err := proxySvc.GetGroups()
+		proxiesMap, err := proxySvc.GetProxies()
 		if err != nil {
 			return wrapNetworkError(fmt.Errorf(i18n.T("cli.list.err_get_groups")+": %w", err))
 		}
-
-		proxiesMap, err := proxySvc.GetProxies()
-		if err != nil {
-			return wrapNetworkError(fmt.Errorf(i18n.T("cli.list.err_get_proxies")+": %w", err))
-		}
+		groups, orderedNames := model.ProxySnapshot(proxiesMap).Groups()
 
 		if err := renderGroupList(os.Stdout, groups, orderedNames, proxiesMap, format); err != nil {
 			return fmt.Errorf(i18n.T("cli.list.err_render")+": %w", err)

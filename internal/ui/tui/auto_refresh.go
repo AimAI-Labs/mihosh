@@ -20,7 +20,7 @@ func fetchAutoRefresh(client *api.Client, current nodes.State) tea.Cmd {
 		if err != nil {
 			return messages.ErrMsg{Err: err}
 		}
-		groups, orderedNames := groupsFromProxies(proxies)
+		groups, orderedNames := model.ProxySnapshot(proxies).Groups()
 		result := messages.AutoRefreshResult{
 			Groups:       groups,
 			OrderedNames: orderedNames,
@@ -29,43 +29,6 @@ func fetchAutoRefresh(client *api.Client, current nodes.State) tea.Cmd {
 		}
 		return messages.AutoRefreshMsg{Result: result, Changed: detectAutoRefreshChange(current, result)}
 	})
-}
-
-func groupsFromProxies(proxies map[string]model.Proxy) (map[string]model.Group, []string) {
-	groups := make(map[string]model.Group)
-	for name, proxy := range proxies {
-		if len(proxy.All) > 0 {
-			groups[name] = model.Group{
-				Name:    name,
-				Type:    proxy.Type,
-				Now:     proxy.Now,
-				All:     proxy.All,
-				History: proxy.History,
-			}
-		}
-	}
-
-	var orderedNames []string
-	if global, ok := proxies["GLOBAL"]; ok {
-		for _, name := range global.All {
-			if _, isGroup := groups[name]; isGroup {
-				orderedNames = append(orderedNames, name)
-			}
-		}
-	}
-	if len(orderedNames) != len(groups) {
-		existing := make(map[string]bool, len(orderedNames))
-		for _, name := range orderedNames {
-			existing[name] = true
-		}
-		for name := range groups {
-			if !existing[name] {
-				orderedNames = append(orderedNames, name)
-			}
-		}
-	}
-
-	return groups, orderedNames
 }
 
 func detectAutoRefreshChange(current nodes.State, result messages.AutoRefreshResult) bool {
