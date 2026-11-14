@@ -55,8 +55,10 @@ func TestUpdate_GlobalMessages(t *testing.T) {
 }
 
 func TestUpdate_MouseMessages(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	client := api.NewClient(config.MihomoEndpoint{}, 2000)
 	m := NewModel(client, "http://www.gstatic.com/generate_204", 2000)
+	m.currentPage = layout.PageNodes // Navigation starts here, independently of first-run routing.
 	m.width = 100
 	m.height = 50
 
@@ -95,8 +97,10 @@ func TestUpdate_MouseMessages(t *testing.T) {
 }
 
 func TestUpdate_KeyMessages(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	client := api.NewClient(config.MihomoEndpoint{}, 2000)
 	m := NewModel(client, "", 2000)
+	m.currentPage = layout.PageNodes // Navigation starts here, independently of first-run routing.
 
 	// Help popup intercepts keys
 	m.showHelp = true
