@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
@@ -87,13 +89,72 @@ func TestManagedProfileValidationFailureDoesNotCommit(t *testing.T) {
 	require.NoError(t, err)
 	binary, err := coreinfra.BinaryPath(root, "v1.2.3", runtime.GOOS)
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(binary, []byte("#!/bin/sh\nexit 1\n"), 0700))
+	path, err := config.ManagedMihomoConfigPath()
+	require.NoError(t, err)
+	baseline, err := config.ReadMihomoYAML(path)
+	require.NoError(t, err)
+	controllerSecret := baseline["secret"].(string)
+	require.NoError(t, profile.WriteRaw(uid, []byte("proxies: [{name: test, type: ss, password: subscription-password, uuid: subscription-uuid}]\nproxy-providers:\n  private:\n    type: http\n    url: https://provider.example/private-path-token?auth=query-token\n")))
+	script := fmt.Sprintf(`#!/bin/sh
+i=0
+while [ "$i" -lt 1000 ]; do
+  printf '%%080d\n' "$i"
+  i=$((i+1))
+done
+printf '%%s\n' 'yaml: line 7: cannot unmarshal value' 'proxy 0: unsupported proxy type' "can't download GeoIP.dat" >&2
+printf '\033[31m%%s\033[0m\n' 'subscription-password subscription-uuid %s' >&2
+printf '%%s\n' 'https://provider.example/private-path-token?auth=query-token query-token' >&2
+exit 1
+`, controllerSecret)
+	require.NoError(t, os.WriteFile(binary, []byte(script), 0700))
 	_, err = svc.ApplyProfile(context.Background(), uid, false)
 	require.Error(t, err)
-	path, _ := config.ManagedMihomoConfigPath()
+	for _, reason := range []string{"yaml: line 7", "proxy 0: unsupported proxy type", "can't download GeoIP.dat", "exit status 1"} {
+		require.Contains(t, err.Error(), reason)
+	}
+	for _, secret := range []string{"subscription-password", "subscription-uuid", controllerSecret, "provider.example", "private-path-token", "query-token", "\x1b"} {
+		require.NotContains(t, err.Error(), secret)
+	}
+	require.Less(t, len(err.Error()), 4200, "child output must remain bounded")
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	require.Equal(t, old, data)
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	require.Empty(t, cfg.ActiveSub)
+	candidates, err := filepath.Glob(filepath.Join(filepath.Dir(path), ".candidate-*.yaml"))
+	require.NoError(t, err)
+	require.Empty(t, candidates)
+}
+
+func TestManagedProfileValidationReportsProcessFailures(t *testing.T) {
+	dir := t.TempDir()
+	binary := filepath.Join(dir, "validator")
+	err := validateManagedProfile(context.Background(), binary, filepath.Join(dir, "config.yaml"), "unused", []byte("proxies: []\n"))
+	require.ErrorIs(t, err, os.ErrNotExist)
+	require.Contains(t, err.Error(), "cannot start core validation")
+
+	require.NoError(t, os.WriteFile(binary, []byte("#!/bin/sh\nexec sleep 30\n"), 0700))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err = validateManagedProfile(ctx, binary, filepath.Join(dir, "config.yaml"), "unused", []byte("proxies: []\n"))
+	require.ErrorIs(t, err, context.Canceled)
+
+	ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	err = validateManagedProfile(ctx, binary, filepath.Join(dir, "config.yaml"), "unused", []byte("proxies: []\n"))
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.Contains(t, err.Error(), "subscription validation interrupted")
+}
+
+func TestProfileValidationOutputRedactsNestedAndEscapedCredentials(t *testing.T) {
+	data := []byte("auth: {credentials: [nested-credential]}\npassword: 'line\"\\password'\nurl: https://alice:secret%2Fvalue@host.example/private?token=query%2Fcredential\n")
+	output := "yaml: line 4: nested-credential line\\\"\\\\password query/credential alice secret/value secret%2Fvalue https://other.example/private-token\x00\x07"
+	result := profileValidationOutput(output, data)
+	require.Contains(t, result, "yaml: line 4")
+	for _, secret := range []string{"nested-credential", "password", "query/credential", "alice", "secret/value", "secret%2Fvalue", "other.example", "private-token", "\x00", "\x07"} {
+		require.NotContains(t, result, secret)
+	}
 }
 
 func TestCoreImportsLocalProfileWithoutExternalKernel(t *testing.T) {

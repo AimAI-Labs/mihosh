@@ -5,22 +5,129 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
+	"github.com/charmbracelet/x/ansi"
 	"gopkg.in/yaml.v3"
 )
 
 type profileRecovery struct {
 	Config    []byte `json:"config"`
 	ActiveSub string `json:"active_sub"`
+}
+
+var validationURL = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.-]*://[^\s"'<>]+`)
+
+// Validation errors can quote subscription values; retain the reason without credentials.
+func profileValidationOutput(output string, data []byte) string {
+	var root yaml.Node
+	if yaml.Unmarshal(data, &root) != nil {
+		return ""
+	}
+	var sensitive []string
+	var collect func(*yaml.Node, bool)
+	collect = func(node *yaml.Node, secret bool) {
+		if node.Kind == yaml.MappingNode {
+			for i := 0; i+1 < len(node.Content); i += 2 {
+				key := strings.ToLower(strings.ReplaceAll(node.Content[i].Value, "_", "-"))
+				credential := secret
+				for _, part := range []string{"password", "secret", "token", "auth", "uuid", "private-key", "pre-shared-key", "username", "psk"} {
+					credential = credential || strings.Contains(key, part)
+				}
+				collect(node.Content[i+1], credential)
+			}
+			return
+		}
+		if node.Kind == yaml.ScalarNode && node.Value != "" {
+			value := node.Value
+			if secret {
+				quoted := strconv.Quote(value)
+				sensitive = append(sensitive, value, quoted[1:len(quoted)-1])
+			}
+			for _, rawURL := range validationURL.FindAllString(value, -1) {
+				sensitive = append(sensitive, rawURL)
+				if parsed, err := url.Parse(rawURL); err == nil {
+					sensitive = append(sensitive, parsed.RawQuery)
+					if parsed.User != nil {
+						password, _ := parsed.User.Password()
+						for _, value := range []string{parsed.User.Username(), password} {
+							quoted := strconv.Quote(value)
+							sensitive = append(sensitive, value, quoted[1:len(quoted)-1], url.QueryEscape(value), url.PathEscape(value))
+						}
+					}
+					for _, values := range parsed.Query() {
+						for _, value := range values {
+							sensitive = append(sensitive, value, url.QueryEscape(value))
+						}
+					}
+				}
+			}
+		}
+		for _, child := range node.Content {
+			collect(child, secret)
+		}
+	}
+	collect(&root, false)
+	output = ansi.Strip(output)
+	sort.Slice(sensitive, func(i, j int) bool { return len(sensitive[i]) > len(sensitive[j]) })
+	var replacements []string
+	for _, value := range sensitive {
+		if value != "" {
+			replacements = append(replacements, value, "[redacted]")
+		}
+	}
+	output = strings.NewReplacer(replacements...).Replace(output)
+	output = validationURL.ReplaceAllString(output, "[redacted URL]")
+	output = strings.TrimSpace(strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) && r != '\n' {
+			return ' '
+		}
+		return r
+	}, output))
+	const limit = 4096
+	if len(output) > limit {
+		output = "…" + strings.ToValidUTF8(output[len(output)-limit:], "")
+	}
+	return output
+}
+
+func validateManagedProfile(ctx context.Context, binary, path, candidate string, data []byte) error {
+	validateCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	command := exec.CommandContext(validateCtx, binary, "-t", "-d", filepath.Dir(path), "-f", candidate)
+	coreinfra.ConfigureProcess(command)
+	var output coreinfra.LogBuffer
+	command.Stdout, command.Stderr = &output, &output
+	command.WaitDelay = time.Second
+	err := command.Run()
+	if validateCtx.Err() != nil {
+		return fmt.Errorf("subscription validation interrupted: %w", validateCtx.Err())
+	}
+	if err == nil {
+		return nil
+	}
+	var exited *exec.ExitError
+	if !errors.As(err, &exited) {
+		return fmt.Errorf("cannot start core validation: %w", err)
+	}
+	if detail := profileValidationOutput(output.String(), data); detail != "" {
+		return fmt.Errorf("candidate subscription failed core validation: %w: %s", err, detail)
+	}
+	return fmt.Errorf("candidate subscription failed core validation: %w", err)
 }
 
 func privateWrite(path string, data []byte) error {
@@ -175,13 +282,8 @@ func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopp
 	if err != nil {
 		return ActivateResult{}, err
 	}
-	validateCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	command := exec.CommandContext(validateCtx, binary, "-t", "-d", filepath.Dir(path), "-f", candidate.Name())
-	coreinfra.ConfigureProcess(command)
-	err = command.Run()
-	cancel()
-	if err != nil {
-		return ActivateResult{}, errors.New("candidate subscription failed core validation")
+	if err = validateManagedProfile(ctx, binary, path, candidate.Name(), data); err != nil {
+		return ActivateResult{}, err
 	}
 	if err = ctx.Err(); err != nil {
 		return ActivateResult{}, err
