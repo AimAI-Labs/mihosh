@@ -24,8 +24,6 @@ const (
 	subMinHeight    = 5
 	subScrollWidth  = 1
 	subHeaderHeight = 3
-	// subVisibleLinesHint 列表可视行数估算（渲染时按实际高度重算，此处仅用于滚动钳制）。
-	subVisibleLinesHint = 10
 )
 
 // PageState 订阅页渲染状态。
@@ -72,11 +70,7 @@ func RenderSubPage(state PageState) string {
 	header := renderHeader(stats, searchBox, state.Width)
 	sections = append(sections, header, "")
 
-	availableHeight := state.Height - subFixedLines
-	if availableHeight < subMinHeight {
-		availableHeight = subMinHeight
-	}
-	list := renderList(state, availableHeight)
+	list := renderList(state, layoutSubList(state))
 	sections = append(sections, list)
 
 	result := strings.Join(sections, "\n")
@@ -158,23 +152,13 @@ func renderSearchBox(filterText string, filterMode bool, engine FilterEngine) st
 	return label + input + hint + engineIndicator
 }
 
-func renderList(state PageState, maxLines int) string {
+func renderList(state PageState, layout subListLayout) string {
+	maxLines := layout.capacity
 	if len(state.FilteredIdx) == 0 {
 		return common.MutedStyle().Render(i18n.T("sub.empty"))
 	}
 
-	scrollTop := state.ScrollTop
-	if state.Selected < scrollTop {
-		scrollTop = state.Selected
-	}
-	if state.Selected >= scrollTop+maxLines {
-		scrollTop = state.Selected - maxLines + 1
-	}
-
-	endIdx := scrollTop + maxLines
-	if endIdx > len(state.FilteredIdx) {
-		endIdx = len(state.FilteredIdx)
-	}
+	scrollTop, endIdx := layout.window.Start, layout.window.End
 
 	listWidth := state.Width - subScrollWidth
 	var lines []string
@@ -184,7 +168,7 @@ func renderList(state PageState, maxLines int) string {
 			continue
 		}
 		p := state.Subs[subIdx]
-		lines = append(lines, renderSubEntry(p, i+1, subIdx == 0, p.UID == state.ActiveUID, p.UID == state.UpdatingUID, i == state.Selected, listWidth))
+		lines = append(lines, renderSubEntry(p, i+1, subIdx == 0, p.UID == state.ActiveUID, p.UID == state.UpdatingUID, i == layout.window.Selected, listWidth))
 	}
 	listStr := strings.Join(lines, "\n")
 
@@ -323,23 +307,8 @@ func relativeTime(ts int64) string {
 
 // resolveListItemAt 根据 pageY 定位命中的列表项索引（filteredIdx 内的索引）。
 func resolveListItemAt(state PageState, pageY, pageHeight int) int {
-	listStartY := subHeaderHeight + 1
-	if pageY < listStartY {
-		return -1
-	}
-	availableHeight := pageHeight - subFixedLines
-	if availableHeight < subMinHeight {
-		availableHeight = subMinHeight
-	}
-	offset := pageY - listStartY
-	if offset < 0 || offset >= availableHeight {
-		return -1
-	}
-	visibleIdx := state.ScrollTop + offset
-	if visibleIdx < 0 || visibleIdx >= len(state.FilteredIdx) || offset >= availableHeight {
-		return -1
-	}
-	return visibleIdx
+	state.Height = pageHeight
+	return layoutSubList(state).itemAt(pageY)
 }
 
 // ============================================================

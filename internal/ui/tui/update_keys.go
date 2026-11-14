@@ -188,6 +188,8 @@ func (m Model) dispatchToPage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.rulesState, cmd = m.rulesState.Update(msg)
 
 	case layout.PageSub:
+		pw, ph := m.getPageSize()
+		m.subState, _ = m.subState.Update(messages.PageResizeMsg{Width: pw, Height: ph})
 		m.subState, cmd = m.subState.Update(msg)
 
 	case layout.PageSettings:

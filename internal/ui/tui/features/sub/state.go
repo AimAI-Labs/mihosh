@@ -37,6 +37,7 @@ type State struct {
 	filterEngine FilterEngine
 	selected     int
 	scrollTop    int
+	pageHeight   int
 
 	// 弹窗/输入模式
 	showAddForm    bool
@@ -130,64 +131,69 @@ func (s State) ApplySubs(subs []profile.Profile, active string) State {
 // Update 处理按键，分派到当前激活的子模式。
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
+	case messages.PageResizeMsg:
+		s.pageHeight = msg.Height
+		s.clampScroll()
+		return s, nil
 	case messages.PageMouseScrollMsg:
+		s.pageHeight = msg.Height
 		return s.HandleMouseScroll(msg.Up), nil
 	case messages.PageMouseClickMsg:
 		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
 	case tea.KeyMsg:
-	// 弹窗优先拦截
-	if s.showDeleteConf {
-		return s.handleDeleteConfirm(msg)
-	}
-	if s.showAddForm {
-		return s.handleAddFormUpdate(msg)
-	}
-	if s.showEditForm {
-		return s.handleEditFormUpdate(msg)
-	}
-	if s.filterMode {
-		return s.handleFilterMode(msg)
-	}
+		// 弹窗优先拦截
+		if s.showDeleteConf {
+			return s.handleDeleteConfirm(msg)
+		}
+		if s.showAddForm {
+			return s.handleAddFormUpdate(msg)
+		}
+		if s.showEditForm {
+			return s.handleEditFormUpdate(msg)
+		}
+		if s.filterMode {
+			return s.handleFilterMode(msg)
+		}
 
-	switch {
-	case key.Matches(msg, common.Keys.Up):
-		if s.selected > 0 {
-			s.selected--
-			s.clampScroll()
-		}
-	case key.Matches(msg, common.Keys.Down):
-		if s.selected < len(s.filteredIdx)-1 {
-			s.selected++
-			s.clampScroll()
-		}
-	case msg.String() == "enter":
-		return s.activateSelected()
-	case msg.String() == "u":
-		return s.updateSelected()
-	case msg.String() == "m":
-		return s.openMergeExternalEditor()
-	case msg.String() == "c":
-		return s.openRawExternalEditor()
-	case msg.String() == "e":
-		return s.openEditForm()
-	case msg.String() == "n":
-		s.showAddForm = true
-		s.addForm = newAddForm()
-	case msg.String() == "d":
-		return s.openDeleteConfirm()
-	case msg.String() == "/":
-		s.filterMode = true
-		s.filter = ""
-	case key.Matches(msg, common.Keys.Refresh):
-		return s, FetchSubs(s.svc)
-	case key.Matches(msg, common.Keys.Escape):
-		if s.filter != "" {
+		switch {
+		case key.Matches(msg, common.Keys.Up):
+			if s.selected > 0 {
+				s.selected--
+				s.clampScroll()
+			}
+		case key.Matches(msg, common.Keys.Down):
+			if s.selected < len(s.filteredIdx)-1 {
+				s.selected++
+				s.clampScroll()
+			}
+		case msg.String() == "enter":
+			return s.activateSelected()
+		case msg.String() == "u":
+			return s.updateSelected()
+		case msg.String() == "m":
+			return s.openMergeExternalEditor()
+		case msg.String() == "c":
+			return s.openRawExternalEditor()
+		case msg.String() == "e":
+			return s.openEditForm()
+		case msg.String() == "n":
+			s.showAddForm = true
+			s.addForm = newAddForm()
+		case msg.String() == "d":
+			return s.openDeleteConfirm()
+		case msg.String() == "/":
+			s.filterMode = true
 			s.filter = ""
-			s.selected = 0
-			s.scrollTop = 0
-			s.updateFiltered()
+		case key.Matches(msg, common.Keys.Refresh):
+			return s, FetchSubs(s.svc)
+		case key.Matches(msg, common.Keys.Escape):
+			if s.filter != "" {
+				s.filter = ""
+				s.selected = 0
+				s.scrollTop = 0
+				s.updateFiltered()
+			}
 		}
-	}
 	}
 	return s, nil
 }
@@ -341,6 +347,7 @@ func (s State) handleEditFormUpdate(msg tea.KeyMsg) (State, tea.Cmd) {
 
 // HandleMouseScroll 鼠标滚轮。
 func (s State) HandleMouseScroll(up bool) State {
+	s.clampScroll()
 	if up {
 		if s.selected > 0 {
 			s.selected--
@@ -357,6 +364,8 @@ func (s State) HandleMouseScroll(up bool) State {
 
 // HandleMouseLeft 处理列表单击/双击。
 func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, tea.Cmd) {
+	s.pageHeight = pageHeight
+	s.clampScroll()
 	// 弹窗激活时点击弹窗外 → 取消关闭（删除确认/添加表单）
 	if s.showDeleteConf || s.showAddForm || s.showEditForm {
 		// 简化处理：点击任意位置不自动关闭破坏性弹窗（需 Esc/Enter），
@@ -396,13 +405,8 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 
 // clampScroll 确保选中项可见。
 func (s *State) clampScroll() {
-	maxLines := subVisibleLinesHint
-	if s.selected < s.scrollTop {
-		s.scrollTop = s.selected
-	}
-	if s.selected >= s.scrollTop+maxLines {
-		s.scrollTop = s.selected - maxLines + 1
-	}
+	window := layoutSubList(s.ToPageState(0, s.pageHeight)).window
+	s.selected, s.scrollTop = window.Selected, window.Start
 }
 
 // updateFiltered 重建过滤缓存。

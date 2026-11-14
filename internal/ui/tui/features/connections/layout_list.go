@@ -49,13 +49,8 @@ func layoutConnectionList(state PageState) connectionListLayout {
 		layout.detailHeight = max(5, maxDisplay/2)
 		maxDisplay = max(3, maxDisplay-layout.detailHeight)
 	}
-	layout.selected = max(0, min(state.SelectedIndex, total-1))
-	layout.scrollTop = max(0, min(state.ScrollTop, total-1))
-	if layout.selected >= layout.scrollTop+maxDisplay {
-		layout.scrollTop = layout.selected - maxDisplay + 1
-	}
-	layout.scrollTop = min(layout.scrollTop, layout.selected)
-	layout.end = min(total, layout.scrollTop+maxDisplay)
+	window := common.ResolveListWindow(total, state.SelectedIndex, state.ScrollTop, maxDisplay)
+	layout.selected, layout.scrollTop, layout.end = window.Selected, window.Start, window.End
 	layout.dataY = layout.rowsY
 	rowCount := max(1, layout.end-layout.scrollTop)
 	if layout.scrollTop > 0 {

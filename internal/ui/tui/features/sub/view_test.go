@@ -1,6 +1,7 @@
 package sub
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -9,6 +10,41 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestRenderedSubscriptionRowsMatchClicksAfterResize(t *testing.T) {
+	var subs []profile.Profile
+	for i := 0; i < 40; i++ {
+		subs = append(subs, profile.Profile{UID: fmt.Sprint(i), Name: fmt.Sprintf("sub-%02d", i)})
+	}
+	for _, width := range []int{99, 100} {
+		for _, height := range []int{12, 24, 48} {
+			for _, selected := range []int{0, 19, 39} {
+				t.Run(fmt.Sprintf("%d/%d/selected=%d", width, height, selected), func(t *testing.T) {
+					state := State{}.ApplySubs(subs, "")
+					state.selected, state.scrollTop = selected, 15
+					ps := state.ToPageState(width, height)
+					found := 0
+					for y, line := range strings.Split(RenderSubPage(ps), "\n") {
+						for i, sub := range subs {
+							if !strings.Contains(line, sub.Name) {
+								continue
+							}
+							found++
+							if got := resolveListItemAt(ps, y, height); got != i {
+								t.Fatalf("rendered sub[%d] at y=%d resolves to %d", i, y, got)
+							}
+							next, _ := state.HandleMouseLeft(1, y, width, height)
+							if next.selected != i {
+								t.Fatalf("click at rendered sub[%d] selected %d", i, next.selected)
+							}
+						}
+					}
+					require.Positive(t, found)
+				})
+			}
+		}
+	}
+}
 
 func TestRenderSubPage_EmptyList(t *testing.T) {
 	state := State{}.ToPageState(80, 24)
