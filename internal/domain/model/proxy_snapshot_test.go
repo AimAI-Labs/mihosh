@@ -53,3 +53,30 @@ func TestProxySnapshotGroups(t *testing.T) {
 		})
 	}
 }
+
+func TestProxySnapshotChain(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		proxies ProxySnapshot
+		root    string
+		chain   []string
+		found   bool
+	}{
+		{"empty snapshot", nil, "GLOBAL", nil, false},
+		{"missing root", ProxySnapshot{"node": {}}, "GLOBAL", nil, false},
+		{"leaf root", ProxySnapshot{"node": {}}, "node", []string{"node"}, true},
+		{"nested selection", ProxySnapshot{"GLOBAL": {Now: "Proxy"}, "Proxy": {Now: "node", All: []string{"node"}}, "node": {}}, "GLOBAL", []string{"GLOBAL", "Proxy", "node"}, true},
+		{"unselected group", ProxySnapshot{"GLOBAL": {All: []string{"node"}}, "node": {}}, "GLOBAL", nil, false},
+		{"empty all retains leaf semantics", ProxySnapshot{"GLOBAL": {Type: "Selector"}}, "GLOBAL", []string{"GLOBAL"}, true},
+		{"missing selected node", ProxySnapshot{"GLOBAL": {Now: "missing"}}, "GLOBAL", nil, false},
+		{"self loop", ProxySnapshot{"GLOBAL": {Now: "GLOBAL"}}, "GLOBAL", nil, false},
+		{"cycle", ProxySnapshot{"GLOBAL": {Now: "Proxy"}, "Proxy": {Now: "GLOBAL"}}, "GLOBAL", nil, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			chain, found := tc.proxies.Chain(tc.root)
+			if found != tc.found || !reflect.DeepEqual(chain, tc.chain) {
+				t.Fatalf("chain=%v found=%t, want %v/%t", chain, found, tc.chain, tc.found)
+			}
+		})
+	}
+}

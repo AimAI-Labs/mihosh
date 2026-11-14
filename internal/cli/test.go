@@ -28,7 +28,7 @@ var (
 )
 
 var testCmd = &cobra.Command{
-	Use:   "test [node <节点名> | group <策略组名>] [--output json|table|plain]",
+	Use: "test [node <节点名> | group <策略组名>] [--output json|table|plain]",
 	Example: `  mihosh test
   mihosh test --output json
   mihosh test node HK --output table
@@ -118,10 +118,11 @@ func resolveTestAction(args []string) (testAction, string, error) {
 func runTestAction(w io.Writer, proxySvc *service.ProxyService, proxyAddress string, action testAction, target string, format outputFormat) error {
 	switch action {
 	case actionCurrent:
-		node, found, err := currentSelectedNode(proxySvc)
+		proxies, err := proxySvc.GetProxies()
 		if err != nil {
 			return fmt.Errorf(i18n.T("cli.test.err_get_current")+": %w", err)
 		}
+		node, chain, found := resolveCurrentSelectedNode(proxies)
 		if !found {
 			return renderNoCurrentTestOutput(w, format)
 		}
@@ -130,11 +131,6 @@ func runTestAction(w io.Writer, proxySvc *service.ProxyService, proxyAddress str
 		_, err = proxySvc.TestProxyDelay(node)
 		if err != nil {
 			return fmt.Errorf(i18n.T("cli.test.err_test_delay")+": %w", err)
-		}
-
-		chain, err := proxySvc.GetNodeChain()
-		if err != nil {
-			return fmt.Errorf(i18n.T("cli.test.err_get_chain")+": %w", err)
 		}
 
 		ipInfo, err := proxySvc.GetIPInfo(proxyAddress)
@@ -273,54 +269,13 @@ func renderGroupTestOutput(w io.Writer, group string, format outputFormat) error
 	}
 }
 
-func currentSelectedNode(proxySvc *service.ProxyService) (string, bool, error) {
-	proxies, err := proxySvc.GetProxies()
-	if err != nil {
-		return "", false, err
-	}
-	node, found := resolveCurrentSelectedNode(proxies)
-	return node, found, nil
-}
-
-func resolveCurrentSelectedNode(proxies map[string]model.Proxy) (string, bool) {
+func resolveCurrentSelectedNode(proxies map[string]model.Proxy) (string, []string, bool) {
 	for _, root := range []string{"GLOBAL", "Proxy"} {
-		if _, ok := proxies[root]; !ok {
-			continue
-		}
-
-		if node, found := resolveLeafFromRoot(proxies, root); found {
-			return node, true
+		if chain, found := model.ProxySnapshot(proxies).Chain(root); found {
+			return chain[len(chain)-1], chain, true
 		}
 	}
-
-	return "", false
-}
-
-func resolveLeafFromRoot(proxies map[string]model.Proxy, root string) (string, bool) {
-	current := root
-	visited := make(map[string]struct{}, len(proxies))
-
-	for {
-		if _, seen := visited[current]; seen {
-			return "", false
-		}
-		visited[current] = struct{}{}
-
-		proxy, ok := proxies[current]
-		if !ok {
-			return "", false
-		}
-
-		if proxy.Now == "" {
-			// 策略组通常带有 all 字段。没有 Now 且仍是策略组时，视为未选择具体节点。
-			if len(proxy.All) > 0 {
-				return "", false
-			}
-			return current, true
-		}
-
-		current = proxy.Now
-	}
+	return "", nil, false
 }
 
 func boxLine(label, value string, labelWidth, width int) string {

@@ -2,11 +2,60 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestCurrentNodeAndChainUseOneSnapshot(t *testing.T) {
+	var snapshots, individual atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.IsAbs():
+			// Act as the local outbound-IP proxy too; no external request is sent.
+			io.WriteString(w, `{"query":"203.0.113.1","status":"success"}`)
+		case r.URL.Path == "/proxies":
+			snapshots.Add(1)
+			io.WriteString(w, `{"proxies":{"GLOBAL":{"now":"Proxy","all":["Proxy"]},"Proxy":{"now":"first","all":["first"]},"first":{}}}`)
+		case r.URL.Path == "/proxies/first/delay":
+			io.WriteString(w, `{"delay":42}`)
+		case strings.HasPrefix(r.URL.Path, "/proxies/"):
+			individual.Add(1)
+			if strings.HasSuffix(r.URL.Path, "/GLOBAL") {
+				io.WriteString(w, `{"now":"changed-after-test"}`)
+			} else {
+				io.WriteString(w, `{}`)
+			}
+		default:
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+		}
+	}))
+	defer server.Close()
+	client := api.NewClient(config.MihomoEndpoint{ExternalController: server.URL}, 1000)
+	svc := service.NewProxyService(client, "http://test.invalid", 1000)
+	var out bytes.Buffer
+	require.NoError(t, runTestAction(&out, svc, server.URL, actionCurrent, "", outputFormatJSON))
+	require.EqualValues(t, 1, snapshots.Load())
+	require.Zero(t, individual.Load(), "chain must come from the same response as the selected node")
+	var result struct {
+		Node  string   `json:"node"`
+		Chain []string `json:"chain"`
+	}
+	require.NoError(t, json.Unmarshal(out.Bytes(), &result))
+	require.Equal(t, "first", result.Node)
+	require.Equal(t, []string{"GLOBAL", "Proxy", "first"}, result.Chain)
+}
 
 func TestResolveTestAction(t *testing.T) {
 	tests := []struct {
@@ -134,13 +183,33 @@ func TestResolveCurrentSelectedNode(t *testing.T) {
 			},
 			wantFound: false,
 		},
+		{
+			name: "invalid GLOBAL still falls back to Proxy",
+			proxies: map[string]model.Proxy{
+				"GLOBAL": {Now: "missing"},
+				"Proxy":  {Now: "JP", All: []string{"JP"}},
+				"JP":     {},
+			},
+			wantNode: "JP", wantFound: true,
+		},
+		{
+			name: "GLOBAL leaf takes precedence over Proxy",
+			proxies: map[string]model.Proxy{
+				"GLOBAL": {Now: "HK"}, "HK": {},
+				"Proxy": {Now: "JP"}, "JP": {},
+			},
+			wantNode: "HK", wantFound: true,
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			gotNode, gotFound := resolveCurrentSelectedNode(tc.proxies)
+			gotNode, chain, gotFound := resolveCurrentSelectedNode(tc.proxies)
 			assert.Equal(t, tc.wantFound, gotFound)
 			assert.Equal(t, tc.wantNode, gotNode)
+			if gotFound {
+				assert.Equal(t, gotNode, chain[len(chain)-1])
+			}
 		})
 	}
 }

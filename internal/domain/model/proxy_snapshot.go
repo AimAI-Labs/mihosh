@@ -4,6 +4,30 @@ package model
 // Callers treat its proxy map as read-only for the duration of a projection.
 type ProxySnapshot map[string]Proxy
 
+// Chain follows current selections to a leaf; incomplete and cyclic chains have no leaf.
+func (proxies ProxySnapshot) Chain(root string) ([]string, bool) {
+	var chain []string
+	visited := make(map[string]struct{})
+	for current := root; ; {
+		if _, seen := visited[current]; seen {
+			return nil, false
+		}
+		visited[current] = struct{}{}
+		proxy, ok := proxies[current]
+		if !ok {
+			return nil, false
+		}
+		chain = append(chain, current)
+		if proxy.Now == "" {
+			if len(proxy.All) > 0 {
+				return nil, false
+			}
+			return chain, true
+		}
+		current = proxy.Now
+	}
+}
+
 func (proxies ProxySnapshot) Groups() (map[string]Group, []string) {
 	groups := make(map[string]Group)
 	for name, proxy := range proxies {

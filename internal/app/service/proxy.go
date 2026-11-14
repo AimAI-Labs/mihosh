@@ -48,42 +48,6 @@ func (s *ProxyService) TestGroupDelay(group string) error {
 	return s.client.TestGroupDelay(group, s.testURL, s.timeout)
 }
 
-// GetNodeChain 获取当前活跃节点链路
-func (s *ProxyService) GetNodeChain() ([]string, error) {
-	var chain []string
-	current := "GLOBAL"
-
-	for {
-		proxy, err := s.client.GetProxy(current)
-		if err != nil {
-			// 如果没有 GLOBAL，尝试找常见的 Proxy 组
-			if current == "GLOBAL" {
-				current = "Proxy"
-				continue
-			}
-			return nil, err
-		}
-
-		// 检查是否已经存在（防止死循环）
-		for _, name := range chain {
-			if name == current {
-				return chain, nil
-			}
-		}
-
-		chain = append(chain, current)
-
-		// 如果节点没有 Now 字段，说明是叶子节点（代理节点）
-		if proxy.Now == "" {
-			break
-		}
-
-		current = proxy.Now
-	}
-
-	return chain, nil
-}
-
 // GetIPInfo 获取当前出口 IP 信息
 func (s *ProxyService) GetIPInfo(proxyAddr string) (*model.IPInfo, error) {
 	httpClient, err := s.client.NewHTTPClientWithProxy(proxyAddr)
