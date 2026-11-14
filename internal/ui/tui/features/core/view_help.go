@@ -31,7 +31,7 @@ func (s State) inlineHelp(width int) string {
 		{Key: "Enter", Desc: i18n.T("core.inline.run")},
 	}
 	if s.tab == 1 {
-		hints[2].Desc = i18n.T("core.inline.download")
+		hints = append([]common.InlineHelpHint{{Key: "Enter", Desc: i18n.T("core.inline.download")}}, hints[:2]...)
 		hints = append(hints, common.InlineHelpHint{Key: "a", Desc: i18n.T("core.inline.activate")})
 	}
 	if s.Editing {
@@ -56,10 +56,10 @@ func (s State) inlineHelp(width int) string {
 		help = common.InlineHelpHint{Key: "Esc", Desc: i18n.T("core.inline.cancel")}
 		hints = hints[:max(0, len(hints)-1)]
 	} else if s.Busy {
-		hints = hints[:2]
+		hints = []common.InlineHelpHint{{Key: "←→", Desc: i18n.T("core.inline.sections")}, {Key: "↑↓", Desc: i18n.T("core.inline.select")}}
 		help = common.InlineHelpHint{Key: "Esc", Desc: i18n.T("core.inline.cancel")}
 	} else if s.task != "" || s.Err != nil {
-		hints = hints[:2]
+		hints = []common.InlineHelpHint{{Key: "←→", Desc: i18n.T("core.inline.sections")}, {Key: "↑↓", Desc: i18n.T("core.inline.select")}}
 		help = common.InlineHelpHint{Key: "Enter/Esc", Desc: i18n.T("core.inline.dismiss")}
 	}
 	for len(hints) > 0 && lipgloss.Width(common.FormatInlineHintRow(append(hints, help))) > width-1 {

@@ -149,7 +149,12 @@ func (s State) releaseLayout(width, height int, parts []string, result pageLayou
 	if count == 0 {
 		rows = append(rows, strings.Split(wrap(i18n.T("core.catalog.empty"), width-4), "\n")...)
 	}
-	columns := s.releaseColumns(start, min(count, start+visible), width-4)
+	rowWidth := width - 4
+	scrollbar := common.BuildVerticalScrollbar(visible, count, start, true)
+	if scrollbar != "" {
+		rowWidth -= 2
+	}
+	columns := s.releaseColumns(start, min(count, start+visible), rowWidth)
 	for i := start; i < min(count, start+visible); i++ {
 		r, ok := s.releaseAt(i)
 		if !ok {
@@ -159,13 +164,19 @@ func (s State) releaseLayout(width, height int, parts []string, result pageLayou
 		if i == s.selected {
 			marker = "› "
 		}
-		label := s.releaseRow(r, marker, columns, width-4)
+		label := s.releaseRow(r, marker, columns, rowWidth)
 		label = lipgloss.NewStyle().Foreground(s.releaseColor(r)).Render(label)
 		if i == s.selected {
-			label = selected.Foreground(s.releaseColor(r)).Render(common.PadString(label, width-4))
+			label = selected.Foreground(s.releaseColor(r)).Render(common.PadString(label, rowWidth))
 		}
 		result.releases = append(result.releases, actionHit{x: 1, y: top + len(rows) + 1, width: width - 2, height: 1, index: i})
 		rows = append(rows, label)
+	}
+	if scrollbar != "" {
+		tracks := strings.Split(scrollbar, "\n")
+		for i := range rows {
+			rows[i] = common.PadString(rows[i], rowWidth) + " " + tracks[i]
+		}
 	}
 	parts = append(parts, panel(i18n.T("core.catalog.title"), strings.Join(rows, "\n"), width))
 	result.content = strings.Join(parts, "\n")
