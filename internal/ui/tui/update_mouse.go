@@ -45,10 +45,16 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if m.currentPage == layout.PageCore && m.coreState.Editing {
+	if m.pageInputCapture().Active {
 		pageX, pageY, pageWidth, pageHeight, ok := m.resolveMainPageMouseHit(msg.X, msg.Y)
-		if ok && isMouseLeftPress(msg) {
+		if !ok {
+			return m, nil
+		}
+		switch {
+		case isMouseLeftPress(msg):
 			return m.dispatchToPage(messages.PageMouseClickMsg{X: pageX, Y: pageY, Width: pageWidth, Height: pageHeight})
+		case isMouseWheelUp(msg), isMouseWheelDown(msg):
+			return m.dispatchToPage(messages.PageMouseScrollMsg{Up: isMouseWheelUp(msg), X: pageX, Y: pageY, Width: pageWidth, Height: pageHeight})
 		}
 		return m, nil
 	}

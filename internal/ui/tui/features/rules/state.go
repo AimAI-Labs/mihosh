@@ -227,5 +227,5 @@ func (s State) FilterMode() bool { return s.ruleFilterMode }
 // InputCapture declares which input belongs to the current page mode.
 func (s State) InputCapture() common.InputCapture {
 	active := s.ruleFilterMode || s.showTypeFilter || s.showAddForm || s.showDeleteConfirm
-	return common.InputCapture{Active: active, Interrupt: active}
+	return common.InputCapture{Active: active || s.showEditForm, Interrupt: active}
 }

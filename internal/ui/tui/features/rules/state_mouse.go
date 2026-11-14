@@ -11,6 +11,17 @@ import (
 
 // HandleMouseScroll 鼠标滚轮处理
 func (s State) HandleMouseScroll(up bool) State {
+	if s.showDeleteConfirm || s.ruleFilterMode {
+		return s
+	}
+	if s.showTypeFilter {
+		keyType := tea.KeyDown
+		if up {
+			keyType = tea.KeyUp
+		}
+		s, _ = s.handleTypeFilterMode(tea.KeyMsg{Type: keyType})
+		return s
+	}
 	// 如果显示添加表单或编辑表单，滚动切换字段焦点
 	if s.showAddForm || s.showEditForm {
 		// 如果策略选择器打开，则滚动策略选择器的列表
@@ -255,6 +266,9 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 	}
 
 	// 处理规则列表的单击和双击
+	if s.ruleFilterMode {
+		return s, nil
+	}
 	pageState := s.ToPageState(pageWidth, pageHeight)
 	idx := ResolveMouseHit(pageState, pageY)
 	if idx < 0 {

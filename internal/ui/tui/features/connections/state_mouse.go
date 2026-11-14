@@ -174,6 +174,9 @@ func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight in
 		s.topNModalPanel.HandleMouseScroll(up)
 		return s, nil
 	}
+	if s.FilterMode() {
+		return s, nil
+	}
 
 	layout := layoutConnectionList(s.ToPageState(s.chartData, mainWidth, mainHeight))
 	if layout.hit(mainX, mainY, mainWidth).Target == MouseTargetInlineDetail {

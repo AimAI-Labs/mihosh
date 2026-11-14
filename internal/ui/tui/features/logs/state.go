@@ -321,6 +321,9 @@ func (s State) HandleMouseLeft(pageY int, pageX int, pageWidth int) (State, tea.
 		return s, nil
 	}
 
+	if s.logFilterMode {
+		return s, nil
+	}
 	// 点击级别栏（带边框，占据 Y=0 到 Y=2）切换日志级别
 	if pageY >= 0 && pageY < logsModeSwitchHeight {
 		// 只检测中间行（Y=1）的按钮点击
@@ -365,6 +368,9 @@ func (s State) HandleMouseScroll(up bool, pageHeight int) State {
 		} else {
 			s.detailScroll++
 		}
+		return s
+	}
+	if s.logFilterMode {
 		return s
 	}
 
@@ -474,5 +480,5 @@ func getLogLevelIndex(level string) int {
 
 // InputCapture declares which input belongs to the current page mode.
 func (s State) InputCapture() common.InputCapture {
-	return common.InputCapture{Active: s.FilterMode(), Interrupt: s.FilterMode()}
+	return common.InputCapture{Active: s.FilterMode() || s.detailMode, Interrupt: s.FilterMode()}
 }

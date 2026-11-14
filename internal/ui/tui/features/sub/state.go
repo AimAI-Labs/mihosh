@@ -347,6 +347,9 @@ func (s State) handleEditFormUpdate(msg tea.KeyMsg) (State, tea.Cmd) {
 
 // HandleMouseScroll 鼠标滚轮。
 func (s State) HandleMouseScroll(up bool) State {
+	if s.Querying() {
+		return s
+	}
 	s.clampScroll()
 	if up {
 		if s.selected > 0 {
@@ -385,6 +388,9 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 	}
 
 	// 列表命中
+	if s.filterMode {
+		return s, nil
+	}
 	idx := resolveListItemAt(s.ToPageState(pageWidth, pageHeight), pageY, pageHeight)
 	if idx < 0 {
 		return s, nil

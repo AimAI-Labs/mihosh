@@ -430,6 +430,9 @@ func (s *State) updateFilteredProxies() {
 
 // HandleMouseLeft 处理 nodes 页面左键单击/双击
 func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, tea.Cmd) {
+	if s.NodeFilterMode {
+		return s, nil
+	}
 	if s.ShowTestDetail {
 		pageState := s.ToPageState(pageWidth, pageHeight)
 		modal := buildTestResultModal(pageState)
@@ -522,6 +525,9 @@ func (s *State) applyGroupSelection(groupIdx int) {
 // HandleMouseScroll 处理鼠标滚轮（弹窗打开时控制弹窗滚动，否则切换选中的策略组或节点，
 // 卡片流与节点网格会根据选中项自动滚动到可见位置）
 func (s State) HandleMouseScroll(up bool, pageX, pageY, pageWidth, pageHeight int) State {
+	if s.NodeFilterMode {
+		return s
+	}
 	if s.ShowTestDetail {
 		if up {
 			if s.DetailScrollTop > 0 {
@@ -868,5 +874,5 @@ func (s *State) ResolveActiveGroupName() string {
 
 // InputCapture declares which input belongs to the current page mode.
 func (s State) InputCapture() common.InputCapture {
-	return common.InputCapture{Active: s.NodeFilterMode, Interrupt: s.NodeFilterMode}
+	return common.InputCapture{Active: s.NodeFilterMode || s.ShowTestDetail, Interrupt: s.NodeFilterMode}
 }

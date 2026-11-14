@@ -412,5 +412,5 @@ func (s State) findConnectionByName(name string) *model.Connection {
 
 // InputCapture declares which input belongs to the current page mode.
 func (s State) InputCapture() common.InputCapture {
-	return common.InputCapture{Active: s.FilterMode(), Interrupt: s.FilterMode()}
+	return common.InputCapture{Active: s.FilterMode() || s.connDetailMode || s.topNModalMode, Interrupt: s.FilterMode()}
 }
