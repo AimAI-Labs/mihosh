@@ -55,8 +55,8 @@ func TestConnsHandleMouseLeft_DoubleClickConnectionEntersDetail(t *testing.T) {
 
 func TestConnsHandleMouseLeft_ClickHistoryTabSwitchesView(t *testing.T) {
 	state := State{
-		Connections:   &model.ConnectionsResponse{},
-		connViewMode:  ConnViewActive,
+		Connections:  &model.ConnectionsResponse{},
+		connViewMode: ConnViewActive,
 	}
 	state.filterList = common.NewFilterList()
 	state.filterList.SetCursor(5)

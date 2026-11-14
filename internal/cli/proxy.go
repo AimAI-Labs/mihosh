@@ -77,13 +77,13 @@ func proxyHintStyle() lipgloss.Style {
 }
 
 var proxyOnCmd = &cobra.Command{
-	Use:   "on",
+	Use:     "on",
 	Example: `  eval "$(mihosh on)"`,
 	RunE:    runProxyOn,
 }
 
 var proxyOffCmd = &cobra.Command{
-	Use:   "off",
+	Use:     "off",
 	Example: `  eval "$(mihosh off)"`,
 	RunE:    runProxyOff,
 }
@@ -170,7 +170,7 @@ func renderProxyOffStatements(w io.Writer) {
 
 // shellQuote 用单引号包裹值并转义内部单引号。
 // 单引号比双引号更安全：避免 $、` 等被 shell 解释。
-// POSIX sh 单引号转义：' → '\''（关闭单引号、转义单引号、重开单引号）。
+// POSIX sh 单引号转义：' → '\”（关闭单引号、转义单引号、重开单引号）。
 func shellQuote(s string) string {
 	escaped := strings.ReplaceAll(s, "'", "'\\''")
 	return "'" + escaped + "'"

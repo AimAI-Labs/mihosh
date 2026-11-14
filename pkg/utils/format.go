@@ -29,6 +29,7 @@ func MaskSecret(secret string) string {
 	}
 	return secret[:3] + "****" + secret[len(secret)-3:]
 }
+
 // FormatDuration 格式化连接时长
 func FormatDuration(startStr string) string {
 	start, err := time.Parse(time.RFC3339, startStr)

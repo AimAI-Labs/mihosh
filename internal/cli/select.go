@@ -10,7 +10,7 @@ import (
 )
 
 var selectCmd = &cobra.Command{
-	Use:   "select <group> <proxy>",
+	Use: "select <group> <proxy>",
 	Example: `  mihosh select Proxy "HK 01"
   mihosh select Auto SG-BGP`,
 	Args: cobra.ExactArgs(2),

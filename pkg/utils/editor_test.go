@@ -30,7 +30,7 @@ func TestParseEditorFromRC(t *testing.T) {
 func TestSplitEditorCommand(t *testing.T) {
 	cases := []struct {
 		name, in string
-		want      []string
+		want     []string
 	}{
 		{"single", "vim", []string{"vim"}},
 		{"with_args", "code --wait", []string{"code", "--wait"}},

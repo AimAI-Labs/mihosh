@@ -7,8 +7,6 @@ import (
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
 
-
-
 func TestBuildTestResultModal_FailureEntry(t *testing.T) {
 	i18n.Init()
 	i18n.SetLanguageOverride("zh-CN")

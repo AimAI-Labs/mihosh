@@ -127,7 +127,7 @@ func TestWSClient_Reconnection(t *testing.T) {
 
 	client := NewWSClient(ts.URL, "")
 	// We only start memory stream manually to test reconnection simply
-	
+
 	// Need to manually set isRunning for test to avoid immediate exit in connectStream loop
 	client.runningMu.Lock()
 	client.isRunning = true
@@ -177,13 +177,13 @@ func TestWSClient_UpdateEndpoint(t *testing.T) {
 
 	client := NewWSClient(ts1.URL, "secret1")
 	client.Start(context.Background())
-	
+
 	// give it a moment to connect
 	time.Sleep(100 * time.Millisecond)
 
 	// Update endpoint
 	client.UpdateEndpoint(ts2.URL, "secret2")
-	
+
 	client.mu.RLock()
 	baseURL := client.baseURL
 	secret := client.secret
@@ -195,6 +195,6 @@ func TestWSClient_UpdateEndpoint(t *testing.T) {
 	if secret != "secret2" {
 		t.Errorf("Expected secret %s, got %s", "secret2", secret)
 	}
-	
+
 	client.Stop()
 }

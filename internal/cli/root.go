@@ -88,15 +88,21 @@ func localizeCommands() {
 		core.Short = i18n.T("cli.core.short")
 		for _, child := range core.Commands() {
 			child.Short = i18n.T("core.action." + child.Name())
-			if child.Name()=="network-recover"{child.Short=i18n.T("core.action.recover")}
-			for _,nested:=range child.Commands(){
-				prefix:="core.network.";if child.Name()=="service"{prefix="core.service."}
-				nested.Short=i18n.T(prefix+nested.Name())
-
+			if child.Name() == "network-recover" {
+				child.Short = i18n.T("core.action.recover")
+			}
+			for _, nested := range child.Commands() {
+				prefix := "core.network."
+				if child.Name() == "service" {
+					prefix = "core.service."
+				}
+				nested.Short = i18n.T(prefix + nested.Name())
 
 			}
 			for _, flagName := range []string{"version", "file", "sha256"} {
-				if flag := child.Flags().Lookup(flagName); flag != nil { flag.Usage = i18n.T("cli.core." + flagName) }
+				if flag := child.Flags().Lookup(flagName); flag != nil {
+					flag.Usage = i18n.T("cli.core." + flagName)
+				}
 			}
 		}
 	}
@@ -108,7 +114,7 @@ func localizeCommands() {
 
 	statusCmd.Short = i18n.T("cli.status.short")
 	statusCmd.Long = i18n.T("cli.status.long")
-	
+
 	configCmd.Short = i18n.T("cli.config.short")
 	configShowCmd.Short = i18n.T("cli.config.show.short")
 	configShowCmd.Long = i18n.T("cli.config.show.long")
@@ -146,8 +152,12 @@ func localizeCommands() {
 	serviceCmd.Long = i18n.T("cli.service.long")
 	if c, _, err := serviceCmd.Find([]string{"logs"}); err == nil && c != nil {
 		c.Short = i18n.T("cli.service.logs.short")
-		if f := c.Flags().Lookup("lines"); f != nil { f.Usage = i18n.T("cli.service.logs.flag_lines") }
-		if f := c.Flags().Lookup("follow"); f != nil { f.Usage = i18n.T("cli.service.logs.flag_follow") }
+		if f := c.Flags().Lookup("lines"); f != nil {
+			f.Usage = i18n.T("cli.service.logs.flag_lines")
+		}
+		if f := c.Flags().Lookup("follow"); f != nil {
+			f.Usage = i18n.T("cli.service.logs.flag_follow")
+		}
 	}
 	for _, action := range []string{"start", "stop", "restart", "enable", "disable", "status"} {
 		if c, _, err := serviceCmd.Find([]string{action}); err == nil && c != nil {
@@ -168,14 +178,34 @@ func localizeCommands() {
 	proxyOffCmd.Long = i18n.T("cli.proxy.off.long")
 
 	// Set flag descriptions
-	if f := statusCmd.Flags().Lookup("output"); f != nil { f.Usage = i18n.T("cli.status.flag_output") }
-	if f := configShowCmd.Flags().Lookup("output"); f != nil { f.Usage = i18n.T("cli.config.show.flag_output") }
-	if f := configEditCmd.Flags().Lookup("editor"); f != nil { f.Usage = i18n.T("cli.config.edit.flag_editor") }
-	if f := configEditCmd.Flags().Lookup("path"); f != nil { f.Usage = i18n.T("cli.config.edit.flag_path") }
-	if f := connectionsCmd.Flags().Lookup("output"); f != nil { f.Usage = i18n.T("cli.connections.flag_output") }
-	if f := listCmd.Flags().Lookup("output"); f != nil { f.Usage = i18n.T("cli.list.flag_output") }
-	if f := testCmd.Flags().Lookup("output"); f != nil { f.Usage = i18n.T("cli.test.flag_output") }
-	if f := versionCmd.Flags().Lookup("output"); f != nil { f.Usage = i18n.T("cli.version.flag_output") }
-	if f := serviceCmd.PersistentFlags().Lookup("unit"); f != nil { f.Usage = i18n.T("cli.service.flag_unit") }
-	if f := doctorCmd.Flags().Lookup("output"); f != nil { f.Usage = i18n.T("cli.doctor.flag_output") }
+	if f := statusCmd.Flags().Lookup("output"); f != nil {
+		f.Usage = i18n.T("cli.status.flag_output")
+	}
+	if f := configShowCmd.Flags().Lookup("output"); f != nil {
+		f.Usage = i18n.T("cli.config.show.flag_output")
+	}
+	if f := configEditCmd.Flags().Lookup("editor"); f != nil {
+		f.Usage = i18n.T("cli.config.edit.flag_editor")
+	}
+	if f := configEditCmd.Flags().Lookup("path"); f != nil {
+		f.Usage = i18n.T("cli.config.edit.flag_path")
+	}
+	if f := connectionsCmd.Flags().Lookup("output"); f != nil {
+		f.Usage = i18n.T("cli.connections.flag_output")
+	}
+	if f := listCmd.Flags().Lookup("output"); f != nil {
+		f.Usage = i18n.T("cli.list.flag_output")
+	}
+	if f := testCmd.Flags().Lookup("output"); f != nil {
+		f.Usage = i18n.T("cli.test.flag_output")
+	}
+	if f := versionCmd.Flags().Lookup("output"); f != nil {
+		f.Usage = i18n.T("cli.version.flag_output")
+	}
+	if f := serviceCmd.PersistentFlags().Lookup("unit"); f != nil {
+		f.Usage = i18n.T("cli.service.flag_unit")
+	}
+	if f := doctorCmd.Flags().Lookup("output"); f != nil {
+		f.Usage = i18n.T("cli.doctor.flag_output")
+	}
 }

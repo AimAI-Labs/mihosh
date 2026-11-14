@@ -15,7 +15,6 @@ func TestState_UpdateMaxHScrollOffset_WideWindow(t *testing.T) {
 	}
 }
 
-
 func TestState_UpdateMaxHScrollOffset_ClampCurrentOffset(t *testing.T) {
 	s := State{maxHScrollOffset: 0, logHScrollOffset: 80}
 	s = s.UpdateMaxHScrollOffset(60, 40)
@@ -23,7 +22,6 @@ func TestState_UpdateMaxHScrollOffset_ClampCurrentOffset(t *testing.T) {
 		t.Fatalf("expected logHScrollOffset=%d clamped to maxHScrollOffset=%d", s.logHScrollOffset, s.maxHScrollOffset)
 	}
 }
-
 
 func TestState_HScrollOffset_RightKeyBoundary(t *testing.T) {
 	s := State{
@@ -84,7 +82,6 @@ func TestState_HScrollOffset_LeftKeyDecrements(t *testing.T) {
 		t.Fatalf("expected logHScrollOffset=10 after two left keys, got %d", s.logHScrollOffset)
 	}
 }
-
 
 func TestState_HScrollOffset_ReachesMaxThenStops(t *testing.T) {
 	s := State{

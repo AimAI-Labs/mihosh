@@ -6,11 +6,11 @@ import (
 
 func TestHexToHSL(t *testing.T) {
 	tests := []struct {
-		name     string
-		hex      string
-		wantH    float64
-		wantS    float64
-		wantL    float64
+		name  string
+		hex   string
+		wantH float64
+		wantS float64
+		wantL float64
 	}{
 		{
 			name:  "black",
@@ -135,22 +135,22 @@ func TestDarkerColor(t *testing.T) {
 
 func TestContrastRatio(t *testing.T) {
 	tests := []struct {
-		name  string
-		hex1  string
-		hex2  string
-		min   float64
+		name string
+		hex1 string
+		hex2 string
+		min  float64
 	}{
 		{
-			name:  "black and white",
-			hex1:  "#000000",
-			hex2:  "#FFFFFF",
-			min:   21.0,
+			name: "black and white",
+			hex1: "#000000",
+			hex2: "#FFFFFF",
+			min:  21.0,
 		},
 		{
-			name:  "same color",
-			hex1:  "#FFFFFF",
-			hex2:  "#FFFFFF",
-			min:   1.0,
+			name: "same color",
+			hex1: "#FFFFFF",
+			hex2: "#FFFFFF",
+			min:  1.0,
 		},
 	}
 
@@ -170,11 +170,11 @@ func TestContrastRatio(t *testing.T) {
 
 func TestMeetsWCAGAA(t *testing.T) {
 	tests := []struct {
-		name        string
-		foreground  string
-		background  string
-		minRatio    float64
-		want        bool
+		name       string
+		foreground string
+		background string
+		minRatio   float64
+		want       bool
 	}{
 		{
 			name:       "white on black meets AA",

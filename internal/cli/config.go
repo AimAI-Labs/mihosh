@@ -20,11 +20,11 @@ import (
 )
 
 var configCmd = &cobra.Command{
-	Use:   "config",
+	Use: "config",
 }
 
 var configShowCmd = &cobra.Command{
-	Use:   "show [--output json|table|plain]",
+	Use: "show [--output json|table|plain]",
 	Example: `  mihosh config show
   mihosh config show --output table
   mihosh config show --output json`,
@@ -51,7 +51,7 @@ var configShowCmd = &cobra.Command{
 }
 
 var configSetCmd = &cobra.Command{
-	Use:   "set <key> <value>",
+	Use:  "set <key> <value>",
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		key := args[0]
@@ -71,7 +71,7 @@ var configSetCmd = &cobra.Command{
 }
 
 var configEditCmd = &cobra.Command{
-	Use:   "edit",
+	Use: "edit",
 	Example: `  mihosh config edit
   mihosh config edit --editor vim`,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -349,10 +349,10 @@ func renderConfigShow(w io.Writer, cfg *config.Config, configPath string, format
 	switch format {
 	case outputFormatJSON:
 		payload := struct {
-			TestURL             string `json:"test_url"`
-			TimeoutMS           int    `json:"timeout_ms"`
-			AutoRefreshInterval int    `json:"auto_refresh_interval"`
-			ConfigFile          string `json:"config_file"`
+			TestURL             string         `json:"test_url"`
+			TimeoutMS           int            `json:"timeout_ms"`
+			AutoRefreshInterval int            `json:"auto_refresh_interval"`
+			ConfigFile          string         `json:"config_file"`
 			Mihomo              mihomoShowInfo `json:"mihomo"`
 		}{
 			TestURL:             cfg.TestURL,

@@ -11,7 +11,7 @@ import (
 )
 
 var modeCmd = &cobra.Command{
-	Use:   "mode [rule|global|direct]",
+	Use: "mode [rule|global|direct]",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {

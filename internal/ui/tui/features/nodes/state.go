@@ -29,8 +29,8 @@ type FilterEngine = common.SearchEngine
 
 const (
 	FilterEngineSubstring = common.SearchSubstring
-	FilterEngineRegex = common.SearchRegex
-	FilterEngineFuzzy = common.SearchFuzzy
+	FilterEngineRegex     = common.SearchRegex
+	FilterEngineFuzzy     = common.SearchFuzzy
 )
 
 // ProxySortOrder 节点列表排序方式
@@ -55,28 +55,28 @@ const (
 // NewState 初始化节点状态
 func NewState(client *api.Client, testURL string, timeout int) State {
 	return State{
-		client:   client,
-		testURL:  testURL,
-		timeout:  timeout,
+		client:  client,
+		testURL: testURL,
+		timeout: timeout,
 	}
 }
 
 // State 节点页面完整状态
 type State struct {
-	client     *api.Client
-	testURL    string
-	timeout    int
-	Mode       string // 运行模式 "Rule", "Global", "Direct", in mihomo API lowercase.
+	client         *api.Client
+	testURL        string
+	timeout        int
+	Mode           string // 运行模式 "Rule", "Global", "Direct", in mihomo API lowercase.
 	Groups         map[string]model.Group
 	Proxies        map[string]model.Proxy
 	GroupNames     []string
 	CurrentProxies []string
 	SelectedGroup  int
 	SelectedProxy  int
-	Testing       bool
-	TestingTarget string
-	testBatch     service.TestBatch
-	batchMode     bool
+	Testing        bool
+	TestingTarget  string
+	testBatch      service.TestBatch
+	batchMode      bool
 	// Ring Buffer for test results (success + failure)
 	TestResultsArr  [testResultCap]TestResultEntry
 	resultHead      int // 写入位置
@@ -213,117 +213,117 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			return s.handleNodeFilterMode(msg)
 		}
 
-	// 测速结果弹窗打开时，↑/↓ 控制弹窗滚动，f/Esc 关闭弹窗
-	if s.ShowTestDetail {
+		// 测速结果弹窗打开时，↑/↓ 控制弹窗滚动，f/Esc 关闭弹窗
+		if s.ShowTestDetail {
+			switch {
+			case key.Matches(msg, common.Keys.Up):
+				if s.DetailScrollTop > 0 {
+					s.DetailScrollTop--
+				}
+			case key.Matches(msg, common.Keys.Down):
+				s.DetailScrollTop++
+			case key.Matches(msg, common.Keys.Home):
+				s.DetailScrollTop = 0
+			case key.Matches(msg, common.Keys.End):
+				// 交由渲染层按可见行数钳制到末尾
+				s.DetailScrollTop = 1 << 30
+			case msg.String() == "f", msg.String() == "esc":
+				s.ShowTestDetail = false
+				s.DetailScrollTop = 0
+			}
+			return s, nil
+		}
+
+		display := s.displayProxies()
+
 		switch {
 		case key.Matches(msg, common.Keys.Up):
-			if s.DetailScrollTop > 0 {
-				s.DetailScrollTop--
+			s.MouseFocus = nodesMouseFocusProxy
+			if s.SelectedProxy > 0 {
+				s.SelectedProxy--
 			}
+
 		case key.Matches(msg, common.Keys.Down):
-			s.DetailScrollTop++
-		case key.Matches(msg, common.Keys.Home):
+			s.MouseFocus = nodesMouseFocusProxy
+			if s.SelectedProxy < len(display)-1 {
+				s.SelectedProxy++
+			}
+
+		case key.Matches(msg, common.Keys.Left):
+			s.MouseFocus = nodesMouseFocusGroup
+			if s.SelectedGroup > 0 {
+				s.SelectedGroup--
+				s.updateCurrentProxies()
+				s.SelectedProxy = 0
+			}
+
+		case key.Matches(msg, common.Keys.Right):
+			s.MouseFocus = nodesMouseFocusGroup
+			if s.SelectedGroup < len(s.GroupNames)-1 {
+				s.SelectedGroup++
+				s.updateCurrentProxies()
+				s.SelectedProxy = 0
+			}
+
+		case key.Matches(msg, common.Keys.Enter):
+			if len(s.GroupNames) > 0 && s.SelectedGroup < len(s.GroupNames) &&
+				len(display) > 0 && s.SelectedProxy < len(display) {
+				groupName := s.GroupNames[s.SelectedGroup]
+				proxyName := display[s.SelectedProxy]
+				return s, SelectProxy(s.client, groupName, proxyName)
+			}
+
+		case key.Matches(msg, common.Keys.Test):
+			if len(display) > 0 && s.SelectedProxy < len(display) {
+				proxyName := display[s.SelectedProxy]
+				return s.StartSingleTest(proxyName)
+			}
+
+		case key.Matches(msg, common.Keys.TestAll):
+			if len(s.CurrentProxies) > 0 {
+				s = s.ResetTesting()
+				s.clearTestResults()
+				s.ShowTestDetail = false
+				s.testBatch = service.NewTestBatch(s.CurrentProxies)
+				s.batchMode = true
+				return s.LaunchBatchTests()
+			}
+
+		case msg.String() == "f":
+			s.ShowTestDetail = true
 			s.DetailScrollTop = 0
-		case key.Matches(msg, common.Keys.End):
-			// 交由渲染层按可见行数钳制到末尾
-			s.DetailScrollTop = 1 << 30
-		case msg.String() == "f", msg.String() == "esc":
-			s.ShowTestDetail = false
-			s.DetailScrollTop = 0
-		}
-		return s, nil
-	}
 
-	display := s.displayProxies()
+		case msg.String() == "m":
+			modes := []string{"rule", "global", "direct"}
+			currentIdx := -1
+			for i, v := range modes {
+				if strings.ToLower(s.Mode) == v {
+					currentIdx = i
+					break
+				}
+			}
+			if currentIdx == -1 {
+				currentIdx = 0
+			}
+			nextMode := modes[(currentIdx+1)%len(modes)]
+			return s, UpdateConfigMode(s.client, nextMode)
 
-	switch {
-	case key.Matches(msg, common.Keys.Up):
-		s.MouseFocus = nodesMouseFocusProxy
-		if s.SelectedProxy > 0 {
-			s.SelectedProxy--
-		}
-
-	case key.Matches(msg, common.Keys.Down):
-		s.MouseFocus = nodesMouseFocusProxy
-		if s.SelectedProxy < len(display)-1 {
-			s.SelectedProxy++
-		}
-
-	case key.Matches(msg, common.Keys.Left):
-		s.MouseFocus = nodesMouseFocusGroup
-		if s.SelectedGroup > 0 {
-			s.SelectedGroup--
-			s.updateCurrentProxies()
+		case msg.String() == "s":
+			s.ProxySortOrder = (s.ProxySortOrder + 1) % ProxySortOrder(len(sortOrderLabels))
+			s.applySortOrder()
+			s.updateFilteredProxies()
 			s.SelectedProxy = 0
-		}
 
-	case key.Matches(msg, common.Keys.Right):
-		s.MouseFocus = nodesMouseFocusGroup
-		if s.SelectedGroup < len(s.GroupNames)-1 {
-			s.SelectedGroup++
-			s.updateCurrentProxies()
-			s.SelectedProxy = 0
-		}
+		case msg.String() == "/":
+			s.NodeFilterMode = true
 
-	case key.Matches(msg, common.Keys.Enter):
-		if len(s.GroupNames) > 0 && s.SelectedGroup < len(s.GroupNames) &&
-			len(display) > 0 && s.SelectedProxy < len(display) {
-			groupName := s.GroupNames[s.SelectedGroup]
-			proxyName := display[s.SelectedProxy]
-			return s, SelectProxy(s.client, groupName, proxyName)
-		}
-
-	case key.Matches(msg, common.Keys.Test):
-		if len(display) > 0 && s.SelectedProxy < len(display) {
-			proxyName := display[s.SelectedProxy]
-			return s.StartSingleTest(proxyName)
-		}
-
-	case key.Matches(msg, common.Keys.TestAll):
-		if len(s.CurrentProxies) > 0 {
-			s = s.ResetTesting()
-			s.clearTestResults()
-			s.ShowTestDetail = false
-			s.testBatch = service.NewTestBatch(s.CurrentProxies)
-			s.batchMode = true
-			return s.LaunchBatchTests()
-		}
-
-	case msg.String() == "f":
-		s.ShowTestDetail = true
-		s.DetailScrollTop = 0
-
-	case msg.String() == "m":
-		modes := []string{"rule", "global", "direct"}
-		currentIdx := -1
-		for i, v := range modes {
-			if strings.ToLower(s.Mode) == v {
-				currentIdx = i
-				break
+		case key.Matches(msg, common.Keys.Escape):
+			if s.NodeFilter != "" {
+				s.NodeFilter = ""
+				s.SelectedProxy = 0
+				s.updateFilteredProxies()
 			}
 		}
-		if currentIdx == -1 {
-			currentIdx = 0
-		}
-		nextMode := modes[(currentIdx+1)%len(modes)]
-		return s, UpdateConfigMode(s.client, nextMode)
-
-	case msg.String() == "s":
-		s.ProxySortOrder = (s.ProxySortOrder + 1) % ProxySortOrder(len(sortOrderLabels))
-		s.applySortOrder()
-		s.updateFilteredProxies()
-		s.SelectedProxy = 0
-
-	case msg.String() == "/":
-		s.NodeFilterMode = true
-
-	case key.Matches(msg, common.Keys.Escape):
-		if s.NodeFilter != "" {
-			s.NodeFilter = ""
-			s.SelectedProxy = 0
-			s.updateFilteredProxies()
-		}
-	}
 	}
 
 	return s, nil

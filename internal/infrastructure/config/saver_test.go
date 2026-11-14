@@ -56,8 +56,8 @@ func TestSavePersistsLanguage(t *testing.T) {
 	t.Setenv("HOMEPATH", "")
 
 	cfg := &Config{
-		TestURL: "http://www.gstatic.com/generate_204",
-		Timeout: 5000,
+		TestURL:  "http://www.gstatic.com/generate_204",
+		Timeout:  5000,
 		Language: "en-US",
 	}
 

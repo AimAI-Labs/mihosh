@@ -154,7 +154,10 @@ func (s State) ToPageState(width, height int) PageState {
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.CoreTargetChangedMsg:
-		if msg.Reset { return s.ClearLogs(), nil }; return s, nil
+		if msg.Reset {
+			return s.ClearLogs(), nil
+		}
+		return s, nil
 	case messages.PageResizeMsg:
 		return s.UpdateMaxHScrollOffset(msg.Width, msg.Height), nil
 	case messages.PageMouseScrollMsg:
@@ -163,78 +166,78 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		return s.HandleMouseLeft(msg.Y, msg.X, msg.Width)
 	case tea.KeyMsg:
 		// 继续处理按键
-	// 详情模式拦截所有按键
-	if s.detailMode {
-		return s.handleDetailMode(msg)
-	}
+		// 详情模式拦截所有按键
+		if s.detailMode {
+			return s.handleDetailMode(msg)
+		}
 
-	if s.logFilterMode {
-		return s.handleLogFilterMode(msg)
-	}
+		if s.logFilterMode {
+			return s.handleLogFilterMode(msg)
+		}
 
-	switch {
-	case key.Matches(msg, common.Keys.Enter):
-		return s.openLogDetail()
+		switch {
+		case key.Matches(msg, common.Keys.Enter):
+			return s.openLogDetail()
 
-	case key.Matches(msg, common.Keys.Up):
-		if s.selectedLog > 0 {
-			s.selectedLog--
-			if s.selectedLog < s.logScrollTop {
-				s.logScrollTop = s.selectedLog
+		case key.Matches(msg, common.Keys.Up):
+			if s.selectedLog > 0 {
+				s.selectedLog--
+				if s.selectedLog < s.logScrollTop {
+					s.logScrollTop = s.selectedLog
+				}
 			}
-		}
 
-	case key.Matches(msg, common.Keys.Down):
-		if s.selectedLog < len(s.filteredLogIndices)-1 {
-			s.selectedLog++
-		}
-
-	case key.Matches(msg, common.Keys.Left):
-		if s.logHScrollOffset > 0 {
-			s.logHScrollOffset -= 10
-			if s.logHScrollOffset < 0 {
-				s.logHScrollOffset = 0
+		case key.Matches(msg, common.Keys.Down):
+			if s.selectedLog < len(s.filteredLogIndices)-1 {
+				s.selectedLog++
 			}
-		}
 
-	case key.Matches(msg, common.Keys.Right):
-		if s.logHScrollOffset < s.maxHScrollOffset {
-			s.logHScrollOffset += 10
-			if s.logHScrollOffset > s.maxHScrollOffset {
-				s.logHScrollOffset = s.maxHScrollOffset
+		case key.Matches(msg, common.Keys.Left):
+			if s.logHScrollOffset > 0 {
+				s.logHScrollOffset -= 10
+				if s.logHScrollOffset < 0 {
+					s.logHScrollOffset = 0
+				}
 			}
-		}
 
-	case key.Matches(msg, common.Keys.LogLevelDown):
-		if s.logLevel > 0 {
-			s.logLevel--
-			s.updateFilteredLogs()
-		}
-		s.selectedLog = 0
-		s.logScrollTop = 0
+		case key.Matches(msg, common.Keys.Right):
+			if s.logHScrollOffset < s.maxHScrollOffset {
+				s.logHScrollOffset += 10
+				if s.logHScrollOffset > s.maxHScrollOffset {
+					s.logHScrollOffset = s.maxHScrollOffset
+				}
+			}
 
-	case key.Matches(msg, common.Keys.LogLevelUp):
-		if s.logLevel < 4 {
-			s.logLevel++
-			s.updateFilteredLogs()
-		}
-		s.selectedLog = 0
-		s.logScrollTop = 0
-
-	case msg.String() == "/":
-		s.logFilterMode = true
-
-	case key.Matches(msg, common.Keys.Clear):
-		s = s.ClearLogs()
-
-	case key.Matches(msg, common.Keys.Escape):
-		if s.logFilter != "" {
-			s.logFilter = ""
+		case key.Matches(msg, common.Keys.LogLevelDown):
+			if s.logLevel > 0 {
+				s.logLevel--
+				s.updateFilteredLogs()
+			}
 			s.selectedLog = 0
 			s.logScrollTop = 0
-			s.updateFilteredLogs()
+
+		case key.Matches(msg, common.Keys.LogLevelUp):
+			if s.logLevel < 4 {
+				s.logLevel++
+				s.updateFilteredLogs()
+			}
+			s.selectedLog = 0
+			s.logScrollTop = 0
+
+		case msg.String() == "/":
+			s.logFilterMode = true
+
+		case key.Matches(msg, common.Keys.Clear):
+			s = s.ClearLogs()
+
+		case key.Matches(msg, common.Keys.Escape):
+			if s.logFilter != "" {
+				s.logFilter = ""
+				s.selectedLog = 0
+				s.logScrollTop = 0
+				s.updateFilteredLogs()
+			}
 		}
-	}
 
 	}
 	return s, nil

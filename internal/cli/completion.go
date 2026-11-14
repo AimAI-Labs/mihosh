@@ -49,8 +49,8 @@ PowerShell:
   mihosh completion zsh
   mihosh completion fish
   mihosh completion powershell`,
-	ValidArgs:         []string{"bash", "zsh", "fish", "powershell"},
-	Args:              cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
+	ValidArgs:          []string{"bash", "zsh", "fish", "powershell"},
+	Args:               cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 	DisableFlagParsing: false,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		root := cmd.Root()
