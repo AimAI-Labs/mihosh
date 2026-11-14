@@ -39,6 +39,33 @@ brew install mihosh
 curl -fsSL https://raw.githubusercontent.com/AimAI-Labs/mihosh/refs/heads/main/install.sh | bash
 ```
 
+### Manual Installation
+
+Download the archive for your system from [GitHub Releases](https://github.com/AimAI-Labs/mihosh/releases/latest):
+
+| System | Architecture | Archive |
+| --- | --- | --- |
+| Linux | amd64 (x86_64) | `mihosh-linux-amd64.tar.gz` |
+| Linux | arm64 (aarch64) | `mihosh-linux-arm64.tar.gz` |
+| macOS | amd64 (Intel) | `mihosh-darwin-amd64.tar.gz` |
+| macOS | arm64 (Apple Silicon) | `mihosh-darwin-arm64.tar.gz` |
+
+You can also download the latest archive with `wget` through [gh-proxy.org](https://gh-proxy.org) (Linux amd64 example):
+
+```bash
+wget -O mihosh-linux-amd64.tar.gz "https://gh-proxy.org/https://github.com/AimAI-Labs/mihosh/releases/latest/download/mihosh-linux-amd64.tar.gz"
+```
+
+For other systems, replace the archive name in both the URL and the `-O` argument using the table above.
+
+Extract the archive and install the binary into a directory in your `PATH`. Replace the archive name below with the one you downloaded:
+
+```bash
+tar -xzf mihosh-linux-amd64.tar.gz
+sudo install -m 755 mihosh /usr/local/bin/mihosh
+mihosh version
+```
+
 Run `mihosh` to launch the TUI.
 
 ## License
