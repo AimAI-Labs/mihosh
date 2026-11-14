@@ -95,7 +95,7 @@ func TestTaskFooterAllowsBrowsingAndCancelsWithoutStartingAnotherTask(t *testing
 	if s.catalog.scroll == 0 || s.followSelection {
 		t.Fatal("running task prevented scrolling the version list")
 	}
-	for _, key := range []string{"i", "a", "g", "e", "enter"} {
+	for _, key := range []string{"i", "a", "g", "enter"} {
 		next, cmd := s.Update(coreKey(key))
 		if next.generation != s.generation || next.Editing || cmd != nil {
 			t.Fatalf("running task allowed another action via %s", key)

@@ -13,10 +13,13 @@ import (
 )
 
 func (s State) editForm(kind string) (State, tea.Cmd) {
-	if s.Busy || s.Editing {
+	if s.Editing || (s.Busy && kind != "network") {
 		return s, nil
 	}
-	s.Err, s.task = nil, ""
+	if !s.Busy {
+		s.Err, s.task = nil, ""
+	}
+	s.formErr = nil
 	s.formSelection, s.formScroll = s.selected, s.scroll
 	s.form, s.Editing, s.choice = kind, true, 0
 	s.fields, s.args = nil, nil
@@ -187,11 +190,11 @@ func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 		}
 		timeout, err := strconv.Atoi(s.fields[2].Value())
 		if err != nil {
-			s.Err = err
+			s.formErr = err
 			return s, nil
 		}
 		err = s.svc.SaveNetwork(s.fields[0].Value(), gateways, timeout)
-		s.Err = err
+		s.formErr = err
 		if err == nil {
 			s = s.closeForm()
 		}
@@ -212,7 +215,7 @@ func (s State) submitService() (State, tea.Cmd) {
 func (s State) closeForm() State {
 	s.selected, s.scroll = s.formSelection, s.formScroll
 	s.Editing, s.form = false, ""
-	s.fields, s.args, s.Err = nil, nil, nil
+	s.fields, s.args, s.formErr = nil, nil, nil
 	s.focus, s.choice, s.formSelection, s.formScroll = 0, 0, 0, 0
 	return s
 }

@@ -63,6 +63,19 @@ func TestCoreNetworkSettingsValidateBeforeSave(t *testing.T) {
 	require.False(t, strings.Contains(cfg.Core.Mode, "managed"), "network setup must not take ownership of an external core")
 }
 
+func TestCoreNetworkPreferencesCanBeSavedDuringDownload(t *testing.T) {
+	newIsolatedService(t)
+	svc := NewCoreService()
+	defer svc.Close()
+	svc.mu.Lock()
+	err := svc.SaveNetwork("", []coreinfra.Accelerator{{URL: "https://mirror.example", Metadata: true, Asset: true}})
+	svc.mu.Unlock()
+	require.NoError(t, err)
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	require.Equal(t, "https://mirror.example", cfg.Core.Accelerators[0].URL)
+}
+
 func TestCoreExternalConnectionRoundTripDoesNotResolveLocalFiles(t *testing.T) {
 	newIsolatedService(t)
 	svc := NewCoreService()

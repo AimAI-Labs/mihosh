@@ -250,8 +250,8 @@ func (s State) formLayout(width int) pageLayout {
 		hits = append(hits, actionHit{x: 2, y: len(lines) + 2, width: width - 4, height: 1, index: i})
 		lines = append(lines, i18n.T(key), field.View(), "")
 	}
-	if s.Err != nil {
-		lines = append(lines, lipgloss.NewStyle().Foreground(t.Danger).Render(wrap(s.Err.Error(), width-4)))
+	if s.formErr != nil {
+		lines = append(lines, lipgloss.NewStyle().Foreground(t.Danger).Render(wrap(s.formErr.Error(), width-4)))
 	}
 	return pageLayout{content: panel(i18n.T("core.action."+s.form), strings.Join(lines, "\n"), width), focusY: focusY, actions: hits}
 }

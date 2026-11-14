@@ -5,12 +5,47 @@ import (
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
+
+func TestDownloadAllowsNetworkPreferencesWithoutReplacingActiveTask(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	if err := config.Save(&config.DefaultConfig); err != nil {
+		t.Fatal(err)
+	}
+	svc := service.NewCoreService()
+	defer svc.Close()
+	s := releaseFixture(t)
+	s.svc = svc
+	s, _ = s.begin("install")
+	defer s.Close()
+	id := s.generation
+	s.Progress = coreinfra.Progress{Downloaded: 1, Total: 2}
+	s, _ = s.Update(coreKey("3"))
+	s, _ = s.Update(coreKey("enter"))
+	if s.tab != 2 || !s.Editing || s.form != "network" || !s.Busy || s.task != "install" || s.generation != id {
+		t.Fatal("download blocked settings or lost its active task")
+	}
+	s.fields[1].SetValue("https://mirror.example")
+	s, _ = s.Update(coreKey("enter"))
+	if s.Editing || !s.Busy || s.task != "install" || s.generation != id || s.Progress.Downloaded != 1 {
+		t.Fatal("saving preferences replaced the active download")
+	}
+	cfg, err := config.Load()
+	if err != nil || len(cfg.Core.Accelerators) != 1 || cfg.Core.Accelerators[0].URL != "https://mirror.example" {
+		t.Fatal("network preferences were not saved", err)
+	}
+	s, _ = s.Update(messages.CoreOperationMsg{ID: id, Action: "install"})
+	if s.Busy {
+		t.Fatal("download completion was lost")
+	}
+}
 
 func TestAdvancedDialogsCancelWithoutOperationsAndRestoreSelection(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())

@@ -69,10 +69,7 @@ func (s *CoreService) Configure() error {
 	return config.Update(func(latest *config.Config) error { latest.Core.Mode = "managed"; return nil })
 }
 func (s *CoreService) SaveNetwork(proxy string, accelerators []coreinfra.Accelerator, timeoutSeconds ...int) error {
-	if !s.mu.TryLock() {
-		return errors.New("another core operation is active")
-	}
-	defer s.mu.Unlock()
+	// Fetchers snapshot these preferences; saving affects the next download.
 	// Validate settings before persisting. No network request is performed.
 	f := coreinfra.NewFetcher()
 	f.Proxy = strings.TrimSpace(proxy)

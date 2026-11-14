@@ -24,6 +24,7 @@ type State struct {
 	Busy              bool
 	Editing           bool
 	form              string
+	formErr           error
 	args              []string
 	fields            []textinput.Model
 	focus             int
