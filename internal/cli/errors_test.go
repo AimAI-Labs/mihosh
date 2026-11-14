@@ -66,9 +66,9 @@ func TestRenderCommandError(t *testing.T) {
 		wantContain string
 	}{
 		{
-			name:        "parameter error message",
-			err:         wrapParameterError(errors.New("参数不合法")),
-			wantPrefix:  i18n.T("cli.errors.param_error"),
+			name:       "parameter error message",
+			err:        wrapParameterError(errors.New("参数不合法")),
+			wantPrefix: i18n.T("cli.errors.param_error"),
 		},
 		{
 			name:       "config error message",
@@ -76,9 +76,9 @@ func TestRenderCommandError(t *testing.T) {
 			wantPrefix: i18n.T("cli.errors.config_error"),
 		},
 		{
-			name:        "network error message",
-			err:         wrapNetworkError(errors.New("dial tcp timeout")),
-			wantPrefix:  i18n.T("cli.errors.network_error"),
+			name:       "network error message",
+			err:        wrapNetworkError(errors.New("dial tcp timeout")),
+			wantPrefix: i18n.T("cli.errors.network_error"),
 		},
 		{
 			name:       "general error message",

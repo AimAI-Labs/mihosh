@@ -134,31 +134,45 @@ func renderStatus(w io.Writer, snapshot statusSnapshot, format outputFormat) err
 
 func renderStatusTable(w io.Writer, snapshot statusSnapshot) error {
 	tw := newTabWriter(w)
-	fmt.Fprintln(tw, "KEY\tVALUE")
-	fmt.Fprintf(tw, "MODE\t%s\n", snapshot.Mode)
-	fmt.Fprintf(tw, "ACTIVE_CONNECTIONS\t%d\n", snapshot.ActiveConnections)
-	fmt.Fprintf(tw, "UPLOAD_SPEED\t%s/s\n", utils.FormatBytes(snapshot.UploadSpeed))
-	fmt.Fprintf(tw, "DOWNLOAD_SPEED\t%s/s\n", utils.FormatBytes(snapshot.DownloadSpeed))
-	fmt.Fprintf(tw, "MEMORY\t%s / %s\n", utils.FormatBytes(snapshot.MemoryInuse), utils.FormatBytes(snapshot.MemoryOSLimit))
+	if _, err := fmt.Fprintln(tw, "KEY\tVALUE"); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(tw, "MODE\t%s\n", snapshot.Mode); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(tw, "ACTIVE_CONNECTIONS\t%d\n", snapshot.ActiveConnections); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(tw, "UPLOAD_SPEED\t%s/s\n", utils.FormatBytes(snapshot.UploadSpeed)); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(tw, "DOWNLOAD_SPEED\t%s/s\n", utils.FormatBytes(snapshot.DownloadSpeed)); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(tw, "MEMORY\t%s / %s\n", utils.FormatBytes(snapshot.MemoryInuse), utils.FormatBytes(snapshot.MemoryOSLimit)); err != nil {
+		return err
+	}
 	for _, group := range snapshot.SelectedGroups {
-		fmt.Fprintf(tw, "GROUP_%s\t%s\n", group.Name, formatSelectedGroupValue(group))
+		if _, err := fmt.Fprintf(tw, "GROUP_%s\t%s\n", group.Name, formatSelectedGroupValue(group)); err != nil {
+			return err
+		}
 	}
 	return tw.Flush()
 }
 
 func renderStatusPlain(w io.Writer, snapshot statusSnapshot) {
-	fmt.Fprintf(w, "%s: %s\n", i18n.T("cli.status.label_mode"), snapshot.Mode)
-	fmt.Fprintf(w, "%s: %d\n", i18n.T("cli.status.label_active_conns"), snapshot.ActiveConnections)
-	fmt.Fprintf(w, "%s: %s/s\n", i18n.T("cli.status.label_upload_speed"), utils.FormatBytes(snapshot.UploadSpeed))
-	fmt.Fprintf(w, "%s: %s/s\n", i18n.T("cli.status.label_download_speed"), utils.FormatBytes(snapshot.DownloadSpeed))
-	fmt.Fprintf(w, "%s: %s / %s\n", i18n.T("cli.status.label_memory"), utils.FormatBytes(snapshot.MemoryInuse), utils.FormatBytes(snapshot.MemoryOSLimit))
+	_, _ = fmt.Fprintf(w, "%s: %s\n", i18n.T("cli.status.label_mode"), snapshot.Mode)
+	_, _ = fmt.Fprintf(w, "%s: %d\n", i18n.T("cli.status.label_active_conns"), snapshot.ActiveConnections)
+	_, _ = fmt.Fprintf(w, "%s: %s/s\n", i18n.T("cli.status.label_upload_speed"), utils.FormatBytes(snapshot.UploadSpeed))
+	_, _ = fmt.Fprintf(w, "%s: %s/s\n", i18n.T("cli.status.label_download_speed"), utils.FormatBytes(snapshot.DownloadSpeed))
+	_, _ = fmt.Fprintf(w, "%s: %s / %s\n", i18n.T("cli.status.label_memory"), utils.FormatBytes(snapshot.MemoryInuse), utils.FormatBytes(snapshot.MemoryOSLimit))
 	if len(snapshot.SelectedGroups) == 0 {
 		return
 	}
 
-	fmt.Fprintln(w, i18n.T("cli.status.label_selected_groups"))
+	_, _ = fmt.Fprintln(w, i18n.T("cli.status.label_selected_groups"))
 	for _, group := range snapshot.SelectedGroups {
-		fmt.Fprintf(w, "  %s: %s\n", group.Name, formatSelectedGroupValue(group))
+		_, _ = fmt.Fprintf(w, "  %s: %s\n", group.Name, formatSelectedGroupValue(group))
 	}
 }
 

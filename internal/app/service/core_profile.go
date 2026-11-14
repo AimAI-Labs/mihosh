@@ -28,13 +28,13 @@ func privateWrite(path string, data []byte) error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(file.Name())
+	defer func() { _ = os.Remove(file.Name()) }()
 	if _, err = file.Write(data); err != nil {
-		file.Close()
+		_ = file.Close()
 		return err
 	}
 	if err = file.Sync(); err != nil {
-		file.Close()
+		_ = file.Close()
 		return err
 	}
 	if err = file.Close(); err != nil {
@@ -114,7 +114,7 @@ func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopp
 		return ActivateResult{}, errors.New("another core operation is active")
 	}
 	defer s.mu.Unlock()
-	cfg, err := loadCoreConfig()
+	_, err := loadCoreConfig()
 	if err != nil {
 		return ActivateResult{}, err
 	}
@@ -131,7 +131,7 @@ func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopp
 	if err = recoverManagedProfile(root); err != nil {
 		return ActivateResult{}, err
 	}
-	cfg, err = loadCoreConfig()
+	cfg, err := loadCoreConfig()
 	if err != nil {
 		return ActivateResult{}, err
 	}
@@ -163,9 +163,9 @@ func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopp
 	if err != nil {
 		return ActivateResult{}, err
 	}
-	defer os.Remove(candidate.Name())
+	defer func() { _ = os.Remove(candidate.Name()) }()
 	if _, err = candidate.Write(data); err != nil {
-		candidate.Close()
+		_ = candidate.Close()
 		return ActivateResult{}, err
 	}
 	if err = candidate.Close(); err != nil {
@@ -213,8 +213,9 @@ func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopp
 	running := s.process != nil
 	started := false
 	rollback := func(cause error) (ActivateResult, error) {
+		var stopErr error
 		if started {
-			s.stopLocked()
+			stopErr = s.stopLocked()
 		}
 		restoreErr := recoverManagedProfile(root)
 		var reloadErr error
@@ -224,7 +225,7 @@ func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopp
 				reloadErr = s.refreshNetworkTUN(context.Background(), root)
 			}
 		}
-		return ActivateResult{}, errors.Join(cause, restoreErr, reloadErr)
+		return ActivateResult{}, errors.Join(cause, stopErr, restoreErr, reloadErr)
 	}
 	if err = privateWrite(path, data); err != nil {
 		return rollback(err)

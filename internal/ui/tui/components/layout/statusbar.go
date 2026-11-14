@@ -47,7 +47,7 @@ func renderNodeInfo(mode, groupName, nodeName string, delay, width int) string {
 	// 延迟
 	var delayStr string
 	if delay > 0 {
-		delayColor := styles.Gray()
+		var delayColor lipgloss.Color
 		switch {
 		case delay < 100:
 			delayColor = styles.Success()

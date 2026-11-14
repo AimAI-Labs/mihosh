@@ -55,8 +55,8 @@ func TestConnsHandleMouseLeft_DoubleClickConnectionEntersDetail(t *testing.T) {
 
 func TestConnsHandleMouseLeft_ClickHistoryTabSwitchesView(t *testing.T) {
 	state := State{
-		Connections:   &model.ConnectionsResponse{},
-		connViewMode:  ConnViewActive,
+		Connections:  &model.ConnectionsResponse{},
+		connViewMode: ConnViewActive,
 	}
 	state.filterList = common.NewFilterList()
 	state.filterList.SetCursor(5)
@@ -335,8 +335,8 @@ func TestConnsHandleMouseLeft_DoubleClickTopNModalItemEntersDetail(t *testing.T)
 
 	// 模拟双击详情页面区域以关闭它
 	// 双击 (10, 10)
-	next, cmd = next.HandleMouseLeft(10, 10, width, height)
-	next, cmd = next.HandleMouseLeft(10, 10, width, height)
+	next, _ = next.HandleMouseLeft(10, 10, width, height)
+	next, _ = next.HandleMouseLeft(10, 10, width, height)
 	if next.connDetailMode {
 		t.Fatalf("expected detail mode closed after double click")
 	}

@@ -25,15 +25,15 @@ func encodeSubscription(lines ...string) []byte {
 
 func TestTryConvertV2Ray_StandardVmess(t *testing.T) {
 	uri := makeVmessURI(vmessJSON{
-		V:   "2",
-		PS:  "测试节点",
-		Add: "example.com",
+		V:    "2",
+		PS:   "测试节点",
+		Add:  "example.com",
 		Port: 443,
-		ID:  "12345678-abcd-1234-abcd-1234567890ab",
-		Aid: 0,
-		Net: "tcp",
-		TLS: "tls",
-		SNI: "example.com",
+		ID:   "12345678-abcd-1234-abcd-1234567890ab",
+		Aid:  0,
+		Net:  "tcp",
+		TLS:  "tls",
+		SNI:  "example.com",
 	})
 	sub := encodeSubscription(uri)
 
@@ -299,7 +299,7 @@ func TestTryConvertV2Ray_ProxyGroups(t *testing.T) {
 func TestTryConvertV2Ray_TcpHttpObfs(t *testing.T) {
 	uri := makeVmessURI(vmessJSON{
 		V: "2", PS: "HTTP伪装", Add: "example.com", Port: 80,
-		ID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+		ID:  "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Net: "tcp", Type: "http", Host: "cdn.example.com", Path: "/path",
 	})
 	sub := encodeSubscription(uri)

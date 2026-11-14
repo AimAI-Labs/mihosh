@@ -20,17 +20,19 @@ func TestExtractGzipAndZip(t *testing.T) {
 			var b bytes.Buffer
 			if platform == "linux" {
 				w := gzip.NewWriter(&b)
-				w.Write([]byte("executable"))
-				w.Close()
+				_, _ = w.Write([]byte("executable"))
+				_ = w.Close()
 			} else {
 				w := zip.NewWriter(&b)
 				entry, _ := w.Create("mihomo.exe")
-				entry.Write([]byte("executable"))
-				w.Close()
+				_, _ = entry.Write([]byte("executable"))
+				_ = w.Close()
 			}
 			dir := t.TempDir()
 			archive := filepath.Join(dir, "archive")
-			os.WriteFile(archive, b.Bytes(), 0600)
+			if err := os.WriteFile(archive, b.Bytes(), 0600); err != nil {
+				t.Fatal(err)
+			}
 			destination := filepath.Join(dir, BinaryName(platform))
 			if err := extractBinary(context.Background(), archive, destination, platform); err != nil {
 				t.Fatal(err)
@@ -48,12 +50,14 @@ func TestExtractRejectsZipTraversalAndMultipleExecutables(t *testing.T) {
 		w := zip.NewWriter(&b)
 		for _, name := range names {
 			entry, _ := w.Create(name)
-			entry.Write([]byte("bad"))
+			_, _ = entry.Write([]byte("bad"))
 		}
-		w.Close()
+		_ = w.Close()
 		dir := t.TempDir()
 		archive := filepath.Join(dir, "archive.zip")
-		os.WriteFile(archive, b.Bytes(), 0600)
+		if err := os.WriteFile(archive, b.Bytes(), 0600); err != nil {
+			t.Fatal(err)
+		}
 		if err := extractBinary(context.Background(), archive, filepath.Join(dir, "core.exe"), "windows"); err == nil {
 			t.Fatalf("accepted %v", names)
 		}
@@ -62,7 +66,9 @@ func TestExtractRejectsZipTraversalAndMultipleExecutables(t *testing.T) {
 func TestImportRequiresChecksumAndKeepsExistingVersion(t *testing.T) {
 	root := t.TempDir()
 	src := filepath.Join(t.TempDir(), "mihomo")
-	os.WriteFile(src, []byte("local executable"), 0700)
+	if err := os.WriteFile(src, []byte("local executable"), 0700); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := Import(context.Background(), root, src, "../../bad", strings.Repeat("0", 64), "linux"); err == nil {
 		t.Fatal("accepted traversal tag")
 	}
@@ -80,8 +86,8 @@ func TestImportRequiresChecksumAndKeepsExistingVersion(t *testing.T) {
 }
 func TestLogBufferIsBounded(t *testing.T) {
 	var b LogBuffer
-	b.Write(bytes.Repeat([]byte("a"), 1<<20))
-	b.Write([]byte("end"))
+	_, _ = b.Write(bytes.Repeat([]byte("a"), 1<<20))
+	_, _ = b.Write([]byte("end"))
 	if len(b.String()) != 64<<10 || !strings.HasSuffix(b.String(), "end") {
 		t.Fatal("unbounded or missing tail")
 	}
@@ -104,8 +110,8 @@ func TestPinnedReleaseHasBaselineAssetsAndDigests(t *testing.T) {
 func TestInstallIsIdempotentButRejectsTamperedExecutable(t *testing.T) {
 	var archive bytes.Buffer
 	gz := gzip.NewWriter(&archive)
-	gz.Write([]byte("verified executable"))
-	gz.Close()
+	_, _ = gz.Write([]byte("verified executable"))
+	_ = gz.Close()
 	hash := sha256.Sum256(archive.Bytes())
 	digest := hex.EncodeToString(hash[:])
 	asset := Asset{Name: "mihomo-linux-amd64-compatible-v1.2.3.gz", URL: "https://github.com/MetaCubeX/mihomo/releases/download/v1.2.3/mihomo-linux-amd64-compatible-v1.2.3.gz", Digest: "sha256:" + digest}
@@ -118,8 +124,12 @@ func TestInstallIsIdempotentButRejectsTamperedExecutable(t *testing.T) {
 		t.Fatal(err)
 	}
 	stale := filepath.Join(root, "core", ".install-interrupted")
-	os.MkdirAll(stale, 0700)
-	os.WriteFile(filepath.Join(stale, "asset.part"), []byte("incomplete"), 0600)
+	if err := os.MkdirAll(stale, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(stale, "asset.part"), []byte("incomplete"), 0600); err != nil {
+		t.Fatal(err)
+	}
 	second, err := f.Install(context.Background(), root, r, "linux", "amd64")
 	if _, e := os.Stat(stale); !os.IsNotExist(e) {
 		t.Fatal("interrupted staging directory was retained")
@@ -128,7 +138,9 @@ func TestInstallIsIdempotentButRejectsTamperedExecutable(t *testing.T) {
 		t.Fatalf("calls=%d err=%v", calls, err)
 	}
 	binary, _ := BinaryPath(root, r.Tag, "linux")
-	os.WriteFile(binary, []byte("tampered"), 0700)
+	if err := os.WriteFile(binary, []byte("tampered"), 0700); err != nil {
+		t.Fatal(err)
+	}
 	if _, err = f.Install(context.Background(), root, r, "linux", "amd64"); err == nil {
 		t.Fatal("tampered installed executable accepted")
 	}

@@ -24,7 +24,7 @@ const doctorProbeTimeout = 2 * time.Second
 var doctorOutput string
 
 var doctorCmd = &cobra.Command{
-	Use:   "doctor [--output json|table|plain]",
+	Use: "doctor [--output json|table|plain]",
 	Example: `  mihosh doctor
   mihosh doctor --output table
   mihosh doctor --output json`,
@@ -159,11 +159,11 @@ func checkWebSocketAvailable(endpoint config.MihomoEndpoint) doctorCheckResult {
 	}
 
 	dialer := websocket.Dialer{HandshakeTimeout: doctorProbeTimeout}
-	conn, _, err := dialer.Dial(wsURL, nil)
+	conn, _, err := dialer.Dial(wsURL, nil) //nolint:bodyclose // Gorilla owns the handshake response body; DialContext requires no application close.
 	if err != nil {
 		return doctorCheckResult{Name: "websocket", Status: doctorStatusFail, Message: err.Error(), Target: endpoint.ExternalController, Hint: "WebSocket 握手失败。可能的原因：API 地址错误、网络不通或 Mihomo 版本过低不支持此端点。"}
 	}
-	conn.Close()
+	_ = conn.Close()
 	return doctorCheckResult{Name: "websocket", Status: doctorStatusOK, Message: "reachable", Target: endpoint.ExternalController}
 }
 
@@ -208,37 +208,49 @@ func renderDoctorReport(w io.Writer, report doctorReport, format outputFormat) e
 	case outputFormatTable:
 		return renderDoctorTable(w, report)
 	case outputFormatPlain:
-		renderDoctorPlain(w, report)
-		return nil
+		return renderDoctorPlain(w, report)
 	default:
 		return fmt.Errorf(i18n.T("cli.doctor.unsupported_format"), format)
 	}
 }
 
-func renderDoctorPlain(w io.Writer, report doctorReport) {
-	fmt.Fprintf(w, "%s: %s\n", i18n.T("cli.doctor.label_health"), report.Status)
-	fmt.Fprintln(w, i18n.Tf("cli.doctor.label_fail_warn", report.Failed, report.Warnings))
+func renderDoctorPlain(w io.Writer, report doctorReport) error {
+	if _, err := fmt.Fprintf(w, "%s: %s\n", i18n.T("cli.doctor.label_health"), report.Status); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(w, i18n.Tf("cli.doctor.label_fail_warn", report.Failed, report.Warnings)); err != nil {
+		return err
+	}
 	for _, check := range report.Checks {
 		targetStr := ""
 		if check.Target != "" && check.Target != "-" {
 			targetStr = fmt.Sprintf(" (%s)", check.Target)
 		}
-		fmt.Fprintf(w, "[%s] %s%s: %s\n", strings.ToUpper(string(check.Status)), check.Name, targetStr, check.Message)
+		if _, err := fmt.Fprintf(w, "[%s] %s%s: %s\n", strings.ToUpper(string(check.Status)), check.Name, targetStr, check.Message); err != nil {
+			return err
+		}
 		if check.Hint != "" {
-			fmt.Fprintf(w, "      %s: %s\n", i18n.T("cli.doctor.label_hint"), check.Hint)
+			if _, err := fmt.Fprintf(w, "      %s: %s\n", i18n.T("cli.doctor.label_hint"), check.Hint); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 func renderDoctorTable(w io.Writer, report doctorReport) error {
 	tw := newTabWriter(w)
-	fmt.Fprintln(tw, "CHECK\tSTATUS\tTARGET\tMESSAGE\tHINT")
+	if _, err := fmt.Fprintln(tw, "CHECK\tSTATUS\tTARGET\tMESSAGE\tHINT"); err != nil {
+		return err
+	}
 	for _, check := range report.Checks {
 		target := check.Target
 		if target == "" {
 			target = "-"
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", check.Name, strings.ToUpper(string(check.Status)), target, check.Message, check.Hint)
+		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", check.Name, strings.ToUpper(string(check.Status)), target, check.Message, check.Hint); err != nil {
+			return err
+		}
 	}
 	return tw.Flush()
 }

@@ -36,7 +36,7 @@ func TestCLIConfigReloadKeepsSuccessAndWarningOutput(t *testing.T) {
 			require.NoError(t, err)
 			saved := os.Stdout
 			os.Stdout = out
-			t.Cleanup(func() { os.Stdout = saved; out.Close() })
+			t.Cleanup(func() { os.Stdout = saved; _ = out.Close() })
 			require.NoError(t, reloadMihomoCore("already-edited.yaml"), "reload failure remains a warning after editing")
 			require.EqualValues(t, 1, requests.Load())
 			_, err = out.Seek(0, io.SeekStart)
@@ -124,7 +124,7 @@ func TestRenderConfigShow(t *testing.T) {
 func TestValidateConfigFile(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "mihosh-test-*")
 	assert.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	tests := []struct {
 		name     string
@@ -191,7 +191,7 @@ func TestDetectEditor(t *testing.T) {
 func TestCheckConfigFileSize(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "mihosh-test-*")
 	assert.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	path := filepath.Join(tempDir, "large-config.yaml")
 

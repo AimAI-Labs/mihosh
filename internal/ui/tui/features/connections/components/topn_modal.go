@@ -180,17 +180,3 @@ func buildTopNModal(items []TopNItem, width, height, scroll int) string {
 	panelWidth := innerW + 4 // 对应 contentWidth = innerW
 	return common.RenderTokyoPanel(i18n.T("conns.topn_modal_title"), body, panelWidth)
 }
-
-func truncateRunes(s string, limit int) string {
-	if limit <= 0 {
-		return ""
-	}
-	runes := []rune(s)
-	if len(runes) <= limit {
-		return s
-	}
-	if limit <= 3 {
-		return string(runes[:limit])
-	}
-	return string(runes[:limit-3]) + "..."
-}

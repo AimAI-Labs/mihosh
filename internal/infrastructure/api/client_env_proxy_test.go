@@ -56,7 +56,7 @@ func TestWSClient_IgnoresEnvProxy(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		_ = conn.WriteJSON(MemoryData{Inuse: 1024})
 	}))
 	defer ts.Close()

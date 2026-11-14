@@ -117,82 +117,82 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	case messages.PageMouseClickMsg:
 		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
 	case tea.KeyMsg:
-	// 编辑规则弹窗优先拦截（吞掉所有按键）
-	if s.showEditForm {
-		return s.handleEditFormMode(msg)
-	}
+		// 编辑规则弹窗优先拦截（吞掉所有按键）
+		if s.showEditForm {
+			return s.handleEditFormMode(msg)
+		}
 
-	// 添加规则弹窗优先拦截（吞掉所有按键）
-	if s.showAddForm {
-		return s.handleAddFormMode(msg)
-	}
+		// 添加规则弹窗优先拦截（吞掉所有按键）
+		if s.showAddForm {
+			return s.handleAddFormMode(msg)
+		}
 
-	// 删除确认弹窗拦截（吞掉所有按键）
-	if s.showDeleteConfirm {
-		return s.handleDeleteConfirmMode(msg)
-	}
+		// 删除确认弹窗拦截（吞掉所有按键）
+		if s.showDeleteConfirm {
+			return s.handleDeleteConfirmMode(msg)
+		}
 
-	// 类型筛选弹窗模式优先处理
-	if s.showTypeFilter {
-		return s.handleTypeFilterMode(msg)
-	}
+		// 类型筛选弹窗模式优先处理
+		if s.showTypeFilter {
+			return s.handleTypeFilterMode(msg)
+		}
 
-	if s.ruleFilterMode {
-		return s.handleRuleFilterMode(msg)
-	}
+		if s.ruleFilterMode {
+			return s.handleRuleFilterMode(msg)
+		}
 
-	switch {
-	case key.Matches(msg, common.Keys.Up):
-		if s.selectedRule > 0 {
-			s.selectedRule--
-			if s.selectedRule < s.ruleScrollTop {
-				s.ruleScrollTop = s.selectedRule
+		switch {
+		case key.Matches(msg, common.Keys.Up):
+			if s.selectedRule > 0 {
+				s.selectedRule--
+				if s.selectedRule < s.ruleScrollTop {
+					s.ruleScrollTop = s.selectedRule
+				}
+			}
+
+		case key.Matches(msg, common.Keys.Down):
+			if s.selectedRule < len(s.filteredRuleIndices)-1 {
+				s.selectedRule++
+			}
+
+		case msg.String() == "/":
+			s.ruleFilterMode = true
+
+		case msg.String() == "t":
+			// 打开类型筛选弹窗，保留已选类型以便增量调整
+			s.showTypeFilter = true
+			s.typeFilterCursor = 0
+			s.extractAvailableTypes()
+
+		case msg.String() == "n":
+			// 打开添加自定义规则弹窗（每次打开重置为干净表单）
+			s.showAddForm = true
+			s.addForm = newAddForm(s.configPath)
+
+		case msg.String() == "d":
+			// 打开删除确认弹窗（针对当前选中规则）
+			return s.openDeleteConfirm()
+
+		case key.Matches(msg, common.Keys.Enter):
+			// Enter 打开编辑规则弹窗（针对当前选中规则）
+			return s.openEditForm()
+
+		case msg.String() == "e":
+			// 在外部编辑器中打开配置文件
+			return s.openConfigEditor()
+
+		case key.Matches(msg, common.Keys.Refresh):
+			return s, FetchRules(s.client)
+
+		case key.Matches(msg, common.Keys.Escape):
+			if s.ruleFilter != "" || len(s.selectedTypes) > 0 {
+				s.ruleFilter = ""
+				s.selectedTypes = nil
+				s.selectedRule = 0
+				s.ruleScrollTop = 0
+				s.updateFilteredRules()
 			}
 		}
-
-	case key.Matches(msg, common.Keys.Down):
-		if s.selectedRule < len(s.filteredRuleIndices)-1 {
-			s.selectedRule++
-		}
-
-	case msg.String() == "/":
-		s.ruleFilterMode = true
-
-	case msg.String() == "t":
-		// 打开类型筛选弹窗，保留已选类型以便增量调整
-		s.showTypeFilter = true
-		s.typeFilterCursor = 0
-		s.extractAvailableTypes()
-
-	case msg.String() == "n":
-		// 打开添加自定义规则弹窗（每次打开重置为干净表单）
-		s.showAddForm = true
-		s.addForm = newAddForm(s.configPath)
-
-	case msg.String() == "d":
-		// 打开删除确认弹窗（针对当前选中规则）
-		return s.openDeleteConfirm()
-
-	case key.Matches(msg, common.Keys.Enter):
-		// Enter 打开编辑规则弹窗（针对当前选中规则）
-		return s.openEditForm()
-
-	case msg.String() == "e":
-		// 在外部编辑器中打开配置文件
-		return s.openConfigEditor()
-
-	case key.Matches(msg, common.Keys.Refresh):
-		return s, FetchRules(s.client)
-
-	case key.Matches(msg, common.Keys.Escape):
-		if s.ruleFilter != "" || len(s.selectedTypes) > 0 {
-			s.ruleFilter = ""
-			s.selectedTypes = nil
-			s.selectedRule = 0
-			s.ruleScrollTop = 0
-			s.updateFilteredRules()
-		}
-	}
 
 	}
 	return s, nil

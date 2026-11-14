@@ -25,9 +25,9 @@ func TestListCommandUsesOneProxySnapshot(t *testing.T) {
 			return
 		}
 		if requests.Add(1) == 1 {
-			io.WriteString(w, `{"proxies":{"GLOBAL":{"all":["Select","GLOBAL"]},"Select":{"type":"Selector","now":"first","all":["first"]},"first":{"history":[{"delay":11}]}}}`)
+			_, _ = io.WriteString(w, `{"proxies":{"GLOBAL":{"all":["Select","GLOBAL"]},"Select":{"type":"Selector","now":"first","all":["first"]},"first":{"history":[{"delay":11}]}}}`)
 		} else {
-			io.WriteString(w, `{"proxies":{"GLOBAL":{"all":["Select","GLOBAL"]},"Select":{"type":"Selector","now":"second","all":["second"]},"second":{"history":[{"delay":77}]}}}`)
+			_, _ = io.WriteString(w, `{"proxies":{"GLOBAL":{"all":["Select","GLOBAL"]},"Select":{"type":"Selector","now":"second","all":["second"]},"second":{"history":[{"delay":77}]}}}`)
 		}
 	}))
 	defer server.Close()
@@ -38,7 +38,7 @@ func TestListCommandUsesOneProxySnapshot(t *testing.T) {
 	require.NoError(t, err)
 	savedOutput, savedStdout := listOutput, os.Stdout
 	listOutput, os.Stdout = "json", out
-	t.Cleanup(func() { listOutput, os.Stdout = savedOutput, savedStdout; out.Close() })
+	t.Cleanup(func() { listOutput, os.Stdout = savedOutput, savedStdout; _ = out.Close() })
 	require.NoError(t, listCmd.RunE(listCmd, nil))
 	require.EqualValues(t, 1, requests.Load(), "one display must use one proxy snapshot")
 	_, err = out.Seek(0, io.SeekStart)

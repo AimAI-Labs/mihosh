@@ -37,7 +37,9 @@ func TitleStyle() lipgloss.Style {
 }
 func SubtitleStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(Gray()) }
 
-func SelectedItemStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(Secondary()).Bold(true) }
+func SelectedItemStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(Secondary()).Bold(true)
+}
 func NormalItemStyle() lipgloss.Style   { return lipgloss.NewStyle().Foreground(Text()) }
 func DisabledItemStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(Gray()) }
 

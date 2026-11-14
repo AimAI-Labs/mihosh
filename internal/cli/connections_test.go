@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRenderConnections(t *testing.T) {

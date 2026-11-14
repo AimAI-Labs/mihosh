@@ -71,9 +71,6 @@ func FetchContext(ctx context.Context, p Profile) error {
 	return fmt.Errorf("订阅内容顶层不是配置映射（可能是错误页或纯文本），已拒绝")
 }
 
-// fetchBytes 按 Source 类型获取原始字节。
-func fetchBytes(src SubSource) ([]byte, error) { return fetchBytesContext(context.Background(), src) }
-
 func fetchBytesContext(ctx context.Context, src SubSource) ([]byte, error) {
 	switch src.Kind {
 	case SourceLocal:
@@ -82,9 +79,6 @@ func fetchBytesContext(ctx context.Context, src SubSource) ([]byte, error) {
 		return fetchRemoteContext(ctx, src.URL)
 	}
 }
-
-// fetchRemote 拉取远程 URL。
-func fetchRemote(url string) ([]byte, error) { return fetchRemoteContext(context.Background(), url) }
 
 func fetchRemoteContext(ctx context.Context, url string) ([]byte, error) {
 	subURL := strings.TrimSpace(url)
@@ -108,7 +102,7 @@ func fetchRemoteContext(ctx context.Context, url string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf(i18n.T("profile.fetcher.err_fetch"), err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf(i18n.T("profile.fetcher.err_status_code"), resp.StatusCode)

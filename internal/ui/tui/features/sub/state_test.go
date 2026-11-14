@@ -161,7 +161,7 @@ func TestSubscriptionScrollUsesActualHeight(t *testing.T) {
 
 func TestActivateSelected_NoSelection(t *testing.T) {
 	s := State{}.ApplySubs([]profile.Profile{}, "")
-	s, cmd := s.activateSelected()
+	_, cmd := s.activateSelected()
 	assert.Nil(t, cmd, "空列表激活应无命令")
 }
 
@@ -190,7 +190,7 @@ func TestUpdate_MKeyOpensMergeEditor(t *testing.T) {
 func TestOpenMergeExternalEditor_NoSelection(t *testing.T) {
 	// 无论列表是否为空，都可以打开全局覆写配置。
 	s := State{}.ApplySubs(nil, "")
-	s, cmd := s.openMergeExternalEditor()
+	_, cmd := s.openMergeExternalEditor()
 	assert.NotNil(t, cmd, "空列表也应该发出编辑器命令")
 }
 

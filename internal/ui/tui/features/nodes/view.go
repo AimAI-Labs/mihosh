@@ -160,9 +160,7 @@ func buildTestResultModal(state PageState) string {
 	if scrollTop > 0 {
 		bodyLines = append(bodyLines, common.DimStyle().Render(i18n.Tf("nodes.result_scroll_up", scrollTop)))
 	}
-	for _, line := range allLines[scrollTop:endIdx] {
-		bodyLines = append(bodyLines, line)
-	}
+	bodyLines = append(bodyLines, allLines[scrollTop:endIdx]...)
 	if endIdx < totalLines {
 		bodyLines = append(bodyLines, common.DimStyle().Render(i18n.Tf("nodes.result_scroll_down", totalLines-endIdx)))
 	}

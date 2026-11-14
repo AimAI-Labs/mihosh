@@ -57,7 +57,7 @@ func nativeFixture(t *testing.T) (string, string, func(...string) ([]byte, error
 		l, e := net.Listen("tcp", "127.0.0.1:0")
 		require.NoError(t, e)
 		port := l.Addr().(*net.TCPAddr).Port
-		l.Close()
+		_ = l.Close()
 		return port
 	}
 	s = NewCoreService()

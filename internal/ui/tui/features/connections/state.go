@@ -35,7 +35,7 @@ type State struct {
 	closedCount       int                             // 已写入的总条数（上限 ClosedConnCap）
 	cachedClosedConns []model.Connection              // 缓存的已关闭连接列表
 
-	filterList common.FilterList
+	filterList              common.FilterList
 	connDetailMode          bool
 	connDetailSnapshot      *model.Connection
 	connIPInfo              *model.IPInfo
@@ -62,7 +62,7 @@ type State struct {
 	client    *api.Client
 	timeout   int
 	chartData *model.ChartData
-	
+
 	siteBatch       service.TestBatch
 	siteTestIndices []int
 	testCtx         context.Context
@@ -190,138 +190,138 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
 	case tea.KeyMsg:
 		// 继续处理 KeyMsg
-	if s.connDetailMode {
-		switch {
-		case key.Matches(msg, common.Keys.Escape), key.Matches(msg, common.Keys.Enter), msg.String() == "q":
-			s.closeConnectionDetail()
-			return s, nil
-		case key.Matches(msg, common.Keys.Left), msg.String() == "h":
-			if s.connDetailFocusPanel > 0 {
-				s.connDetailFocusPanel--
+		if s.connDetailMode {
+			switch {
+			case key.Matches(msg, common.Keys.Escape), key.Matches(msg, common.Keys.Enter), msg.String() == "q":
+				s.closeConnectionDetail()
+				return s, nil
+			case key.Matches(msg, common.Keys.Left), msg.String() == "h":
+				if s.connDetailFocusPanel > 0 {
+					s.connDetailFocusPanel--
+				}
+				return s, nil
+			case key.Matches(msg, common.Keys.Right), msg.String() == "l":
+				if s.connDetailFocusPanel < 1 {
+					s.connDetailFocusPanel++
+				}
+				return s, nil
+			}
+
+			if s.connDetailFocusPanel == 0 {
+				s.connDetailLeftPanel.Update(msg)
+				s.clampLeftScroll() // apply specific static limits if needed
+			} else {
+				s.connDetailRightPanel.Update(msg)
+				s.clampRightScroll() // apply specific json limit if needed
 			}
 			return s, nil
-		case key.Matches(msg, common.Keys.Right), msg.String() == "l":
-			if s.connDetailFocusPanel < 1 {
-				s.connDetailFocusPanel++
+		}
+
+		if s.topNModalMode {
+			switch {
+			case key.Matches(msg, common.Keys.Escape), key.Matches(msg, common.Keys.Enter), msg.String() == "q":
+				s.closeTopNModal()
+				return s, nil
 			}
+			s.topNModalPanel.Update(msg)
 			return s, nil
 		}
 
-		if s.connDetailFocusPanel == 0 {
-			s.connDetailLeftPanel.Update(msg)
-			s.clampLeftScroll() // apply specific static limits if needed
-		} else {
-			s.connDetailRightPanel.Update(msg)
-			s.clampRightScroll() // apply specific json limit if needed
-		}
-		return s, nil
-	}
-
-	if s.topNModalMode {
-		switch {
-		case key.Matches(msg, common.Keys.Escape), key.Matches(msg, common.Keys.Enter), msg.String() == "q":
-			s.closeTopNModal()
-			return s, nil
-		}
-		s.topNModalPanel.Update(msg)
-		return s, nil
-	}
-
-	// 过滤输入模式
-	if s.filterList.FilterMode() {
-		s.filterList.SetItemCount(s.filteredConnCount())
-		_, cmd := s.filterList.Update(msg)
-		s.filterList.SetItemCount(s.filteredConnCount()) // Update again after filter string changes
-		return s, cmd
-	}
-
-	// tab 切换键（所有 viewMode 通用）
-	if msg.String() == "h" {
-		s.CancelTest()
-		s.setConnViewMode((s.connViewMode + 1) % 3)
-		return s, nil
-	}
-
-	// 流量监控 tab：仅响应站点测速和选择
-	if s.connViewMode == ConnViewTraffic {
-		switch {
-		case msg.String() == "s":
-			return s.triggerSiteTestByIndex(s.selectedSiteTest, s.timeout)
-		case msg.String() == "S":
-			indices := make([]int, len(s.siteTests))
-			for i := range indices {
-				indices[i] = i
-			}
-			return s.startSiteTests(indices, s.timeout)
-		case key.Matches(msg, common.Keys.Left):
-			if s.selectedSiteTest > 0 {
-				s.selectedSiteTest--
-			}
-		case key.Matches(msg, common.Keys.Right):
-			if s.selectedSiteTest < len(s.siteTests)-1 {
-				s.selectedSiteTest++
-			}
-		}
-		return s, nil
-	}
-
-	// 活跃/历史连接 tab：连接列表操作
-	switch {
-	case msg.String() == "i":
-		if s.connViewMode == ConnViewActive || s.connViewMode == ConnViewHistory {
-			s.inlineDetailMode = !s.inlineDetailMode
-		}
-
-	case key.Matches(msg, common.Keys.Up):
-		if s.inlineDetailFocused {
-			s.inlineDetailPanel.Update(msg)
-		} else {
+		// 过滤输入模式
+		if s.filterList.FilterMode() {
 			s.filterList.SetItemCount(s.filteredConnCount())
-			s.filterList.Update(msg)
-			s.inlineDetailPanel.Reset()
+			_, cmd := s.filterList.Update(msg)
+			s.filterList.SetItemCount(s.filteredConnCount()) // Update again after filter string changes
+			return s, cmd
 		}
 
-	case key.Matches(msg, common.Keys.Down):
-		if s.inlineDetailFocused {
-			s.inlineDetailPanel.Update(msg)
-		} else {
-			s.filterList.SetItemCount(s.filteredConnCount())
-			s.filterList.Update(msg)
-			s.inlineDetailPanel.Reset()
+		// tab 切换键（所有 viewMode 通用）
+		if msg.String() == "h" {
+			s.CancelTest()
+			s.setConnViewMode((s.connViewMode + 1) % 3)
+			return s, nil
 		}
 
-	case key.Matches(msg, common.Keys.Enter):
-		return s.openSelectedConnectionDetail()
+		// 流量监控 tab：仅响应站点测速和选择
+		if s.connViewMode == ConnViewTraffic {
+			switch {
+			case msg.String() == "s":
+				return s.triggerSiteTestByIndex(s.selectedSiteTest, s.timeout)
+			case msg.String() == "S":
+				indices := make([]int, len(s.siteTests))
+				for i := range indices {
+					indices[i] = i
+				}
+				return s.startSiteTests(indices, s.timeout)
+			case key.Matches(msg, common.Keys.Left):
+				if s.selectedSiteTest > 0 {
+					s.selectedSiteTest--
+				}
+			case key.Matches(msg, common.Keys.Right):
+				if s.selectedSiteTest < len(s.siteTests)-1 {
+					s.selectedSiteTest++
+				}
+			}
+			return s, nil
+		}
 
-	case msg.String() == "x":
-		if s.connViewMode == ConnViewActive {
-			conn := s.selectedConnection()
-			if conn != nil {
+		// 活跃/历史连接 tab：连接列表操作
+		switch {
+		case msg.String() == "i":
+			if s.connViewMode == ConnViewActive || s.connViewMode == ConnViewHistory {
+				s.inlineDetailMode = !s.inlineDetailMode
+			}
+
+		case key.Matches(msg, common.Keys.Up):
+			if s.inlineDetailFocused {
+				s.inlineDetailPanel.Update(msg)
+			} else {
+				s.filterList.SetItemCount(s.filteredConnCount())
+				s.filterList.Update(msg)
+				s.inlineDetailPanel.Reset()
+			}
+
+		case key.Matches(msg, common.Keys.Down):
+			if s.inlineDetailFocused {
+				s.inlineDetailPanel.Update(msg)
+			} else {
+				s.filterList.SetItemCount(s.filteredConnCount())
+				s.filterList.Update(msg)
+				s.inlineDetailPanel.Reset()
+			}
+
+		case key.Matches(msg, common.Keys.Enter):
+			return s.openSelectedConnectionDetail()
+
+		case msg.String() == "x":
+			if s.connViewMode == ConnViewActive {
+				conn := s.selectedConnection()
+				if conn != nil {
+					return s, tea.Batch(
+						CloseConnection(s.client, conn.ID),
+						FetchConnections(s.client),
+					)
+				}
+			}
+
+		case msg.String() == "X":
+			if s.connViewMode == ConnViewActive {
 				return s, tea.Batch(
-					CloseConnection(s.client, conn.ID),
+					CloseAllConnections(s.client),
 					FetchConnections(s.client),
 				)
 			}
-		}
 
-	case msg.String() == "X":
-		if s.connViewMode == ConnViewActive {
-			return s, tea.Batch(
-				CloseAllConnections(s.client),
-				FetchConnections(s.client),
-			)
-		}
+		case msg.String() == "/":
+			s.filterList.Update(msg)
 
-	case msg.String() == "/":
-		s.filterList.Update(msg)
-
-	case key.Matches(msg, common.Keys.Escape):
-		if s.inlineDetailFocused {
-			s.inlineDetailFocused = false
-		} else if s.filterList.FilterValue() != "" {
-			s.filterList.ResetFilter()
+		case key.Matches(msg, common.Keys.Escape):
+			if s.inlineDetailFocused {
+				s.inlineDetailFocused = false
+			} else if s.filterList.FilterValue() != "" {
+				s.filterList.ResetFilter()
+			}
 		}
-	}
 
 	}
 

@@ -7,8 +7,8 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/viper"
@@ -93,8 +93,6 @@ func TestSettingsLanguageMouseClickAppliesI18nImmediately(t *testing.T) {
 
 	const pageX = 48 // originally 42, shifted by 4 due to label width increase, +2 to be safe
 	const pageY = 7
-	const rawX = pageX
-	const rawY = pageY + layout.TopNavHeight
 
 	msg := messages.PageMouseClickMsg{X: pageX, Y: pageY, Width: model.width, Height: model.height - layout.TopNavHeight}
 	next, cmd := model.dispatchToPage(msg)
@@ -142,8 +140,6 @@ func TestSettingsThemeMouseClickClearsScreen(t *testing.T) {
 
 	const pageX = 48 // originally 40, shifted by 4 due to label width increase, +4 to be safe
 	const pageY = 9
-	const rawX = pageX
-	const rawY = pageY + layout.TopNavHeight
 
 	msg := messages.PageMouseClickMsg{X: pageX, Y: pageY, Width: model.width, Height: model.height - layout.TopNavHeight}
 	next, cmd := model.dispatchToPage(msg)

@@ -3,8 +3,6 @@ package tui
 import (
 	"context"
 
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
-
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
@@ -21,11 +19,6 @@ func fetchMemory(client *api.Client) tea.Cmd {
 		}
 		return messages.MemoryWSMsg{Memory: mem.Inuse}
 	})
-}
-
-// fetchConnectionsAndMemory 同时获取连接和内存数据
-func fetchConnectionsAndMemory(client *api.Client) tea.Cmd {
-	return tea.Batch(connections.FetchConnections(client), fetchMemory(client))
 }
 
 // startWSStreams 启动WebSocket流
@@ -72,16 +65,8 @@ func startWSStreams(ctx context.Context, wsClient *api.WSClient, msgChan chan in
 		})
 
 		// 启动WebSocket连接
-		wsClient.Start(ctx)
-		return nil
-	}
-}
-
-// stopWSStreams 停止WebSocket流
-func stopWSStreams(wsClient *api.WSClient) tea.Cmd {
-	return func() tea.Msg {
-		if wsClient != nil {
-			wsClient.Stop()
+		if err := wsClient.Start(ctx); err != nil {
+			return messages.ErrMsg{Err: err}
 		}
 		return nil
 	}

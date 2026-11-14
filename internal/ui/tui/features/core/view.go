@@ -111,7 +111,8 @@ func (s State) overview(width int) string {
 	if s.connectionChecked && !s.connected && s.Status.Mode == "managed" && s.Status.Running {
 		rows = append(rows, lipgloss.NewStyle().Foreground(t.Warning).Render(wrap(i18n.T("core.connection_unavailable"), width-4)))
 	}
-	if s.tab == 0 {
+	switch s.tab {
+	case 0:
 		value := func(text string) string {
 			if text == "" {
 				return i18n.T("core.unknown_version")
@@ -144,14 +145,14 @@ func (s State) overview(width int) string {
 			}
 			rows = append(rows, i18n.T("core.runtime")+": "+i18n.T(runtime))
 		}
-	} else if s.tab == 1 {
+	case 1:
 		tag := s.Release.Tag
 		if tag == "" {
 			tag = i18n.T("core.unknown_version")
 		}
 		rows = append(rows, "", i18n.T("core.available")+": "+tag,
 			wrap(i18n.Tf("core.installed_count", len(s.Status.Installed)), width-4))
-	} else {
+	default:
 		runtime := "core.runtime.session"
 		if s.Status.Runtime == "service" {
 			runtime = "core.runtime.service"

@@ -17,7 +17,7 @@ func TestNodesState_TestAllDoesNotPanic(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hj, _ := w.(http.Hijacker)
 		conn, _, _ := hj.Hijack()
-		conn.Close()
+		_ = conn.Close()
 	}))
 	defer ts.Close()
 

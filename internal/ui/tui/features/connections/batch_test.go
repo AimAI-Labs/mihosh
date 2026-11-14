@@ -25,7 +25,7 @@ func TestSiteBatchCapacityRefillAndCancellation(t *testing.T) {
 		for old := peak.Load(); current > old && !peak.CompareAndSwap(old, current); old = peak.Load() {
 		}
 		var index int
-		fmt.Sscanf(r.URL.Path, "/site-%d", &index)
+		_, _ = fmt.Sscanf(r.URL.Path, "/site-%d", &index)
 		started <- index
 		select {
 		case <-release:

@@ -278,7 +278,7 @@ func (f *Fetcher) request(ctx context.Context, raw string, metadata bool, consum
 			wait := time.Second
 			if resp != nil {
 				wait = max(wait, retryDelay(resp.Header.Get("Retry-After")))
-				resp.Body.Close()
+				_ = resp.Body.Close()
 			}
 			timer := time.NewTimer(wait)
 			select {
@@ -291,7 +291,7 @@ func (f *Fetcher) request(ctx context.Context, raw string, metadata bool, consum
 		if routeCtx.Err() != nil {
 			requestErr = routeCtx.Err()
 			if resp != nil {
-				resp.Body.Close()
+				_ = resp.Body.Close()
 			}
 		}
 		fatal := false
@@ -314,7 +314,7 @@ func (f *Fetcher) request(ctx context.Context, raw string, metadata bool, consum
 					// Do not immediately issue the same upstream request through another route.
 					wait := retryDelay(resp.Header.Get("Retry-After"))
 					if wait > 0 {
-						resp.Body.Close()
+						_ = resp.Body.Close()
 						timer := time.NewTimer(wait)
 						select {
 						case <-routeCtx.Done():
@@ -329,7 +329,7 @@ func (f *Fetcher) request(ctx context.Context, raw string, metadata bool, consum
 					}
 				}
 			}
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 		client.CloseIdleConnections()
 		routeCancel()
@@ -384,7 +384,7 @@ func (f *Fetcher) Download(ctx context.Context, raw, destination, expected strin
 		return Route{}, errors.New("a trusted SHA-256 digest is required")
 	}
 	part := destination + ".part"
-	defer os.Remove(part)
+	defer func() { _ = os.Remove(part) }() // The verified file is renamed on success; failed transfers are best-effort cleanup.
 	route, err := f.request(ctx, raw, false, func(resp *http.Response, route Route) error {
 		if resp.ContentLength > MaxAssetBytes {
 			return errors.New("asset exceeds size limit")
@@ -399,14 +399,14 @@ func (f *Fetcher) Download(ctx context.Context, raw, destination, expected strin
 		reader := io.LimitReader(resp.Body, MaxAssetBytes+1)
 		buf := make([]byte, 64<<10)
 		// Cancel a stalled body independently of the overall download deadline.
-		idle := time.AfterFunc(30*time.Second, func() { resp.Body.Close() })
+		idle := time.AfterFunc(30*time.Second, func() { _ = resp.Body.Close() })
 		defer idle.Stop()
 		for {
 			n, readErr := reader.Read(buf)
 			if n > 0 {
 				idle.Reset(30 * time.Second)
 				if _, err = file.Write(buf[:n]); err != nil {
-					file.Close()
+					_ = file.Close()
 					return errors.New("cannot write download file")
 				}
 				hash.Write(buf[:n])
@@ -417,7 +417,7 @@ func (f *Fetcher) Download(ctx context.Context, raw, destination, expected strin
 			}
 			if readErr != nil {
 				if readErr != io.EOF {
-					file.Close()
+					_ = file.Close()
 					return errors.New("asset transfer interrupted")
 				}
 				break

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -100,6 +101,40 @@ func TestNetworkRecoveryFailureRetainsRecordForRetry(t *testing.T) {
 	require.NoError(t, s.RecoverNetwork(context.Background()))
 	current, _ := n.ReadProxy(context.Background())
 	require.Equal(t, fakeSettings("old", "auto"), current)
+}
+
+func TestExitedCoreOperationsReturnNetworkRecoveryError(t *testing.T) {
+	for _, action := range []string{"start", "ports", "mutation", "wait", "close"} {
+		t.Run(action, func(t *testing.T) {
+			s, n, root := networkService(t)
+			require.NoError(t, writeNetwork(root, networkRecovery{Before: fakeSettings("old", "auto"), Applied: n.ProxyTarget(1)}))
+			n.fail = true
+			s.process = &exec.Cmd{}
+			s.done = make(chan error)
+			close(s.done)
+			s.stop = func() {}
+			var err error
+			switch action {
+			case "start":
+				err = s.Start(context.Background())
+			case "ports":
+				err = s.SetPorts(9090, 7890)
+			case "mutation":
+				_, err = s.lockCoreMutation(root)
+				unlock, lockErr := coreinfra.LockRuntime(filepath.Join(root, "runtime", "config.lock"))
+				require.NoError(t, lockErr)
+				unlock()
+			case "wait":
+				err = s.Wait(context.Background())
+			case "close":
+				s.Close()
+				err = s.failure
+			}
+			require.ErrorContains(t, err, "desktop temporarily unavailable")
+			_, err = os.Stat(networkJournal(root))
+			require.NoError(t, err, "failed recovery must remain retryable")
+		})
+	}
 }
 func TestNetworkRecoveryRejectsLiveOwnerAndInvalidIdentity(t *testing.T) {
 	s, n, root := networkService(t)

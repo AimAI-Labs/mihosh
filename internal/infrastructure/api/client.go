@@ -87,7 +87,7 @@ func (c *Client) DoRequest(method, path string, body interface{}) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return io.ReadAll(resp.Body)
 }
@@ -127,7 +127,7 @@ func (c *Client) doRawRequest(method, path string, body interface{}) (*http.Resp
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return nil, fmt.Errorf("%s", i18n.Tf("api.client.err_request_failed", resp.Status, string(bodyBytes)))
 	}
 

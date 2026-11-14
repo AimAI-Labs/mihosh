@@ -55,14 +55,16 @@ func TestUpdate_GlobalMessages(t *testing.T) {
 }
 
 func TestUpdate_MouseMessages(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	client := api.NewClient(config.MihomoEndpoint{}, 2000)
 	m := NewModel(client, "http://www.gstatic.com/generate_204", 2000)
+	m.currentPage = layout.PageNodes // Navigation starts here, independently of first-run routing.
 	m.width = 100
 	m.height = 50
 
 	// Help popup intercepts mouse clicks
 	m.showHelp = true
-	msg := tea.MouseMsg{X: 10, Y: 10, Type: tea.MouseLeft, Action: tea.MouseActionPress}
+	msg := tea.MouseMsg{X: 10, Y: 10, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress}
 	newM, _ := m.Update(msg)
 	newModel := newM.(Model)
 	if newModel.showHelp {
@@ -86,7 +88,7 @@ func TestUpdate_MouseMessages(t *testing.T) {
 	}
 
 	// Click on top nav
-	msg = tea.MouseMsg{X: 10, Y: 0, Type: tea.MouseLeft, Action: tea.MouseActionPress}
+	msg = tea.MouseMsg{X: 10, Y: 0, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress}
 	newM, _ = newModel.Update(msg)
 	newModel = newM.(Model)
 	if newModel.currentPage != layout.PageNodes {
@@ -95,8 +97,10 @@ func TestUpdate_MouseMessages(t *testing.T) {
 }
 
 func TestUpdate_KeyMessages(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	client := api.NewClient(config.MihomoEndpoint{}, 2000)
 	m := NewModel(client, "", 2000)
+	m.currentPage = layout.PageNodes // Navigation starts here, independently of first-run routing.
 
 	// Help popup intercepts keys
 	m.showHelp = true

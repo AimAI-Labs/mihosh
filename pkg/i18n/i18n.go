@@ -53,11 +53,12 @@ func Init() {
 func SetLanguageOverride(lang string) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	if lang == "zh-CN" {
+	switch lang {
+	case "zh-CN":
 		isChinese = true
-	} else if lang == "en-US" {
+	case "en-US":
 		isChinese = false
-	} else if lang == "auto" || lang == "" {
+	case "auto", "":
 		// Re-detect system language
 		isChinese = false
 		localesList, err := locale.GetLocales()

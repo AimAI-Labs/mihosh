@@ -105,7 +105,9 @@ func TestDownloadRestartsAndVerifiesBeforeCommit(t *testing.T) {
 	body := "verified compressed asset"
 	digest := sha256.Sum256([]byte(body))
 	destination := filepath.Join(t.TempDir(), "asset.gz")
-	os.WriteFile(destination, []byte("previous"), 0600)
+	if err := os.WriteFile(destination, []byte("previous"), 0600); err != nil {
+		t.Fatal(err)
+	}
 	var got []string
 	f := testFetcher(t, func(route Route, _ *http.Request) (int, string, error) {
 		got = append(got, route.Name)
@@ -131,7 +133,9 @@ func TestDownloadRestartsAndVerifiesBeforeCommit(t *testing.T) {
 }
 func TestDownloadFailurePreservesPreviousFile(t *testing.T) {
 	destination := filepath.Join(t.TempDir(), "asset.gz")
-	os.WriteFile(destination, []byte("previous"), 0600)
+	if err := os.WriteFile(destination, []byte("previous"), 0600); err != nil {
+		t.Fatal(err)
+	}
 	f := testFetcher(t, func(Route, *http.Request) (int, string, error) { return 200, "corrupt", nil })
 	_, err := f.Download(context.Background(), testAssetURL, destination, strings.Repeat("0", 64))
 	if err == nil {

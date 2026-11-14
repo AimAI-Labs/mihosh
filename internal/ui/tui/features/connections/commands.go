@@ -65,7 +65,7 @@ func FetchIPInfo(ip string) tea.Cmd {
 		if err != nil {
 			return messages.IPInfoMsg{Info: nil, Err: err}
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		var info model.IPInfo
 		if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
@@ -105,7 +105,7 @@ func TestSiteDelay(ctx context.Context, proxyAddr string, siteName string, siteU
 		if err != nil {
 			return messages.SiteTestMsg{Name: siteName, Delay: 0, Err: err}
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		delay := int(time.Since(start).Milliseconds())
 		return messages.SiteTestMsg{Name: siteName, Delay: delay, Err: nil}

@@ -24,7 +24,7 @@ func TestRefreshGroupProjectionMatchesAPI(t *testing.T) {
 		{"GLOBAL": {All: []string{"Select", "Auto", "GLOBAL"}}, "Select": {Type: "Selector", All: []string{"Auto"}}, "Auto": {Type: "URLTest", Now: "Select", All: []string{"Select"}}},
 	} {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			json.NewEncoder(w).Encode(model.ProxiesResponse{Proxies: proxies})
+			_ = json.NewEncoder(w).Encode(model.ProxiesResponse{Proxies: proxies})
 		}))
 		client := api.NewClient(config.MihomoEndpoint{ExternalController: server.URL}, 1000)
 		apiGroups, apiOrder, err := client.GetGroups()

@@ -1,9 +1,6 @@
 package rules
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
@@ -91,76 +88,4 @@ func getAdjustedRuleTypeColor(ruleType string, adjustedColors map[string]lipglos
 		return baseColor
 	}
 	return common.Gray()
-}
-
-// animateColor 计算平滑过渡动画后的颜色
-func animateColor(from, to lipgloss.Color, progress float64) lipgloss.Color {
-	fromStr := string(from)
-	toStr := string(to)
-
-	if fromStr == toStr {
-		return from
-	}
-
-	fromHex := strings.TrimPrefix(fromStr, "#")
-	toHex := strings.TrimPrefix(toStr, "#")
-
-	if len(fromHex) != 6 || len(toHex) != 6 {
-		return to
-	}
-
-	fromR := hexToInt(fromHex[0:2])
-	fromG := hexToInt(fromHex[2:4])
-	fromB := hexToInt(fromHex[4:6])
-
-	toR := hexToInt(toHex[0:2])
-	toG := hexToInt(toHex[2:4])
-	toB := hexToInt(toHex[4:6])
-
-	newR := int(float64(fromR) + float64(toR-fromR)*progress)
-	newG := int(float64(fromG) + float64(toG-fromG)*progress)
-	newB := int(float64(fromB) + float64(toB-fromB)*progress)
-
-	return lipgloss.Color(fmt.Sprintf("#%02X%02X%02X", newR, newG, newB))
-}
-
-// hexToInt 将十六进制字符串转换为整数
-func hexToInt(s string) int {
-	var val int
-	for _, c := range s {
-		val *= 16
-		switch {
-		case c >= '0' && c <= '9':
-			val += int(c - '0')
-		case c >= 'A' && c <= 'F':
-			val += int(c - 'A' + 10)
-		case c >= 'a' && c <= 'f':
-			val += int(c - 'a' + 10)
-		}
-	}
-	return val
-}
-
-// interpolateColor 在两个颜色之间进行线性插值
-func interpolateColor(color1, color2 string, t float64) string {
-	c1 := strings.TrimPrefix(color1, "#")
-	c2 := strings.TrimPrefix(color2, "#")
-
-	if len(c1) != 6 || len(c2) != 6 {
-		return color2
-	}
-
-	r1 := hexToInt(c1[0:2])
-	g1 := hexToInt(c1[2:4])
-	b1 := hexToInt(c1[4:6])
-
-	r2 := hexToInt(c2[0:2])
-	g2 := hexToInt(c2[2:4])
-	b2 := hexToInt(c2[4:6])
-
-	r := int(float64(r1) + float64(r2-r1)*t)
-	g := int(float64(g1) + float64(g2-g1)*t)
-	b := int(float64(b1) + float64(b2-b1)*t)
-
-	return fmt.Sprintf("#%02X%02X%02X", r, g, b)
 }

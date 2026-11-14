@@ -119,9 +119,6 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m.handleMouseScroll(false, msg.X, msg.Y)
 	}
 	return m, nil
-
-	// ── 全局：键盘 ──
-	return m, nil
 }
 
 // handleMouseScroll 处理鼠标滚轮滚动
@@ -190,19 +187,19 @@ func isMouseLeftPress(msg tea.MouseMsg) bool {
 	if msg.Button == tea.MouseButtonLeft {
 		return msg.Action == tea.MouseActionPress
 	}
-	return msg.Type == tea.MouseLeft
+	return msg.Type == tea.MouseLeft //nolint:staticcheck // Preserve legacy Bubble Tea v1 mouse messages.
 }
 
 func isMouseWheelUp(msg tea.MouseMsg) bool {
 	if msg.Button == tea.MouseButtonWheelUp {
 		return msg.Action == tea.MouseActionPress
 	}
-	return msg.Type == tea.MouseWheelUp
+	return msg.Type == tea.MouseWheelUp //nolint:staticcheck // Preserve legacy Bubble Tea v1 mouse messages.
 }
 
 func isMouseWheelDown(msg tea.MouseMsg) bool {
 	if msg.Button == tea.MouseButtonWheelDown {
 		return msg.Action == tea.MouseActionPress
 	}
-	return msg.Type == tea.MouseWheelDown
+	return msg.Type == tea.MouseWheelDown //nolint:staticcheck // Preserve legacy Bubble Tea v1 mouse messages.
 }

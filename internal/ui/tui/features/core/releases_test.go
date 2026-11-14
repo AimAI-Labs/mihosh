@@ -300,13 +300,12 @@ func TestLazyCataloguePrefetchesAppendsAndDeduplicatesWithoutMovingSelection(t *
 	if !s.Busy || s.catalog.requested != 2 || cmd == nil || s.selected != 7 {
 		t.Fatal("approaching the end did not prefetch exactly one page")
 	}
-	tag := s.Release.Tag
 	generation := s.generation
 	s, _ = s.Update(coreKey("down"))
 	if s.generation != generation || s.selected != 8 {
 		t.Fatal("prefetch prevented browsing or issued a duplicate request")
 	}
-	tag = s.Release.Tag
+	tag := s.Release.Tag
 	page := olderReleases(2, 10, true)
 	duplicate, _ := s.releaseAt(9)
 	page.Releases[0] = duplicate
@@ -332,7 +331,6 @@ func TestLazyCatalogueMouseScrollPreservesViewportAndStopsOnError(t *testing.T) 
 	if !s.Busy || cmd == nil || s.catalog.requested != 2 {
 		t.Fatal("wheel did not load near the visible end")
 	}
-	start := s.catalog.scroll
 	generation := s.generation
 	s, _ = s.Update(wheel)
 	if s.generation != generation {
@@ -351,7 +349,7 @@ func TestLazyCatalogueMouseScrollPreservesViewportAndStopsOnError(t *testing.T) 
 		t.Fatal("retry did not resume the failed page")
 	}
 	page := olderReleases(2, 10, false)
-	start = s.catalog.scroll
+	start := s.catalog.scroll
 	s, _ = s.Update(messages.CoreOperationMsg{ID: s.generation, Action: "releases", Releases: &page})
 	if s.releaseCount() != 20 || s.catalog.scroll != start || s.followSelection || s.catalog.page.HasNext {
 		t.Fatal("append moved the mouse viewport or lost the terminal state")

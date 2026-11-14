@@ -220,7 +220,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case messages.ConfigReloadedMsg:
 		if msg.Err != nil {
-			m.err = messages.ErrMsg{Err: msg.Err}
+			m.err = messages.ErrMsg(msg)
 			return m, nil
 		}
 		if m.currentPage == layout.PageRules {
@@ -263,7 +263,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// 不恢复鼠标模式（Bubble Tea v1.3.10 缺陷），需显式重新启用，否则退出编辑器后鼠标失效。
 		reenableMouse := func() tea.Msg { return tea.EnableMouseCellMotion() }
 		if msg.Err != nil {
-			m.err = messages.ErrMsg{Err: msg.Err}
+			m.err = messages.ErrMsg(msg)
 			m.notice = ""
 			m.noticeTicks = 0
 			return m, reenableMouse

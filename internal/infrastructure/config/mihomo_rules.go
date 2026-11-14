@@ -26,7 +26,10 @@ const mihomoRulesKey = "rules"
 // 写入采用「临时文件 + Rename」原子替换，避免半写损坏用户配置。
 func InsertRule(configPath, rule string, index int) error {
 	release, err := lockMihomoFile(configPath)
-	if err != nil { return err }; defer release()
+	if err != nil {
+		return err
+	}
+	defer release()
 	if rule == "" {
 		return fmt.Errorf("%s", i18n.T("config.rules.err_empty_rule"))
 	}
@@ -90,7 +93,10 @@ func InsertRule(configPath, rule string, index int) error {
 // 未匹配到（如规则来自 rule-provider，不在文件中）返回 errRuleNotFound。
 func DeleteRule(configPath, ruleType, payload, proxy string, noResolve bool) error {
 	release, err := lockMihomoFile(configPath)
-	if err != nil { return err }; defer release()
+	if err != nil {
+		return err
+	}
+	defer release()
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return fmt.Errorf(i18n.T("config.rules.err_read_config"), err)
@@ -154,7 +160,10 @@ func DeleteRule(configPath, ruleType, payload, proxy string, noResolve bool) err
 // 注释安全：使用 yaml.Node 操作并原子写回。
 func ReplaceRule(configPath, oldType, oldPayload, oldProxy string, oldNoResolve bool, newRule string, newIndex int) error {
 	release, err := lockMihomoFile(configPath)
-	if err != nil { return err }; defer release()
+	if err != nil {
+		return err
+	}
+	defer release()
 	if newRule == "" {
 		return fmt.Errorf("%s", i18n.T("config.rules.err_empty_rule"))
 	}
@@ -196,7 +205,7 @@ func ReplaceRule(configPath, oldType, oldPayload, oldProxy string, oldNoResolve 
 				removedIdx = i
 				continue
 			}
-			}
+		}
 		seq.Content[n] = item
 		n++
 	}
@@ -474,21 +483,23 @@ func marshalYAML(doc *yaml.Node) ([]byte, error) {
 
 // atomicWriteFile 先写入同目录临时文件再 Rename 覆盖目标，降低半写损坏风险。
 func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
- if info,err:=os.Stat(path);err==nil{perm=info.Mode().Perm()}
+	if info, err := os.Stat(path); err == nil {
+		perm = info.Mode().Perm()
+	}
 	dir := filepath.Dir(path)
 	tmp, err := os.CreateTemp(dir, ".mihosh-config-*")
 	if err != nil {
 		return fmt.Errorf(i18n.T("config.file.err_create_temp"), err)
 	}
 	tmpName := tmp.Name()
-	defer os.Remove(tmpName) // Rename 成功后已不存在，忽略错误
+	defer func() { _ = os.Remove(tmpName) }() // Rename 成功后已不存在，忽略错误
 
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return fmt.Errorf(i18n.T("config.file.err_write_temp"), err)
 	}
 	if err := tmp.Sync(); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return fmt.Errorf(i18n.T("config.file.err_sync_temp"), err)
 	}
 	if err := tmp.Close(); err != nil {

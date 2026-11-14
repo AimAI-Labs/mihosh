@@ -293,16 +293,6 @@ func renderLogSearchBox(filterText string, filterMode bool) string {
 	return label + input
 }
 
-// getLevelIndex 获取日志级别索引
-func getLevelIndex(level string) int {
-	for i, l := range logLevels {
-		if l == level {
-			return i
-		}
-	}
-	return 1 // 默认info
-}
-
 // renderLogList 渲染日志列表
 func renderLogList(logs []model.LogEntry, selectedIdx, scrollTop, maxLines, width, hOffset int) string {
 	if len(logs) == 0 {

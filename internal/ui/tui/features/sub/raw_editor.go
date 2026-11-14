@@ -47,11 +47,14 @@ func (s State) openRawExternalEditor() (State, tea.Cmd) {
 	}
 	tempPath := tempFile.Name()
 	if _, err := tempFile.Write(data); err != nil {
-		tempFile.Close()
-		os.Remove(tempPath)
+		_ = tempFile.Close()
+		_ = os.Remove(tempPath)
 		return s, rawEditError(uid, err)
 	}
-	tempFile.Close()
+	if err := tempFile.Close(); err != nil {
+		_ = os.Remove(tempPath)
+		return s, rawEditError(uid, err)
+	}
 
 	fields := utils.SplitEditorCommand(editor)
 	args := make([]string, 0, len(fields))
@@ -61,7 +64,7 @@ func (s State) openRawExternalEditor() (State, tea.Cmd) {
 
 	return s, tea.ExecProcess(c, func(err error) tea.Msg {
 		// 编辑结束后直接清理临时文件（绝对不回写）
-		os.Remove(tempPath)
+		_ = os.Remove(tempPath)
 		return messages.SubRawEditFinishedMsg{UID: uid, Err: err}
 	})
 }

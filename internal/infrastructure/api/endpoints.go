@@ -114,7 +114,7 @@ func (c *Client) GetMemory() (*model.MemoryResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer httpResp.Body.Close()
+	defer func() { _ = httpResp.Body.Close() }()
 
 	var mem model.MemoryResponse
 	if err := json.NewDecoder(httpResp.Body).Decode(&mem); err != nil {

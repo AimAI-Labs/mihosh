@@ -6,8 +6,6 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 )
 
-
-
 // filteredConnCount 过滤后的连接数量
 func (s State) filteredConnCount() int {
 	if s.connViewMode == ConnViewTraffic {

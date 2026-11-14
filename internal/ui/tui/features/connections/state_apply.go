@@ -63,7 +63,7 @@ func (s State) ApplyConnections(resp *model.ConnectionsResponse) State {
 func (s State) ApplyConnectionClosed() State {
 	if s.filterList.Cursor > 0 {
 		// 临时借用 SetCursor 只更新值，实际限制由随后的 SetItemCount 保证
-		s.filterList.Cursor-- 
+		s.filterList.Cursor--
 	}
 	// 确保选中索引不超过连接数量上限
 	connCount := s.filteredConnCount()

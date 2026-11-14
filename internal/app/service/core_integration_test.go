@@ -47,7 +47,7 @@ func TestCoreRealBinary(t *testing.T) {
 		listener, e := net.Listen("tcp", "127.0.0.1:0")
 		require.NoError(t, e)
 		port := listener.Addr().(*net.TCPAddr).Port
-		listener.Close()
+		_ = listener.Close()
 		return port
 	}
 	controller := net.JoinHostPort("127.0.0.1", strconv.Itoa(freePort()))
@@ -67,7 +67,7 @@ func TestCoreRealBinary(t *testing.T) {
 	require.Equal(t, tag, version.Version)
 	proxy, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(proxyPort)), time.Second)
 	require.NoError(t, err)
-	proxy.Close()
+	_ = proxy.Close()
 	other := NewCoreService()
 	defer other.Close()
 	require.NoError(t, other.Start(ctx), "another client should reuse the live owner")

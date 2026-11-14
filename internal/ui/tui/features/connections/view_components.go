@@ -176,21 +176,6 @@ func resolveViewModeHit(state PageState, pageX, pageY int) (MouseHit, bool) {
 	return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}, false
 }
 
-func connectionTabLabels(viewMode int) (trafficLabel, activeLabel, historyLabel string) {
-	trafficLabel = i18n.T("conns.tab_traffic")
-	activeLabel = i18n.T("conns.tab_active")
-	historyLabel = i18n.T("conns.tab_history")
-	switch viewMode {
-	case ConnViewTraffic:
-		trafficLabel = "● " + trafficLabel
-	case ConnViewActive:
-		activeLabel = "● " + activeLabel
-	case ConnViewHistory:
-		historyLabel = "● " + historyLabel
-	}
-	return trafficLabel, activeLabel, historyLabel
-}
-
 // RenderConnModeSwitchComponent 渲染连接页面模式切换按钮（带边框，与节点模式切换风格一致）
 func RenderConnModeSwitchComponent(viewMode int, width int, inlineMode bool) string {
 	modes := []struct {

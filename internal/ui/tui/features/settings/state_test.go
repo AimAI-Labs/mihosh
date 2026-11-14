@@ -2,6 +2,7 @@ package settings
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
@@ -63,6 +64,22 @@ func TestIsEditing(t *testing.T) {
 	s.editMode = true
 	if !s.IsEditing() {
 		t.Errorf("expected IsEditing to be true")
+	}
+}
+
+func TestHandleMouseScrollForwardsToSystemStatus(t *testing.T) {
+	s := State{activeTab: 1, SysStatus: NewSysStatusState()}
+	s.SysStatus.Supported = true
+	s.SysStatus.Viewport.Width = 40
+	s.SysStatus.Viewport.Height = 2
+	s.SysStatus.Viewport.SetContent(strings.Repeat("status\n", 20))
+	s, _ = s.HandleMouseScroll(false, 20, 30, 18)
+	if s.SysStatus.Viewport.YOffset == 0 {
+		t.Fatal("wheel down did not scroll the system status viewport")
+	}
+	s, _ = s.HandleMouseScroll(true, 20, 30, 18)
+	if s.SysStatus.Viewport.YOffset != 0 {
+		t.Fatal("wheel up did not restore the system status viewport")
 	}
 }
 
