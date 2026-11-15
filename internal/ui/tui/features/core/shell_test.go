@@ -15,9 +15,13 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-func TestShellProxyDialogSavesAndShowsSourceCommand(t *testing.T) {
+func TestShellProxyDialogInstallsStartupAndShowsRefreshCommand(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("MIHOSH_CONFIG_DIR", root)
+	t.Setenv("HOME", root)
+	t.Setenv("USERPROFILE", root)
+	t.Setenv("SHELL", "/bin/zsh")
+	t.Setenv("ZDOTDIR", root)
 	i18n.Init()
 	t.Cleanup(func() { i18n.SetLanguageOverride("") })
 	svc := service.NewCoreService()
@@ -49,7 +53,7 @@ func TestShellProxyDialogSavesAndShowsSourceCommand(t *testing.T) {
 	batch := cmd().(tea.BatchMsg)
 	result := batch[1]().(messages.CoreOperationMsg)
 	s, _ = s.Update(result)
-	if result.Err != nil || s.Busy || s.shellPath != filepath.Join(root, "proxy.sh") {
+	if result.Err != nil || s.Busy || s.shellPath != filepath.Join(root, ".zshrc") {
 		t.Fatal("shell setting save failed", result.Err)
 	}
 	cfg, err := config.Load()
@@ -58,6 +62,10 @@ func TestShellProxyDialogSavesAndShowsSourceCommand(t *testing.T) {
 	}
 	if _, err := os.Stat(s.shellPath); err != nil {
 		t.Fatal(err)
+	}
+	startup, err := os.ReadFile(s.shellPath)
+	if err != nil || !strings.Contains(string(startup), "proxy.sh") {
+		t.Fatal("TUI did not install shell startup", err)
 	}
 	if !strings.Contains(ansi.Strip(s.Render(120, 30)), "source '") {
 		t.Fatal("save result does not explain how to apply it to the current shell")

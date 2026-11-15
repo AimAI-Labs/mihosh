@@ -7,7 +7,7 @@ description: 在当前 Bash/Zsh 设置代理环境并加载测试函数
 
 这些命令输出 Bash/Zsh 脚本。通过 `eval` 或 `source` 在当前 shell 应用，设置大小写两组 `HTTP_PROXY`、`HTTPS_PROXY`、`ALL_PROXY`、`NO_PROXY`。代理地址每次从当前内核的 mixed-port 读取，`NO_PROXY` 排除本地地址。
 
-- `mihosh env on/off`：保存终端代理偏好，生成 `~/.mihosh/proxy.sh`，并输出环境设置和测试函数。
+- `mihosh env on/off`：保存终端代理偏好，生成 `~/.mihosh/proxy.sh`，自动写入当前 Bash/Zsh 启动文件，并提示刷新 shell。标准输出仍为环境设置和测试函数。
 - `mihosh env`：按保存的偏好输出脚本；支持 `--output plain|table|json`，默认 `plain` 可供 `eval` 使用。
 - `mihosh on/off`：只输出当前 shell 的 export/unset，不保存偏好。
 
@@ -24,10 +24,10 @@ eval "$(mihosh env off)"
 
 `mihosh_proxy_on` / `mihosh_proxy_off` 临时切换当前 shell；`mihosh_proxy_status` 显示代理变量；`mihosh_proxy_ip` 执行当前节点的延迟、链路与出口 IP 检查；`mihosh_proxy_test` 将参数交给 `mihosh test`。节点检查需要内核运行且控制器可连接。
 
-TUI 中进入 **Core → 高级设置 → 终端代理环境**（快捷键 `w`），选择开关并按 `Enter` 保存，然后按界面给出的命令在需要代理的终端执行：
+TUI 中进入 **Core → 高级设置 → 终端代理环境**（快捷键 `w`），选择开关并按 `Enter` 保存。程序根据 `SHELL` 自动更新 Bash 的 `~/.bashrc` 或 Zsh 的 `${ZDOTDIR:-$HOME}/.zshrc`，保留已有配置，重复保存不会重复添加。按界面提示刷新 shell，例如：
 
 ```bash
-source ~/.mihosh/proxy.sh
+source ~/.zshrc
 ```
 
-设置 `MIHOSH_CONFIG_DIR` 时，脚本位于该配置目录。脚本绑定生成时的 Mihosh 路径与配置目录；移动可执行文件后重新保存。程序不会直接修改父 shell 环境或写入 shell 启动文件。会话模式退出 TUI 会停止它拥有的内核；若退出后继续使用代理，请使用后台服务或已有外部内核。
+设置 `MIHOSH_CONFIG_DIR` 时，脚本位于该配置目录。脚本绑定生成时的 Mihosh 路径与配置目录；移动可执行文件后重新保存。其他 shell 会提示不支持，不会写入启动文件。现有终端需刷新 shell 或打开新终端才会应用。会话模式退出 TUI 会停止它拥有的内核；若退出后继续使用代理，请使用后台服务或已有外部内核。

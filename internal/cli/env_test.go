@@ -30,6 +30,9 @@ func TestEnvCommandPersistsSettingsAndSupportsAllFormats(t *testing.T) {
 		t.Run(format, func(t *testing.T) {
 			root := t.TempDir()
 			t.Setenv("MIHOSH_CONFIG_DIR", root)
+			t.Setenv("HOME", root)
+			t.Setenv("USERPROFILE", root)
+			t.Setenv("SHELL", "/bin/bash")
 			out, err := runEnvForTest("on", "--output", format)
 			if err != nil {
 				t.Fatal(err)
@@ -40,6 +43,10 @@ func TestEnvCommandPersistsSettingsAndSupportsAllFormats(t *testing.T) {
 			}
 			if _, err := os.Stat(filepath.Join(root, "proxy.sh")); err != nil {
 				t.Fatal("CLI did not create a source script", err)
+			}
+			startup, err := os.ReadFile(filepath.Join(root, ".bashrc"))
+			if err != nil || !strings.Contains(string(startup), "proxy.sh") {
+				t.Fatal("CLI did not install shell startup", err)
 			}
 			switch format {
 			case "json":

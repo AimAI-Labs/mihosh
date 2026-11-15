@@ -118,11 +118,19 @@ printf 'failed:%s:%s\n' "$?" "$HTTP_PROXY"
 }
 
 func TestSaveShellProxyPersistsPreferenceAndPrivateDynamicLoader(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("SHELL", "/bin/bash")
 	root := filepath.Join(t.TempDir(), "configuration")
 	t.Setenv("MIHOSH_CONFIG_DIR", root)
-	path, err := SaveShellProxy(true)
+	startup, err := SaveShellProxy(true)
 	require.NoError(t, err)
-	require.Equal(t, filepath.Join(root, "proxy.sh"), path)
+	require.Equal(t, filepath.Join(home, ".bashrc"), startup)
+	path := filepath.Join(root, "proxy.sh")
+	rc, err := os.ReadFile(startup)
+	require.NoError(t, err)
+	require.Contains(t, string(rc), ShellProxySourceCommand(path))
 	cfg, err := config.Load()
 	require.NoError(t, err)
 	require.True(t, cfg.ShellProxy)
@@ -147,6 +155,9 @@ func TestSaveShellProxyPersistsPreferenceAndPrivateDynamicLoader(t *testing.T) {
 	after, err := os.ReadFile(path)
 	require.NoError(t, err)
 	require.Equal(t, loader, after, "loader must read the setting at source time")
+	after, err = os.ReadFile(startup)
+	require.NoError(t, err)
+	require.Equal(t, rc, after, "saving again must not duplicate the startup block")
 	if runtime.GOOS == "windows" {
 		return
 	}
@@ -174,4 +185,66 @@ func TestSaveShellProxyPersistsPreferenceAndPrivateDynamicLoader(t *testing.T) {
 	f.env = append(f.env, "MIHOSH_SHELL_FAIL=1")
 	output := f.run(t, shell, ". "+quoteShellProxy(copyPath)+"\nprintf 'source-failed:%s\\n' \"$?\"\n")
 	require.Contains(t, output, "source-failed:1\n")
+}
+
+func TestShellProxyStartupPreservesDotfilesAndUpdatesLoader(t *testing.T) {
+	for _, newline := range []string{"\n", "\r\n"} {
+		t.Run(strings.ReplaceAll(newline, "\n", "LF"), func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), ".zshrc")
+			original := "export MY_SETTING=keep" + newline
+			require.NoError(t, os.WriteFile(path, []byte(original), 0640))
+			require.NoError(t, installShellProxyStartup(path, "/old/proxy.sh"))
+			require.NoError(t, installShellProxyStartup(path, "/new ' $(touch injected)/proxy.sh"))
+			data, err := os.ReadFile(path)
+			require.NoError(t, err)
+			require.True(t, strings.HasPrefix(string(data), original))
+			require.Equal(t, 1, strings.Count(string(data), "# >>> mihosh proxy >>>"))
+			require.NotContains(t, string(data), "/old/proxy.sh")
+			require.Contains(t, string(data), ShellProxySourceCommand("/new ' $(touch injected)/proxy.sh"))
+			info, err := os.Stat(path)
+			require.NoError(t, err)
+			if runtime.GOOS != "windows" {
+				require.Equal(t, os.FileMode(0640), info.Mode().Perm())
+			}
+		})
+	}
+	if runtime.GOOS != "windows" {
+		dir := t.TempDir()
+		target, link := filepath.Join(dir, "dotfile"), filepath.Join(dir, ".bashrc")
+		require.NoError(t, os.WriteFile(target, []byte("# keep\n"), 0600))
+		require.NoError(t, os.Symlink(target, link))
+		require.NoError(t, installShellProxyStartup(link, "/proxy.sh"))
+		actual, err := os.Readlink(link)
+		require.NoError(t, err)
+		require.Equal(t, target, actual)
+		data, err := os.ReadFile(target)
+		require.NoError(t, err)
+		require.Contains(t, string(data), "# keep\n")
+		require.Contains(t, string(data), "source '/proxy.sh'")
+	}
+}
+
+func TestShellProxyStartupRejectsInvalidFilesAndUnsupportedShell(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".bashrc")
+	for _, data := range []string{"# >>> mihosh proxy >>>\nkeep", "# <<< mihosh proxy <<<\nkeep"} {
+		require.NoError(t, os.WriteFile(path, []byte(data), 0600))
+		require.Error(t, installShellProxyStartup(path, "/proxy.sh"))
+		after, err := os.ReadFile(path)
+		require.NoError(t, err)
+		require.Equal(t, data, string(after))
+	}
+	t.Setenv("SHELL", "/bin/fish")
+	t.Setenv("MIHOSH_CONFIG_DIR", filepath.Join(t.TempDir(), "unused"))
+	_, err := SaveShellProxy(true)
+	require.ErrorContains(t, err, "Bash or Zsh")
+	_, err = config.Load()
+	require.ErrorIs(t, err, config.ErrConfigNotFound)
+}
+
+func TestShellProxyZshStartupUsesZdotdir(t *testing.T) {
+	t.Setenv("SHELL", "/bin/zsh")
+	t.Setenv("ZDOTDIR", t.TempDir())
+	path, err := shellProxyStartupFile()
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join(os.Getenv("ZDOTDIR"), ".zshrc"), path)
 }

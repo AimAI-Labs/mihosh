@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -51,8 +52,12 @@ mihosh_proxy_test() {
 	return script.String()
 }
 
-// SaveShellProxy writes a stable loader; source always reads the latest setting and port.
+// SaveShellProxy installs a dynamic loader in the shell startup file and returns that file.
 func SaveShellProxy(enabled bool) (string, error) {
+	startup, err := shellProxyStartupFile()
+	if err != nil {
+		return "", err
+	}
 	root, err := config.GetConfigDir()
 	if err != nil {
 		return "", err
@@ -73,11 +78,79 @@ func SaveShellProxy(enabled bool) (string, error) {
 	if err := privateWrite(path, []byte(loader)); err != nil {
 		return "", err
 	}
+	if err := installShellProxyStartup(startup, path); err != nil {
+		return "", err
+	}
 	if err := config.Update(func(cfg *config.Config) error {
 		cfg.ShellProxy = enabled
 		return nil
 	}); err != nil {
 		return "", err
 	}
-	return path, nil
+	return startup, nil
+}
+
+func shellProxyStartupFile() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	switch filepath.Base(os.Getenv("SHELL")) {
+	case "bash":
+		return filepath.Join(home, ".bashrc"), nil
+	case "zsh":
+		if dir := os.Getenv("ZDOTDIR"); dir != "" {
+			home = dir
+		}
+		return filepath.Join(home, ".zshrc"), nil
+	default:
+		return "", errors.New("shell proxy startup requires Bash or Zsh (SHELL)")
+	}
+}
+
+func installShellProxyStartup(startup, loader string) error {
+	// Follow dotfile symlinks so an atomic replacement keeps the user's dotfile layout.
+	if info, err := os.Lstat(startup); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		target, err := filepath.EvalSymlinks(startup)
+		if err != nil {
+			return err
+		}
+		startup = target
+	} else if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	data, err := os.ReadFile(startup)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	const begin, end = "# >>> mihosh proxy >>>", "# <<< mihosh proxy <<<"
+	text := string(data)
+	newline := "\n"
+	if strings.Contains(text, "\r\n") {
+		newline = "\r\n"
+	}
+	block := strings.Join([]string{begin, "if [ -r " + quoteShellProxy(loader) + " ]; then", "  " + ShellProxySourceCommand(loader), "fi", end}, newline)
+	start, finish := strings.Index(text, begin), strings.Index(text, end)
+	if start >= 0 || finish >= 0 {
+		if start < 0 || finish < start || strings.Count(text, begin) != 1 || strings.Count(text, end) != 1 {
+			return errors.New("invalid Mihosh proxy block in shell startup file")
+		}
+		text = text[:start] + block + text[finish+len(end):]
+	} else {
+		if len(text) > 0 && !strings.HasSuffix(text, "\n") {
+			text += newline
+		}
+		text += block + newline
+	}
+	if text == string(data) {
+		return nil
+	}
+	mode := os.FileMode(0600)
+	if info, err := os.Stat(startup); err == nil {
+		mode = info.Mode().Perm()
+	}
+	if err := privateWrite(startup, []byte(text)); err != nil {
+		return err
+	}
+	return os.Chmod(startup, mode)
 }

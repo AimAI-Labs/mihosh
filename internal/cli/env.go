@@ -38,9 +38,11 @@ func newEnvCommand() *cobra.Command {
 			}
 			if len(args) == 1 {
 				cfg.ShellProxy = args[0] == "on"
-				if _, err := service.SaveShellProxy(cfg.ShellProxy); err != nil {
+				startup, err := service.SaveShellProxy(cfg.ShellProxy)
+				if err != nil {
 					return wrapConfigError(err)
 				}
+				fmt.Fprintln(cmd.ErrOrStderr(), i18n.Tf("core.shell.source_hint", service.ShellProxySourceCommand(startup)))
 			}
 			root, err := config.GetConfigDir()
 			if err != nil {

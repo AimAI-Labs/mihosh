@@ -1,11 +1,8 @@
 package core
 
 import (
-	"path/filepath"
 	"strings"
 
-	"github.com/AimAI-Labs/mihosh/internal/app/service"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
@@ -19,11 +16,6 @@ import (
 func (s State) choiceLayout(width int) pageLayout {
 	t := theme.Current()
 	rows := strings.Split(wrap(i18n.T("core.desc."+s.form), width-4), "\n")
-	if s.form == "shell-proxy" {
-		if root, err := config.GetConfigDir(); err == nil {
-			rows = append(rows, "", wrap(i18n.Tf("core.shell.source_hint", service.ShellProxySourceCommand(filepath.Join(root, "proxy.sh"))), width-4))
-		}
-	}
 	rows = append(rows, "")
 	var controls []releaseControl
 	if s.form == "system-proxy" || s.form == "tun" || s.form == "shell-proxy" {
