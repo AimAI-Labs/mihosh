@@ -32,7 +32,12 @@ func (s *CoreService) usesService() bool {
 	cfg, err := loadCoreConfig()
 	return err == nil && cfg.Core.Mode == "managed" && cfg.Core.Runtime == "service"
 }
-func (s *CoreService) ServiceAction(ctx context.Context, action string) error {
+func (s *CoreService) ServiceAction(ctx context.Context, action string) (resultErr error) {
+	switch action {
+	case "install", "uninstall", "start", "stop", "restart", "enable", "disable", "boot":
+	default:
+		return errors.New("unsupported service action")
+	}
 	if runtime.GOOS != "linux" {
 		return errors.New("managed background services require Linux/systemd")
 	}
@@ -53,56 +58,50 @@ func (s *CoreService) ServiceAction(ctx context.Context, action string) error {
 	if cfg.Core.Mode != "managed" {
 		return errors.New("configure a managed core before managing its service")
 	}
-	if s.process != nil {
-		return errors.New("stop the session core before managing its background service")
-	}
 	manager := s.serviceManager(root)
 	if action == "install" {
-
-		unlock, err := s.lockCoreMutation(root)
-		if err != nil {
+		if err = s.installService(ctx, root, manager); err != nil {
 			return err
 		}
-		defer unlock()
-		source, err := os.Executable()
-		if err != nil {
+		if s.process == nil {
+			return nil
+		}
+		action = "start"
+	}
+	if action == "enable" || action == "boot" {
+		if err = manager.Action(ctx, action); err != nil {
 			return err
 		}
-		dir := filepath.Join(root, "bin")
-		if err = os.MkdirAll(dir, 0700); err != nil {
+		action = "start"
+	}
+	if s.process != nil && (action == "start" || action == "restart") {
+		// Release ports and the runtime lock before systemd starts the new owner.
+		if err = s.stopLocked(); err != nil {
 			return err
 		}
-		name := "mihosh"
-
-		target := filepath.Join(dir, name)
-		if filepath.Clean(source) != filepath.Clean(target) {
-			input, e := os.Open(source)
-			if e != nil {
-				return e
+		removeOwner(root, s.controlOwner.Token)
+		defer func() {
+			if resultErr == nil {
+				return
 			}
-			defer func() { _ = input.Close() }()
-			output, e := os.CreateTemp(dir, ".service-install-*")
-			if e != nil {
-				return e
+			// A failed handoff must not leave a working session without its proxy.
+			recovery, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			if stopErr := manager.Action(recovery, "stop"); stopErr != nil {
+				resultErr = errors.Join(resultErr, stopErr)
+				return
 			}
-			defer func() { _ = os.Remove(output.Name()) }()
-			_, copyErr := io.Copy(output, input)
-			syncErr := output.Sync()
-			closeErr := output.Close()
-			if err = errors.Join(copyErr, syncErr, closeErr); err != nil {
-				return err
+			restoreErr := config.Update(func(latest *config.Config) error { latest.Core.Runtime = cfg.Core.Runtime; return nil })
+			resultErr = errors.Join(resultErr, restoreErr)
+			if restoreErr == nil {
+				resultErr = errors.Join(resultErr, s.start(recovery))
 			}
-			if err = os.Chmod(output.Name(), 0700); err != nil {
-				return err
-			}
-			if err = os.Rename(output.Name(), target); err != nil {
-				return err
-			}
-		}
-		if err = manager.Install(ctx, target); err != nil {
+		}()
+	}
+	if action == "start" || action == "restart" {
+		if err = config.Update(func(latest *config.Config) error { latest.Core.Runtime = "service"; return nil }); err != nil {
 			return err
 		}
-		return config.Update(func(latest *config.Config) error { latest.Core.Runtime = "service"; return nil })
 	}
 	if err = manager.Action(ctx, action); err != nil {
 		return err
@@ -131,6 +130,53 @@ func (s *CoreService) ServiceAction(ctx context.Context, action string) error {
 		}
 	}
 	return nil
+}
+
+func (s *CoreService) installService(ctx context.Context, root string, manager host.Services) error {
+	unlock, err := s.lockCoreMutation(root)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	source, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	dir := filepath.Join(root, "bin")
+	if err = os.MkdirAll(dir, 0700); err != nil {
+		return err
+	}
+	name := "mihosh"
+
+	target := filepath.Join(dir, name)
+	if filepath.Clean(source) != filepath.Clean(target) {
+		input, e := os.Open(source)
+		if e != nil {
+			return e
+		}
+		defer func() { _ = input.Close() }()
+		output, e := os.CreateTemp(dir, ".service-install-*")
+		if e != nil {
+			return e
+		}
+		defer func() { _ = os.Remove(output.Name()) }()
+		_, copyErr := io.Copy(output, input)
+		syncErr := output.Sync()
+		closeErr := output.Close()
+		if err = errors.Join(copyErr, syncErr, closeErr); err != nil {
+			return err
+		}
+		if err = os.Chmod(output.Name(), 0700); err != nil {
+			return err
+		}
+		if err = os.Rename(output.Name(), target); err != nil {
+			return err
+		}
+	}
+	if err = manager.Install(ctx, target); err != nil {
+		return err
+	}
+	return config.Update(func(latest *config.Config) error { latest.Core.Runtime = "service"; return nil })
 }
 
 // Serve is the only service-manager entry. The selected kernel remains a child of

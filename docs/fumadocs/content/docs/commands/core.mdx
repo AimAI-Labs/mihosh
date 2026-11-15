@@ -47,7 +47,7 @@ Existing filename aliases and configured official lite datasets are preserved. C
 
 Press `2` in Core to browse official stable releases. The list matches assets to the current OS and architecture, showing version, publication date, size, and Current / Installed badges. Each on-demand request reads up to 10 upstream releases. Compatible stable entries are appended to one continuous list and deduplicated by tag. Arrow-key and wheel navigation near the bottom automatically load older releases until upstream history ends, skipping fully filtered batches. Loaded records live in a session temporary directory, with a fixed 64-record memory cache and rendering limited to visible rows. All loaded history remains browsable; exiting the app cleans up the temporary directory.
 
-Select with the arrow keys or mouse to inspect the matching asset. **Selecting or downloading a release does not switch or restart the running core.** Press `Enter` / `i` to download, then explicitly press `a` to activate an installed version, which may restart a managed core. The current version is not activated again.
+Select with the arrow keys or mouse wheel or mouse to inspect the matching asset. **Selecting or downloading a release does not switch or restart the running core.** Press `Enter` / `i` to download, then explicitly press `a` to activate an installed version, which may restart a managed core. The current version is not activated again.
 
 Use `PgUp` / `PgDn` or `[` / `]` to move through the continuous list. `End` moves to its loaded end and triggers another load, also available through Load more. The footer shows the loaded count, loading status, or completion. `r` / `v` refresh from the latest releases and replace the old snapshot only after success; `t` finds a stable version directly. Failed loads retain all displayed data and pause automatic requests; press `r` or click Retry to resume the failed batch. An initial failure leaves the bundled verified release or the existing single-release cache available, explicitly labelled as fallback data. Downloads without trusted SHA-256 metadata are disabled. Retry through direct/proxy access, or use `l` to import an independently verified local executable.
 
@@ -86,7 +86,7 @@ mihosh core configure --output json
 
 ## Background services and automatic startup
 
-Press `h` in Core, select **Install background service** with the arrow keys and press `Enter`. Press `Esc` to return. Stop a session core before installing its background service. Installation copies Mihosh into `~/.mihosh/bin/` as a stable service entry and selects `core.runtime: service`. Core start/stop/restart then control that service. Closing the TUI leaves it running; profile activation and version changes are forwarded to its private owner endpoint.
+Press `h` in Core, select **Install background service** with the arrow keys or mouse wheel and press `Enter`. Press `Esc` to return. A running session core transfers automatically to the background service. If background startup fails, Mihosh restores the session core. Installation copies Mihosh into `~/.mihosh/bin/` as a stable service entry and selects `core.runtime: service`. Core start/stop/restart then control that service. Closing the TUI leaves it running; profile activation and version changes are forwarded to its private owner endpoint.
 
 ```bash
 mihosh core service install --output json
@@ -98,7 +98,7 @@ mihosh core service disable --output json
 mihosh core service uninstall --output json
 ```
 
-Linux uses a systemd **user service**. `enable` starts it on login. `boot` additionally invokes `loginctl enable-linger`, which may require authorization. Uninstall removes only the owned unit and retains data; it leaves user lingering unchanged to protect other services. Restart attempts are bounded. Core logs go to the user journal, available through `mihosh service logs`.
+Linux uses a systemd **user service**. `enable` starts it now and on login. `boot` starts it now and additionally invokes `loginctl enable-linger`, which may require authorization. Uninstall removes only the owned unit and retains data; it leaves user lingering unchanged to protect other services. Restart attempts are bounded. Core logs go to the user journal, available through `mihosh service logs`.
 
 After updating Mihosh itself, stop and reinstall the stable service entry. Legacy `mihosh service` commands resolve the managed target when no `--unit` is supplied; explicit units retain their external systemd semantics.
 

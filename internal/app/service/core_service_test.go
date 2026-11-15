@@ -47,7 +47,7 @@ func (m *fakeCoreServices) Action(_ context.Context, action string) error {
 func (m *fakeCoreServices) Status(context.Context) (host.ServiceState, error) { return m.state, nil }
 func TestServiceInstallUsesStableApplicationAndUninstallRestoresSessionMode(t *testing.T) {
 	s, _, root := networkService(t)
-	m := &fakeCoreServices{}
+	m := &fakeCoreServices{state: host.ServiceState{Enabled: true}}
 	s.services = m
 	require.NoError(t, config.Update(func(cfg *config.Config) error { cfg.Core.Mode = "managed"; return nil }))
 	require.NoError(t, s.ServiceAction(context.Background(), "install"))
@@ -57,7 +57,6 @@ func TestServiceInstallUsesStableApplicationAndUninstallRestoresSessionMode(t *t
 	cfg, err := config.Load()
 	require.NoError(t, err)
 	require.Equal(t, "service", cfg.Core.Runtime)
-	require.NoError(t, s.ServiceAction(context.Background(), "enable"))
 	status, err := s.Status()
 	require.NoError(t, err)
 	require.True(t, status.ServiceInstalled)

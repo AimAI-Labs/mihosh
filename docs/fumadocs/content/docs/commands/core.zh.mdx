@@ -86,7 +86,7 @@ mihosh core configure --output json
 
 ## 后台服务与自动启动
 
-Core 菜单按 `h`，使用方向键选择「安装后台服务」，按 `Enter` 执行；`Esc` 返回。先停止会话内核再安装；安装会将当前 Mihosh 复制到 `~/.mihosh/bin/`，作为固定的服务入口，并将 `core.runtime` 切换为 `service`。之后 `s` / `x` / `z` 和 `core start/stop/restart` 操作后台服务。关闭 TUI 不会停止服务；订阅、升级和回滚通过私有控制入口交给拥有内核的后台会话执行。
+Core 菜单按 `h`，使用方向键或鼠标滚轮选择「安装后台服务」，按 `Enter` 执行；`Esc` 返回。安装时会自动将正在运行的会话内核交接至后台服务；后台启动失败时恢复会话内核。安装会将当前 Mihosh 复制到 `~/.mihosh/bin/`，作为固定的服务入口，并将 `core.runtime` 切换为 `service`。之后 `s` / `x` / `z` 和 `core start/stop/restart` 操作后台服务。关闭 TUI 不会停止服务；订阅、升级和回滚通过私有控制入口交给拥有内核的后台会话执行。
 
 ```bash
 mihosh core service install --output json
@@ -98,7 +98,7 @@ mihosh core service disable --output json
 mihosh core service uninstall --output json
 ```
 
-Linux 使用 systemd **用户服务**。`enable` 随用户登录启动；`boot` 额外调用 `loginctl enable-linger`，允许用户管理器在开机、未登录时运行，可能需要系统授权。卸载只删除本应用按配置根目录生成的服务单元，保留订阅、内核和备份；不会关闭用户的 linger，以免影响其他用户服务。服务失败启动受次数与时间窗口限制。内核日志写入用户 journal，可用 `mihosh service logs` 查看。
+Linux 使用 systemd **用户服务**。`enable` 立即启动并随用户登录启动；`boot` 立即启动并额外调用 `loginctl enable-linger`，允许用户管理器在开机、未登录时运行，可能需要系统授权。卸载只删除本应用按配置根目录生成的服务单元，保留订阅、内核和备份；不会关闭用户的 linger，以免影响其他用户服务。服务失败启动受次数与时间窗口限制。内核日志写入用户 journal，可用 `mihosh service logs` 查看。
 
 Mihosh 自身升级后，可停止服务并重新安装固定入口。既有 `mihosh service` 在托管模式且未指定 `--unit` 时使用托管目标；显式 `--unit` 保留原有外部 systemd 服务语义。
 
