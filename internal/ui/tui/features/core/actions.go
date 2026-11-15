@@ -27,7 +27,7 @@ func (s State) actions() []actionItem {
 	case 1:
 		return []actionItem{{"v", "check"}, {"g", "upgrade"}, {"b", "rollback"}, {"t", "version"}, {"i", "install"}, {"a", "activate"}, {"l", "import"}}
 	case 2:
-		return []actionItem{{"e", "network"}, {"h", "service"}, {"y", "system-proxy"}, {"n", "tun"}, {"p", "ports"}, {"m", "configure"}, {"c", "recover"}}
+		return []actionItem{{"e", "network"}, {"h", "service"}, {"y", "system-proxy"}, {"n", "tun"}, {"p", "ports"}, {"m", "configure"}, {"c", "recover"}, {"w", "shell-proxy"}}
 	case 3:
 		items := make([]actionItem, len(s.geoFiles))
 		for i := range items {
@@ -65,7 +65,7 @@ func (s State) choose(action string) (State, tea.Cmd) {
 		}
 		s.args = []string{s.geoFiles[s.selected].Key}
 		return s.begin(action)
-	case "network", "version", "import", "ports", "external", "service", "system-proxy", "tun", "configure", "recover":
+	case "network", "version", "import", "ports", "external", "service", "system-proxy", "tun", "configure", "recover", "shell-proxy":
 		return s.editForm(action)
 	default:
 		return s.begin(action)

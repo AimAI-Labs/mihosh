@@ -59,6 +59,7 @@ func init() {
 	rootCmd.AddCommand(doctorCmd)
 	rootCmd.AddCommand(proxyOnCmd)
 	rootCmd.AddCommand(proxyOffCmd)
+	rootCmd.AddCommand(newEnvCommand())
 }
 
 // Execute 执行命令
@@ -84,6 +85,9 @@ func loadClient(cfg *config.Config) *api.Client {
 }
 
 func localizeCommands() {
+	if env, _, err := rootCmd.Find([]string{"env"}); err == nil {
+		env.Short, env.Long = i18n.T("cli.env.short"), i18n.T("cli.env.long")
+	}
 	if core, _, err := rootCmd.Find([]string{"core"}); err == nil {
 		core.Short = i18n.T("cli.core.short")
 		for _, child := range core.Commands() {

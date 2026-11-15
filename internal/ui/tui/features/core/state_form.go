@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"net"
 	"strconv"
 	"strings"
@@ -24,6 +25,16 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 	s.form, s.Editing, s.choice = kind, true, 0
 	s.fields, s.args = nil, nil
 	s.focus = 0
+	if kind == "shell-proxy" {
+		cfg, err := config.Load()
+		if err != nil && !errors.Is(err, config.ErrConfigNotFound) {
+			s.formErr = err
+		}
+		if cfg != nil && cfg.ShellProxy {
+			s.choice = 1
+		}
+		return s, nil
+	}
 	if kind == "system-proxy" || kind == "tun" {
 		if (kind == "system-proxy" && s.Status.SystemProxy) || (kind == "tun" && s.Status.TUN) {
 			s.choice = 1
@@ -115,12 +126,12 @@ func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 	if s.Busy && s.form != "network" && msg.String() == "enter" {
 		return s, nil
 	}
-	if s.form == "system-proxy" || s.form == "tun" || s.form == "configure" || s.form == "recover" {
+	if s.form == "system-proxy" || s.form == "tun" || s.form == "shell-proxy" || s.form == "configure" || s.form == "recover" {
 		switch msg.String() {
 		case "esc":
 			return s.closeForm(), nil
 		case "left", "right", "tab", "shift+tab", "up", "down":
-			if s.form == "system-proxy" || s.form == "tun" {
+			if s.form == "system-proxy" || s.form == "tun" || s.form == "shell-proxy" {
 				s.choice = 1 - s.choice
 			}
 		case "enter":
@@ -228,6 +239,10 @@ func (s State) submitChoice() (State, tea.Cmd) {
 	}
 	action, enabled := s.form, s.choice == 1
 	s = s.closeForm()
+	if action == "shell-proxy" {
+		s.args = []string{strconv.FormatBool(enabled)}
+		return s.begin(action)
+	}
 	if action == "system-proxy" || action == "tun" {
 		current := s.Status.SystemProxy
 		if action == "tun" {

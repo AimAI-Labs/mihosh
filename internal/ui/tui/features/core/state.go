@@ -46,6 +46,7 @@ type State struct {
 	catalog           releaseCatalog
 	geoFiles          []service.GeoDataFile
 	geoErr            error
+	shellPath         string
 }
 
 func NewState(svc *service.CoreService) State {
@@ -117,6 +118,7 @@ func (s State) begin(action string) (State, tea.Cmd) {
 		defer cancel()
 		var err error
 		var result *coreinfra.Release
+		var shellPath string
 		var releases *coreinfra.ReleasePage
 		switch action {
 		case "releases":
@@ -202,6 +204,12 @@ func (s State) begin(action string) (State, tea.Cmd) {
 			err = svc.Install(ctx, release, notify)
 		case "geo-update":
 			err = svc.UpdateGeoData(ctx, args[0], notify)
+		case "shell-proxy":
+			enabled, parseErr := strconv.ParseBool(args[0])
+			err = parseErr
+			if err == nil {
+				shellPath, err = service.SaveShellProxy(enabled)
+			}
 		case "configure":
 			err = svc.Configure()
 		case "start":
@@ -216,7 +224,7 @@ func (s State) begin(action string) (State, tea.Cmd) {
 		if action == "tun" && !status.Running {
 			resultAction = "tun-offline"
 		}
-		return messages.CoreOperationMsg{ID: id, Release: result, Releases: releases, Err: err, Action: resultAction}
+		return messages.CoreOperationMsg{ID: id, Release: result, Releases: releases, Err: err, Action: resultAction, ShellPath: shellPath}
 	})
 }
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
@@ -257,6 +265,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		s.Busy = false
 		s.cancel = nil
 		s.Err = msg.Err
+		if msg.Action == "shell-proxy" && msg.Err == nil {
+			s.shellPath = msg.ShellPath
+		}
 		if msg.Action == "releases" {
 			if msg.Err != nil {
 				s.catalog.failed = true
@@ -397,6 +408,8 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			return s.begin("stop")
 		case "e":
 			return s.editForm("network")
+		case "w":
+			return s.editForm("shell-proxy")
 		}
 	}
 	return s, nil

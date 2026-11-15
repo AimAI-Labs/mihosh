@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -86,6 +87,9 @@ func (s State) footer(width, height int) string {
 		}
 		if showTask {
 			body = i18n.T("core.action."+s.task) + " · " + body
+		}
+		if s.task == "shell-proxy" && s.Err == nil && s.shellPath != "" {
+			body += "\n" + i18n.Tf("core.shell.source_hint", service.ShellProxySourceCommand(s.shellPath))
 		}
 	}
 	if !s.Busy && s.tab == 1 && s.catalog.failed {

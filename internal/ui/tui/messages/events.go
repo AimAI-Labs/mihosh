@@ -344,11 +344,12 @@ type CoreGeoDataMsg struct {
 	Err   error
 }
 type CoreOperationMsg struct {
-	ID       uint64
-	Action   string
-	Release  *coreinfra.Release
-	Releases *coreinfra.ReleasePage
-	Err      error
+	ID        uint64
+	Action    string
+	ShellPath string
+	Release   *coreinfra.Release
+	Releases  *coreinfra.ReleasePage
+	Err       error
 }
 type CoreProgressTickMsg struct{ ID uint64 }
 

@@ -150,6 +150,7 @@ func buildHelpSections(ctx HelpContext) []section {
 			{"←→ / 1–4", i18n.T("core.help.sections")},
 			{"s / x", i18n.T("core.help.runtime")},
 			{"e", i18n.T("core.action.network")},
+			{"w", i18n.T("core.action.shell-proxy")},
 			{"h", i18n.T("core.action.service")},
 			{"Esc", i18n.T("core.cancel")},
 		}})

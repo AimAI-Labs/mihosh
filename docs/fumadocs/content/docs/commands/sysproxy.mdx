@@ -1,18 +1,33 @@
 ---
-title: "mihosh on/off"
-description: Enable/Disable system proxy
+title: "mihosh env / on/off"
+description: Apply proxy settings and test helpers in the current Bash/Zsh shell
 ---
 
 ## Description
 
-These commands enable or disable the system proxy via the Mihomo API.
+These commands print Bash/Zsh scripts. Use `eval` or `source` to apply both uppercase and lowercase `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` and `NO_PROXY` in the current shell. The proxy address follows the core's current mixed-port, and `NO_PROXY` excludes local addresses.
 
-- `mihosh on`: Enable system proxy.
-- `mihosh off`: Disable system proxy.
+- `mihosh env on/off`: Save the shell proxy preference, generate `~/.mihosh/proxy.sh`, and print environment settings and test helpers.
+- `mihosh env`: Print a script using the saved preference; supports `--output plain|table|json`, with `plain` suitable for `eval`.
+- `mihosh on/off`: Print export/unset statements for the current shell without saving a preference.
 
 ## Examples
 
 ```bash
-mihosh on
-mihosh off
+eval "$(mihosh env on)"
+mihosh_proxy_status
+mihosh_proxy_ip
+mihosh_proxy_test node 'Node name'
+mihosh_proxy_test group 'Proxy group'
+eval "$(mihosh env off)"
 ```
+
+`mihosh_proxy_on` / `mihosh_proxy_off` temporarily toggle the current shell. `mihosh_proxy_status` displays proxy variables. `mihosh_proxy_ip` checks the current node's delay, chain and exit IP. `mihosh_proxy_test` forwards arguments to `mihosh test`. Node checks require a running core and a reachable controller.
+
+In the TUI, open **Core > Advanced > Shell proxy environment** (shortcut `w`), select a preference and press `Enter`. Then run the displayed command in the terminal that needs the proxy:
+
+```bash
+source ~/.mihosh/proxy.sh
+```
+
+With `MIHOSH_CONFIG_DIR`, the script lives in that directory. It binds the executable and configuration paths used when generated; save again after moving the executable. Mihosh does not directly change the parent shell's environment or edit shell startup files. Exiting a session-mode TUI stops its owned core; use a background service or an existing external core to keep the proxy available afterward.
