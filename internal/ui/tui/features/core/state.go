@@ -66,6 +66,9 @@ func NewState(svc *service.CoreService, configSvc *service.ConfigService, client
 	return State{svc: svc, editor: preferences.NewMihomoState(configSvc, client), Release: release, followSelection: true, catalog: releaseCatalog{page: coreinfra.ReleasePage{Releases: []coreinfra.Release{release}}, cleanup: &releaseCleanup{}}}
 }
 func (s State) Refresh() tea.Cmd {
+	if s.svc == nil {
+		return nil
+	}
 	status := func() tea.Msg { status, err := s.svc.Status(); return messages.CoreStatusMsg{Status: status, Err: err} }
 	if s.tab == 3 {
 		return tea.Batch(status, s.refreshGeoData())

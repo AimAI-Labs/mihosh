@@ -12,6 +12,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/require"
 )
 
@@ -129,4 +130,71 @@ func TestAutoRefreshNoticeExpiresOnTicks(t *testing.T) {
 	if got.notice != "" {
 		t.Fatalf("expected auto refresh notice to expire, got %q", got.notice)
 	}
+}
+
+func TestStartupConnectTriggersAutoRefreshAndLoadsInitialData(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/proxies":
+			_, _ = w.Write([]byte(`{"proxies":{"Proxy":{"type":"Selector","all":["HK-01"],"now":"HK-01"},"HK-01":{"type":"Shadowsocks","name":"HK-01"}}}`))
+		case "/configs":
+			_, _ = w.Write([]byte(`{"mode":"rule"}`))
+		case "/connections":
+			_, _ = w.Write([]byte(`{"downloadTotal":2048,"uploadTotal":512,"connections":[]}`))
+		case "/rules":
+			_, _ = w.Write([]byte(`{"rules":[{"type":"DOMAIN","payload":"example.com","proxy":"Proxy"}]}`))
+		case "/version":
+			_, _ = w.Write([]byte(`{"version":"v1.20.0"}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := api.NewClient(config.MihomoEndpoint{ExternalController: server.URL}, 1000)
+	m := NewModel(client, "", 1000)
+	t.Cleanup(m.Close)
+
+	require.False(t, m.connectionChecked)
+
+	updated, cmd := m.Update(messages.CoreConnectionMsg{Epoch: m.connectionEpoch, Version: "v1.20.0"})
+	m = updated.(Model)
+	require.True(t, m.connectionChecked)
+	require.True(t, m.connectionReady)
+	require.Equal(t, 1, m.autoRefreshRemaining)
+	require.NotNil(t, cmd)
+
+	var applyCmd func(tea.Cmd)
+	applyCmd = func(c tea.Cmd) {
+		if c == nil {
+			return
+		}
+		res := c()
+		if batch, ok := res.(tea.BatchMsg); ok {
+			for _, subCmd := range batch {
+				applyCmd(subCmd)
+			}
+			return
+		}
+		if res != nil {
+			u, nextCmd := m.Update(res)
+			m = u.(Model)
+			applyCmd(nextCmd)
+		}
+	}
+	applyCmd(cmd)
+
+	require.True(t, m.autoRefreshSynced)
+	require.Contains(t, m.nodesState.Groups, "Proxy")
+	require.Equal(t, "rule", m.nodesState.Mode)
+	require.NotNil(t, m.connsState.Connections)
+	require.Equal(t, int64(2048), m.connsState.Connections.DownloadTotal)
+	require.Len(t, m.rulesState.ToPageState(120, 40).Rules, 1)
+
+	// Next tick immediately runs a follow-up auto-refresh when AutoRefreshInterval > 0.
+	updated, tickCmd := m.Update(messages.AutoRefreshTickMsg(time.Now()))
+	m = updated.(Model)
+	require.Equal(t, m.autoRefreshInterval(), m.autoRefreshRemaining)
+	require.NotNil(t, tickCmd)
 }

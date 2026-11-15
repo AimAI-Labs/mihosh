@@ -5,6 +5,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/preferences"
 	"time"
 
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/sub"
@@ -102,7 +103,11 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.wsStarted = true
 			stream = startWSStreams(m.wsCtx, m.wsClient, m.wsMsgChan)
 		}
-		return m, tea.Batch(stream, m.fetchNodes(), m.coreState.Refresh())
+		if m.autoRefreshInterval() > 0 {
+			// Run one follow-up auto-refresh on the next tick so delayed core startup data appears automatically.
+			m.autoRefreshRemaining = 1
+		}
+		return m, tea.Batch(stream, m.refreshOnConnect())
 
 	case messages.CoreStatusMsg, messages.CoreGeoDataMsg, messages.CoreProgressTickMsg, messages.CoreOperationMsg:
 		if result, ok := msg.(messages.CoreOperationMsg); ok && result.ID != m.coreState.OperationID() {
@@ -342,7 +347,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.autoRefreshRemaining--
 		if m.autoRefreshRemaining <= 0 {
 			m.autoRefreshRemaining = interval
-			if m.connectionChecked && !m.connectionReady {
+			if !m.connectionReady {
 				return m, autoRefreshTick()
 			}
 			return m, tea.Batch(autoRefreshTick(), fetchAutoRefresh(m.client, m.nodesState))
@@ -350,6 +355,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, autoRefreshTick()
 
 	case messages.AutoRefreshMsg:
+		m.err = nil
 		m.nodesState = m.nodesState.ApplyGroups(msg.Result.Groups, msg.Result.OrderedNames)
 		m.nodesState = m.nodesState.ApplyProxies(msg.Result.Proxies)
 		m.nodesState = m.nodesState.ApplyConfigMode(msg.Result.Mode)
@@ -622,6 +628,26 @@ func (m *Model) fetchNodes() tea.Cmd {
 		nodes.FetchProxies(m.client),
 		nodes.FetchConfigMode(m.client),
 	)
+}
+
+// refreshOnConnect 每次连接就绪进入界面时自动触发一次全量刷新，避免部分页面或状态栏信息未及时展示。
+func (m *Model) refreshOnConnect() tea.Cmd {
+	var cmds []tea.Cmd
+	if m.client != nil {
+		cmds = append(cmds,
+			fetchAutoRefresh(m.client, m.nodesState),
+			connections.FetchConnections(m.client),
+			rules.FetchRules(m.client),
+			preferences.FetchMihomoVersion(m.client),
+		)
+	}
+	if m.profileSvc != nil {
+		cmds = append(cmds, sub.FetchSubs(m.profileSvc))
+	}
+	if m.coreSvc != nil {
+		cmds = append(cmds, m.coreState.Refresh())
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m *Model) reloadStoredConfig() {
