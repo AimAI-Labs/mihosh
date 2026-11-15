@@ -22,21 +22,7 @@ func (s State) choiceLayout(width int) pageLayout {
 	rows := strings.Split(wrap(desc, width-4), "\n")
 	rows = append(rows, "")
 	var controls []releaseControl
-	if s.form == "system-proxy" || s.form == "tun" || s.form == "shell-proxy" {
-		x := 2
-		var options []string
-		for i, key := range []string{"core.disabled", "core.enabled"} {
-			label := " " + i18n.T(key) + " "
-			style := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted))
-			if i == s.choice {
-				style = style.Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true)
-			}
-			controls = append(controls, releaseControl{actionHit: actionHit{x: x, y: len(rows) + 1, width: lipgloss.Width(label), height: 1, index: i}, action: "choice"})
-			options = append(options, style.Render(label))
-			x += lipgloss.Width(label) + 1
-		}
-		rows = append(rows, strings.Join(options, "│"))
-	} else if s.form == "geo-update" {
+	if s.form == "geo-update" {
 		confirmLabel := " " + i18n.T("core.dialog.confirm") + " "
 		cancelLabel := " " + i18n.T("core.dialog.cancel") + " "
 		x := 2
@@ -77,9 +63,9 @@ func (s State) formDialog(width, height int) (pageLayout, int) {
 	var page pageLayout
 	switch s.form {
 	case "service":
-		page.content, page.actions = s.actionPanel(popupWidth, true)
+		page.content, page.actions, _ = s.actionPanel(popupWidth, true)
 		page.focusY = page.actions[s.selected].y
-	case "system-proxy", "tun", "shell-proxy", "configure", "recover", "geo-update":
+	case "configure", "recover", "geo-update":
 		page = s.choiceLayout(popupWidth)
 		page.focusY = page.controls[0].y
 	default:

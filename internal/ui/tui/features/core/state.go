@@ -4,10 +4,12 @@ import (
 	"context"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/preferences"
@@ -63,7 +65,11 @@ func NewState(svc *service.CoreService, configSvc *service.ConfigService, client
 	if asset, err := release.SelectAsset(runtime.GOOS, runtime.GOARCH); err == nil {
 		release.Assets = []coreinfra.Asset{asset}
 	}
-	return State{svc: svc, editor: preferences.NewMihomoState(configSvc, client), Release: release, followSelection: true, catalog: releaseCatalog{page: coreinfra.ReleasePage{Releases: []coreinfra.Release{release}}, cleanup: &releaseCleanup{}}}
+	var status coreinfra.Status
+	if cfg, err := config.Load(); err == nil && cfg != nil {
+		status.ShellProxy = cfg.ShellProxy
+	}
+	return State{svc: svc, Status: status, editor: preferences.NewMihomoState(configSvc, client), Release: release, followSelection: true, catalog: releaseCatalog{page: coreinfra.ReleasePage{Releases: []coreinfra.Release{release}}, cleanup: &releaseCleanup{}}}
 }
 func (s State) Refresh() tea.Cmd {
 	if s.svc == nil {
@@ -214,8 +220,10 @@ func (s State) begin(action string) (State, tea.Cmd) {
 		case "geo-update":
 			err = svc.UpdateGeoData(ctx, args[0], notify)
 		case "shell-proxy":
-			enabled, parseErr := strconv.ParseBool(args[0])
-			err = parseErr
+			enabled := !status.ShellProxy
+			if len(args) > 0 {
+				enabled, err = strconv.ParseBool(args[0])
+			}
 			if err == nil {
 				shellPath, err = service.SaveShellProxy(enabled)
 			}
@@ -285,6 +293,15 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		s.Err = msg.Err
 		if msg.Action == "shell-proxy" && msg.Err == nil {
 			s.shellPath = msg.ShellPath
+			if cfg, err := config.Load(); err == nil && cfg != nil {
+				s.Status.ShellProxy = cfg.ShellProxy
+			}
+		}
+		if (msg.Action == "system-proxy" || msg.Action == "tun" || msg.Action == "tun-offline") && msg.Err == nil {
+			if cfg, err := config.Load(); err == nil && cfg != nil {
+				s.Status.SystemProxy = cfg.Core.SystemProxy
+				s.Status.TUN = cfg.Core.TUN
+			}
 		}
 		if msg.Action == "releases" {
 			if msg.Err != nil {
@@ -334,6 +351,20 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		}
 		if s.tab == 4 {
 			return s.updateEditorMouse(msg, page.editorY)
+		}
+		for _, control := range page.controls {
+			hit := control.actionHit
+			if hit.height > 0 && msg.X >= hit.x && msg.X < hit.x+hit.width && y >= hit.y && y < hit.y+hit.height {
+				if action, ok := strings.CutPrefix(control.action, "switch:"); ok {
+					for i, item := range s.actions() {
+						if item.action == action {
+							s.selected = i
+							break
+						}
+					}
+					return s.setSwitchAction(action, hit.index == 1)
+				}
+			}
 		}
 		for _, hit := range page.actions {
 			if msg.X >= hit.x && msg.X < hit.x+hit.width && y >= hit.y && y < hit.y+hit.height {
@@ -414,6 +445,13 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			if items := s.actions(); len(items) > 0 {
 				return s.choose(items[min(s.selected, len(items)-1)].action)
 			}
+		case " ":
+			if items := s.actions(); len(items) > 0 {
+				action := items[min(s.selected, len(items)-1)].action
+				if _, isSwitch := s.switchValue(action); isSwitch {
+					return s.choose(action)
+				}
+			}
 		case "t":
 			return s.editForm("version")
 		case "l":
@@ -444,7 +482,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case "e":
 			return s.editForm("network")
 		case "w":
-			return s.editForm("shell-proxy")
+			return s.choose("shell-proxy")
 		}
 	}
 	return s, nil

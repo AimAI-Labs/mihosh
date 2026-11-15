@@ -192,7 +192,7 @@ func TestCoreVisibleMouseTargetsMatchAfterViewportScrolling(t *testing.T) {
 				for _, target := range []struct {
 					index  int
 					action string
-				}{{0, "network"}, {4, "mihomo"}} {
+				}{{0, "network"}, {4, "configure"}} {
 					s := NewState(svc, nil, nil).selectTab(2)
 					s.selected = target.index
 					label := i18n.T("core.action." + target.action)
@@ -205,7 +205,7 @@ func TestCoreVisibleMouseTargetsMatchAfterViewportScrolling(t *testing.T) {
 						}
 						x := lipgloss.Width(line[:at]) + 1
 						next, _ := s.Update(messages.PageMouseClickMsg{X: x, Y: y, Width: width, Height: height})
-						if target.action == "mihomo" && !next.IsMihomoPage() || target.action != "mihomo" && (!next.Editing || next.form != target.action) {
+						if !next.Editing || next.form != target.action {
 							t.Fatalf("%s %dx%d: click on visible %s did not open its form", language, width, height, target.action)
 						}
 						found = true

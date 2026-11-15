@@ -51,7 +51,7 @@ func TestDownloadAllowsInspectingAdvancedDialogsWithoutConcurrentOperations(t *t
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	svc := service.NewCoreService()
 	defer svc.Close()
-	for _, action := range []string{"service", "system-proxy", "tun", "configure", "recover"} {
+	for _, action := range []string{"service", "configure", "recover"} {
 		s := releaseFixture(t)
 		s.svc = svc
 		s, _ = s.begin("install")
@@ -96,9 +96,12 @@ func TestAdvancedDialogsCancelWithoutOperationsAndRestoreSelection(t *testing.T)
 	defer svc.Close()
 	for i, item := range (State{tab: 2}).actions() {
 		if item.action == "mihomo" {
-			continue // Mihomo configuration has its own Core section.
+			t.Fatal("duplicate mihomo action must not appear on the advanced tab")
 		}
 		s := NewState(svc, nil, nil).selectTab(2)
+		if _, isSwitch := s.switchValue(item.action); isSwitch {
+			continue // Two-option settings toggle inline without opening a dialog.
+		}
 		s.selected, s.scroll = i, 3
 		s, _ = s.choose(item.action)
 		if !s.Editing || s.form != item.action || s.Busy {
@@ -117,23 +120,111 @@ func TestAdvancedDialogsCancelWithoutOperationsAndRestoreSelection(t *testing.T)
 	}
 }
 
-func TestNetworkSelectorsUseCurrentValueAndRequireExplicitChange(t *testing.T) {
-	for _, action := range []string{"system-proxy", "tun"} {
-		for _, enabled := range []bool{false, true} {
-			s := State{Status: service.CoreStatus{SystemProxy: enabled, TUN: enabled}}
-			s, _ = s.choose(action)
-			if (s.choice == 1) != enabled {
-				t.Fatal("selector does not start at the current value")
-			}
-			unchanged, cmd := s.Update(coreKey("enter"))
-			if unchanged.Editing || unchanged.Busy || cmd != nil {
-				t.Fatal("accepting the current value repeated the operation")
-			}
-			s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRight})
-			s, cmd = s.Update(coreKey("enter"))
-			defer s.Close()
-			if s.Editing || !s.Busy || s.task != action || cmd == nil || s.args != nil {
-				t.Fatal("confirmed value was not queued with the dialog cleared")
+func TestAdvancedInlineSwitchesRenderAndApplyDirectTargets(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+
+	for _, item := range (State{tab: 2}).actions() {
+		if item.action == "mihomo" {
+			t.Fatal("duplicate mihomo entry remained on the advanced tab")
+		}
+	}
+
+	svc := service.NewCoreService()
+	defer svc.Close()
+
+	for _, language := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(language)
+		for _, width := range []int{24, 40, 80, 120} {
+			for _, height := range []int{12, 24, 30} {
+				for _, action := range []string{"system-proxy", "tun", "shell-proxy"} {
+					actionIdx := 0
+					for idx, item := range (State{tab: 2}).actions() {
+						if item.action == action {
+							actionIdx = idx
+							break
+						}
+					}
+					for _, enabled := range []bool{false, true} {
+						s := State{svc: svc, tab: 2, selected: actionIdx, followSelection: true, Status: service.CoreStatus{
+							SystemProxy: enabled,
+							TUN:         enabled,
+							ShellProxy:  enabled,
+						}}
+						view := ansi.Strip(s.Render(width, height))
+						if lipgloss.Height(view) != height {
+							t.Fatalf("%s %dx%d: inline switch view exceeded height", language, width, height)
+						}
+						for _, line := range strings.Split(view, "\n") {
+							if lipgloss.Width(line) > width {
+								t.Fatalf("%s %dx%d: inline switch line overflowed width: %q", language, width, height, line)
+							}
+						}
+						if !strings.Contains(view, i18n.T("core.disabled")) || !strings.Contains(view, i18n.T("core.enabled")) {
+							t.Fatalf("%s %dx%d: inline switch labels missing on advanced tab", language, width, height)
+						}
+
+						// Clicking the currently active pill is a no-op and never opens a dialog.
+						contentHeight := max(1, height-footerHeight)
+						page := s.layout(width, contentHeight)
+						offset := s.viewportOffset(page, contentHeight)
+						activeIdx := 0
+						if enabled {
+							activeIdx = 1
+						}
+						var activeHit, inactiveHit actionHit
+						for _, ctrl := range page.controls {
+							if ctrl.action == "switch:"+action {
+								if ctrl.index == activeIdx {
+									activeHit = ctrl.actionHit
+								} else {
+									inactiveHit = ctrl.actionHit
+								}
+							}
+						}
+						if activeHit.width == 0 || inactiveHit.width == 0 {
+							t.Fatalf("%s %dx%d: switch hitboxes missing for %s", language, width, height, action)
+						}
+						viewLines := strings.Split(view, "\n")
+						if activeHit.y-offset >= 0 && activeHit.y-offset < contentHeight {
+							activeRow := activeHit.y - offset
+							expectedLabel := i18n.T("core.disabled")
+							if enabled {
+								expectedLabel = i18n.T("core.enabled")
+							}
+							if gotSlice := ansi.Cut(viewLines[activeRow], activeHit.x, activeHit.x+activeHit.width); !strings.Contains(gotSlice, expectedLabel) {
+								t.Fatalf("%s %dx%d: hitbox %+v missed rendered active label %q (got %q)", language, width, height, activeHit, expectedLabel, gotSlice)
+							}
+							same, sameCmd := s.Update(messages.PageMouseClickMsg{X: activeHit.x, Y: activeRow, Width: width, Height: height})
+							if same.Editing || same.Busy || sameCmd != nil {
+								t.Fatalf("%s %s: clicking active switch pill triggered an operation", language, action)
+							}
+						}
+						if inactiveHit.y-offset >= 0 && inactiveHit.y-offset < contentHeight {
+							inactiveRow := inactiveHit.y - offset
+							expectedLabel := i18n.T("core.enabled")
+							if enabled {
+								expectedLabel = i18n.T("core.disabled")
+							}
+							if gotSlice := ansi.Cut(viewLines[inactiveRow], inactiveHit.x, inactiveHit.x+inactiveHit.width); !strings.Contains(gotSlice, expectedLabel) {
+								t.Fatalf("%s %dx%d: hitbox %+v missed rendered inactive label %q (got %q)", language, width, height, inactiveHit, expectedLabel, gotSlice)
+							}
+							toggled, toggledCmd := s.Update(messages.PageMouseClickMsg{X: inactiveHit.x, Y: inactiveRow, Width: width, Height: height})
+							toggled.Close()
+							if toggled.Editing || !toggled.Busy || toggled.task != action || toggledCmd == nil || toggled.args != nil {
+								t.Fatalf("%s %s: clicking target switch pill did not queue direct toggle", language, action)
+							}
+						}
+
+						// Pressing Enter / Space / choose directly toggles without opening a modal.
+						direct, directCmd := s.choose(action)
+						direct.Close()
+						if direct.Editing || !direct.Busy || direct.task != action || directCmd == nil || direct.args != nil {
+							t.Fatalf("%s %s: choose did not toggle directly without modal", language, action)
+						}
+					}
+				}
 			}
 		}
 	}
@@ -144,7 +235,7 @@ func TestAdvancedDialogsPreserveBackgroundAndMouseMatchesVisibleControls(t *test
 	t.Cleanup(func() { i18n.SetLanguageOverride("") })
 	for _, language := range []string{"zh-CN", "en-US"} {
 		i18n.SetLanguageOverride(language)
-		for _, action := range []string{"service", "system-proxy", "tun", "configure", "recover"} {
+		for _, action := range []string{"service", "configure", "recover"} {
 			for _, width := range []int{24, 80, 120} {
 				for _, height := range []int{8, 24, 30} {
 					s := State{tab: 2, selected: 2}
@@ -176,12 +267,6 @@ func TestAdvancedDialogsPreserveBackgroundAndMouseMatchesVisibleControls(t *test
 					} else {
 						hit := page.controls[len(page.controls)-1]
 						next, cmd = s.Update(messages.PageMouseClickMsg{X: hit.x, Y: hit.y, Width: width, Height: height})
-						if action == "system-proxy" || action == "tun" {
-							if next.choice != 1 || next.Busy || cmd != nil {
-								t.Fatal("option click did not change only the pending value")
-							}
-							continue
-						}
 					}
 					defer next.Close()
 					if next.Editing || !next.Busy || cmd == nil {

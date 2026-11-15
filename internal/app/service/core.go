@@ -89,6 +89,7 @@ func (s *CoreService) Status() (CoreStatus, error) {
 	}
 	state.SystemProxy = cfg.Core.SystemProxy
 	state.TUN = cfg.Core.TUN
+	state.ShellProxy = cfg.ShellProxy
 	_, journalErr := os.Stat(filepath.Join(root, "runtime", "network-recovery.json"))
 	state.RecoveryPending = journalErr == nil
 	if state.Runtime == "service" {

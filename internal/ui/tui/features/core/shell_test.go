@@ -27,33 +27,31 @@ func TestShellProxyDialogInstallsStartupAndShowsRefreshCommand(t *testing.T) {
 	svc := service.NewCoreService()
 	defer svc.Close()
 	s := NewState(svc, nil, nil).selectTab(2)
-	s, _ = s.Update(coreKey("w"))
-	if !s.Editing || s.choice != 0 || len(s.fields) != 0 {
-		t.Fatal("shell proxy dialog did not open with the saved default")
+	if s.Status.ShellProxy {
+		t.Fatal("shell proxy initial status should start disabled")
 	}
 	for _, language := range []string{"zh-CN", "en-US"} {
 		i18n.SetLanguageOverride(language)
 		for _, width := range []int{24, 40, 80, 120} {
-			view := s.Render(width, 16)
-			if lipgloss.Height(view) > 16 {
-				t.Fatal("shell proxy dialog exceeded terminal height")
+			view := s.Render(width, 20)
+			if lipgloss.Height(view) > 20 {
+				t.Fatal("advanced page exceeded terminal height")
 			}
 			for _, line := range strings.Split(view, "\n") {
 				if lipgloss.Width(line) > width || strings.Contains(line, "core.desc.") {
-					t.Fatalf("invalid shell proxy dialog line: %q", line)
+					t.Fatalf("invalid advanced page line: %q", line)
 				}
 			}
 		}
 	}
-	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRight})
-	s, cmd := s.Update(coreKey("enter"))
-	if s.Editing || !s.Busy || cmd == nil {
-		t.Fatal("confirm did not queue the shell setting save")
+	s, cmd := s.Update(coreKey("w"))
+	if s.Editing || !s.Busy || s.task != "shell-proxy" || cmd == nil {
+		t.Fatal("shell proxy shortcut should toggle directly without opening a modal")
 	}
 	batch := cmd().(tea.BatchMsg)
 	result := batch[1]().(messages.CoreOperationMsg)
 	s, _ = s.Update(result)
-	if result.Err != nil || s.Busy || s.shellPath != filepath.Join(root, ".zshrc") {
+	if result.Err != nil || s.Busy || !s.Status.ShellProxy || s.shellPath != filepath.Join(root, ".zshrc") {
 		t.Fatal("shell setting save failed", result.Err)
 	}
 	cfg, err := config.Load()
@@ -70,8 +68,19 @@ func TestShellProxyDialogInstallsStartupAndShowsRefreshCommand(t *testing.T) {
 	if !strings.Contains(ansi.Strip(s.Render(120, 30)), "source '") {
 		t.Fatal("save result does not explain how to apply it to the current shell")
 	}
-	s, _ = s.Update(coreKey("w"))
-	if s.choice != 1 {
-		t.Fatal("reopening the dialog lost the saved preference")
+	status, err := svc.Status()
+	if err != nil || !status.ShellProxy {
+		t.Fatal("service status did not expose updated ShellProxy state")
+	}
+	s, cmd = s.Update(coreKey("w"))
+	if s.Editing || !s.Busy || s.task != "shell-proxy" || cmd == nil {
+		t.Fatal("toggling shell proxy back off did not queue operation")
+	}
+	batch = cmd().(tea.BatchMsg)
+	result = batch[1]().(messages.CoreOperationMsg)
+	s, _ = s.Update(result)
+	cfg, err = config.Load()
+	if err != nil || cfg.ShellProxy || s.Status.ShellProxy {
+		t.Fatal("TUI did not turn shell proxy back off")
 	}
 }

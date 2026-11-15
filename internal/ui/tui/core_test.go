@@ -151,7 +151,7 @@ func TestCoreSettingsDialogsBlockGlobalNavigationAndMouse(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	svc := service.NewCoreService()
 	defer svc.Close()
-	for _, shortcut := range []string{"e", "h", "y", "n", "m", "c"} {
+	for _, shortcut := range []string{"e", "h", "m", "c"} {
 		s := corepage.NewState(svc, nil, nil)
 		s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
 		s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(shortcut)})

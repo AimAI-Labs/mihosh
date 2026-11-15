@@ -38,15 +38,39 @@ func panel(title, body string, width int) string {
 	return common.RenderTokyoPanel(title, body, max(24, width))
 }
 
-func (s State) actionPanel(width int, serviceMenu bool) (string, []actionHit) {
+func renderInlineSwitch(enabled bool, width int) (control string, offOffset, offWidth, onOffset, onWidth int) {
+	t := theme.Current()
+	offLabel := " " + i18n.T("core.disabled") + " "
+	onLabel := " " + i18n.T("core.enabled") + " "
+	offStyle := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted)).Background(theme.Resolve(t.Background))
+	onStyle := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted)).Background(theme.Resolve(t.Background))
+	if enabled {
+		onStyle = lipgloss.NewStyle().Foreground(theme.Resolve(t.Background)).Background(theme.Resolve(t.Success)).Bold(true)
+	} else {
+		offStyle = lipgloss.NewStyle().Foreground(theme.Resolve(t.Bright)).Background(theme.Resolve(t.Overlay)).Bold(true)
+	}
+	muted := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted))
+	offW := lipgloss.Width(offLabel)
+	onW := lipgloss.Width(onLabel)
+	rendered := muted.Render("[") + offStyle.Render(offLabel) + muted.Render("│") + onStyle.Render(onLabel) + muted.Render("]")
+	if lipgloss.Width(rendered) > width {
+		rendered = ansi.Truncate(rendered, max(1, width), "…")
+	}
+	return rendered, 1, offW, 1 + offW + 1, onW
+}
+
+func (s State) actionPanel(width int, serviceMenu bool) (string, []actionHit, []releaseControl) {
 	if s.tab == 3 && !serviceMenu {
-		return s.geoPanel(width)
+		content, hits := s.geoPanel(width)
+		return content, hits, nil
 	}
 	t := theme.Current()
 	muted := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted))
 	selected := lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true)
+	innerW := max(1, width-4)
 	var rows []string
 	var hits []actionHit
+	var controls []releaseControl
 	items := s.actions()
 	if serviceMenu {
 		items = nil
@@ -66,11 +90,51 @@ func (s State) actionPanel(width int, serviceMenu bool) (string, []actionHit) {
 		if item.key != "" && item.key != "enter" {
 			label += " [" + item.key + "]"
 		}
-		label = ansi.Truncate(label, max(1, width-4), "…")
-		if i == s.selected {
-			label = selected.Render(common.PadString(label, max(1, width-4)))
-		}
 		desc := "  " + strings.ReplaceAll(wrap(i18n.T(descKey), width-6), "\n", "\n  ")
+		if enabled, isSwitch := s.switchValue(item.action); isSwitch && !serviceMenu {
+			switchStr, offOff, offW, onOff, onW := renderInlineSwitch(enabled, innerW)
+			switchW := lipgloss.Width(switchStr)
+			if innerW >= switchW+1+8 {
+				leftAvail := innerW - switchW - 1
+				leftText := common.PadString(ansi.Truncate(label, leftAvail, "…"), leftAvail)
+				if i == s.selected {
+					leftText = selected.Render(leftText)
+				}
+				rowY := len(rows) + 1
+				ctrlX := 2 + leftAvail + 1
+				controls = append(controls,
+					releaseControl{actionHit: actionHit{x: ctrlX + offOff, y: rowY, width: offW, height: 1, index: 0}, action: "switch:" + item.action},
+					releaseControl{actionHit: actionHit{x: ctrlX + onOff, y: rowY, width: onW, height: 1, index: 1}, action: "switch:" + item.action},
+				)
+				hits = append(hits, actionHit{x: 1, y: rowY, width: width - 2, height: 1 + lipgloss.Height(desc), index: i})
+				rows = append(rows, leftText+" "+switchStr)
+				rows = append(rows, strings.Split(muted.Render(desc), "\n")...)
+				continue
+			}
+			labelLine := ansi.Truncate(label, innerW, "…")
+			if i == s.selected {
+				labelLine = selected.Render(common.PadString(labelLine, innerW))
+			}
+			indent := "  "
+			if innerW < switchW+2 {
+				indent = ""
+			}
+			rowY := len(rows) + 1
+			ctrlY := rowY + 1
+			ctrlX := 2 + lipgloss.Width(indent)
+			controls = append(controls,
+				releaseControl{actionHit: actionHit{x: ctrlX + offOff, y: ctrlY, width: offW, height: 1, index: 0}, action: "switch:" + item.action},
+				releaseControl{actionHit: actionHit{x: ctrlX + onOff, y: ctrlY, width: onW, height: 1, index: 1}, action: "switch:" + item.action},
+			)
+			hits = append(hits, actionHit{x: 1, y: rowY, width: width - 2, height: 2 + lipgloss.Height(desc), index: i})
+			rows = append(rows, labelLine, indent+switchStr)
+			rows = append(rows, strings.Split(muted.Render(desc), "\n")...)
+			continue
+		}
+		label = ansi.Truncate(label, innerW, "…")
+		if i == s.selected {
+			label = selected.Render(common.PadString(label, innerW))
+		}
 		hit := actionHit{x: 1, y: len(rows) + 1, width: width - 2, height: 1 + lipgloss.Height(desc), index: i}
 		hits = append(hits, hit)
 		rows = append(rows, label)
@@ -80,7 +144,7 @@ func (s State) actionPanel(width int, serviceMenu bool) (string, []actionHit) {
 	if serviceMenu {
 		title = "core.action.service"
 	}
-	return panel(i18n.T(title), strings.Join(rows, "\n"), width), hits
+	return panel(i18n.T(title), strings.Join(rows, "\n"), width), hits, controls
 }
 
 func (s State) overview(width int) string {
@@ -190,8 +254,8 @@ func (s State) layout(width, height int) pageLayout {
 		return s.formLayout(width)
 	}
 	if s.Editing {
-		content, hits := s.actionPanel(width, true)
-		return pageLayout{content: content, actions: hits}
+		content, hits, controls := s.actionPanel(width, true)
+		return pageLayout{content: content, actions: hits, controls: controls}
 	}
 	var result pageLayout
 	var labels []string
@@ -229,7 +293,7 @@ func (s State) layout(width, height int) pageLayout {
 		rightWidth = width - leftWidth
 	}
 	left := s.overview(leftWidth)
-	right, hits := s.actionPanel(rightWidth, false)
+	right, hits, controls := s.actionPanel(rightWidth, false)
 	for i := range hits {
 		hits[i].y += top
 		if width >= 100 {
@@ -238,7 +302,16 @@ func (s State) layout(width, height int) pageLayout {
 			hits[i].y += lipgloss.Height(left) + 1
 		}
 	}
+	for i := range controls {
+		controls[i].y += top
+		if width >= 100 {
+			controls[i].x += leftWidth
+		} else {
+			controls[i].y += lipgloss.Height(left) + 1
+		}
+	}
 	result.actions = hits
+	result.controls = controls
 	if width >= 100 {
 		parts = append(parts, lipgloss.JoinHorizontal(lipgloss.Top, left, right))
 	} else {
@@ -284,11 +357,11 @@ func (s State) viewportOffset(page pageLayout, height int) int {
 		offset = max(0, page.focusY-height+2)
 	} else if s.followSelection && len(page.actions) > 0 {
 		hit := page.actions[min(s.selected, len(page.actions)-1)]
-		if hit.y < offset {
-			offset = hit.y
-		}
 		if hit.y+hit.height > offset+height {
 			offset = hit.y + hit.height - height
+		}
+		if hit.y < offset {
+			offset = hit.y
 		}
 	}
 	return min(max(0, offset), max(0, lipgloss.Height(page.content)-height))

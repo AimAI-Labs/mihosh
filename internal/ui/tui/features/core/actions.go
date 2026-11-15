@@ -1,6 +1,10 @@
 package core
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	"strconv"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 type actionItem struct {
 	key, action string
@@ -27,7 +31,7 @@ func (s State) actions() []actionItem {
 	case 1:
 		return []actionItem{{"v", "check"}, {"g", "upgrade"}, {"b", "rollback"}, {"t", "version"}, {"i", "install"}, {"a", "activate"}, {"l", "import"}}
 	case 2:
-		return []actionItem{{"e", "network"}, {"h", "service"}, {"y", "system-proxy"}, {"n", "tun"}, {"p", "mihomo"}, {"m", "configure"}, {"c", "recover"}, {"w", "shell-proxy"}}
+		return []actionItem{{"e", "network"}, {"h", "service"}, {"y", "system-proxy"}, {"n", "tun"}, {"m", "configure"}, {"c", "recover"}, {"w", "shell-proxy"}}
 	case 3:
 		items := make([]actionItem, len(s.geoFiles))
 		for i := range items {
@@ -57,16 +61,46 @@ func (s State) actions() []actionItem {
 	return items
 }
 
+func (s State) switchValue(action string) (bool, bool) {
+	switch action {
+	case "system-proxy":
+		return s.Status.SystemProxy, true
+	case "tun":
+		return s.Status.TUN, true
+	case "shell-proxy":
+		return s.Status.ShellProxy, true
+	default:
+		return false, false
+	}
+}
+
+func (s State) setSwitchAction(action string, target bool) (State, tea.Cmd) {
+	current, ok := s.switchValue(action)
+	if !ok || target == current {
+		return s, nil
+	}
+	s.args = []string{strconv.FormatBool(target)}
+	return s.begin(action)
+}
+
+func (s State) toggleSwitch(action string) (State, tea.Cmd) {
+	current, ok := s.switchValue(action)
+	if !ok {
+		return s, nil
+	}
+	return s.setSwitchAction(action, !current)
+}
+
 func (s State) choose(action string) (State, tea.Cmd) {
 	switch action {
-	case "mihomo":
-		return s.openTab(4)
 	case "geo-update":
 		if s.selected < 0 || s.selected >= len(s.geoFiles) || !s.geoFiles[s.selected].Updatable {
 			return s, nil
 		}
 		return s.editForm(action)
-	case "network", "version", "import", "external", "service", "system-proxy", "tun", "configure", "recover", "shell-proxy":
+	case "system-proxy", "tun", "shell-proxy":
+		return s.toggleSwitch(action)
+	case "network", "version", "import", "external", "service", "configure", "recover":
 		return s.editForm(action)
 	default:
 		return s.begin(action)

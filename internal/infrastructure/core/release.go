@@ -261,6 +261,7 @@ type Status struct {
 	AutoStart        bool     `json:"auto_start"`
 	SystemProxy      bool     `json:"system_proxy"`
 	TUN              bool     `json:"tun"`
+	ShellProxy       bool     `json:"shell_proxy"`
 	RecoveryPending  bool     `json:"recovery_pending"`
 	Mode             string   `json:"mode"`
 	Version          string   `json:"version"`
