@@ -6,6 +6,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -130,5 +131,73 @@ func TestBuildAddRuleModal_TypeUsesArrowsProxyDoesNot(t *testing.T) {
 	// 策略行直接显示名称
 	if !strings.Contains(plain, "DIRECT") {
 		t.Fatalf("expected proxy row 'DIRECT', got:\n%s", plain)
+	}
+}
+
+// TestAddAndEditRuleModalsDoNotShiftRightOnMouseScroll 验证添加和编辑规则弹窗在鼠标滚轮切换焦点时
+// 所有字段行的起始列位置与弹窗宽度保持不变（不右移）。
+func TestAddAndEditRuleModalsDoNotShiftRightOnMouseScroll(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+
+	fieldColumn := func(plainModal, prefix string) int {
+		for _, line := range strings.Split(plainModal, "\n") {
+			if idx := strings.Index(line, prefix); idx >= 0 {
+				return common.DisplayWidth(line[:idx])
+			}
+		}
+		return -1
+	}
+
+	assertStableColumns := func(t *testing.T, state State, build func(PageState, int, int) string) {
+		t.Helper()
+		prefixes := []string{
+			i18n.T("rules.add_field_type"),
+			i18n.T("rules.add_field_payload"),
+			i18n.T("rules.add_field_proxy"),
+			i18n.T("rules.add_field_index"),
+		}
+		if state.addForm.isIPType() {
+			prefixes = append(prefixes, i18n.T("rules.add_field_noresolve"))
+		}
+		baselineModal := stripANSI(build(state.ToPageState(80, 24), 80, 24))
+		baselineWidth := lipgloss.Width(baselineModal)
+		wantCols := make([]int, len(prefixes))
+		for i, p := range prefixes {
+			wantCols[i] = fieldColumn(baselineModal, p)
+			if wantCols[i] < 0 {
+				t.Fatalf("missing field %q in modal:\n%s", p, baselineModal)
+			}
+		}
+
+		for step := 0; step < addFieldCount*2; step++ {
+			state = state.HandleMouseScroll(false)
+			plain := stripANSI(build(state.ToPageState(80, 24), 80, 24))
+			if gotW := lipgloss.Width(plain); gotW != baselineWidth {
+				t.Fatalf("step %d: modal width changed from %d to %d", step, baselineWidth, gotW)
+			}
+			for i, p := range prefixes {
+				if gotCol := fieldColumn(plain, p); gotCol != wantCols[i] {
+					t.Fatalf("step %d: field %q shifted horizontally from col %d to %d\n%s", step, p, wantCols[i], gotCol, plain)
+				}
+			}
+		}
+	}
+
+	for _, lang := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(lang)
+		addState := State{showAddForm: true, addForm: newAddForm("")}
+		assertStableColumns(t, addState, buildAddRuleModal)
+
+		editState := State{
+			showEditForm: true,
+			addForm: newEditForm("", model.Rule{
+				Type:      "IP-CIDR",
+				Payload:   "10.0.0.0/8",
+				Proxy:     "DIRECT",
+				NoResolve: true,
+			}, 0),
+		}
+		assertStableColumns(t, editState, buildEditRuleModal)
 	}
 }

@@ -230,20 +230,20 @@ func renderAddFormNoResolveRow(form addForm, innerWidth int) string {
 }
 
 // applyFieldRowBackground 为聚焦的表单字段行铺满整行 TokyoSelected 背景，
-// 并在左侧加 1 个空格前导与右侧用空格补齐至 innerWidth，使高亮条对齐稳定。
-// 非聚焦行原样返回。背景色与顶部导航栏选中项保持一致（#292E42）。
+// 保持聚焦与非聚焦行左对齐完全一致（滚动切换焦点时不产生横向右移），
+// 并用空格补齐至 innerWidth。背景色与顶部导航栏选中项保持一致（#292E42）。
 func applyFieldRowBackground(row string, focused bool, innerWidth int) string {
 	if !focused {
 		return row
 	}
-	// 左侧加一个空格作为光标条视觉间隔，便于辨识当前编辑项
-	styled := " " + row
-	// 补齐至 innerWidth：内容显示宽度 + 1（前导空格）
-	pad := innerWidth - 1 - common.DisplayWidth(row)
+	if common.DisplayWidth(row) > innerWidth {
+		row = common.TruncateDisplay(row, innerWidth)
+	}
+	pad := innerWidth - common.DisplayWidth(row)
 	if pad < 0 {
 		pad = 0
 	}
-	return lipgloss.NewStyle().Background(common.TokyoSelected()).Render(styled + strings.Repeat(" ", pad))
+	return lipgloss.NewStyle().Background(common.TokyoSelected()).Render(row + strings.Repeat(" ", pad))
 }
 
 // ResolveAddFormBounds 返回添加规则弹窗在页面坐标系中的边界（右下为开区间）。
