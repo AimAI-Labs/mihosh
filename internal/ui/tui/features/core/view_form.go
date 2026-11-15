@@ -156,6 +156,12 @@ func (s State) scrollForm(msg messages.PageMouseScrollMsg) (State, tea.Cmd) {
 	if msg.Up {
 		delta = -1
 	}
+	if s.form == "service" {
+		s.selected = max(0, min(len(serviceActions)-1, s.selected+delta))
+		s.dialogScroll = page.scrollOffset
+		s.formFollowFocus = true
+		return s, nil
+	}
 	s.dialogScroll = max(0, min(page.maxScroll, page.scrollOffset+delta))
 	s.formFollowFocus = false
 	return s, nil

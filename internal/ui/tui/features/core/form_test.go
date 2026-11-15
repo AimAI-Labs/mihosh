@@ -195,7 +195,7 @@ func TestCoreDialogsScrollIndependentlyAndRestoreParentOnOutsideClick(t *testing
 	i18n.Init()
 	svc := service.NewCoreService()
 	defer svc.Close()
-	for _, action := range []string{"network", "external", "service"} {
+	for _, action := range []string{"network", "external"} {
 		for _, width := range []int{24, 80, 120} {
 			s := NewState(svc).selectTab(2)
 			s.selected, s.scroll = 1, 3
@@ -231,6 +231,41 @@ func TestCoreDialogsScrollIndependentlyAndRestoreParentOnOutsideClick(t *testing
 			s, cmd := s.Update(messages.PageMouseClickMsg{X: 0, Y: 0, Width: width, Height: 10})
 			if s.Editing || s.selected != 1 || s.scroll != 3 || s.fields != nil || s.dialogScroll != 0 || cmd != nil {
 				t.Fatal("outside close did not restore and clear dialog state")
+			}
+		}
+	}
+}
+
+func TestServiceDialogWheelSelectsVisibleActions(t *testing.T) {
+	i18n.Init()
+	for _, width := range []int{24, 80, 120} {
+		for _, height := range []int{10, 30} {
+			s := State{tab: 2, selected: 1, scroll: 3}
+			s, _ = s.editForm("service")
+			wheel := messages.PageMouseScrollMsg{X: width / 2, Y: height / 2, Width: width, Height: height}
+			for i := range len(serviceActions) + 2 {
+				var cmd tea.Cmd
+				s, cmd = s.Update(wheel)
+				page, _ := s.formDialog(width, height)
+				if s.selected != min(i+1, len(serviceActions)-1) || page.actions[s.selected].height == 0 || s.Busy || cmd != nil {
+					t.Fatalf("%dx%d: wheel did not select a visible action", width, height)
+				}
+			}
+			wheel.Up = true
+			for range len(serviceActions) + 2 {
+				s, _ = s.Update(wheel)
+			}
+			if s.selected != 0 {
+				t.Fatal("wheel did not clamp at the first action")
+			}
+			wheel.X, wheel.Y, wheel.Up = 0, 0, false
+			unchanged, _ := s.Update(wheel)
+			if unchanged.selected != s.selected {
+				t.Fatal("wheel outside dialog changed selection")
+			}
+			s, cmd := s.Update(messages.PageMouseClickMsg{X: 0, Y: 0, Width: width, Height: height})
+			if s.Editing || s.selected != 1 || s.scroll != 3 || s.dialogScroll != 0 || cmd != nil {
+				t.Fatal("closing service dialog did not restore parent")
 			}
 		}
 	}
