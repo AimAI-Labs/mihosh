@@ -1,6 +1,7 @@
 package messages
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 	"time"
 
@@ -337,6 +338,10 @@ type PageMouseScrollMsg struct {
 type CoreStatusMsg struct {
 	Status coreinfra.Status
 	Err    error
+}
+type CoreGeoDataMsg struct {
+	Files []service.GeoDataFile
+	Err   error
 }
 type CoreOperationMsg struct {
 	ID       uint64

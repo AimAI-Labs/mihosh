@@ -44,6 +44,8 @@ type State struct {
 	updates           chan coreinfra.Progress
 	generation        uint64
 	catalog           releaseCatalog
+	geoFiles          []service.GeoDataFile
+	geoErr            error
 }
 
 func NewState(svc *service.CoreService) State {
@@ -57,7 +59,11 @@ func NewState(svc *service.CoreService) State {
 	return State{svc: svc, Release: release, followSelection: true, catalog: releaseCatalog{page: coreinfra.ReleasePage{Releases: []coreinfra.Release{release}}, cleanup: &releaseCleanup{}}}
 }
 func (s State) Refresh() tea.Cmd {
-	return func() tea.Msg { status, err := s.svc.Status(); return messages.CoreStatusMsg{Status: status, Err: err} }
+	status := func() tea.Msg { status, err := s.svc.Status(); return messages.CoreStatusMsg{Status: status, Err: err} }
+	if s.tab == 3 {
+		return tea.Batch(status, s.refreshGeoData())
+	}
+	return status
 }
 func (s *State) Close() {
 	if s.catalog.cleanup != nil {
@@ -194,6 +200,8 @@ func (s State) begin(action string) (State, tea.Cmd) {
 			err = svc.UseExternal()
 		case "install":
 			err = svc.Install(ctx, release, notify)
+		case "geo-update":
+			err = svc.UpdateGeoData(ctx, args[0], notify)
 		case "configure":
 			err = svc.Configure()
 		case "start":
@@ -225,6 +233,12 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		}
 		if msg.Err != nil {
 			s.Err = msg.Err
+		}
+		return s, nil
+	case messages.CoreGeoDataMsg:
+		s.geoFiles, s.geoErr = msg.Files, msg.Err
+		if s.tab == 3 && !s.Editing {
+			s.selected = max(0, min(s.selected, s.selectionCount()-1))
 		}
 		return s, nil
 	case messages.CoreProgressTickMsg:
@@ -323,7 +337,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			}
 		}
 		switch msg.String() {
-		case "1", "2", "3":
+		case "1", "2", "3", "4":
 			return s.openTab(int(msg.String()[0] - '1'))
 		case "left":
 			return s.openTab(s.tab - 1)
@@ -351,7 +365,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			}
 			return s, nil
 		case "enter":
-			return s.choose(s.actions()[min(s.selected, s.selectionCount()-1)].action)
+			if items := s.actions(); len(items) > 0 {
+				return s.choose(items[min(s.selected, len(items)-1)].action)
+			}
 		case "t":
 			return s.editForm("version")
 		case "l":

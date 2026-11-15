@@ -7,7 +7,7 @@ description: Download, configure and manage an independent Mihomo core
 
 Run `mihosh` and open **Core** in the navigation bar. The application works without an installed core or a subscription.
 
-On first use, select **Set up and start** and press `Enter` to install the bundled verified version, create a DIRECT configuration and start the core. Press `o` to import a subscription URL or a local Mihomo configuration. Existing subscriptions remain available on the Sub page.
+On first use, select **Set up and start** and press `Enter` to install the bundled verified version, create a DIRECT configuration and start the core. Then open the Sub page to add a subscription URL or a local Mihomo configuration.
 
 The baseline configuration provides direct connections, not proxy nodes. System proxy settings, shell environment variables and TUN are separate facilities; starting the core does not route every application's traffic through it.
 
@@ -16,7 +16,7 @@ The baseline configuration provides direct connections, not proxy nodes. System 
 | Key | Action |
 | --- | --- |
 | `↑` / `↓`, `Enter` | Select / run an action (defaults to Set up and start on first use) |
-| `←` / `→` or `1` / `2` / `3` | Switch Everyday, Versions and Advanced sections |
+| `←` / `→` or `1` / `2` / `3` / `4` | Switch Everyday, Versions, Advanced and GEO sections |
 | `v` / `t` | Open or refresh the release browser / look up a stable tag |
 | `Enter` / `i` (Versions), `a` | Download the selected release / activate it after installation |
 | `PgUp` / `PgDn` or `[` / `]` | Move up / down the continuous version list |
@@ -24,7 +24,6 @@ The baseline configuration provides direct connections, not proxy nodes. System 
 | `g` / `b` | Upgrade to the latest stable release / restore the previous version |
 | `s` / `x` / `z` | Start / stop / restart |
 | `l` | Import a local executable using its independently verified SHA-256 |
-| `o` | Import and activate a subscription or local configuration |
 | `e` | Edit download proxy and accelerator settings |
 | `h` | Install, control and configure automatic startup of the background service |
 | `y` / `n` | Toggle system proxy / TUN |
@@ -32,10 +31,16 @@ The baseline configuration provides direct connections, not proxy nodes. System 
 | `p` | Change managed ports after stopping the core |
 | `u` | Connect to an external API; leave the address empty for auto-discovery |
 | `r` | Refresh status and retry the connection; also refresh the list on Versions |
-| Mouse wheel | Scroll |
-| `Esc` | Cancel the task or leave the form |
+| Mouse wheel | Move selection in Everyday, Advanced and GEO; scroll dialog contents |
+| `Esc` | Cancel the task or leave the form; downloads also have a clickable Cancel download control |
 
-Actions are grouped into Everyday, Versions and Advanced, each with a short explanation. Click an action to run it. The status panel suggests the next step; switches show saved preferences, whose effects depend on the running core. Wide terminals use 43% / 57% panels; narrow terminals stack the content. Use `Tab` and `Enter` inside forms. Exiting Mihosh stops the child owned by a session. A background service continues after the TUI exits. Existing external cores remain under their original owner.
+Actions are grouped into Everyday, Versions, Advanced and GEO, each with a short explanation. Click an action to run it. The status panel shows core information; switches show saved preferences, whose effects depend on the running core. Wide terminals use 43% / 57% panels; narrow terminals stack the content. Use `Tab` and `Enter` inside forms. Exiting Mihosh stops the child owned by a session. A background service continues after the TUI exits. Existing external cores remain under their original owner.
+
+## GEO management
+
+Press `4` in Core to inspect the managed core's `Country.mmdb`, `GeoIP.dat`, `GeoSite.dat` and `ASN.mmdb`. The list shows actual filenames, sizes and modification times, or Not downloaded for missing files. Select a file and press `Enter` or click to download or update it through the configured proxy/accelerator chain with SHA-256 verification. Press `z` after updating to restart the core and load the new data.
+
+Existing filename aliases and configured official lite datasets are preserved. Custom sources are marked for management through the core. External cores retain GEO updates in Settings > Mihomo.
 
 ## Visual release browser
 

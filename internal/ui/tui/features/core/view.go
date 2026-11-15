@@ -37,6 +37,9 @@ func panel(title, body string, width int) string {
 }
 
 func (s State) actionPanel(width int, serviceMenu bool) (string, []actionHit) {
+	if s.tab == 3 && !serviceMenu {
+		return s.geoPanel(width)
+	}
 	t := theme.Current()
 	muted := lipgloss.NewStyle().Foreground(t.Muted)
 	selected := lipgloss.NewStyle().Foreground(t.Primary).Background(t.Selected).Bold(true)
@@ -79,6 +82,9 @@ func (s State) actionPanel(width int, serviceMenu bool) (string, []actionHit) {
 }
 
 func (s State) overview(width int) string {
+	if s.tab == 3 {
+		return s.geoOverview(width)
+	}
 	t := theme.Current()
 	status, color := "core.state.external", t.Info
 	if s.Status.Mode == "managed" {
@@ -188,6 +194,7 @@ func (s State) layout(width, height int) pageLayout {
 	var result pageLayout
 	var labels []string
 	x := 2
+	selectedEnd := 0
 	for i, tab := range tabs {
 		label := " " + i18n.T("core.tab."+tab) + " "
 		result.tabs = append(result.tabs, actionHit{x: x, y: 1, width: lipgloss.Width(label), height: 1, index: i})
@@ -195,10 +202,16 @@ func (s State) layout(width, height int) pageLayout {
 		style := lipgloss.NewStyle().Foreground(t.Muted)
 		if s.tab == i {
 			style = style.Foreground(t.Primary).Background(t.Selected).Bold(true)
+			selectedEnd = x - 3
 		}
 		labels = append(labels, style.Render(label))
 	}
-	parts := []string{panel(i18n.T("core.heading"), strings.Join(labels, "│"), width), ""}
+	tabOffset := max(0, selectedEnd-(width-4))
+	for i := range result.tabs {
+		result.tabs[i].x -= tabOffset
+	}
+	tabText := ansi.Cut(strings.Join(labels, "│"), tabOffset, tabOffset+width-4)
+	parts := []string{panel(i18n.T("core.heading"), tabText, width), ""}
 	if s.tab == 1 {
 		return s.releaseLayout(width, height, parts, result)
 	}

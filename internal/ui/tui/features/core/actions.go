@@ -6,7 +6,7 @@ type actionItem struct {
 	key, action string
 }
 
-var tabs = []string{"daily", "versions", "advanced"}
+var tabs = []string{"daily", "versions", "advanced", "geo"}
 var serviceActions = []string{"install", "start", "stop", "restart", "enable", "disable", "boot", "uninstall"}
 
 func (s State) primaryAction() actionItem {
@@ -28,6 +28,12 @@ func (s State) actions() []actionItem {
 		return []actionItem{{"v", "check"}, {"g", "upgrade"}, {"b", "rollback"}, {"t", "version"}, {"i", "install"}, {"a", "activate"}, {"l", "import"}}
 	case 2:
 		return []actionItem{{"e", "network"}, {"h", "service"}, {"y", "system-proxy"}, {"n", "tun"}, {"p", "ports"}, {"m", "configure"}, {"c", "recover"}}
+	case 3:
+		items := make([]actionItem, len(s.geoFiles))
+		for i := range items {
+			items[i] = actionItem{"enter", "geo-update"}
+		}
+		return items
 	}
 	primary := s.primaryAction()
 	items := []actionItem{primary}
@@ -53,6 +59,12 @@ func (s State) actions() []actionItem {
 
 func (s State) choose(action string) (State, tea.Cmd) {
 	switch action {
+	case "geo-update":
+		if s.selected < 0 || s.selected >= len(s.geoFiles) || !s.geoFiles[s.selected].Updatable {
+			return s, nil
+		}
+		s.args = []string{s.geoFiles[s.selected].Key}
+		return s.begin(action)
 	case "network", "version", "import", "ports", "external", "service", "system-proxy", "tun", "configure", "recover":
 		return s.editForm(action)
 	default:

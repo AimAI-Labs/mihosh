@@ -17,7 +17,7 @@ import (
 const footerHeight = 4
 
 func (s State) downloading() bool {
-	return s.Busy && (s.task == "install" || s.task == "upgrade" || s.task == "setup")
+	return s.Busy && (s.task == "install" || s.task == "upgrade" || s.task == "setup" || s.task == "geo-update")
 }
 
 func (s State) cancelHint() common.InlineHelpHint {

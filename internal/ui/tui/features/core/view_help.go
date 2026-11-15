@@ -33,6 +33,9 @@ func (s State) inlineHelp(width int) string {
 	if s.tab == 1 {
 		hints = append([]common.InlineHelpHint{{Key: "Enter", Desc: i18n.T("core.inline.download")}}, hints[:2]...)
 		hints = append(hints, common.InlineHelpHint{Key: "a", Desc: i18n.T("core.inline.activate")})
+	} else if s.tab == 3 {
+		hints[2].Desc = i18n.T("core.geo.update")
+		hints = append(hints, common.InlineHelpHint{Key: "z", Desc: i18n.T("core.action.restart")})
 	}
 	if s.Editing {
 		hints = []common.InlineHelpHint{

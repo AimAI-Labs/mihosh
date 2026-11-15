@@ -144,3 +144,30 @@ func TestDownloadGeoDataRejectsUnknownAssetWithoutRequests(t *testing.T) {
 		}
 	}
 }
+
+func TestDownloadGeoDataSerializesWritersAndReleasesLock(t *testing.T) {
+	metadata := geoDataTestJSON(t, geoDataTestRelease())
+	destination := filepath.Join(t.TempDir(), "country.mmdb")
+	blocked := testFetcher(t, func(Route, *http.Request) (int, string, error) {
+		t.Fatal("concurrent GEO download started a request")
+		return 0, "", nil
+	})
+	checked := false
+	f := testFetcher(t, func(_ Route, req *http.Request) (int, string, error) {
+		if !checked {
+			checked = true
+			if err := blocked.DownloadGeoData(context.Background(), "country.mmdb", destination); err == nil {
+				t.Fatal("concurrent downloader acquired the GEO lock")
+			}
+		}
+		if req.URL.String() == geoDataAPI {
+			return http.StatusOK, metadata, nil
+		}
+		return http.StatusOK, geoDataTestBody, nil
+	})
+	for range 2 {
+		if err := f.DownloadGeoData(context.Background(), "country.mmdb", destination); err != nil {
+			t.Fatal("GEO lock was not released", err)
+		}
+	}
+}

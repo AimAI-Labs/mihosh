@@ -8,11 +8,116 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 	"gopkg.in/yaml.v3"
 )
+
+type GeoDataFile struct {
+	Key       string    `json:"key"`
+	Name      string    `json:"name"`
+	Path      string    `json:"path"`
+	Asset     string    `json:"asset"`
+	Exists    bool      `json:"exists"`
+	Updatable bool      `json:"updatable"`
+	Size      int64     `json:"size"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+var geoDataResources = []struct{ key, file, asset, failure, starting, invalid string }{
+	{"mmdb", "Country.mmdb", "country.mmdb", "can't download MMDB:", "Can't find MMDB, start download", "MMDB invalid, remove and download"},
+	{"geoip", "GeoIP.dat", "geoip.dat", "can't download GeoIP.dat:", "Can't find GeoIP.dat, start download", "GeoIP.dat invalid, remove and download"},
+	{"geosite", "GeoSite.dat", "geosite.dat", "can't download GeoSite.dat:", "Can't find GeoSite.dat, start download", "GeoSite.dat invalid, remove and download"},
+	{"asn", "ASN.mmdb", "GeoLite2-ASN.mmdb", "can't download ASN", "Can't find ASN.mmdb, start download", "ASN invalid, remove and download"},
+}
+
+func (s *CoreService) GeoDataFiles() ([]GeoDataFile, error) {
+	cfg, err := loadCoreConfig()
+	if err != nil {
+		return nil, err
+	}
+	return managedGeoDataFiles(cfg)
+}
+
+func (s *CoreService) UpdateGeoData(ctx context.Context, key string, notify func(coreinfra.Progress)) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !s.mu.TryLock() {
+		return errors.New("another core operation is active")
+	}
+	defer s.mu.Unlock()
+	ctx, cancel := s.operationContext(ctx)
+	defer cancel()
+	if err := s.lifetime.Err(); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	cfg, err := loadCoreConfig()
+	if err != nil {
+		return err
+	}
+	files, err := managedGeoDataFiles(cfg)
+	if err != nil {
+		return err
+	}
+	for _, file := range files {
+		if file.Key != key {
+			continue
+		}
+		if !file.Updatable {
+			return errors.New("custom GEO providers cannot be updated through the official downloader")
+		}
+		if err := os.MkdirAll(filepath.Dir(file.Path), 0700); err != nil {
+			return err
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		fetcher := coreFetcher(cfg, notify)
+		fetcher.RunningProxy = managedDownloadProxy(cfg)
+		return fetcher.DownloadGeoData(ctx, file.Asset, file.Path)
+	}
+	return fmt.Errorf("unknown GEO resource: %s", key)
+}
+
+func managedGeoDataFiles(cfg *config.Config) ([]GeoDataFile, error) {
+	if cfg.Core.Mode != "managed" {
+		return nil, errors.New("GEO file management requires managed core mode")
+	}
+	path, err := config.ManagedMihomoConfigPath()
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	files, err := geoDataTargets(data, filepath.Dir(path))
+	if err != nil {
+		return nil, err
+	}
+	for i := range files {
+		info, err := os.Stat(files[i].Path)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if !info.Mode().IsRegular() {
+			return nil, fmt.Errorf("GEO resource is not a regular file: %s", files[i].Name)
+		}
+		files[i].Exists = true
+		files[i].Size = info.Size()
+		files[i].UpdatedAt = info.ModTime()
+	}
+	return files, nil
+}
 
 type geoDataRequired struct {
 	asset, destination string
@@ -57,32 +162,37 @@ func validateWithGeoData(ctx context.Context, binary, path, candidate string, da
 }
 
 func missingGeoData(validationErr error, data []byte, dir string) (asset, destination string, ok bool) {
+	files, err := geoDataTargets(data, dir)
+	if err != nil {
+		return "", "", false
+	}
+	for i, resource := range geoDataResources {
+		output := validationErr.Error()
+		if strings.Contains(output, resource.failure) || strings.Contains(output, resource.starting) || strings.Contains(output, resource.invalid) {
+			return files[i].Asset, files[i].Path, files[i].Updatable
+		}
+	}
+	return "", "", false
+}
+
+func geoDataTargets(data []byte, dir string) ([]GeoDataFile, error) {
 	var cfg struct {
 		URLs map[string]string `yaml:"geox-url"`
 	}
-	if yaml.Unmarshal(data, &cfg) != nil {
-		return "", "", false
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, err
 	}
-	for _, resource := range []struct{ key, file, asset, failure, starting, invalid string }{
-		{"mmdb", "Country.mmdb", "country.mmdb", "can't download MMDB:", "Can't find MMDB, start download", "MMDB invalid, remove and download"},
-		{"geoip", "GeoIP.dat", "geoip.dat", "can't download GeoIP.dat:", "Can't find GeoIP.dat, start download", "GeoIP.dat invalid, remove and download"},
-		{"geosite", "GeoSite.dat", "geosite.dat", "can't download GeoSite.dat:", "Can't find GeoSite.dat, start download", "GeoSite.dat invalid, remove and download"},
-		{"asn", "ASN.mmdb", "GeoLite2-ASN.mmdb", "can't download ASN", "Can't find ASN.mmdb, start download", "ASN invalid, remove and download"},
-	} {
-		output := validationErr.Error()
-		if !strings.Contains(output, resource.failure) && !strings.Contains(output, resource.starting) && !strings.Contains(output, resource.invalid) {
-			continue
-		}
-		asset = resource.asset
+	entries, err := os.ReadDir(dir)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	files := make([]GeoDataFile, 0, len(geoDataResources))
+	for _, resource := range geoDataResources {
+		asset, updatable := resource.asset, true
 		if raw := cfg.URLs[resource.key]; raw != "" {
-			var supported bool
-			asset, supported = officialGeoDataAsset(raw)
-			if !supported {
-				return "", "", false
-			}
+			asset, updatable = officialGeoDataAsset(raw)
 		}
 		file := resource.file
-		entries, _ := os.ReadDir(dir)
 		for _, entry := range entries {
 			name := entry.Name()
 			if !entry.IsDir() && (strings.EqualFold(name, file) || resource.key == "mmdb" && (strings.EqualFold(name, "geoip.metadb") || strings.EqualFold(name, "geoip.db"))) {
@@ -90,9 +200,9 @@ func missingGeoData(validationErr error, data []byte, dir string) (asset, destin
 				break
 			}
 		}
-		return asset, filepath.Join(dir, file), true
+		files = append(files, GeoDataFile{Key: resource.key, Name: file, Path: filepath.Join(dir, file), Asset: asset, Updatable: updatable})
 	}
-	return "", "", false
+	return files, nil
 }
 
 // Preserve explicit custom providers; only known official distributions use our gateway chain.

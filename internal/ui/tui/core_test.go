@@ -32,6 +32,20 @@ func TestOfflineStartupRoutesToCoreWithoutStartingStreams(t *testing.T) {
 		t.Fatal("Core page not rendered")
 	}
 }
+
+func TestCoreGeoResultIsDeliveredWhileAnotherPageIsOpen(t *testing.T) {
+	i18n.Init()
+	svc := service.NewCoreService()
+	defer svc.Close()
+	s := corepage.NewState(svc)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("4")})
+	m := Model{currentPage: layout.PageSub, coreSvc: svc, coreState: s}
+	updated, _ := m.Update(messages.CoreGeoDataMsg{Files: []service.GeoDataFile{{Key: "mmdb", Name: "Country.mmdb", Updatable: true}}})
+	m = updated.(Model)
+	if m.currentPage != layout.PageSub || !strings.Contains(m.coreState.Render(120, 30), "Country.mmdb") {
+		t.Fatal("GEO result was lost after leaving the Core page")
+	}
+}
 func TestCoreIsReachableFromNavigationByMouse(t *testing.T) {
 	i18n.Init()
 	i18n.SetLanguageOverride("en-US")

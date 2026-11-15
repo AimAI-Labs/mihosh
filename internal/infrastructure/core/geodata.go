@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"path/filepath"
 )
 
 const geoDataAPI = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases/tags/latest"
@@ -23,6 +25,15 @@ func (f *Fetcher) DownloadGeoData(ctx context.Context, name, destination string)
 	if !IsGeoDataAsset(name) {
 		return errors.New("unsupported GeoData asset")
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	// Manual updates and startup validation can run in different Mihosh processes.
+	unlock, err := LockRuntime(filepath.Join(filepath.Dir(destination), ".geo-data.lock"))
+	if err != nil {
+		return fmt.Errorf("cannot start GEO download: %w", err)
+	}
+	defer unlock()
 	var asset Asset
 	_, route, err := f.Metadata(ctx, geoDataAPI, func(data []byte) error {
 		var release Release

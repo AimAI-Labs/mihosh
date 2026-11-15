@@ -104,7 +104,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(stream, m.fetchNodes(), m.coreState.Refresh())
 
-	case messages.CoreStatusMsg, messages.CoreProgressTickMsg, messages.CoreOperationMsg:
+	case messages.CoreStatusMsg, messages.CoreGeoDataMsg, messages.CoreProgressTickMsg, messages.CoreOperationMsg:
 		if result, ok := msg.(messages.CoreOperationMsg); ok && result.ID != m.coreState.OperationID() {
 			return m, nil
 		}

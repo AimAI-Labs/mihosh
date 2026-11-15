@@ -104,7 +104,7 @@ func (s State) selectionCount() int {
 	if s.tab == 1 {
 		return max(1, s.releaseCount())
 	}
-	return len(s.actions())
+	return max(1, len(s.actions()))
 }
 
 func (s State) selectedRelease() (coreinfra.Release, bool) {
@@ -136,6 +136,9 @@ func (s State) openTab(tab int) (State, tea.Cmd) {
 		if !s.catalog.loaded {
 			return s.loadReleasePage(1)
 		}
+	}
+	if s.tab == 3 {
+		return s, s.refreshGeoData()
 	}
 	return s, nil
 }
