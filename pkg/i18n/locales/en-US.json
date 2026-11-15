@@ -933,6 +933,7 @@
   "core.inline.field": "Field",
   "core.inline.save": "Save",
   "core.inline.cancel": "Cancel",
+  "core.inline.cancel_download": "Cancel download",
   "core.inline.dismiss": "Dismiss",
   "core.inline.wait": "Wait for the current task",
   "core.inline.help": "Help",

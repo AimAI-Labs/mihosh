@@ -176,3 +176,43 @@ func TestTaskFooterResultsAndTerminalBounds(t *testing.T) {
 		}
 	}
 }
+
+func TestDownloadCancelControlUsesRenderedFooterBounds(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	for _, language := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(language)
+		for _, width := range []int{12, 24, 80, 120} {
+			for _, action := range []string{"install", "upgrade", "setup"} {
+				for tab := range tabs {
+					s := releaseFixture(t).selectTab(tab)
+					s, _ = s.begin(action)
+					cancelled := false
+					cancel := s.cancel
+					s.cancel = func() { cancelled = true; cancel() }
+					id := s.generation
+					view := ansi.Strip(s.Render(width, 16))
+					if width >= 24 && !strings.Contains(view, i18n.T("core.inline.cancel_download")) {
+						t.Fatal("download cancellation has no visible control")
+					}
+					click := messages.PageMouseClickMsg{X: width - 2, Y: 15, Width: width, Height: 16}
+					outside := click
+					outside.Y--
+					s, _ = s.Update(outside)
+					if cancelled {
+						t.Fatal("click above the control cancelled the download")
+					}
+					s, cmd := s.Update(click)
+					if !cancelled || !s.Busy || s.generation != id || cmd != nil {
+						t.Fatalf("%s width=%d tab=%d: click did not cancel and wait for the active task", language, width, tab)
+					}
+					s, _ = s.Update(messages.CoreOperationMsg{ID: id, Action: action, Err: context.Canceled})
+					if s.Busy || s.cancelDownloadAt(click.X, click.Y, width, 16) {
+						t.Fatal("cancel control remained active after completion")
+					}
+					s.Close()
+				}
+			}
+		}
+	}
+}

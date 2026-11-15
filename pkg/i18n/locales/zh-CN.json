@@ -933,6 +933,7 @@
   "core.inline.field": "字段",
   "core.inline.save": "保存",
   "core.inline.cancel": "取消",
+  "core.inline.cancel_download": "取消下载",
   "core.inline.dismiss": "收起结果",
   "core.inline.wait": "等待当前任务结束",
   "core.inline.help": "帮助",

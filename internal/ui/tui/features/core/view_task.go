@@ -16,6 +16,29 @@ import (
 // Reserve the same space while idle so tasks never move the viewport.
 const footerHeight = 4
 
+func (s State) downloading() bool {
+	return s.Busy && (s.task == "install" || s.task == "upgrade" || s.task == "setup")
+}
+
+func (s State) cancelHint() common.InlineHelpHint {
+	desc := "core.inline.cancel"
+	if !s.Editing && s.downloading() {
+		desc = "core.inline.cancel_download"
+	}
+	return common.InlineHelpHint{Key: "Esc", Desc: i18n.T(desc)}
+}
+
+func (s State) cancelDownloadAt(x, y, width, height int) bool {
+	if !s.downloading() || s.cancel == nil || y != height-1 || x < 0 || x >= width || width <= 0 || height <= 0 {
+		return false
+	}
+	footer := strings.Split(ansi.Strip(s.footer(width, height)), "\n")
+	row := footer[len(footer)-1]
+	hint := ansi.Truncate(ansi.Strip(common.FormatInlineHintRow([]common.InlineHelpHint{s.cancelHint()})), max(1, width-1), "")
+	index := strings.LastIndex(row, hint)
+	return index >= 0 && x >= lipgloss.Width(row[:index]) && x < lipgloss.Width(row[:index])+lipgloss.Width(hint)
+}
+
 func (s State) progressText(width int) string {
 	progress := i18n.T("core.action."+s.task) + " · " + i18n.T("core.busy")
 	if s.Progress.Route != "" {
@@ -90,7 +113,7 @@ func (s State) footer(width, height int) string {
 	if notice != "" {
 		control := common.InlineHelpHint{Key: "Enter/Esc", Desc: i18n.T("core.inline.dismiss")}
 		if s.Busy || s.Editing {
-			control = common.InlineHelpHint{Key: "Esc", Desc: i18n.T("core.inline.cancel")}
+			control = s.cancelHint()
 		}
 		helpWidth = min(width, max(width/2, lipgloss.Width(common.FormatInlineHintRow([]common.InlineHelpHint{control}))))
 	}

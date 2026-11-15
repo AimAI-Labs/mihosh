@@ -166,6 +166,38 @@ func TestDownloadFailurePreservesPreviousFile(t *testing.T) {
 		t.Fatal("part left behind")
 	}
 }
+func TestDownloadCancellationPreservesPreviousFileAndStopsFallback(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	body := strings.Repeat("buffered asset", 16<<10)
+	digest := sha256.Sum256([]byte(body))
+	destination := filepath.Join(t.TempDir(), "asset.gz")
+	if err := os.WriteFile(destination, []byte("previous"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	f := testFetcher(t, func(Route, *http.Request) (int, string, error) {
+		calls++
+		return http.StatusOK, body, nil
+	})
+	f.Notify = func(progress Progress) {
+		if progress.Downloaded > 0 {
+			cancel()
+		}
+	}
+	_, err := f.Download(ctx, testAssetURL, destination, hex.EncodeToString(digest[:]))
+	if !errors.Is(err, context.Canceled) || calls != 1 {
+		t.Fatalf("calls=%d err=%v", calls, err)
+	}
+	data, err := os.ReadFile(destination)
+	if err != nil || string(data) != "previous" {
+		t.Fatalf("data=%q err=%v", data, err)
+	}
+	if _, err := os.Stat(destination + ".part"); !os.IsNotExist(err) {
+		t.Fatal("part left behind after cancellation")
+	}
+}
+
 func TestCancellationStopsFallback(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	calls := 0

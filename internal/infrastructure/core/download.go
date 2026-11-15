@@ -405,6 +405,10 @@ func (f *Fetcher) Download(ctx context.Context, raw, destination, expected strin
 		idle := time.AfterFunc(30*time.Second, func() { _ = resp.Body.Close() })
 		defer idle.Stop()
 		for {
+			if err := ctx.Err(); err != nil {
+				_ = file.Close()
+				return err
+			}
 			n, readErr := reader.Read(buf)
 			if n > 0 {
 				idle.Reset(30 * time.Second)
@@ -438,6 +442,9 @@ func (f *Fetcher) Download(ctx context.Context, raw, destination, expected strin
 		return nil
 	})
 	if err != nil {
+		return Route{}, err
+	}
+	if err := ctx.Err(); err != nil {
 		return Route{}, err
 	}
 	if err = os.Rename(part, destination); err != nil {

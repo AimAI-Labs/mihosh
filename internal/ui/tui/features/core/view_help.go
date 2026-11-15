@@ -60,7 +60,7 @@ func (s State) inlineHelp(width int) string {
 		}
 	} else if s.Busy {
 		hints = []common.InlineHelpHint{{Key: "←→", Desc: i18n.T("core.inline.sections")}, {Key: "↑↓", Desc: i18n.T("core.inline.select")}}
-		help = common.InlineHelpHint{Key: "Esc", Desc: i18n.T("core.inline.cancel")}
+		help = s.cancelHint()
 	} else if s.task != "" || s.Err != nil {
 		hints = []common.InlineHelpHint{{Key: "←→", Desc: i18n.T("core.inline.sections")}, {Key: "↑↓", Desc: i18n.T("core.inline.select")}}
 		help = common.InlineHelpHint{Key: "Enter/Esc", Desc: i18n.T("core.inline.dismiss")}

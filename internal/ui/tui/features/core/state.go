@@ -270,6 +270,10 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		if s.Editing {
 			return s.clickForm(msg)
 		}
+		if s.cancelDownloadAt(msg.X, msg.Y, msg.Width, msg.Height) {
+			s.cancel()
+			return s, nil
+		}
 		contentHeight := max(1, msg.Height-footerHeight)
 		if msg.X < 0 || msg.X >= msg.Width || msg.Y < 0 || msg.Y >= contentHeight {
 			return s, nil
