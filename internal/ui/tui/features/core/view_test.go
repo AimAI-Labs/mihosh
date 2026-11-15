@@ -86,6 +86,48 @@ func TestCoreEnterFollowsSelectionAndServiceMenuCapturesKeys(t *testing.T) {
 	// Do not execute the command: real system services must not be touched by UI tests.
 }
 
+func TestCoreMenuWheelSelectsAndKeepsActionsVisible(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	for _, language := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(language)
+		for _, width := range []int{40, 80, 120} {
+			for _, tab := range []int{0, 2} {
+				s := State{tab: tab, followSelection: true}
+				s.Status = service.CoreStatus{Mode: "managed", Version: "v1", Running: true}
+				wheel := messages.PageMouseScrollMsg{X: width / 2, Y: 6, Width: width, Height: 16}
+				for _, up := range []bool{false, true} {
+					wheel.Up = up
+					for range s.selectionCount() + 2 {
+						want := min(s.selectionCount()-1, s.selected+1)
+						if up {
+							want = max(0, s.selected-1)
+						}
+						next, cmd := s.Update(wheel)
+						s = next
+						if s.selected != want || !s.followSelection || cmd != nil || s.Busy || s.Editing {
+							t.Fatalf("%s width=%d tab=%d: wheel did not select %d without running it", language, width, tab, want)
+						}
+						height := wheel.Height - footerHeight
+						page := s.layout(width, height)
+						offset := s.viewportOffset(page, height)
+						hit := page.actions[s.selected]
+						if hit.y < offset || hit.y >= offset+height {
+							t.Fatalf("%s width=%d tab=%d: selected action is outside the viewport", language, width, tab)
+						}
+					}
+				}
+			}
+		}
+	}
+	s := State{tab: 2, followSelection: true}
+	s, _ = s.Update(messages.PageMouseScrollMsg{Width: 120, Height: 30})
+	s, cmd := s.Update(coreKey("enter"))
+	if !s.Editing || s.form != "service" || cmd != nil {
+		t.Fatal("Enter did not open the menu item selected by the wheel")
+	}
+}
+
 func TestCoreExistingConnectionOffersConnectionFormWithoutStartingCore(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	svc := service.NewCoreService()

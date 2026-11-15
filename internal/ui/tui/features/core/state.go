@@ -12,7 +12,6 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type State struct {
@@ -298,15 +297,12 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		if s.tab == 1 {
 			return s.scrollReleasePage(msg)
 		}
-		contentHeight := max(1, msg.Height-footerHeight)
-		page := s.layout(msg.Width, contentHeight)
-		s.scroll = s.viewportOffset(page, contentHeight)
-		s.followSelection = false
 		if msg.Up {
-			s.scroll = max(0, s.scroll-1)
+			s.selected = max(0, s.selected-1)
 		} else {
-			s.scroll = min(max(0, lipgloss.Height(page.content)-contentHeight), s.scroll+1)
+			s.selected = min(s.selectionCount()-1, s.selected+1)
 		}
+		s.followSelection = true
 		return s, nil
 	case tea.KeyMsg:
 		if !s.Editing && !s.Busy && (s.task != "" || s.Err != nil) && (msg.String() == "enter" || msg.String() == "esc") {
