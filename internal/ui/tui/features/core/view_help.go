@@ -52,7 +52,7 @@ func (s State) inlineHelp(width int) string {
 			hints[1].Desc = i18n.T("core.inline.run")
 		case "system-proxy", "tun", "shell-proxy":
 			hints[0] = common.InlineHelpHint{Key: "←→/Tab", Desc: i18n.T("core.inline.select")}
-		case "configure", "recover":
+		case "configure", "recover", "geo-update":
 			hints = hints[1:]
 			hints[0].Desc = i18n.T("core.inline.run")
 		}

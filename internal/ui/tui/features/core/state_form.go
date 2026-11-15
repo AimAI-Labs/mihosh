@@ -40,6 +40,12 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 		}
 		return s, nil
 	}
+	if kind == "geo-update" {
+		if s.selected >= 0 && s.selected < len(s.geoFiles) {
+			s.args = []string{s.geoFiles[s.selected].Key}
+		}
+		return s, nil
+	}
 	if kind == "configure" || kind == "recover" {
 		return s, nil
 	}
@@ -115,7 +121,7 @@ func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 	if s.Busy && s.form != "network" && msg.String() == "enter" {
 		return s, nil
 	}
-	if s.form == "system-proxy" || s.form == "tun" || s.form == "shell-proxy" || s.form == "configure" || s.form == "recover" {
+	if s.form == "system-proxy" || s.form == "tun" || s.form == "shell-proxy" || s.form == "configure" || s.form == "recover" || s.form == "geo-update" {
 		switch msg.String() {
 		case "esc":
 			return s.closeForm(), nil
@@ -224,7 +230,12 @@ func (s State) submitChoice() (State, tea.Cmd) {
 		return s, nil
 	}
 	action, enabled := s.form, s.choice == 1
+	args := append([]string(nil), s.args...)
 	s = s.closeForm()
+	if action == "geo-update" {
+		s.args = args
+		return s.begin(action)
+	}
 	if action == "shell-proxy" {
 		s.args = []string{strconv.FormatBool(enabled)}
 		return s.begin(action)

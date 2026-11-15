@@ -15,7 +15,11 @@ import (
 
 func (s State) choiceLayout(width int) pageLayout {
 	t := theme.Current()
-	rows := strings.Split(wrap(i18n.T("core.desc."+s.form), width-4), "\n")
+	desc := i18n.T("core.desc." + s.form)
+	if s.form == "geo-update" {
+		desc = i18n.Tf("core.desc.geo-update", s.geoConfirmTarget())
+	}
+	rows := strings.Split(wrap(desc, width-4), "\n")
 	rows = append(rows, "")
 	var controls []releaseControl
 	if s.form == "system-proxy" || s.form == "tun" || s.form == "shell-proxy" {
@@ -32,6 +36,17 @@ func (s State) choiceLayout(width int) pageLayout {
 			x += lipgloss.Width(label) + 1
 		}
 		rows = append(rows, strings.Join(options, "│"))
+	} else if s.form == "geo-update" {
+		confirmLabel := " " + i18n.T("core.dialog.confirm") + " "
+		cancelLabel := " " + i18n.T("core.dialog.cancel") + " "
+		x := 2
+		controls = append(controls,
+			releaseControl{actionHit: actionHit{x: x, y: len(rows) + 1, width: lipgloss.Width(confirmLabel), height: 1}, action: "confirm"},
+			releaseControl{actionHit: actionHit{x: x + lipgloss.Width(confirmLabel) + 2, y: len(rows) + 1, width: lipgloss.Width(cancelLabel), height: 1}, action: "cancel"},
+		)
+		confirmBtn := lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true).Render(confirmLabel)
+		cancelBtn := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted)).Render(cancelLabel)
+		rows = append(rows, confirmBtn+"  "+cancelBtn)
 	} else {
 		label := i18n.T("core.dialog.confirm")
 		controls = append(controls, releaseControl{actionHit: actionHit{x: 2, y: len(rows) + 1, width: lipgloss.Width(label), height: 1}, action: "confirm"})
@@ -43,6 +58,18 @@ func (s State) choiceLayout(width int) pageLayout {
 	return pageLayout{content: panel(i18n.T("core.action."+s.form), strings.Join(rows, "\n"), width), controls: controls}
 }
 
+func (s State) geoConfirmTarget() string {
+	if len(s.args) > 0 {
+		for _, f := range s.geoFiles {
+			if f.Key == s.args[0] {
+				return f.Name
+			}
+		}
+		return s.args[0]
+	}
+	return "GEO"
+}
+
 // The renderer and mouse handler use the same clipped, centered dialog bounds.
 func (s State) formDialog(width, height int) (pageLayout, int) {
 	popupWidth := max(24, min(76, width*2/3))
@@ -52,7 +79,7 @@ func (s State) formDialog(width, height int) (pageLayout, int) {
 	case "service":
 		page.content, page.actions = s.actionPanel(popupWidth, true)
 		page.focusY = page.actions[s.selected].y
-	case "system-proxy", "tun", "shell-proxy", "configure", "recover":
+	case "system-proxy", "tun", "shell-proxy", "configure", "recover", "geo-update":
 		page = s.choiceLayout(popupWidth)
 		page.focusY = page.controls[0].y
 	default:
@@ -130,6 +157,9 @@ func (s State) clickForm(msg messages.PageMouseClickMsg) (State, tea.Cmd) {
 		if hit.height > 0 && msg.X >= hit.x && msg.X < hit.x+hit.width && msg.Y == hit.y {
 			if control.action == "confirm" {
 				return s.submitChoice()
+			}
+			if control.action == "cancel" {
+				return s.closeForm(), nil
 			}
 			s.choice = hit.index
 			return s, nil

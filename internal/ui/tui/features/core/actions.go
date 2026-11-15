@@ -65,8 +65,7 @@ func (s State) choose(action string) (State, tea.Cmd) {
 		if s.selected < 0 || s.selected >= len(s.geoFiles) || !s.geoFiles[s.selected].Updatable {
 			return s, nil
 		}
-		s.args = []string{s.geoFiles[s.selected].Key}
-		return s.begin(action)
+		return s.editForm(action)
 	case "network", "version", "import", "external", "service", "system-proxy", "tun", "configure", "recover", "shell-proxy":
 		return s.editForm(action)
 	default:
