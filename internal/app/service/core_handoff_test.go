@@ -23,9 +23,13 @@ type handoffServices struct {
 	*fakeCoreServices
 	owner     *CoreService
 	failStart bool
+	failStop  bool
 }
 
 func (m *handoffServices) Action(ctx context.Context, action string) error {
+	if action == "stop" && m.failStop {
+		return errors.New("unit not loaded")
+	}
 	if err := m.fakeCoreServices.Action(ctx, action); err != nil {
 		return err
 	}
@@ -34,8 +38,13 @@ func (m *handoffServices) Action(ctx context.Context, action string) error {
 		if m.failStart {
 			return errors.New("background start rejected")
 		}
-		return m.owner.Start(ctx)
+		if err := m.owner.Start(ctx); err != nil {
+			return err
+		}
+		m.state.Running = true
+		return nil
 	case "stop":
+		m.state.Running = false
 		return m.owner.StopContext(ctx)
 	}
 	return nil
@@ -94,6 +103,9 @@ func TestServiceHandoffKeepsProxyAfterClientClose(t *testing.T) {
 	for _, action := range []string{"install", "start", "restart", "enable", "boot"} {
 		t.Run(action, func(t *testing.T) {
 			s, manager, client := serviceHandoffFixture(t)
+			if action != "install" {
+				manager.state.Installed = true
+			}
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			require.NoError(t, s.ServiceAction(ctx, action))
@@ -135,4 +147,38 @@ func TestServiceHandoffFailurePreservesSession(t *testing.T) {
 			require.NotEqual(t, "service", cfg.Core.Runtime)
 		})
 	}
+}
+
+func TestServiceActionWithoutInstallPreservesRunningSessionAndConfig(t *testing.T) {
+	s, _, client := serviceHandoffFixture(t)
+	original := s.process
+	for _, action := range []string{"start", "restart", "enable", "boot", "stop", "disable", "uninstall"} {
+		t.Run(action, func(t *testing.T) {
+			err := s.ServiceAction(context.Background(), action)
+			require.ErrorContains(t, err, "not installed")
+			require.Same(t, original, s.process, "uninstalled service action must never stop the running session")
+			_, err = client.GetVersion()
+			require.NoError(t, err)
+			cfg, err := config.Load()
+			require.NoError(t, err)
+			require.NotEqual(t, "service", cfg.Core.Runtime)
+		})
+	}
+}
+
+func TestServiceHandoffRecoveryRestoresSessionEvenIfStopErrors(t *testing.T) {
+	s, manager, client := serviceHandoffFixture(t)
+	manager.state.Installed = true
+	manager.failStart = true
+	manager.failStop = true
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	err := s.ServiceAction(ctx, "start")
+	require.Error(t, err)
+	require.NotNil(t, s.process, "failed handoff with inactive service must still recover session core")
+	_, err = client.GetVersion()
+	require.NoError(t, err)
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	require.NotEqual(t, "service", cfg.Core.Runtime)
 }

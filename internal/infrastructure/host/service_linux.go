@@ -35,6 +35,9 @@ func unitQuote(value string) (string, error) {
 func (s *UserService) owned() error {
 	data, err := os.ReadFile(filepath.Join(s.UnitDir, s.unit()))
 	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("background service is not installed; install it first: %w", err)
+		}
 		return err
 	}
 	if !strings.HasPrefix(string(data), serviceMarker) {
@@ -99,7 +102,7 @@ func (s *UserService) Action(ctx context.Context, action string) error {
 	return errors.New("unsupported service action")
 }
 func (s *UserService) Status(ctx context.Context) (ServiceState, error) {
-	if err := s.owned(); os.IsNotExist(err) {
+	if err := s.owned(); errors.Is(err, os.ErrNotExist) {
 		return ServiceState{}, nil
 	} else if err != nil {
 		return ServiceState{}, err

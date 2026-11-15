@@ -70,3 +70,16 @@ func TestServiceNetworkGuardUsesSeparateSystemdUnit(t *testing.T) {
 	cmd = GuardCommand("/test/mihosh", root, false)
 	require.Equal(t, "/test/mihosh", cmd.Path)
 }
+
+func TestUserServiceMissingUnitReportsFriendlyNotInstalledError(t *testing.T) {
+	s := &UserService{Root: t.TempDir(), UnitDir: t.TempDir(), Run: func(context.Context, string, ...string) ([]byte, error) {
+		t.Fatal("must not invoke systemctl for missing unit")
+		return nil, nil
+	}}
+	state, err := s.Status(context.Background())
+	require.NoError(t, err)
+	require.False(t, state.Installed)
+	err = s.Action(context.Background(), "start")
+	require.ErrorContains(t, err, "not installed")
+	require.ErrorIs(t, err, os.ErrNotExist)
+}

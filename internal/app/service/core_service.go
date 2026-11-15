@@ -67,6 +67,14 @@ func (s *CoreService) ServiceAction(ctx context.Context, action string) (resultE
 			return nil
 		}
 		action = "start"
+	} else {
+		state, statusErr := manager.Status(ctx)
+		if statusErr != nil {
+			return statusErr
+		}
+		if !state.Installed {
+			return errors.New("background service is not installed; install it first")
+		}
 	}
 	if action == "enable" || action == "boot" {
 		if err = manager.Action(ctx, action); err != nil {
@@ -74,31 +82,36 @@ func (s *CoreService) ServiceAction(ctx context.Context, action string) (resultE
 		}
 		action = "start"
 	}
-	if s.process != nil && (action == "start" || action == "restart") {
+	hadSession := s.process != nil
+	if hadSession && (action == "start" || action == "restart") {
 		// Release ports and the runtime lock before systemd starts the new owner.
 		if err = s.stopLocked(); err != nil {
 			return err
 		}
 		removeOwner(root, s.controlOwner.Token)
+	}
+	if action == "start" || action == "restart" {
+		restoreRuntime := cfg.Core.Runtime
 		defer func() {
 			if resultErr == nil {
 				return
 			}
-			// A failed handoff must not leave a working session without its proxy.
+			// A failed handoff or start must not strand an active session or corrupt runtime mode.
 			recovery, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
 			if stopErr := manager.Action(recovery, "stop"); stopErr != nil {
-				resultErr = errors.Join(resultErr, stopErr)
-				return
+				state, statusErr := manager.Status(recovery)
+				if statusErr == nil && state.Running {
+					resultErr = errors.Join(resultErr, stopErr)
+					return
+				}
 			}
-			restoreErr := config.Update(func(latest *config.Config) error { latest.Core.Runtime = cfg.Core.Runtime; return nil })
+			restoreErr := config.Update(func(latest *config.Config) error { latest.Core.Runtime = restoreRuntime; return nil })
 			resultErr = errors.Join(resultErr, restoreErr)
-			if restoreErr == nil {
+			if hadSession && restoreErr == nil {
 				resultErr = errors.Join(resultErr, s.start(recovery))
 			}
 		}()
-	}
-	if action == "start" || action == "restart" {
 		if err = config.Update(func(latest *config.Config) error { latest.Core.Runtime = "service"; return nil }); err != nil {
 			return err
 		}
