@@ -65,12 +65,13 @@ func TestConfigSaveWriteAndApplyOutcomes(t *testing.T) {
 	}{
 		{"path failure", failure, nil, nil, 204, false, false, false, true, []string{"path"}},
 		{"write failure", nil, failure, nil, 204, false, false, false, true, []string{"path", "write"}},
-		{"restart success", nil, nil, nil, 500, false, true, true, false, []string{"path", "write", "restart"}},
-		{"fallback success", nil, nil, failure, 204, false, true, true, false, []string{"path", "write", "restart", "reload"}},
-		{"all apply methods fail", nil, nil, failure, 500, false, true, false, true, []string{"path", "write", "restart", "reload"}},
-		{"offline file-only save", nil, nil, failure, 204, true, true, false, false, []string{"path", "write", "restart"}},
+		{"reload success skips service restart", nil, nil, nil, 204, false, true, true, false, []string{"path", "write", "reload"}},
+		{"fallback restart success after reload failure", nil, nil, nil, 500, false, true, true, false, []string{"path", "write", "reload", "restart"}},
+		{"all apply methods fail", nil, nil, failure, 500, false, true, false, true, []string{"path", "write", "reload", "restart"}},
+		{"offline file-only save skips service restart", nil, nil, failure, 204, true, true, false, false, []string{"path", "write"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 			events := make(chan string, 4)
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				events <- "reload"
@@ -112,7 +113,7 @@ func TestConfigSaveWriteAndApplyOutcomes(t *testing.T) {
 	}
 }
 
-func TestConfigFirstWriteSurvivesApplyFailure(t *testing.T) {
+func TestConfigManagedFirstWriteSkipsSudoAndPreservesFileOnReloadFailure(t *testing.T) {
 	path := managedConfigFile(t, "")
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
@@ -122,14 +123,14 @@ func TestConfigFirstWriteSurvivesApplyFailure(t *testing.T) {
 	}))
 	defer server.Close()
 	s := NewConfigService()
-	s.restartMihomo = func() error { return errors.New("restart unavailable") }
+	s.restartMihomo = func() error { t.Fatal("managed mode should not invoke system service restart"); return nil }
 	client := api.NewClient(config.MihomoEndpoint{ExternalController: server.URL}, 1000)
-	result := s.SaveMihomoConfigField(client, "external-controller", "127.0.0.1:9191")
+	result := s.SaveMihomoConfigField(client, "allow-lan", true)
 	if !result.WriteOK || result.Applied || result.Err == nil {
 		t.Fatalf("partial save lost its write fact: %+v", result)
 	}
 	data, err := config.ReadMihomoYAML(path)
-	if err != nil || data["external-controller"] != "127.0.0.1:9191" {
+	if err != nil || data["allow-lan"] != true {
 		t.Fatalf("first write was not preserved: %v, %v", data, err)
 	}
 }

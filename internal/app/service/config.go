@@ -108,7 +108,7 @@ func (s *ConfigService) ReadMihomoConfig() *model.MihomoConfig {
 	return mihomoCfg
 }
 
-// SaveMihomoConfigField writes YAML, then tries the legacy service restart before API reload.
+// SaveMihomoConfigField writes YAML, then hot-reloads via API before any service restart fallback.
 func (s *ConfigService) SaveMihomoConfigField(client *api.Client, key string, value interface{}) MihomoConfigSaveResult {
 	path, err := s.mihomoConfigPath()
 	if err != nil {
@@ -125,23 +125,29 @@ func (s *ConfigService) ReloadMihomoConfig(client *api.Client, path string) Miho
 	return s.applyMihomoConfig(client, path, false)
 }
 
-func (s *ConfigService) applyMihomoConfig(client *api.Client, path string, restartFirst bool) MihomoConfigSaveResult {
+func (s *ConfigService) isManagedCore() bool {
+	cfg, err := config.Load()
+	return err == nil && cfg.Core.Mode == "managed"
+}
+
+func (s *ConfigService) applyMihomoConfig(client *api.Client, path string, allowServiceFallback bool) MihomoConfigSaveResult {
 	result := MihomoConfigSaveResult{WriteOK: true}
-	if restartFirst && s.restartMihomo() == nil {
-		result.Applied = true
-		return result
-	}
-	// An offline save retains the existing file-only success semantics.
+	// An offline save retains the existing file-only success semantics without invoking sudo.
 	if client == nil {
 		return result
 	}
-	if err := client.ReloadConfig(path); err != nil {
-		result.Err = err
-		if restartFirst {
-			result.Err = fmt.Errorf("systemctl restart and API reload both failed: %w", err)
-		}
+	reloadErr := client.ReloadConfig(path)
+	if reloadErr == nil {
+		result.Applied = true
 		return result
 	}
-	result.Applied = true
+	if allowServiceFallback && !s.isManagedCore() && s.restartMihomo() == nil {
+		result.Applied = true
+		return result
+	}
+	result.Err = reloadErr
+	if allowServiceFallback && !s.isManagedCore() {
+		result.Err = fmt.Errorf("API reload and systemctl restart both failed: %w", reloadErr)
+	}
 	return result
 }
