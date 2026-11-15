@@ -195,7 +195,7 @@ func TestCoreDialogsScrollIndependentlyAndRestoreParentOnOutsideClick(t *testing
 	i18n.Init()
 	svc := service.NewCoreService()
 	defer svc.Close()
-	for _, action := range []string{"network", "profile", "external", "service"} {
+	for _, action := range []string{"network", "external", "service"} {
 		for _, width := range []int{24, 80, 120} {
 			s := NewState(svc).selectTab(2)
 			s.selected, s.scroll = 1, 3

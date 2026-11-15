@@ -7,7 +7,6 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
-	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -44,7 +43,7 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 		if kind == "import" || kind == "external" {
 			count = 3
 		}
-		if kind == "ports" || kind == "profile" {
+		if kind == "ports" {
 			count = 2
 		}
 
@@ -55,9 +54,6 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 			s.fields[i].Width = 50
 		}
 		switch kind {
-		case "profile":
-			s.fields[0].SetValue(i18n.T("core.profile_default"))
-			s.fields[1].EchoMode = textinput.EchoPassword
 		case "version":
 			s.fields[0].SetValue(s.Release.Tag)
 		case "import":
@@ -178,9 +174,6 @@ func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 			}
 			if s.form == "ports" {
 				action = "ports"
-			}
-			if s.form == "profile" {
-				action = "profile"
 			}
 			args := s.args
 			s = s.closeForm()

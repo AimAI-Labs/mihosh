@@ -156,8 +156,6 @@ func (s State) begin(action string) (State, tea.Cmd) {
 					result = &r
 				}
 			}
-		case "profile":
-			err = svc.ImportProfile(ctx, args[0], args[1], true)
 		case "upgrade":
 			err = svc.Upgrade(ctx, notify)
 		case "setup":
@@ -358,8 +356,6 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			return s.editForm("version")
 		case "l":
 			return s.editForm("import")
-		case "o":
-			return s.editForm("profile")
 		case "g":
 			return s.begin("upgrade")
 		case "a":

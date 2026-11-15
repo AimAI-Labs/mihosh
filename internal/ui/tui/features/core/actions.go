@@ -18,7 +18,7 @@ func (s State) primaryAction() actionItem {
 	case !s.Status.Running:
 		return actionItem{"s", "start"}
 	default:
-		return actionItem{"o", "profile"}
+		return actionItem{"x", "stop"}
 	}
 }
 
@@ -37,7 +37,7 @@ func (s State) actions() []actionItem {
 	}
 	others := []actionItem{{"enter", "setup"}, {"u", "external"}}
 	if s.Status.Mode == "managed" && s.Status.Version != "" {
-		others = []actionItem{{"o", "profile"}, run}
+		others = []actionItem{run}
 		if s.Status.Running {
 			others = append(others, actionItem{"z", "restart"})
 		}
@@ -53,7 +53,7 @@ func (s State) actions() []actionItem {
 
 func (s State) choose(action string) (State, tea.Cmd) {
 	switch action {
-	case "network", "version", "import", "ports", "external", "profile", "service", "system-proxy", "tun", "configure", "recover":
+	case "network", "version", "import", "ports", "external", "service", "system-proxy", "tun", "configure", "recover":
 		return s.editForm(action)
 	default:
 		return s.begin(action)

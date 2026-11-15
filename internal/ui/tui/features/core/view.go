@@ -232,7 +232,6 @@ func (s State) formLayout(width int) pageLayout {
 	t := theme.Current()
 	labels := map[string][]string{
 		"network":  {"core.proxy", "core.accelerators", "core.download_timeout"},
-		"profile":  {"core.profile_name", "core.profile_source"},
 		"version":  {"core.version_input"},
 		"import":   {"cli.core.file", "core.version_input", "cli.core.sha256"},
 		"external": {"core.controller", "core.secret", "core.mixed_port"},

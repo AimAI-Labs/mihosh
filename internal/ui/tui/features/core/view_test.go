@@ -55,11 +55,15 @@ func TestCoreEnterFollowsSelectionAndServiceMenuCapturesKeys(t *testing.T) {
 	defer svc.Close()
 	s := NewState(svc)
 	s.Status = service.CoreStatus{Mode: "managed", Version: "v1", Running: true}
-	s, cmd := s.Update(coreKey("enter"))
-	if !s.Editing || s.form != "profile" || s.Busy || cmd == nil {
-		t.Fatal("a running core without nodes should offer the subscription form")
+	for _, item := range s.actions() {
+		if item.action == "profile" || item.key == "o" {
+			t.Fatal("duplicate subscription entry remains in the daily menu")
+		}
 	}
-	s, _ = s.Update(coreKey("esc"))
+	s, cmd := s.Update(coreKey("o"))
+	if s.Editing || s.Busy || cmd != nil {
+		t.Fatal("removed subscription shortcut still performs an action")
+	}
 	s, _ = s.Update(coreKey("3"))
 	s, _ = s.Update(coreKey("down"))
 	s, cmd = s.Update(coreKey("enter"))
@@ -191,7 +195,7 @@ func TestCoreAllSectionsAndFormsRespectTerminalBounds(t *testing.T) {
 					s.Err = errors.New(strings.Repeat("a long error message ", 12))
 					states = append(states, s)
 				}
-				for _, form := range []string{"network", "profile", "version", "import", "external", "ports", "service"} {
+				for _, form := range []string{"network", "version", "import", "external", "ports", "service"} {
 					s, _ := NewState(svc).editForm(form)
 					states = append(states, s)
 				}

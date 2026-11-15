@@ -148,7 +148,6 @@ func buildHelpSections(ctx HelpContext) []section {
 		sections = append(sections, section{title: i18n.T("menu.core"), bindings: []keybinding{
 			{"↑↓ / Enter", i18n.T("core.help.select")},
 			{"←→ / 1–3", i18n.T("core.help.sections")},
-			{"o", i18n.T("core.action.profile")},
 			{"s / x", i18n.T("core.help.runtime")},
 			{"e", i18n.T("core.action.network")},
 			{"h", i18n.T("core.action.service")},
