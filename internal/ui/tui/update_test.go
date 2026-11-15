@@ -2,12 +2,15 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	tea "github.com/charmbracelet/bubbletea"
@@ -187,5 +190,49 @@ func TestUpdate_DataMessages(t *testing.T) {
 	m = newM.(Model)
 	if m.autoRefreshRemaining != 5 { // Default auto refresh is 5 from DefaultConfig
 		t.Errorf("Expected auto refresh remaining to reset to default interval, got %v", m.autoRefreshRemaining)
+	}
+}
+
+func TestModelCompactFootprintAndBoundedRingBuffers(t *testing.T) {
+	if sz := unsafe.Sizeof(Model{}); sz >= 64<<10 {
+		t.Fatalf("Model value size = %d bytes, want < %d bytes", sz, 64<<10)
+	}
+
+	m := NewModel(nil, "", 2000)
+	defer m.Close()
+
+	// Logs ring buffer caps at common.LogsCap and retains newest entry.
+	totalLogs := common.LogsCap + 25
+	for i := 0; i < totalLogs; i++ {
+		next, _ := m.Update(messages.LogsWSMsg{
+			LogType: "info",
+			Payload: fmt.Sprintf("entry-%d", i),
+		})
+		m = next.(Model)
+	}
+	logs := m.logsState.Logs()
+	if len(logs) != common.LogsCap {
+		t.Fatalf("len(Logs()) = %d, want %d", len(logs), common.LogsCap)
+	}
+	if logs[0].Payload != fmt.Sprintf("entry-%d", totalLogs-1) {
+		t.Fatalf("newest log = %q, want entry-%d", logs[0].Payload, totalLogs-1)
+	}
+
+	// Closed connections ring buffer caps at common.ClosedConnCap.
+	totalConns := common.ClosedConnCap + 25
+	opened := make([]api.ConnectionData, totalConns)
+	for i := range opened {
+		opened[i] = api.ConnectionData{ID: fmt.Sprintf("conn-%d", i)}
+	}
+	next, _ := m.Update(messages.ConnectionsWSMsg{
+		Data: api.ConnectionsData{Connections: opened},
+	})
+	m = next.(Model)
+	next, _ = m.Update(messages.ConnectionsWSMsg{
+		Data: api.ConnectionsData{Connections: nil},
+	})
+	m = next.(Model)
+	if closed := m.connsState.ClosedConnections(); len(closed) != common.ClosedConnCap {
+		t.Fatalf("len(ClosedConnections()) = %d, want %d", len(closed), common.ClosedConnCap)
 	}
 }

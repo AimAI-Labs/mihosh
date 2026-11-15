@@ -5,9 +5,9 @@ import "github.com/charmbracelet/lipgloss"
 func RenderSearchEngineBadge(engine SearchEngine) string {
 	switch engine {
 	case SearchRegex:
-		return lipgloss.NewStyle().Foreground(TokyoPurple()).Render(" [RE]")
+		return lipgloss.NewStyle().Foreground(resolve(TokyoPurple())).Render(" [RE]")
 	case SearchFuzzy:
-		return lipgloss.NewStyle().Foreground(TokyoYellow()).Render(" [Fuzzy]")
+		return lipgloss.NewStyle().Foreground(resolve(TokyoYellow())).Render(" [Fuzzy]")
 	default:
 		return ""
 	}

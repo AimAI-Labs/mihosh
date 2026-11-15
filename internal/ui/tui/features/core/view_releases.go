@@ -148,7 +148,7 @@ func (s State) releaseStart(visible int) int {
 
 func (s State) releaseLayout(width, height int, parts []string, result pageLayout) pageLayout {
 	t := theme.Current()
-	selected := lipgloss.NewStyle().Foreground(t.Primary).Background(t.Selected).Bold(true)
+	selected := lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true)
 	top := lipgloss.Height(strings.Join(parts, "\n"))
 	visible := max(1, height-top-2)
 	result.listRows = visible
@@ -174,9 +174,10 @@ func (s State) releaseLayout(width, height int, parts []string, result pageLayou
 			marker = "› "
 		}
 		label := s.releaseRow(r, marker, columns, rowWidth)
-		label = lipgloss.NewStyle().Foreground(s.releaseColor(r)).Render(label)
+		rc := theme.Resolve(s.releaseColor(r))
+		label = lipgloss.NewStyle().Foreground(rc).Render(label)
 		if i == s.selected {
-			label = selected.Foreground(s.releaseColor(r)).Render(common.PadString(label, rowWidth))
+			label = selected.Foreground(rc).Render(common.PadString(label, rowWidth))
 		}
 		result.releases = append(result.releases, actionHit{x: 1, y: top + len(rows) + 1, width: width - 2, height: 1, index: i})
 		rows = append(rows, label)

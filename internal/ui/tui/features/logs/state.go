@@ -18,8 +18,8 @@ const (
 
 // State 日志页面完整状态（使用 Ring Buffer 存储日志）
 type State struct {
-	// Ring Buffer
-	logBuf   [common.LogsCap]model.LogEntry
+	// Ring Buffer (bounded at common.LogsCap)
+	logBuf   []model.LogEntry
 	logHead  int // 写入位置
 	logCount int // 已写入总数（上限 LogsCap）
 
@@ -54,9 +54,16 @@ type State struct {
 // NewState 初始化日志状态
 func NewState(resolver *service.IPResolver) State {
 	return State{
+		logBuf:             make([]model.LogEntry, common.LogsCap),
 		logLevel:           1, // 默认 info
 		filteredLogIndices: make([]int, 0, filteredLogIndexCap),
 		resolver:           resolver,
+	}
+}
+
+func (s *State) ensureLogBuf() {
+	if len(s.logBuf) != common.LogsCap {
+		s.logBuf = make([]model.LogEntry, common.LogsCap)
 	}
 }
 
@@ -90,6 +97,7 @@ func (s *State) rebuildCachedLogs() {
 
 // AppendLog 追加一条日志并更新过滤缓存
 func (s State) AppendLog(logType, payload string) State {
+	s.ensureLogBuf()
 	entry := model.LogEntry{
 		Type:      logType,
 		Payload:   payload,

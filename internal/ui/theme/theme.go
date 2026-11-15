@@ -1,9 +1,13 @@
 package theme
 
 import (
+	"strconv"
+	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
 
 // Theme 主题语义色集合
@@ -71,4 +75,30 @@ func IsValid(name string) bool {
 // Names 返回所有内置主题名（顺序稳定）
 func Names() []string {
 	return []string{"tokyo-night", "catppuccin", "gruvbox", "nord", "dracula"}
+}
+
+var resolvedColorCache sync.Map
+
+// Resolve 将十六进制色值缓存为 CompleteColor，避免在 ANSI256/ANSI 终端下每帧重复计算 HSLuv 调色板匹配。
+func Resolve(c lipgloss.Color) lipgloss.TerminalColor {
+	s := string(c)
+	if !strings.HasPrefix(s, "#") {
+		return c
+	}
+	if cached, ok := resolvedColorCache.Load(s); ok {
+		return cached.(lipgloss.CompleteColor)
+	}
+	rgb := termenv.RGBColor(s)
+	a256, ok256 := termenv.ANSI256.Convert(rgb).(termenv.ANSI256Color)
+	a16, ok16 := termenv.ANSI.Convert(rgb).(termenv.ANSIColor)
+	if !ok256 || !ok16 {
+		return c
+	}
+	resolved := lipgloss.CompleteColor{
+		TrueColor: s,
+		ANSI256:   strconv.Itoa(int(a256)),
+		ANSI:      strconv.Itoa(int(a16)),
+	}
+	actual, _ := resolvedColorCache.LoadOrStore(s, resolved)
+	return actual.(lipgloss.CompleteColor)
 }

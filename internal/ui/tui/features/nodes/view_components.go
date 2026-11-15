@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
@@ -47,12 +48,12 @@ func RenderModeSwitchComponent(currentMode string, width int) string {
 	}
 
 	activeStyle := lipgloss.NewStyle().
-		Background(common.TokyoSelected()).
-		Foreground(common.TokyoCyan()).
+		Background(theme.Resolve(common.TokyoSelected())).
+		Foreground(theme.Resolve(common.TokyoCyan())).
 		Bold(true)
 	inactiveStyle := lipgloss.NewStyle().
-		Foreground(common.TokyoBlue())
-	separatorStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted())
+		Foreground(theme.Resolve(common.TokyoBlue()))
+	separatorStyle := lipgloss.NewStyle().Foreground(theme.Resolve(common.TokyoMuted()))
 
 	var parts []string
 	for i, m := range modes {
@@ -79,7 +80,7 @@ func RenderModeSwitchComponent(currentMode string, width int) string {
 		content += strings.Repeat(" ", innerWidth-contentWidth)
 	}
 
-	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
+	borderStyle := lipgloss.NewStyle().Foreground(theme.Resolve(common.TokyoBlue()))
 	topLine := borderStyle.Render("╭" + strings.Repeat("─", innerWidth) + "╮")
 	middleLine := borderStyle.Render("│") + content + borderStyle.Render("│")
 	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")

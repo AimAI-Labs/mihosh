@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -183,7 +184,7 @@ func buildTestResultModal(state PageState) string {
 
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(common.TokyoBlue()).
+		BorderForeground(theme.Resolve(common.TokyoBlue())).
 		Padding(0, 1).
 		Width(modalWidth).
 		Render(content)

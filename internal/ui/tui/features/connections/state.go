@@ -28,12 +28,12 @@ const (
 type State struct {
 	Connections *model.ConnectionsResponse
 	PrevConnIDs map[string]model.Connection
-	// Ring Buffer for closed connections
-	closedConns       [common.ClosedConnCap]model.Connection
-	closedTimes       [common.ClosedConnCap]time.Time // 新增：记录关闭时间
-	closedHead        int                             // 写入位置（下一条写入的索引）
-	closedCount       int                             // 已写入的总条数（上限 ClosedConnCap）
-	cachedClosedConns []model.Connection              // 缓存的已关闭连接列表
+	// Ring Buffer for closed connections (bounded at common.ClosedConnCap)
+	closedConns       []model.Connection
+	closedTimes       []time.Time        // 新增：记录关闭时间
+	closedHead        int                // 写入位置（下一条写入的索引）
+	closedCount       int                // 已写入的总条数（上限 ClosedConnCap）
+	cachedClosedConns []model.Connection // 缓存的已关闭连接列表
 
 	filterList              common.FilterList
 	connDetailMode          bool
@@ -73,13 +73,24 @@ type State struct {
 func NewState(proxyAddr string, siteTests []model.SiteTest, client *api.Client, timeout int, chartData *model.ChartData) State {
 	fl := common.NewFilterList()
 	return State{
-		proxyAddr:  proxyAddr,
-		siteTests:  siteTests,
-		filterList: fl,
-		topNCache:  &topNCache{},
-		client:     client,
-		timeout:    timeout,
-		chartData:  chartData,
+		closedConns: make([]model.Connection, common.ClosedConnCap),
+		closedTimes: make([]time.Time, common.ClosedConnCap),
+		proxyAddr:   proxyAddr,
+		siteTests:   siteTests,
+		filterList:  fl,
+		topNCache:   &topNCache{},
+		client:      client,
+		timeout:     timeout,
+		chartData:   chartData,
+	}
+}
+
+func (s *State) ensureClosedRing() {
+	if len(s.closedConns) != common.ClosedConnCap {
+		s.closedConns = make([]model.Connection, common.ClosedConnCap)
+	}
+	if len(s.closedTimes) != common.ClosedConnCap {
+		s.closedTimes = make([]time.Time, common.ClosedConnCap)
 	}
 }
 
@@ -107,6 +118,7 @@ func (s *State) rebuildCachedClosedConns() {
 
 // appendClosed 向 Ring Buffer 追加一条历史连接
 func (s *State) appendClosed(conn model.Connection) {
+	s.ensureClosedRing()
 	s.connGen++
 	s.closedConns[s.closedHead] = conn
 	s.closedTimes[s.closedHead] = time.Now()

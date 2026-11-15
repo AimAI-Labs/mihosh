@@ -110,14 +110,20 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		var cmd tea.Cmd
 		m.coreState, cmd = m.coreState.Update(msg)
-		if result, ok := msg.(messages.CoreOperationMsg); ok && result.Err == nil {
-			targetCmd := m.coreOperationCompleted(result.Action)
+		if result, ok := msg.(messages.CoreOperationMsg); ok {
+			var targetCmd tea.Cmd
+			if result.Err == nil {
+				targetCmd = m.coreOperationCompleted(result.Action)
+			}
 			m.syncProcessLogs()
 			return m, tea.Batch(cmd, targetCmd)
 		}
-
-		if _, ok := msg.(messages.CoreOperationMsg); ok {
+		if statusMsg, ok := msg.(messages.CoreStatusMsg); ok && statusMsg.Err == nil {
 			m.syncProcessLogs()
+			if statusMsg.Status.Mode == "managed" && !statusMsg.Status.Running && m.connectionReady {
+				m.reloadStoredConfig()
+				return m, tea.Batch(cmd, m.updateCoreTarget(config.ResolveMihomoEndpoint(), coreTargetStopped))
+			}
 		}
 		return m, cmd
 
@@ -602,7 +608,7 @@ func (m *Model) advanceAutoRefreshTransientState() {
 	}
 }
 
-func (m Model) autoRefreshInterval() int {
+func (m *Model) autoRefreshInterval() int {
 	if m.config == nil {
 		return 0
 	}
@@ -610,7 +616,7 @@ func (m Model) autoRefreshInterval() int {
 }
 
 // fetchNodes 批量拉取节点信息（用于端点切换后刷新）。
-func (m Model) fetchNodes() tea.Cmd {
+func (m *Model) fetchNodes() tea.Cmd {
 	return tea.Batch(
 		nodes.FetchGroups(m.client),
 		nodes.FetchProxies(m.client),

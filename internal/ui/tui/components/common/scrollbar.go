@@ -37,9 +37,9 @@ func BuildVerticalScrollbar(viewHeight, total, scrollTop int, thumbFocused bool)
 		return ""
 	}
 
-	thumbStyle := lipgloss.NewStyle().Foreground(TokyoMuted())
+	thumbStyle := lipgloss.NewStyle().Foreground(resolve(TokyoMuted()))
 	if thumbFocused {
-		thumbStyle = lipgloss.NewStyle().Foreground(TokyoCyan())
+		thumbStyle = lipgloss.NewStyle().Foreground(resolve(TokyoCyan()))
 	}
 	trackStyle := DimStyle()
 

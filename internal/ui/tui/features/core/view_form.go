@@ -23,9 +23,9 @@ func (s State) choiceLayout(width int) pageLayout {
 		var options []string
 		for i, key := range []string{"core.disabled", "core.enabled"} {
 			label := " " + i18n.T(key) + " "
-			style := lipgloss.NewStyle().Foreground(t.Muted)
+			style := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted))
 			if i == s.choice {
-				style = style.Foreground(t.Primary).Background(t.Selected).Bold(true)
+				style = style.Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true)
 			}
 			controls = append(controls, releaseControl{actionHit: actionHit{x: x, y: len(rows) + 1, width: lipgloss.Width(label), height: 1, index: i}, action: "choice"})
 			options = append(options, style.Render(label))
@@ -35,10 +35,10 @@ func (s State) choiceLayout(width int) pageLayout {
 	} else {
 		label := i18n.T("core.dialog.confirm")
 		controls = append(controls, releaseControl{actionHit: actionHit{x: 2, y: len(rows) + 1, width: lipgloss.Width(label), height: 1}, action: "confirm"})
-		rows = append(rows, lipgloss.NewStyle().Foreground(t.Primary).Background(t.Selected).Bold(true).Render(label))
+		rows = append(rows, lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true).Render(label))
 	}
 	if s.formErr != nil {
-		rows = append(rows, "", lipgloss.NewStyle().Foreground(t.Danger).Render(wrap(s.formErr.Error(), width-4)))
+		rows = append(rows, "", lipgloss.NewStyle().Foreground(theme.Resolve(t.Danger)).Render(wrap(s.formErr.Error(), width-4)))
 	}
 	return pageLayout{content: panel(i18n.T("core.action."+s.form), strings.Join(rows, "\n"), width), controls: controls}
 }

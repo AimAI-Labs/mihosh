@@ -6,6 +6,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/styles"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
@@ -18,24 +19,22 @@ import (
 func renderNodeInfo(mode, groupName, nodeName string, delay, width int) string {
 	// 无数据时显示占位符
 	if mode == "" && groupName == "" && nodeName == "" {
-		return lipgloss.NewStyle().Foreground(styles.Gray()).Render("● -- · --")
+		return lipgloss.NewStyle().Foreground(theme.Resolve(styles.Gray())).Render("● -- · --")
 	}
 
 	// 样式
-	modeStyle := lipgloss.NewStyle().Foreground(styles.Gray())
-	groupStyle := lipgloss.NewStyle().Foreground(styles.Gray())
-	nodeStyle := lipgloss.NewStyle().Foreground(styles.Text())
-	dotStyle := lipgloss.NewStyle().Foreground(common.TokyoCyan())
-	sepStyle := lipgloss.NewStyle().Foreground(styles.Gray())
+	grayStyle := lipgloss.NewStyle().Foreground(theme.Resolve(styles.Gray()))
+	nodeStyle := lipgloss.NewStyle().Foreground(theme.Resolve(styles.Text()))
+	dotStyle := lipgloss.NewStyle().Foreground(theme.Resolve(common.TokyoCyan()))
 
 	// 构建各部分
 	modeDisplay := mode
 	if modeDisplay == "" {
 		modeDisplay = "--"
 	}
-	modeStr := modeStyle.Render(modeDisplay)
+	modeStr := grayStyle.Render(modeDisplay)
 	dot := dotStyle.Render(" ● ")
-	sep := sepStyle.Render(" · ")
+	sep := grayStyle.Render(" · ")
 
 	// 节点名截断（最大 20 字符）
 	nodeDisplay := truncateRunes(nodeName, 20)
@@ -56,14 +55,14 @@ func renderNodeInfo(mode, groupName, nodeName string, delay, width int) string {
 		default:
 			delayColor = styles.Danger()
 		}
-		delayStr = lipgloss.NewStyle().Foreground(delayColor).Render(fmt.Sprintf("%dms", delay))
+		delayStr = lipgloss.NewStyle().Foreground(theme.Resolve(delayColor)).Render(fmt.Sprintf("%dms", delay))
 	} else {
-		delayStr = modeStyle.Render("--")
+		delayStr = grayStyle.Render("--")
 	}
 
 	// 组装（宽屏含策略组名，窄屏隐藏）
 	if width >= 60 && groupName != "" {
-		groupStr := groupStyle.Render(groupName)
+		groupStr := grayStyle.Render(groupName)
 		return modeStr + dot + groupStr + sep + nodeStr + sep + delayStr
 	}
 	return modeStr + dot + nodeStr + sep + delayStr
@@ -76,9 +75,9 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, n
 
 	// ── 右侧：实时指标 ──
 	var metricsStr string
-	dimStyle := lipgloss.NewStyle().Foreground(styles.Gray())
-	upStyle := lipgloss.NewStyle().Foreground(styles.Success())
-	downStyle := lipgloss.NewStyle().Foreground(styles.Primary())
+	dimStyle := lipgloss.NewStyle().Foreground(theme.Resolve(styles.Gray()))
+	upStyle := lipgloss.NewStyle().Foreground(theme.Resolve(styles.Success()))
+	downStyle := lipgloss.NewStyle().Foreground(theme.Resolve(styles.Primary()))
 	sep := dimStyle.Render(" │ ")
 
 	// 当前实时流量
@@ -165,7 +164,7 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, n
 
 	var rightIcon string
 	if hasUpdate {
-		rightIcon = lipgloss.NewStyle().Foreground(common.TokyoCyan()).Blink(true).Render(" ◉")
+		rightIcon = lipgloss.NewStyle().Foreground(theme.Resolve(common.TokyoCyan())).Blink(true).Render(" ◉")
 	}
 
 	// ── 组装状态行 ──

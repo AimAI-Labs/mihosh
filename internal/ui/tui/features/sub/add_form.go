@@ -144,12 +144,15 @@ func (f addForm) buildSource() profile.SubSource {
 
 // handleUpdate 处理表单内的按键（弹窗激活时由 state 分派到此）。
 func (s State) handleAddFormUpdate(msg tea.KeyMsg) (State, tea.Cmd) {
-	form := s.addForm
+	form := newAddForm()
+	if s.addForm != nil {
+		form = *s.addForm
+	}
 	next, submit, cmd, closed := updateFormFields(msg, form)
 	if closed {
 		// Esc：关闭并清空表单
 		s.showAddForm = false
-		s.addForm = newAddForm()
+		s.addForm = nil
 		return s, nil
 	}
 	if submit {
@@ -157,10 +160,10 @@ func (s State) handleAddFormUpdate(msg tea.KeyMsg) (State, tea.Cmd) {
 		name := next.nameField.Value()
 		src := next.buildSource()
 		s.showAddForm = false
-		s.addForm = newAddForm()
+		s.addForm = nil
 		return s, AddSubCmd(s.svc, name, src)
 	}
-	s.addForm = next
+	s.addForm = &next
 	return s, cmd
 }
 

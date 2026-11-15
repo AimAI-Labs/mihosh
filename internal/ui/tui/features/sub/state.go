@@ -40,10 +40,10 @@ type State struct {
 
 	// 弹窗/输入模式
 	showAddForm    bool
-	addForm        addForm
+	addForm        *addForm
 	showEditForm   bool // 编辑当前选中订阅（名称 + 来源）
 	editUID        string
-	editForm       addForm
+	editForm       *addForm
 	showDeleteConf bool
 	deleteUID      string // 待删除订阅 UID
 
@@ -73,6 +73,13 @@ const (
 
 // ToPageState 转换为渲染层所需的 PageState。
 func (s State) ToPageState(width, height int) PageState {
+	var addFormVal, editFormVal addForm
+	if s.addForm != nil {
+		addFormVal = *s.addForm
+	}
+	if s.editForm != nil {
+		editFormVal = *s.editForm
+	}
 	return PageState{
 		Subs:           s.subs,
 		FilteredIdx:    s.filteredIdx,
@@ -85,9 +92,9 @@ func (s State) ToPageState(width, height int) PageState {
 		Width:          width,
 		Height:         height,
 		ShowAddForm:    s.showAddForm,
-		AddForm:        s.addForm,
+		AddForm:        addFormVal,
 		ShowEditForm:   s.showEditForm,
-		EditForm:       s.editForm,
+		EditForm:       editFormVal,
 		ShowDeleteConf: s.showDeleteConf,
 		DeleteUID:      s.deleteUID,
 		UpdatingUID:    s.updatingUID,
@@ -133,11 +140,15 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	case messages.PageResizeMsg:
 		s.pageWidth = msg.Width
 		s.pageHeight = msg.Height
-		if s.showAddForm {
-			s.addForm.resize(msg.Width, msg.Height)
+		if s.showAddForm && s.addForm != nil {
+			f := *s.addForm
+			f.resize(msg.Width, msg.Height)
+			s.addForm = &f
 		}
-		if s.showEditForm {
-			s.editForm.resize(msg.Width, msg.Height)
+		if s.showEditForm && s.editForm != nil {
+			f := *s.editForm
+			f.resize(msg.Width, msg.Height)
+			s.editForm = &f
 		}
 		s.clampScroll()
 		return s, nil
@@ -187,8 +198,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			return s.openEditForm()
 		case msg.String() == "n":
 			s.showAddForm = true
-			s.addForm = newAddForm()
-			s.addForm.resize(s.pageWidth, s.pageHeight)
+			f := newAddForm()
+			f.resize(s.pageWidth, s.pageHeight)
+			s.addForm = &f
 		case msg.String() == "d":
 			return s.openDeleteConfirm()
 		case msg.String() == "/":
@@ -301,19 +313,22 @@ func (s State) openEditForm() (State, tea.Cmd) {
 	form.focusCurrent()
 	s.showEditForm = true
 	s.editUID = p.UID
-	s.editForm = form
+	s.editForm = &form
 	return s, nil
 }
 
 // handleEditFormUpdate 处理编辑表单按键（与添加表单逻辑共用）。
 func (s State) handleEditFormUpdate(msg tea.KeyMsg) (State, tea.Cmd) {
-	form := s.editForm
+	form := newAddForm()
+	if s.editForm != nil {
+		form = *s.editForm
+	}
 	next, submit, cmd, closed := updateFormFields(msg, form)
 	if closed {
 		// Esc：关闭并清空
 		s.showEditForm = false
 		s.editUID = ""
-		s.editForm = newAddForm()
+		s.editForm = nil
 		return s, nil
 	}
 	if submit {
@@ -322,10 +337,10 @@ func (s State) handleEditFormUpdate(msg tea.KeyMsg) (State, tea.Cmd) {
 		uid := s.editUID
 		s.showEditForm = false
 		s.editUID = ""
-		s.editForm = newAddForm()
+		s.editForm = nil
 		return s, EditSubCmd(s.svc, uid, name, src)
 	}
-	s.editForm = next
+	s.editForm = &next
 	return s, cmd
 }
 
@@ -362,10 +377,10 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 			left, top, right, bottom := resolveFormBounds(ps, pageWidth, pageHeight)
 			if pageX < left || pageX >= right || pageY < top || pageY >= bottom {
 				s.showAddForm = false
-				s.addForm = newAddForm()
+				s.addForm = nil
 				s.showEditForm = false
 				s.editUID = ""
-				s.editForm = newAddForm()
+				s.editForm = nil
 			} else {
 				return s.clickForm(pageX-left-2, pageY-top-1, pageWidth, pageHeight)
 			}

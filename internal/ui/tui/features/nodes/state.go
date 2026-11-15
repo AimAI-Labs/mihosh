@@ -78,7 +78,7 @@ type State struct {
 	testBatch      service.TestBatch
 	batchMode      bool
 	// Ring Buffer for test results (success + failure)
-	TestResultsArr  [testResultCap]TestResultEntry
+	TestResultsArr  []TestResultEntry
 	resultHead      int // 写入位置
 	resultCount     int // 已写入总数（上限 testResultCap）
 	ShowTestDetail  bool
@@ -98,6 +98,11 @@ type State struct {
 
 // appendTestResult 向 Ring Buffer 追加一条测速结果记录
 func (s *State) appendTestResult(entry TestResultEntry) {
+	if len(s.TestResultsArr) < testResultCap {
+		buf := make([]TestResultEntry, testResultCap)
+		copy(buf, s.TestResultsArr)
+		s.TestResultsArr = buf
+	}
 	s.TestResultsArr[s.resultHead] = entry
 	s.resultHead = (s.resultHead + 1) % testResultCap
 	if s.resultCount < testResultCap {
@@ -107,7 +112,7 @@ func (s *State) appendTestResult(entry TestResultEntry) {
 
 // TestResults 返回测速结果列表（最新在前）
 func (s State) TestResults() []TestResultEntry {
-	if s.resultCount == 0 {
+	if s.resultCount == 0 || len(s.TestResultsArr) < testResultCap {
 		return nil
 	}
 	result := make([]TestResultEntry, s.resultCount)

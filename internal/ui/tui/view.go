@@ -116,7 +116,7 @@ func (m Model) View() string {
 }
 
 // buildHelpContext 根据当前模型状态构建帮助弹窗上下文
-func (m Model) buildHelpContext() help.HelpContext {
+func (m *Model) buildHelpContext() help.HelpContext {
 	platform, asset := m.coreState.ReleaseHelpDetails()
 	return help.HelpContext{
 		CurrentPage:        int(m.currentPage),

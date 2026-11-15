@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
 
 func TestBuiltinThemesComplete(t *testing.T) {
@@ -81,5 +82,32 @@ func TestThemeReturnsColorValues(t *testing.T) {
 	}
 	if th.Primary != lipgloss.Color("#BD93F9") {
 		t.Errorf("Theme().Primary = %q, want #BD93F9", th.Primary)
+	}
+}
+
+func TestResolveMatchesLipglossProfilesAndHandlesInvalidColors(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	defer lipgloss.SetColorProfile(prev)
+
+	for _, profile := range []termenv.Profile{
+		termenv.TrueColor,
+		termenv.ANSI256,
+		termenv.ANSI,
+		termenv.Ascii,
+	} {
+		lipgloss.SetColorProfile(profile)
+		for _, hex := range []lipgloss.Color{"#7AA2F7", "#BD93F9", "#F7768E", "#9ECE6A"} {
+			want := lipgloss.NewStyle().Foreground(hex).Render("mihosh")
+			got := lipgloss.NewStyle().Foreground(Resolve(hex)).Render("mihosh")
+			if got != want {
+				t.Fatalf("profile=%v color=%s render mismatch: got %q, want %q", profile, hex, got, want)
+			}
+		}
+	}
+
+	for _, raw := range []lipgloss.Color{"", "12", "#zzzzzz", "#12"} {
+		if got := Resolve(raw); got != raw {
+			t.Fatalf("Resolve(%q) = %#v, want original input", raw, got)
+		}
 	}
 }

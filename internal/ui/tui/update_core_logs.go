@@ -2,7 +2,7 @@ package tui
 
 import "github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 
-func (m Model) usesProcessLogs() bool {
+func (m *Model) usesProcessLogs() bool {
 	return m.coreSvc != nil && m.config != nil && m.config.Core.Mode == "managed" && m.config.Core.Runtime != "service" && m.coreSvc.UsesProcessLogs()
 }
 

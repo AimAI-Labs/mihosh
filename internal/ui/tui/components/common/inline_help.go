@@ -18,13 +18,17 @@ import (
 // InlineHelp 样式函数（支持主题热切换）
 
 // InlineHelpKeyStyle 按键文本样式（醒目黄）
-func InlineHelpKeyStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(TokyoYellow()) }
+func InlineHelpKeyStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(resolve(TokyoYellow()))
+}
 
 // InlineHelpDimStyle 分隔符等次要文本样式（灰）
-func InlineHelpDimStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(TokyoMuted()) }
+func InlineHelpDimStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(resolve(TokyoMuted()))
+}
 
 // InlineHelpDescStyle 描述文本样式（柔和蓝）
-func InlineHelpDescStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(Dim()) }
+func InlineHelpDescStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(resolve(Dim())) }
 
 // InlineHelpHint 内联帮助条目（按键 + 描述）
 type InlineHelpHint struct {

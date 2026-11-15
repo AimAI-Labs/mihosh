@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
@@ -333,7 +334,7 @@ func renderCardArea(state PageState, areaH int) string {
 		b := &l.Boxes[i]
 		for j, line := range renderGroupCard(state, *b) {
 			if b.Y+j < len(colLines[b.Col]) {
-				colLines[b.Col][b.Y+j] = common.PadString(common.TruncateDisplay(line, b.Width), b.Width)
+				colLines[b.Col][b.Y+j] = line
 			}
 		}
 	}
@@ -362,33 +363,32 @@ func renderGroupCard(state PageState, b cardBox) []string {
 	if b.Expanded {
 		border = common.Info()
 	}
-	frame := lipgloss.NewStyle().Foreground(border)
+	frame := lipgloss.NewStyle().Foreground(theme.Resolve(border))
+	leftEdge := frame.Render("│ ")
+	rightEdge := frame.Render(" │")
 
 	name := state.GroupNames[b.GroupIndex]
 	group := state.Groups[name]
 
 	lines := make([]string, 0, b.Height)
 	lines = append(lines, frame.Render("╭"+strings.Repeat("─", b.Width-2)+"╮"))
-	lines = append(lines, cardContentLine(frame, cardHeader(state, name, group, b), b.Width))
-	lines = append(lines, cardContentLine(frame, cardSubtitle(state, group), b.Width))
+	lines = append(lines, cardContentLine(leftEdge, rightEdge, cardHeader(state, name, group, b), b.Width))
+	lines = append(lines, cardContentLine(leftEdge, rightEdge, cardSubtitle(state, group), b.Width))
 	if b.Expanded {
-		lines = append(lines, cardGridLines(state, b, frame)...)
-		lines = append(lines, cardContentLine(frame, cardFooter(state, b), b.Width))
+		lines = append(lines, cardGridLines(state, b, leftEdge, rightEdge)...)
+		lines = append(lines, cardContentLine(leftEdge, rightEdge, cardFooter(state, b), b.Width))
 	} else {
-		lines = append(lines, cardDotLines(state, group, b, frame)...)
+		lines = append(lines, cardDotLines(state, group, b, leftEdge, rightEdge)...)
 	}
 	lines = append(lines, frame.Render("╰"+strings.Repeat("─", b.Width-2)+"╯"))
 
-	for i, line := range lines {
-		lines[i] = common.PadString(common.TruncateDisplay(line, b.Width), b.Width)
-	}
 	return lines
 }
 
-func cardContentLine(frame lipgloss.Style, content string, width int) string {
+func cardContentLine(leftEdge, rightEdge, content string, width int) string {
 	innerWidth := width - 4
 	inner := common.PadString(common.TruncateDisplay(content, innerWidth), innerWidth)
-	return frame.Render("│ ") + inner + frame.Render(" │")
+	return leftEdge + inner + rightEdge
 }
 
 func cardHeader(state PageState, name string, group model.Group, b cardBox) string {
@@ -399,9 +399,9 @@ func cardHeader(state PageState, name string, group model.Group, b cardBox) stri
 		}
 	}
 
-	nameStyle := lipgloss.NewStyle().Foreground(common.TokyoForeground()).Bold(true)
+	nameStyle := lipgloss.NewStyle().Foreground(theme.Resolve(common.TokyoForeground())).Bold(true)
 	if color, ok := parseHexColor(name); ok {
-		nameStyle = nameStyle.Foreground(color)
+		nameStyle = nameStyle.Foreground(theme.Resolve(color))
 	}
 	left := nameStyle.Render(name) +
 		common.MutedStyle().Render(fmt.Sprintf(" : %s (%d/%d)", group.Type, alive, len(group.All)))
@@ -409,7 +409,7 @@ func cardHeader(state PageState, name string, group model.Group, b cardBox) stri
 	d := resolveNowDelay(state, group)
 	var right string
 	if d > 0 {
-		right = lipgloss.NewStyle().Foreground(utils.GetDelayColor(d)).Bold(true).Render(fmt.Sprintf("%d", d))
+		right = lipgloss.NewStyle().Foreground(theme.Resolve(utils.GetDelayColor(d))).Bold(true).Render(fmt.Sprintf("%d", d))
 	} else {
 		right = common.MutedStyle().Render("⚡")
 	}
@@ -421,7 +421,7 @@ func cardSubtitle(state PageState, group model.Group) string {
 	if now == "" {
 		now = i18n.T("nodes.unknown_node")
 	}
-	style := lipgloss.NewStyle().Foreground(common.TokyoForeground())
+	style := lipgloss.NewStyle().Foreground(theme.Resolve(common.TokyoForeground()))
 	switch now {
 	case "REJECT":
 		style = common.ErrorStyle()
@@ -429,28 +429,35 @@ func cardSubtitle(state PageState, group model.Group) string {
 		style = common.MutedStyle()
 	default:
 		if color, ok := parseHexColor(now); ok {
-			style = lipgloss.NewStyle().Foreground(color)
+			style = lipgloss.NewStyle().Foreground(theme.Resolve(color))
 		} else if d := resolveNowDelay(state, group); d > 0 {
-			style = lipgloss.NewStyle().Foreground(utils.GetDelayColor(d))
+			style = lipgloss.NewStyle().Foreground(theme.Resolve(utils.GetDelayColor(d)))
 		}
 	}
 	return common.MutedStyle().Render("◎ ") + style.Render(now)
 }
 
-func cardDotLines(state PageState, group model.Group, b cardBox, frame lipgloss.Style) []string {
+func cardDotLines(state PageState, group model.Group, b cardBox, leftEdge, rightEdge string) []string {
 	lines := make([]string, 0, b.DotRows)
+	dotCache := make(map[lipgloss.Color]string, 8)
 	for r := 0; r < b.DotRows; r++ {
 		var sb strings.Builder
 		for i := r * b.DotCols; i < (r+1)*b.DotCols && i < b.DotCount; i++ {
-			sb.WriteString(lipgloss.NewStyle().Foreground(cardDotColor(state, group.All[i])).Render("●"))
-			sb.WriteString(" ")
+			c := cardDotColor(state, group.All[i])
+			dot, ok := dotCache[c]
+			if !ok {
+				dot = lipgloss.NewStyle().Foreground(theme.Resolve(c)).Render("●")
+				dotCache[c] = dot
+			}
+			sb.WriteString(dot)
+			sb.WriteByte(' ')
 		}
-		lines = append(lines, cardContentLine(frame, sb.String(), b.Width))
+		lines = append(lines, cardContentLine(leftEdge, rightEdge, sb.String(), b.Width))
 	}
 	return lines
 }
 
-func cardGridLines(state PageState, b cardBox, frame lipgloss.Style) []string {
+func cardGridLines(state PageState, b cardBox, leftEdge, rightEdge string) []string {
 	lines := make([]string, 0, b.GridVisibleRows*2)
 	for vr := 0; vr < b.GridVisibleRows; vr++ {
 		gr := b.GridScrollRow + vr
@@ -460,8 +467,8 @@ func cardGridLines(state PageState, b cardBox, frame lipgloss.Style) []string {
 			nameLine += name
 			metaLine += meta
 		}
-		lines = append(lines, cardContentLine(frame, nameLine, b.Width))
-		lines = append(lines, cardContentLine(frame, metaLine, b.Width))
+		lines = append(lines, cardContentLine(leftEdge, rightEdge, nameLine, b.Width))
+		lines = append(lines, cardContentLine(leftEdge, rightEdge, metaLine, b.Width))
 	}
 	return lines
 }
@@ -495,8 +502,8 @@ func renderGridCell(state PageState, b cardBox, idx int) (string, string) {
 
 	if idx == state.SelectedProxy {
 		selected := lipgloss.NewStyle().
-			Background(common.Selected()).
-			Foreground(common.TokyoForeground()).
+			Background(theme.Resolve(common.Selected())).
+			Foreground(theme.Resolve(common.TokyoForeground())).
 			Bold(true).
 			Width(contentW)
 		return common.PadString(selected.Render(nameText), w),
@@ -518,10 +525,10 @@ func renderGridCell(state PageState, b cardBox, idx int) (string, string) {
 		delayColor = common.Danger()
 	}
 
-	nameLine := common.PadString(lipgloss.NewStyle().Foreground(nameColor).Render(nameText), w)
+	nameLine := common.PadString(lipgloss.NewStyle().Foreground(theme.Resolve(nameColor)).Render(nameText), w)
 	metaLine := common.PadString(
 		common.MutedStyle().Render(left+strings.Repeat(" ", gap))+
-			lipgloss.NewStyle().Foreground(delayColor).Render(delay),
+			lipgloss.NewStyle().Foreground(theme.Resolve(delayColor)).Render(delay),
 		w,
 	)
 	return nameLine, metaLine

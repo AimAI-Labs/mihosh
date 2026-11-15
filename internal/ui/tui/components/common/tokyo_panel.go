@@ -15,31 +15,31 @@ import (
 // 此处仅保留样式函数，动态读取当前主题。
 
 func TokyoTextStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(TokyoForeground())
+	return lipgloss.NewStyle().Foreground(resolve(TokyoForeground()))
 }
 
 func TokyoHeaderStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(TokyoMuted()).Bold(true)
+	return lipgloss.NewStyle().Foreground(resolve(TokyoMuted())).Bold(true)
 }
 
 func TokyoMutedStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(TokyoMuted())
+	return lipgloss.NewStyle().Foreground(resolve(TokyoMuted()))
 }
 
 func TokyoCyanStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(TokyoCyan()).Bold(true)
+	return lipgloss.NewStyle().Foreground(resolve(TokyoCyan())).Bold(true)
 }
 
 func TokyoGreenStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(TokyoGreen()).Bold(true)
+	return lipgloss.NewStyle().Foreground(resolve(TokyoGreen())).Bold(true)
 }
 
 func TokyoRedStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(TokyoRed())
+	return lipgloss.NewStyle().Foreground(resolve(TokyoRed()))
 }
 
 func TokyoBlueStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(TokyoBlue())
+	return lipgloss.NewStyle().Foreground(resolve(TokyoBlue()))
 }
 
 // ============================================================
@@ -135,8 +135,8 @@ func RenderBorderedPanel(title, body string, width int, borderColor lipgloss.Col
 		title = TruncateDisplay(title, maxTitleLen)
 	}
 
-	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
-	titleStyle := lipgloss.NewStyle().Foreground(titleColor).Bold(true)
+	borderStyle := lipgloss.NewStyle().Foreground(resolve(borderColor))
+	titleStyle := lipgloss.NewStyle().Foreground(resolve(titleColor)).Bold(true)
 
 	topBorderStart := "╭─ "
 	topBorderEnd := " "

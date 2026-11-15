@@ -32,7 +32,7 @@ func (s State) geoOverview(width int) string {
 		}
 		rows = append(rows, "", wrap(i18n.T("core.geo.restart_hint"), width-4))
 		if s.geoErr != nil {
-			rows = append(rows, "", lipgloss.NewStyle().Foreground(theme.Current().Danger).Render(wrap(s.geoErr.Error(), width-4)))
+			rows = append(rows, "", lipgloss.NewStyle().Foreground(theme.Resolve(theme.Current().Danger)).Render(wrap(s.geoErr.Error(), width-4)))
 		}
 	}
 	return panel(i18n.T("core.tab.geo"), strings.Join(rows, "\n"), width)
@@ -40,8 +40,8 @@ func (s State) geoOverview(width int) string {
 
 func (s State) geoPanel(width int) (string, []actionHit) {
 	t := theme.Current()
-	muted := lipgloss.NewStyle().Foreground(t.Muted)
-	selected := lipgloss.NewStyle().Foreground(t.Primary).Background(t.Selected).Bold(true)
+	muted := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted))
+	selected := lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true)
 	var rows []string
 	var hits []actionHit
 	for i, file := range s.geoFiles {

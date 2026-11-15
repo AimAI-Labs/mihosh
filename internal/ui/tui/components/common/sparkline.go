@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/styles"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -95,12 +96,12 @@ func RenderDualSparkline(data1, data2 []int64, config SparklineConfig) string {
 	}
 
 	// 样式
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary())
-	labelStyle := lipgloss.NewStyle().Foreground(styles.Secondary())
-	color1Style := lipgloss.NewStyle().Foreground(config.Color1)
-	color2Style := lipgloss.NewStyle().Foreground(config.Color2)
-	pauseStyle := lipgloss.NewStyle().Foreground(styles.Secondary())
-	axisStyle := lipgloss.NewStyle().Foreground(styles.Gray())
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Resolve(styles.Primary()))
+	labelStyle := lipgloss.NewStyle().Foreground(theme.Resolve(styles.Secondary()))
+	color1Style := lipgloss.NewStyle().Foreground(theme.Resolve(config.Color1))
+	color2Style := lipgloss.NewStyle().Foreground(theme.Resolve(config.Color2))
+	pauseStyle := lipgloss.NewStyle().Foreground(theme.Resolve(styles.Secondary()))
+	axisStyle := lipgloss.NewStyle().Foreground(theme.Resolve(styles.Gray()))
 
 	var lines []string
 

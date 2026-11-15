@@ -153,7 +153,7 @@ func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
 	return m.dispatchToPage(scrollMsg)
 }
 
-func (m Model) resolveMainPageMouseHit(x, y int) (pageX, pageY, pageWidth, pageHeight int, ok bool) {
+func (m *Model) resolveMainPageMouseHit(x, y int) (pageX, pageY, pageWidth, pageHeight int, ok bool) {
 	statusBarHeight := common.StatusBarHeight
 	contentHeight := m.height - statusBarHeight - layout.TopNavHeight
 	if contentHeight < common.MinContentHeight {

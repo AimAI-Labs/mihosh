@@ -7,9 +7,23 @@ import (
 
 func (s *State) activeForm() *addForm {
 	if s.showEditForm {
-		return &s.editForm
+		if s.editForm == nil {
+			f := newAddForm()
+			s.editForm = &f
+		} else {
+			f := *s.editForm
+			s.editForm = &f
+		}
+		return s.editForm
 	}
-	return &s.addForm
+	if s.addForm == nil {
+		f := newAddForm()
+		s.addForm = &f
+	} else {
+		f := *s.addForm
+		s.addForm = &f
+	}
+	return s.addForm
 }
 
 func (s State) clickForm(x, y, width, height int) (State, tea.Cmd) {

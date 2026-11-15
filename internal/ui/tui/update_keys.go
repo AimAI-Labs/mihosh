@@ -210,7 +210,7 @@ func (m Model) dispatchToPage(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // pageInputCapture asks the page to own its mode-specific input rules.
-func (m Model) pageInputCapture() common.InputCapture {
+func (m *Model) pageInputCapture() common.InputCapture {
 	switch m.currentPage {
 	case layout.PageCore:
 		return m.coreState.InputCapture()

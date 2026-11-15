@@ -43,8 +43,8 @@ func (s State) actionPanel(width int, serviceMenu bool) (string, []actionHit) {
 		return s.geoPanel(width)
 	}
 	t := theme.Current()
-	muted := lipgloss.NewStyle().Foreground(t.Muted)
-	selected := lipgloss.NewStyle().Foreground(t.Primary).Background(t.Selected).Bold(true)
+	muted := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted))
+	selected := lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true)
 	var rows []string
 	var hits []actionHit
 	items := s.actions()
@@ -111,14 +111,14 @@ func (s State) overview(width int) string {
 		mode = "core.mode.choose"
 	}
 	rows := []string{
-		lipgloss.NewStyle().Foreground(color).Bold(true).Render("● " + i18n.T(status)),
+		lipgloss.NewStyle().Foreground(theme.Resolve(color)).Bold(true).Render("● " + i18n.T(status)),
 		i18n.T(mode),
 	}
 	if s.Status.Mode == "managed" {
 		rows = append(rows, i18n.T("core.version")+": "+version)
 	}
 	if s.connectionChecked && !s.connected && s.Status.Mode == "managed" && s.Status.Running {
-		rows = append(rows, lipgloss.NewStyle().Foreground(t.Warning).Render(wrap(i18n.T("core.connection_unavailable"), width-4)))
+		rows = append(rows, lipgloss.NewStyle().Foreground(theme.Resolve(t.Warning)).Render(wrap(i18n.T("core.connection_unavailable"), width-4)))
 	}
 	switch s.tab {
 	case 0:
@@ -177,7 +177,7 @@ func (s State) overview(width int) string {
 			setting("core.system_proxy", s.Status.SystemProxy), setting("core.tun_label", s.Status.TUN),
 			"", wrap(i18n.T("core.hint.network"), width-4))
 		if s.Status.RecoveryPending {
-			rows = append(rows, lipgloss.NewStyle().Foreground(t.Warning).Render(wrap(i18n.T("core.hint.recovery"), width-4)))
+			rows = append(rows, lipgloss.NewStyle().Foreground(theme.Resolve(t.Warning)).Render(wrap(i18n.T("core.hint.recovery"), width-4)))
 		}
 	}
 	return panel(i18n.T("core.overview"), strings.Join(rows, "\n"), width)
@@ -201,9 +201,9 @@ func (s State) layout(width, height int) pageLayout {
 		label := " " + i18n.T("core.tab."+tab) + " "
 		result.tabs = append(result.tabs, actionHit{x: x, y: 1, width: lipgloss.Width(label), height: 1, index: i})
 		x += lipgloss.Width(label) + 1
-		style := lipgloss.NewStyle().Foreground(t.Muted)
+		style := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted))
 		if s.tab == i {
-			style = style.Foreground(t.Primary).Background(t.Selected).Bold(true)
+			style = style.Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true)
 			selectedEnd = x - 3
 		}
 		labels = append(labels, style.Render(label))
@@ -270,7 +270,7 @@ func (s State) formLayout(width int) pageLayout {
 		lines = append(lines, i18n.T(key), field.View(), "")
 	}
 	if s.formErr != nil {
-		lines = append(lines, lipgloss.NewStyle().Foreground(t.Danger).Render(wrap(s.formErr.Error(), width-4)))
+		lines = append(lines, lipgloss.NewStyle().Foreground(theme.Resolve(t.Danger)).Render(wrap(s.formErr.Error(), width-4)))
 	}
 	return pageLayout{content: panel(i18n.T("core.action."+s.form), strings.Join(lines, "\n"), width), focusY: focusY, actions: hits}
 }

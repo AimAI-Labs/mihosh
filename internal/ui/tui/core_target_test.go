@@ -115,3 +115,23 @@ func TestStoppedOwnerRejectsQueuedHealthyResult(t *testing.T) {
 	require.False(t, updated.(Model).connectionReady)
 	require.Nil(t, cmd)
 }
+
+func TestStoppedManagedStatusClearsReadyConnection(t *testing.T) {
+	m, _ := targetTestModel(t)
+	updated, cmd := m.Update(messages.CoreStatusMsg{
+		Status: m.coreState.Status,
+	})
+	// Mode != "managed" in empty status leaves connection alone
+	require.True(t, updated.(Model).connectionReady)
+	require.Nil(t, cmd)
+
+	status := m.coreState.Status
+	status.Mode = "managed"
+	status.Running = false
+	updated, cmd = updated.(Model).Update(messages.CoreStatusMsg{Status: status})
+	next := updated.(Model)
+	require.Greater(t, next.connectionEpoch, m.connectionEpoch)
+	require.True(t, next.connectionChecked)
+	require.False(t, next.connectionReady)
+	require.Nil(t, cmd)
+}

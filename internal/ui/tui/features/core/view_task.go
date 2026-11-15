@@ -110,8 +110,9 @@ func (s State) footer(width, height int) string {
 	}
 	lines = append(make([]string, max(0, budget-len(lines))), lines...)
 	lines = lines[:budget]
+	lineStyle := lipgloss.NewStyle().Width(width).Foreground(theme.Resolve(color))
 	for i := range lines {
-		lines[i] = lipgloss.NewStyle().Width(width).Foreground(color).Render(ansi.Truncate(lines[i], width, "…"))
+		lines[i] = lineStyle.Render(ansi.Truncate(lines[i], width, "…"))
 	}
 	helpWidth := width
 	if notice != "" {
@@ -123,7 +124,7 @@ func (s State) footer(width, height int) string {
 	}
 	help := s.inlineHelp(helpWidth + 1)
 	leftWidth := max(0, width-lipgloss.Width(help)-2)
-	left := lipgloss.NewStyle().Foreground(color).Render(ansi.Truncate(notice, leftWidth, "…"))
+	left := lipgloss.NewStyle().Foreground(theme.Resolve(color)).Render(ansi.Truncate(notice, leftWidth, "…"))
 	row := common.PadString(left, max(0, width-lipgloss.Width(help))) + help
 	return strings.Join(append(lines, row), "\n")
 }

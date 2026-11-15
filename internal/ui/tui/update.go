@@ -179,7 +179,7 @@ func (m Model) topNavActive() bool {
 	return false
 }
 
-func (m Model) checkCoreConnection() tea.Cmd {
+func (m *Model) checkCoreConnection() tea.Cmd {
 	epoch := m.connectionEpoch
 	client := m.client
 	if client != nil {
@@ -194,7 +194,7 @@ func (m Model) checkCoreConnection() tea.Cmd {
 	}
 }
 
-func (m Model) listenCoreOwner() tea.Cmd {
+func (m *Model) listenCoreOwner() tea.Cmd {
 	ctx := m.wsCtx
 	events := m.coreSvc.Events()
 	return func() tea.Msg {
