@@ -97,7 +97,7 @@
   "cli.config.show.label_mihomo_conn_table": "--- Mihomo Connection ---",
   "cli.config.show.unsupported_format": "Unsupported output format: %s",
   "cli.config.set.short": "Set a configuration item",
-  "cli.config.set.long": "Set a configuration item\n\nAvailable keys:\n  test-url     - Test URL (e.g. http://www.gstatic.com/generate_204)\n  timeout      - Timeout in milliseconds (e.g. 5000)\n  language     - UI language (auto, zh-CN, en-US)\n  auto-refresh-interval - TUI auto-refresh interval in seconds, 0 to disable\n  theme        - UI color theme\n\nNote: Connection info (external-controller/secret/mixed-port) has migrated to mihomo config.\nUse the TUI Mihomo tab or \"mihosh config edit\" to edit mihomo config.\n\nExamples:\n  mihosh config set test-url http://www.google.com/generate_204\n  mihosh config set timeout 3000\n  mihosh config set auto-refresh-interval 5",
+  "cli.config.set.long": "Set a configuration item\n\nAvailable keys:\n  test-url     - Test URL (e.g. http://www.gstatic.com/generate_204)\n  timeout      - Timeout in milliseconds (e.g. 5000)\n  language     - UI language (auto, zh-CN, en-US)\n  auto-refresh-interval - TUI auto-refresh interval in seconds, 0 to disable\n  theme        - UI color theme\n\nNote: Connection info (external-controller/secret/mixed-port) has migrated to mihomo config.\nUse the Core > Mihomo config or \"mihosh config edit\" to edit mihomo config.\n\nExamples:\n  mihosh config set test-url http://www.google.com/generate_204\n  mihosh config set timeout 3000\n  mihosh config set auto-refresh-interval 5",
   "cli.config.set.err_set": "Failed to set config",
   "cli.config.set.success": "✓ Set %s = %s",
   "cli.config.edit.short": "Open config file in editor",
@@ -847,7 +847,7 @@
   "cli.env.enabled": "Proxy enabled",
   "cli.env.script": "Source script",
   "core.geo.description": "View managed core GEO files. Select a file and press Enter or click to download or update it.",
-  "core.geo.managed_only": "File management requires a Mihosh managed core. Update an external core's GEO data in Settings > Mihomo.",
+  "core.geo.managed_only": "File management requires a Mihosh managed core. Update an external core's GEO data in Core > Mihomo config.",
   "core.geo.restart_hint": "After updating, press z to restart the core and load the new data.",
   "core.geo.files": "Data files",
   "core.geo.missing": "Not downloaded",
@@ -912,7 +912,7 @@
   "core.route.proxy": "Downloading through a proxy",
   "core.route.accelerator": "Downloading through a GitHub mirror",
   "core.help.select": "Select an action / run the selection",
-  "core.help.sections": "Switch action sections",
+  "core.help.sections": "Switch Everyday, Versions, Advanced, GEO and Mihomo configuration.",
   "core.mode.choose": "Install a core or connect an existing one",
   "core.catalog.title": "Available core versions",
   "core.catalog.selection": "Selected version",
@@ -968,5 +968,8 @@
   "core.catalog.prerelease": "Prerelease",
   "core.task.complete": "Task completed",
   "core.task.cancelled": "Task cancelled",
-  "core.task.close": "Enter / Esc Close"
+  "core.task.close": "Enter / Esc Close",
+  "core.tab.mihomo": "Mihomo config",
+  "core.action.mihomo": "Mihomo configuration",
+  "core.desc.mihomo": "Manage the controller, secret, proxy port, LAN access and log level in one place."
 }

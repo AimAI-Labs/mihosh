@@ -191,8 +191,6 @@ func (m Model) dispatchToPage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.settingsState.Config = m.config
 		m.settingsState, cmd = m.settingsState.Update(msg)
 		newCfg = m.settingsState.Config
-		pw, ph := m.getPageSize()
-		m.settingsState = m.settingsState.SyncSysStatus(pw, ph, newCfg, m.logsState.GetSysLogs())
 		m.config = newCfg
 		if newCfg != nil && newCfg.Language != oldLanguage {
 			i18n.SetLanguageOverride(newCfg.Language)

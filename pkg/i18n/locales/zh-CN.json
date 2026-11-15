@@ -97,7 +97,7 @@
   "cli.config.show.label_mihomo_conn_table": "--- Mihomo 连接 ---",
   "cli.config.show.unsupported_format": "不支持的输出格式: %s",
   "cli.config.set.short": "设置配置项",
-  "cli.config.set.long": "设置配置项\n\n可用的配置项:\n  test-url     - 测速 URL (例如: http://www.gstatic.com/generate_204)\n  timeout      - 超时时间，单位毫秒 (例如: 5000)\n  language     - 界面语言 (auto, zh-CN, en-US)\n  auto-refresh-interval - TUI 自动刷新间隔，单位秒，0 表示关闭\n  theme        - 界面配色主题\n\n注意：连接信息（external-controller/secret/mixed-port）已迁移至 mihomo 配置文件，\n请使用 TUI 的 Mihomo 标签页或 \"mihosh config edit\" 编辑 mihomo 配置。\n\n示例:\n  mihosh config set test-url http://www.google.com/generate_204\n  mihosh config set timeout 3000\n  mihosh config set auto-refresh-interval 5",
+  "cli.config.set.long": "设置配置项\n\n可用的配置项:\n  test-url     - 测速 URL (例如: http://www.gstatic.com/generate_204)\n  timeout      - 超时时间，单位毫秒 (例如: 5000)\n  language     - 界面语言 (auto, zh-CN, en-US)\n  auto-refresh-interval - TUI 自动刷新间隔，单位秒，0 表示关闭\n  theme        - 界面配色主题\n\n注意：连接信息（external-controller/secret/mixed-port）已迁移至 mihomo 配置文件，\n请使用 Core → Mihomo 配置或 \"mihosh config edit\" 编辑 mihomo 配置。\n\n示例:\n  mihosh config set test-url http://www.google.com/generate_204\n  mihosh config set timeout 3000\n  mihosh config set auto-refresh-interval 5",
   "cli.config.set.err_set": "设置配置失败",
   "cli.config.set.success": "✓ 已设置 %s = %s",
   "cli.config.edit.short": "在编辑器中打开配置文件进行编辑",
@@ -847,7 +847,7 @@
   "cli.env.enabled": "代理启用",
   "cli.env.script": "Source 脚本",
   "core.geo.description": "查看托管内核的 GEO 数据文件。选中文件后按 Enter 或点击下载、更新。",
-  "core.geo.managed_only": "文件管理需要使用 Mihosh 托管内核。外部内核可在设置的 Mihomo 页面更新 GEO。",
+  "core.geo.managed_only": "文件管理需要使用 Mihosh 托管内核。外部内核可在Core → Mihomo 配置更新 GEO。",
   "core.geo.restart_hint": "更新后按 z 重启内核，使新数据生效。",
   "core.geo.files": "数据文件",
   "core.geo.missing": "尚未下载",
@@ -912,7 +912,7 @@
   "core.route.proxy": "正在通过代理下载",
   "core.route.accelerator": "正在通过加速网址下载",
   "core.help.select": "选择操作 / 执行所选操作",
-  "core.help.sections": "切换操作分类",
+  "core.help.sections": "切换日常使用、版本管理、高级设置、GEO 管理与 Mihomo 配置。",
   "core.mode.choose": "可自动安装，也可连接已有内核",
   "core.catalog.title": "可下载的内核版本",
   "core.catalog.selection": "所选版本",
@@ -968,5 +968,8 @@
   "core.catalog.prerelease": "预发布",
   "core.task.complete": "任务已完成",
   "core.task.cancelled": "任务已取消",
-  "core.task.close": "Enter / Esc 关闭"
+  "core.task.close": "Enter / Esc 关闭",
+  "core.tab.mihomo": "Mihomo 配置",
+  "core.action.mihomo": "Mihomo 配置",
+  "core.desc.mihomo": "统一配置管理接口、密钥、代理端口、局域网访问和日志等级。"
 }

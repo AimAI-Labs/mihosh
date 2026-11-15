@@ -2,7 +2,6 @@ package core
 
 import (
 	"errors"
-	"net"
 	"strconv"
 	"strings"
 
@@ -54,9 +53,6 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 		if kind == "import" || kind == "external" {
 			count = 3
 		}
-		if kind == "ports" {
-			count = 2
-		}
 
 		s.fields = make([]textinput.Model, count)
 		for i := range s.fields {
@@ -80,13 +76,6 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 			if cfg != nil && cfg.Core.ExternalMixedPort > 0 {
 				s.fields[2].SetValue(strconv.Itoa(cfg.Core.ExternalMixedPort))
 			}
-		case "ports":
-			endpoint := config.ResolveMihomoEndpoint()
-			s.fields[0].SetValue("9090")
-			if _, port, e := net.SplitHostPort(endpoint.ExternalController); e == nil {
-				s.fields[0].SetValue(port)
-			}
-			s.fields[1].SetValue(strconv.Itoa(endpoint.MixedPort))
 		}
 		s.fields[0].Focus()
 		return s, textinput.Blink
@@ -182,9 +171,6 @@ func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 			}
 			if s.form == "external" {
 				action = "connect"
-			}
-			if s.form == "ports" {
-				action = "ports"
 			}
 			args := s.args
 			s = s.closeForm()

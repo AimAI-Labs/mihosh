@@ -1,4 +1,4 @@
-package settings
+package preferences
 
 import (
 	"fmt"
@@ -12,7 +12,6 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/viper"
 )
 
@@ -657,63 +656,21 @@ func TestThemeSwitchHotSwap(t *testing.T) {
 	}
 }
 
-// TestUpdate_SwitchTabByKey 验证 h/l/Tab 键可在 Mihosh ↔ Mihomo 间切换，并重置选中项。
-func TestUpdate_SwitchTabByKey(t *testing.T) {
-	configSvc, cfg := setupTestConfig(t, nil)
-	s := State{activeTab: 0, selectedSetting: 3}
-
-	// h 键切换到 Mihomo 标签页
-	s.Config = cfg
-	s.configSvc = configSvc
-	next, _ := s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
-	if next.activeTab != 1 {
-		t.Fatalf("expected activeTab=1 after h, got %d", next.activeTab)
-	}
-	if next.selectedSetting != 0 {
-		t.Fatalf("expected selectedSetting reset to 0, got %d", next.selectedSetting)
-	}
-
-	// l 键切换回 Mihosh 标签页
-	next.Config = cfg
-	next.configSvc = configSvc
-	next, _ = next.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
-	if next.activeTab != 0 {
-		t.Fatalf("expected activeTab=0 after l, got %d", next.activeTab)
-	}
-
-	// Tab 键再次切换到 Mihomo
-	next.Config = cfg
-	next.configSvc = configSvc
-	next, _ = next.Update(tea.KeyMsg{Type: tea.KeyTab})
-	if next.activeTab != 1 {
-		t.Fatalf("expected activeTab=1 after tab, got %d", next.activeTab)
-	}
-}
-
-// TestHandleMouseLeft_ClickTabBarSwitchesTab 验证点击标签栏内容行可切换标签页。
-func TestHandleMouseLeft_ClickTabBarSwitchesTab(t *testing.T) {
-	configSvc, cfg := setupTestConfig(t, nil)
-	s := State{activeTab: 0, selectedSetting: 3}
-
-	// 标签内容行位于 pageY=settingsTabBarContentY；第二个标签 Mihomo 起始 x=12
-	mihomoTabX := settingsContainerLeft + 1 + lipgloss.Width(" "+i18n.T("settings.tab.mihosh")+" ") + 1
-	s.Config = cfg
-	s.configSvc = configSvc
-	next, _ := s.HandleMouseLeft(mihomoTabX, settingsTabBarContentY, 100, 30)
-	if next.activeTab != 1 {
-		t.Fatalf("expected activeTab=1 after clicking Mihomo tab, got %d", next.activeTab)
-	}
-	if next.selectedSetting != 0 {
-		t.Fatalf("expected selectedSetting reset to 0 after tab switch, got %d", next.selectedSetting)
-	}
-
-	// 第一个标签 Mihomo 起始 x=containerLeft+1
-	mihoshTabX := settingsContainerLeft + 1
-	next.Config = cfg
-	next.configSvc = configSvc
-	next, _ = next.HandleMouseLeft(mihoshTabX, settingsTabBarContentY, 100, 30)
-	if next.activeTab != 0 {
-		t.Fatalf("expected activeTab=0 after clicking Mihosh tab, got %d", next.activeTab)
+func TestEditorsKeepTheirScope(t *testing.T) {
+	svc, cfg := setupTestConfig(t, nil)
+	for _, editor := range []State{NewState(svc, nil), NewMihomoState(svc, nil)} {
+		editor.Config = cfg
+		mode := editor.activeTab
+		for _, msg := range []tea.KeyMsg{{Type: tea.KeyRunes, Runes: []rune("h")}, {Type: tea.KeyRunes, Runes: []rune("l")}, {Type: tea.KeyTab}} {
+			next, _ := editor.Update(msg)
+			if next.activeTab != mode {
+				t.Fatal("editor changed preference scope")
+			}
+		}
+		next, _ := editor.HandleMouseLeft(20, settingsTabBarContentY, 100, 30)
+		if next.activeTab != mode {
+			t.Fatal("header click changed preference scope")
+		}
 	}
 }
 

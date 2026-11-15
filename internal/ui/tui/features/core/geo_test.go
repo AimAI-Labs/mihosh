@@ -31,7 +31,7 @@ func TestGeoManagementLoadsFilesAndQueuesSelectedUpdate(t *testing.T) {
 	}
 	svc := service.NewCoreService()
 	defer svc.Close()
-	s := NewState(svc)
+	s := NewState(svc, nil, nil)
 	s.Status.Mode = "managed"
 	s, cmd := s.Update(coreKey("4"))
 	if s.tab != 3 || cmd == nil || s.Busy {

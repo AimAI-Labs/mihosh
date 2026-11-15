@@ -51,7 +51,7 @@ func TestDownloadAllowsInspectingAdvancedDialogsWithoutConcurrentOperations(t *t
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	svc := service.NewCoreService()
 	defer svc.Close()
-	for _, action := range []string{"service", "system-proxy", "tun", "ports", "configure", "recover"} {
+	for _, action := range []string{"service", "system-proxy", "tun", "configure", "recover"} {
 		s := releaseFixture(t)
 		s.svc = svc
 		s, _ = s.begin("install")
@@ -95,7 +95,10 @@ func TestAdvancedDialogsCancelWithoutOperationsAndRestoreSelection(t *testing.T)
 	svc := service.NewCoreService()
 	defer svc.Close()
 	for i, item := range (State{tab: 2}).actions() {
-		s := NewState(svc).selectTab(2)
+		if item.action == "mihomo" {
+			continue // Mihomo configuration has its own Core section.
+		}
+		s := NewState(svc, nil, nil).selectTab(2)
 		s.selected, s.scroll = i, 3
 		s, _ = s.choose(item.action)
 		if !s.Editing || s.form != item.action || s.Busy {
@@ -197,7 +200,7 @@ func TestCoreDialogsScrollIndependentlyAndRestoreParentOnOutsideClick(t *testing
 	defer svc.Close()
 	for _, action := range []string{"network", "external"} {
 		for _, width := range []int{24, 80, 120} {
-			s := NewState(svc).selectTab(2)
+			s := NewState(svc, nil, nil).selectTab(2)
 			s.selected, s.scroll = 1, 3
 			s, _ = s.editForm(action)
 			parentScroll := s.scroll

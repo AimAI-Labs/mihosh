@@ -132,7 +132,7 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 		client:               client,
 		connectionChecked:    true,
 		coreSvc:              coreSvc,
-		coreState:            corepage.NewState(coreSvc),
+		coreState:            corepage.NewState(coreSvc, configSvc, client),
 		config:               cfg,
 		configSvc:            configSvc,
 		connSvc:              connSvc,

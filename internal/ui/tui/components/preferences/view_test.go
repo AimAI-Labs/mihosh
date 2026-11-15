@@ -1,4 +1,4 @@
-package settings
+package preferences
 
 import (
 	"strings"
@@ -115,7 +115,7 @@ func TestRenderSettingsPage_TabBarHasBorder(t *testing.T) {
 	if !strings.Contains(lines[0], "╭") || !strings.Contains(lines[0], "╮") {
 		t.Fatalf("expected tab bar top border on line 0, got %q", lines[0])
 	}
-	if !strings.Contains(lines[1], i18n.T("settings.tab.mihosh")) || !strings.Contains(lines[1], i18n.T("settings.tab.mihomo")) {
+	if !strings.Contains(lines[1], i18n.T("settings.tab.mihosh")) || strings.Contains(lines[1], i18n.T("settings.tab.mihomo")) {
 		t.Fatalf("expected tab labels on line 1, got %q", lines[1])
 	}
 	if !strings.Contains(lines[2], "╰") || !strings.Contains(lines[2], "╯") {

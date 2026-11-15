@@ -140,6 +140,9 @@ func (s State) openTab(tab int) (State, tea.Cmd) {
 	if s.tab == 3 {
 		return s, s.refreshGeoData()
 	}
+	if s.tab == 4 {
+		return s, s.editor.Refresh()
+	}
 	return s, nil
 }
 

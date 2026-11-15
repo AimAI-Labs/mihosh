@@ -6,6 +6,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/preferences"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
@@ -18,6 +19,7 @@ type actionHit struct {
 }
 
 type pageLayout struct {
+	editorY                 int
 	content                 string
 	actions                 []actionHit
 	tabs                    []actionHit
@@ -216,6 +218,11 @@ func (s State) layout(width, height int) pageLayout {
 		return s.releaseLayout(width, height, parts, result)
 	}
 	top := lipgloss.Height(strings.Join(parts, "\n"))
+	if s.tab == 4 {
+		parts = append(parts, preferences.RenderEmbedded(s.editor.ToPageState(s.editor.Config, nil), width, max(1, height-top)))
+		result.content, result.editorY = strings.Join(parts, "\n"), top
+		return result
+	}
 	leftWidth, rightWidth := width, width
 	if width >= 100 {
 		leftWidth = width * 43 / 100
@@ -248,7 +255,6 @@ func (s State) formLayout(width int) pageLayout {
 		"version":  {"core.version_input"},
 		"import":   {"cli.core.file", "core.version_input", "cli.core.sha256"},
 		"external": {"core.controller", "core.secret", "core.mixed_port"},
-		"ports":    {"core.controller_port", "core.mixed_port"},
 	}[s.form]
 	lines := strings.Split(wrap(i18n.T("core.desc."+s.form), width-4), "\n")
 	lines = append(lines, "")

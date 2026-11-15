@@ -1,4 +1,4 @@
-package settings
+package preferences
 
 import (
 	"fmt"
@@ -11,6 +11,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 const (
@@ -125,8 +126,11 @@ func GetSettingValue(state PageState, key string) string {
 // buildSettingsLayoutBase 抽取基础布局的渲染逻辑，供高度计算和最终渲染复用
 func buildSettingsLayoutBase(state PageState, width int) (parts []string, descRow string, versionText string) {
 	// Tab Bar
-	tabs := []string{i18n.T("settings.tab.mihosh"), i18n.T("settings.tab.mihomo")}
-	tabBar := renderSettingsTabBar(tabs, state.ActiveTab, width)
+	title := "settings.tab.mihosh"
+	if state.ActiveTab == 1 {
+		title = "settings.tab.mihomo"
+	}
+	tabBar := renderSettingsTabBar([]string{i18n.T(title)}, 0, width)
 
 	// 渲染设置项列表
 	var settingItems []string
@@ -176,7 +180,7 @@ func buildSettingsLayoutBase(state PageState, width int) (parts []string, descRo
 			return lipgloss.NewStyle().Background(bgColor).Foreground(common.Background()).Padding(0, 1).MarginRight(1).Render(btn.Label)
 		}
 
-		rows := LayoutActionButtons(width)
+		rows := LayoutActionButtons(width, state.Config)
 		var rowStrings []string
 		for _, row := range rows {
 			var rowNodes []string
@@ -239,6 +243,14 @@ func CalculateViewportHeight(state PageState, width, height int) int {
 
 // RenderSettingsPage 渲染设置页面
 func RenderSettingsPage(state PageState, width, height int) string {
+	return renderSettingsPage(state, width, height, true)
+}
+
+func RenderEmbedded(state PageState, width, height int) string {
+	return renderSettingsPage(state, width, height, false)
+}
+
+func renderSettingsPage(state PageState, width, height int, standalone bool) string {
 	// Toast 管理器
 	if state.Toast == nil {
 		state.Toast = common.NewToastManager()
@@ -246,6 +258,9 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	state.Toast.CleanExpired()
 
 	parts, descRow, versionText := buildSettingsLayoutBase(state, width)
+	if !standalone {
+		parts = parts[2:] // Core already supplies the section header.
+	}
 
 	if state.ActiveTab == 1 && state.SysStatus.Supported && state.SysStatus.Viewport.Height > 0 {
 		statusView := lipgloss.NewStyle().MarginTop(1).Render(common.RenderTokyoPanel(
@@ -263,7 +278,9 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	mainContent = lipgloss.PlaceVertical(height, lipgloss.Top, mainContent)
 
 	// 将版本信息叠加在左下角（状态栏上方）
-	mainContent = overlayVersionAtBottomLeft(mainContent, versionText, width, height)
+	if standalone {
+		mainContent = overlayVersionAtBottomLeft(mainContent, versionText, width, height)
+	}
 
 	// 渲染 Toast（如果有）
 	toastStr := state.Toast.Render(width)
@@ -276,7 +293,15 @@ func RenderSettingsPage(state PageState, width, height int) string {
 		result = overlayToast(result, toastStr, width)
 	}
 
-	return renderSettingsInlineHelp(result, state, width, height)
+	if standalone {
+		return renderSettingsInlineHelp(result, state, width, height)
+	}
+	return result
+}
+
+func (s State) InlineHelp(width int) string {
+	hints := buildSettingsInlineHelpHints(s.ToPageState(s.Config, nil))
+	return ansi.Truncate(common.FormatInlineHintRow(hints), max(1, width-1), "")
 }
 
 // overlayVersionAtBottomLeft 将版本信息叠加在页面左下角（状态栏上方一行）。
@@ -344,7 +369,6 @@ func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
 
 	// 普通模式：切换标签 + 选择 + 编辑 + 刷新
 	return []common.InlineHelpHint{
-		{Key: "h/l", Desc: i18n.T("help.settings.hint_tab")},
 		{Key: "↑↓", Desc: i18n.T("help.settings.hint_select")},
 		{Key: "↵", Desc: i18n.T("help.settings.hint_edit")},
 		{Key: "r", Desc: i18n.T("help.settings.hint_refresh")},

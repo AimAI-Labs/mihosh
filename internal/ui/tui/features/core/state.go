@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/preferences"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -47,9 +49,13 @@ type State struct {
 	geoFiles          []service.GeoDataFile
 	geoErr            error
 	shellPath         string
+	editor            preferences.State
 }
 
-func NewState(svc *service.CoreService) State {
+func NewState(svc *service.CoreService, configSvc *service.ConfigService, client *api.Client) State {
+	if configSvc == nil {
+		configSvc = service.NewConfigService()
+	}
 	release := svc.CachedRelease()
 	if !release.IsStable() {
 		release = coreinfra.PinnedRelease()
@@ -57,12 +63,15 @@ func NewState(svc *service.CoreService) State {
 	if asset, err := release.SelectAsset(runtime.GOOS, runtime.GOARCH); err == nil {
 		release.Assets = []coreinfra.Asset{asset}
 	}
-	return State{svc: svc, Release: release, followSelection: true, catalog: releaseCatalog{page: coreinfra.ReleasePage{Releases: []coreinfra.Release{release}}, cleanup: &releaseCleanup{}}}
+	return State{svc: svc, editor: preferences.NewMihomoState(configSvc, client), Release: release, followSelection: true, catalog: releaseCatalog{page: coreinfra.ReleasePage{Releases: []coreinfra.Release{release}}, cleanup: &releaseCleanup{}}}
 }
 func (s State) Refresh() tea.Cmd {
 	status := func() tea.Msg { status, err := s.svc.Status(); return messages.CoreStatusMsg{Status: status, Err: err} }
 	if s.tab == 3 {
 		return tea.Batch(status, s.refreshGeoData())
+	}
+	if s.tab == 4 {
+		return tea.Batch(status, s.editor.Refresh())
 	}
 	return status
 }
@@ -175,18 +184,6 @@ func (s State) begin(action string) (State, tea.Cmd) {
 			err = svc.ActivateVersion(ctx, "")
 		case "restart":
 			err = svc.Restart(ctx)
-		case "ports":
-			controller, e := strconv.Atoi(args[0])
-			if e != nil {
-				err = e
-				break
-			}
-			mixed, e := strconv.Atoi(args[1])
-			if e != nil {
-				err = e
-				break
-			}
-			err = svc.SetPorts(controller, mixed)
 		case "connect":
 			mixed, e := strconv.Atoi(args[2])
 			if e != nil {
@@ -229,6 +226,15 @@ func (s State) begin(action string) (State, tea.Cmd) {
 }
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
+	case messages.MihomoConfigMsg:
+		s.editor = s.editor.ApplyMihomoConfig(&msg)
+		return s, nil
+	case messages.MihomoVersionMsg:
+		s.editor = s.editor.ApplyMihomoVersion(msg.Version)
+		return s, nil
+	case messages.CoreActionDoneMsg, messages.CoreActionErrorMsg:
+		s.editor = s.editor.ClearActionStates()
+		return s, nil
 	case messages.CoreConnectionMsg:
 		s.connected = msg.Err == nil
 		s.externalVersion = msg.Version
@@ -313,6 +319,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		if s.tab == 1 {
 			return s.clickReleasePage(page, msg.X, msg.Y)
 		}
+		if s.tab == 4 {
+			return s.updateEditorMouse(msg, page.editorY)
+		}
 		for _, hit := range page.actions {
 			if msg.X >= hit.x && msg.X < hit.x+hit.width && y >= hit.y && y < hit.y+hit.height {
 				s.selected = hit.index
@@ -326,6 +335,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		if s.tab == 1 {
 			return s.scrollReleasePage(msg)
 		}
+		if s.tab == 4 {
+			return s.updateEditorMouse(msg, 4)
+		}
 		if msg.Up {
 			s.selected = max(0, s.selected-1)
 		} else {
@@ -334,6 +346,16 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		s.followSelection = true
 		return s, nil
 	case tea.KeyMsg:
+		if s.tab == 4 && !s.Editing {
+			if s.editor.IsEditing() || !isCoreTabKey(msg.String()) {
+				if s.Busy {
+					return s, nil
+				}
+				var cmd tea.Cmd
+				s.editor, cmd = s.editor.Update(msg)
+				return s, cmd
+			}
+		}
 		if !s.Editing && !s.Busy && (s.task != "" || s.Err != nil) && (msg.String() == "enter" || msg.String() == "esc") {
 			s.task, s.Err = "", nil
 			s.Progress = coreinfra.Progress{}
@@ -348,7 +370,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			}
 		}
 		switch msg.String() {
-		case "1", "2", "3", "4":
+		case "1", "2", "3", "4", "5":
 			return s.openTab(int(msg.String()[0] - '1'))
 		case "left":
 			return s.openTab(s.tab - 1)
@@ -394,7 +416,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case "u":
 			return s.editForm("external")
 		case "p":
-			return s.editForm("ports")
+			return s.openTab(4)
 		case "v":
 			s = s.selectTab(1)
 			return s.releaseAction("refresh")
@@ -421,10 +443,12 @@ func (s State) Leave() State {
 		s = s.closeForm()
 	}
 	s.args = nil
+	s.editor = s.editor.CancelEdit()
 	return s
 }
 
 // InputCapture declares which input belongs to the current page mode.
 func (s State) InputCapture() common.InputCapture {
-	return common.InputCapture{Active: s.Editing, Help: s.Editing}
+	editing := s.tab == 4 && s.editor.IsEditing()
+	return common.InputCapture{Active: s.Editing || editing, Help: s.Editing || editing, Interrupt: editing}
 }

@@ -1,6 +1,7 @@
-package settings
+package preferences
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -12,14 +13,14 @@ type ActionButton struct {
 }
 
 // GetActionButtons returns the list of buttons and their physical widths.
-func GetActionButtons() []ActionButton {
+func GetActionButtons(cfg *config.Config) []ActionButton {
 	// 模拟和 view.go 一致的宽度计算
 	// padding = 2, margin = 1 -> 总附加宽度 = 3
 	calcWidth := func(key string) int {
 		return lipgloss.Width(i18n.T(key)) + 3
 	}
 
-	return []ActionButton{
+	buttons := []ActionButton{
 		{"upgrade_auto", i18n.T("settings.action.upgrade_auto"), calcWidth("settings.action.upgrade_auto")},
 		{"upgrade_release", i18n.T("settings.action.upgrade_release"), calcWidth("settings.action.upgrade_release")},
 		{"upgrade_alpha", i18n.T("settings.action.upgrade_alpha"), calcWidth("settings.action.upgrade_alpha")},
@@ -29,17 +30,28 @@ func GetActionButtons() []ActionButton {
 		{"flush_dns", i18n.T("settings.action.flush_dns"), calcWidth("settings.action.flush_dns")},
 		{"flush_fakeip", i18n.T("settings.action.flush_fakeip"), calcWidth("settings.action.flush_fakeip")},
 	}
+	if cfg != nil && cfg.Core.Mode == "managed" {
+		var unique []ActionButton
+		for _, button := range buttons {
+			switch button.ID {
+			case "reload", "flush_dns", "flush_fakeip":
+				unique = append(unique, button)
+			}
+		}
+		return unique
+	}
+	return buttons
 }
 
 // LayoutActionButtons calculates the row layout.
 // Returns a slice of rows, where each row is a slice of buttons.
-func LayoutActionButtons(width int) [][]ActionButton {
+func LayoutActionButtons(width int, cfg *config.Config) [][]ActionButton {
 	contentWidth := width - 4
 	if contentWidth < 10 {
 		contentWidth = 10
 	}
 
-	btns := GetActionButtons()
+	btns := GetActionButtons(cfg)
 	var rows [][]ActionButton
 	var currentRow []ActionButton
 	currentX := 0

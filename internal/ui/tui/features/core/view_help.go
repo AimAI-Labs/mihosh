@@ -25,6 +25,9 @@ func (s State) ReleaseHelpNotes() []string {
 }
 
 func (s State) inlineHelp(width int) string {
+	if s.tab == 4 && !s.Editing && !s.Busy {
+		return s.editor.InlineHelp(width)
+	}
 	hints := []common.InlineHelpHint{
 		{Key: "←→", Desc: i18n.T("core.inline.sections")},
 		{Key: "↑↓", Desc: i18n.T("core.inline.select")},

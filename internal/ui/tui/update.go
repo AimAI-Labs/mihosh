@@ -1,10 +1,10 @@
 package tui
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/preferences"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/sub"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
@@ -87,7 +87,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		pw, ph := m.getPageSize()
-		m.settingsState = m.settingsState.SyncSysStatus(pw, ph, m.config, m.logsState.GetSysLogs())
+		m.coreState, _ = m.coreState.HandleEditorMsg(nil, pw, ph, m.logsState.GetSysLogs())
 		resizeMsg := messages.PageResizeMsg{Width: pw, Height: ph}
 		newModel, cmd := m.dispatchToPage(resizeMsg)
 		m = newModel.(Model)
@@ -124,13 +124,7 @@ func (m *Model) onPageChange() tea.Cmd {
 	case layout.PageSub:
 		return sub.FetchSubs(m.profileSvc)
 	case layout.PageSettings:
-		cmds := []tea.Cmd{settings.FetchMihomoVersion(m.client), settings.FetchMihomoConfig(m.configSvc, m.client)}
-		if m.settingsState.SysStatus.Supported && m.settingsState.ActiveTab() == 1 {
-			cmds = append(cmds, settings.FetchSysStatusCmd())
-		}
-		pw, ph := m.getPageSize()
-		m.settingsState = m.settingsState.SyncSysStatus(pw, ph, m.config, m.logsState.GetSysLogs())
-		return tea.Batch(cmds...)
+		return preferences.FetchMihomoVersion(m.client)
 	}
 	return nil
 }
@@ -174,8 +168,8 @@ func (m *Model) refreshCurrentPage() tea.Cmd {
 		cfg, _ := m.configSvc.LoadConfig()
 		m.config = cfg
 		return tea.Batch(
-			settings.FetchMihomoVersion(m.client),
-			settings.FetchMihomoConfig(m.configSvc, m.client),
+			preferences.FetchMihomoVersion(m.client),
+			preferences.FetchMihomoConfig(m.configSvc, m.client),
 		)
 	}
 	return nil

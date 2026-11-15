@@ -10,10 +10,10 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/preferences"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/require"
@@ -115,7 +115,7 @@ func TestControllerReadCommandsBindTargetBeforeExecution(t *testing.T) {
 	}{
 		{"groups", nodes.FetchGroups}, {"proxies", nodes.FetchProxies}, {"mode", nodes.FetchConfigMode},
 		{"connections", connections.FetchConnections}, {"rules", rules.FetchRules},
-		{"version", settings.FetchMihomoVersion}, {"memory", fetchMemory},
+		{"version", preferences.FetchMihomoVersion}, {"memory", fetchMemory},
 		{"auto-refresh", func(c *api.Client) tea.Cmd { return fetchAutoRefresh(c, nodes.State{}) }},
 	} {
 		t.Run(makeCommand.name, func(t *testing.T) {

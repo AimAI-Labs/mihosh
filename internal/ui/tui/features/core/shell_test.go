@@ -26,7 +26,7 @@ func TestShellProxyDialogInstallsStartupAndShowsRefreshCommand(t *testing.T) {
 	t.Cleanup(func() { i18n.SetLanguageOverride("") })
 	svc := service.NewCoreService()
 	defer svc.Close()
-	s := NewState(svc).selectTab(2)
+	s := NewState(svc, nil, nil).selectTab(2)
 	s, _ = s.Update(coreKey("w"))
 	if !s.Editing || s.choice != 0 || len(s.fields) != 0 {
 		t.Fatal("shell proxy dialog did not open with the saved default")

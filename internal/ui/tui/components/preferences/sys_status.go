@@ -1,4 +1,4 @@
-package settings
+package preferences
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/host"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/logs"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -64,7 +66,16 @@ func FetchSysStatusCmd() tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
-		cmd := exec.CommandContext(ctx, "systemctl", "status", "mihomo", "--no-pager", "-n", "0")
+		args := []string{"status", "mihomo", "--no-pager", "-n", "0"}
+		if cfg, err := config.Load(); err == nil && cfg.Core.Mode == "managed" {
+			if cfg.Core.Runtime != "service" {
+				return messages.SysStatusResultMsg{}
+			}
+			if root, err := config.GetConfigDir(); err == nil {
+				args = []string{"--user", "status", host.ServiceName(root), "--no-pager", "-n", "0"}
+			}
+		}
+		cmd := exec.CommandContext(ctx, "systemctl", args...)
 		// systemctl often returns exit code 3 if service is not running but status is requested
 		out, err := cmd.CombinedOutput()
 		return messages.SysStatusResultMsg{
@@ -116,6 +127,7 @@ func parseSystemctlStatusCompact(output string) string {
 	}
 
 	loaded := "unknown"
+	serviceName := "mihomo"
 	active := "unknown"
 	pid := "unknown"
 	mem := "unknown"
@@ -124,6 +136,9 @@ func parseSystemctlStatusCompact(output string) string {
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
+		if fields := strings.Fields(strings.TrimPrefix(line, "● ")); len(fields) > 0 && strings.HasSuffix(fields[0], ".service") {
+			serviceName = strings.TrimSuffix(fields[0], ".service")
+		}
 		if strings.HasPrefix(line, "Loaded:") {
 			parts := strings.SplitN(line, " ", 3)
 			if len(parts) >= 2 {
@@ -156,5 +171,5 @@ func parseSystemctlStatusCompact(output string) string {
 		}
 	}
 
-	return "Service: mihomo (" + loaded + ") | PID: " + pid + "\nState: " + active + " | Mem: " + mem + " | CPU: " + cpu
+	return "Service: " + serviceName + " (" + loaded + ") | PID: " + pid + "\nState: " + active + " | Mem: " + mem + " | CPU: " + cpu
 }

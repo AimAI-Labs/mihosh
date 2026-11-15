@@ -1,4 +1,4 @@
-package settings
+package preferences
 
 import (
 	"github.com/AimAI-Labs/mihosh/internal/app/service"

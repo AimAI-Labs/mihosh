@@ -2,11 +2,11 @@ package tui
 
 import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/preferences"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/settings"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/sub"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
@@ -205,9 +205,9 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.usesProcessLogs() {
 			m.logsState = m.logsState.AppendLog(msg.LogType, msg.Payload)
 		}
-		if m.currentPage == layout.PageSettings && m.settingsState.ActiveTab() == 1 {
+		if m.currentPage == layout.PageCore && m.coreState.IsMihomoPage() {
 			pw, ph := m.getPageSize()
-			m.settingsState = m.settingsState.SyncSysStatus(pw, ph, m.config, m.logsState.GetSysLogs())
+			m.coreState, _ = m.coreState.HandleEditorMsg(nil, pw, ph, m.logsState.GetSysLogs())
 		}
 		if m.wsMsgChan != nil {
 			return m, listenWSMessages(m.wsCtx, m.wsMsgChan)
@@ -311,10 +311,10 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case messages.SysStatusTickMsg, messages.SysStatusResultMsg:
-		if m.currentPage == layout.PageSettings {
+		if m.currentPage == layout.PageCore && m.coreState.IsMihomoPage() {
 			var cmd tea.Cmd
 			pw, ph := m.getPageSize()
-			m.settingsState, cmd = m.settingsState.HandleMsg(msg, pw, ph, m.config, m.logsState.GetSysLogs())
+			m.coreState, cmd = m.coreState.HandleEditorMsg(msg, pw, ph, m.logsState.GetSysLogs())
 			return m, cmd
 		}
 
@@ -362,7 +362,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.nodesState = m.nodesState.ResetTesting()
 
 	case messages.CoreActionDoneMsg:
-		m.settingsState = m.settingsState.ClearActionStates()
+		m.coreState, _ = m.coreState.Update(msg)
 		m.notice = msg.Action + " " + i18n.T("settings.action.success")
 		m.noticeTicks = autoRefreshNoticeTicks
 		if msg.NeedReloadAll {
@@ -371,8 +371,8 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 				nodes.FetchProxies(m.client),
 				nodes.FetchConfigMode(m.client),
 				rules.FetchRules(m.client),
-				settings.FetchMihomoVersion(m.client),
-				settings.FetchMihomoConfig(m.configSvc, m.client),
+				preferences.FetchMihomoVersion(m.client),
+				preferences.FetchMihomoConfig(m.configSvc, m.client),
 			}
 			if msg.DelayMs > 0 {
 				return m, tea.Sequence(
@@ -384,19 +384,20 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case messages.CoreActionErrorMsg:
-		m.settingsState = m.settingsState.ClearActionStates()
+		m.coreState, _ = m.coreState.Update(msg)
 		m.err = messages.ErrMsg{Err: msg.Err}
 		m.notice = ""
 		m.noticeTicks = 0
 
 	case messages.MihomoVersionMsg:
 		m.settingsState = m.settingsState.ApplyMihomoVersion(msg.Version)
+		m.coreState, _ = m.coreState.Update(msg)
 
 	case messages.MihomoConfigMsg:
 		// Mihomo 标签页配置加载完成（成功或失败）。
 		// 同步热刷新 client/wsClient 端点（external-controller/secret 变更），
 		// 并把 mixed-port 派生的代理地址同步到 connections。
-		m.settingsState = m.settingsState.ApplyMihomoConfig(&msg)
+		m.coreState, _ = m.coreState.Update(msg)
 		if msg.Config != nil {
 			cmd := m.updateCoreTarget(config.MihomoEndpoint{ExternalController: msg.Config.ExternalController, Secret: msg.Config.Secret, MixedPort: msg.Config.MixedPort}, coreTargetSync)
 			m.err = nil
@@ -423,7 +424,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.noticeTicks = autoRefreshNoticeTicks
 			m.err = nil
 		}
-		return m, tea.Batch(targetCmd, m.fetchNodes(), settings.FetchMihomoConfig(m.configSvc, m.client))
+		return m, tea.Batch(targetCmd, m.fetchNodes(), preferences.FetchMihomoConfig(m.configSvc, m.client))
 
 	case messages.ThemeChangedMsg:
 		// 主题已切换，触发重绘（View 会读取新主题色）

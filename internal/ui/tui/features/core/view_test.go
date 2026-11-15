@@ -53,7 +53,7 @@ func TestCoreEnterFollowsSelectionAndServiceMenuCapturesKeys(t *testing.T) {
 	i18n.Init()
 	svc := service.NewCoreService()
 	defer svc.Close()
-	s := NewState(svc)
+	s := NewState(svc, nil, nil)
 	s.Status = service.CoreStatus{Mode: "managed", Version: "v1", Running: true}
 	for _, item := range s.actions() {
 		if item.action == "profile" || item.key == "o" {
@@ -132,7 +132,7 @@ func TestCoreExistingConnectionOffersConnectionFormWithoutStartingCore(t *testin
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	svc := service.NewCoreService()
 	defer svc.Close()
-	s := NewState(svc)
+	s := NewState(svc, nil, nil)
 	s, _ = s.Update(messages.CoreConnectionMsg{})
 	s, _ = s.Update(coreKey("enter"))
 	if !s.Editing || s.form != "external" || s.Busy {
@@ -192,8 +192,8 @@ func TestCoreVisibleMouseTargetsMatchAfterViewportScrolling(t *testing.T) {
 				for _, target := range []struct {
 					index  int
 					action string
-				}{{0, "network"}, {4, "ports"}} {
-					s := NewState(svc).selectTab(2)
+				}{{0, "network"}, {4, "mihomo"}} {
+					s := NewState(svc, nil, nil).selectTab(2)
 					s.selected = target.index
 					label := i18n.T("core.action." + target.action)
 					view := ansi.Strip(s.Render(width, height))
@@ -205,7 +205,7 @@ func TestCoreVisibleMouseTargetsMatchAfterViewportScrolling(t *testing.T) {
 						}
 						x := lipgloss.Width(line[:at]) + 1
 						next, _ := s.Update(messages.PageMouseClickMsg{X: x, Y: y, Width: width, Height: height})
-						if !next.Editing || next.form != target.action {
+						if target.action == "mihomo" && !next.IsMihomoPage() || target.action != "mihomo" && (!next.Editing || next.form != target.action) {
 							t.Fatalf("%s %dx%d: click on visible %s did not open its form", language, width, height, target.action)
 						}
 						found = true
@@ -232,13 +232,13 @@ func TestCoreAllSectionsAndFormsRespectTerminalBounds(t *testing.T) {
 			for _, height := range []int{8, 24} {
 				var states []State
 				for tab := range tabs {
-					s := NewState(svc).selectTab(tab)
+					s := NewState(svc, nil, nil).selectTab(tab)
 					s.Status = service.CoreStatus{Mode: "managed", Version: "v1", Running: true, SystemProxy: true, TUN: true, RecoveryPending: true}
 					s.Err = errors.New(strings.Repeat("a long error message ", 12))
 					states = append(states, s)
 				}
-				for _, form := range []string{"network", "version", "import", "external", "ports", "service"} {
-					s, _ := NewState(svc).editForm(form)
+				for _, form := range []string{"network", "version", "import", "external", "service"} {
+					s, _ := NewState(svc, nil, nil).editForm(form)
 					states = append(states, s)
 				}
 				for _, s := range states {

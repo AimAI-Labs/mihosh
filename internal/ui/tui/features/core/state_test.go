@@ -13,7 +13,7 @@ import (
 )
 
 func TestBusyCoreDoesNotStartAnotherTaskAndIgnoresStaleResult(t *testing.T) {
-	s := NewState(service.NewCoreService())
+	s := NewState(service.NewCoreService(), nil, nil)
 	defer s.svc.Close()
 	s, cmd := s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
 	if !s.Busy || cmd == nil {
@@ -39,7 +39,7 @@ func TestCoreViewFitsNarrowAndWideTerminals(t *testing.T) {
 	for _, language := range []string{"zh-CN", "en-US"} {
 		i18n.SetLanguageOverride(language)
 		for _, width := range []int{24, 80, 120} {
-			s := NewState(service.NewCoreService())
+			s := NewState(service.NewCoreService(), nil, nil)
 			view := s.Render(width, 30)
 			s.svc.Close()
 			for _, line := range strings.Split(view, "\n") {
@@ -54,7 +54,7 @@ func TestCoreViewFitsNarrowAndWideTerminals(t *testing.T) {
 func TestCoreFormLeaveClearsSensitiveInputs(t *testing.T) {
 	svc := service.NewCoreService()
 	defer svc.Close()
-	s := NewState(svc)
+	s := NewState(svc, nil, nil)
 	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("u")})
 	if !s.Editing || len(s.fields) != 3 {
 		t.Fatal("external connection form missing")
@@ -68,7 +68,7 @@ func TestCoreFormLeaveClearsSensitiveInputs(t *testing.T) {
 func TestServiceFormAndNetworkActionsRemainInCoreState(t *testing.T) {
 	svc := service.NewCoreService()
 	defer svc.Close()
-	s := NewState(svc)
+	s := NewState(svc, nil, nil)
 	s, cmd := s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
 	if !s.Editing || s.form != "service" || cmd != nil || len(s.fields) != 0 {
 		t.Fatal("service menu should open without text inputs or a background command")

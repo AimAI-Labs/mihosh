@@ -6,7 +6,7 @@ type actionItem struct {
 	key, action string
 }
 
-var tabs = []string{"daily", "versions", "advanced", "geo"}
+var tabs = []string{"daily", "versions", "advanced", "geo", "mihomo"}
 var serviceActions = []string{"install", "start", "stop", "restart", "enable", "disable", "boot", "uninstall"}
 
 func (s State) primaryAction() actionItem {
@@ -27,7 +27,7 @@ func (s State) actions() []actionItem {
 	case 1:
 		return []actionItem{{"v", "check"}, {"g", "upgrade"}, {"b", "rollback"}, {"t", "version"}, {"i", "install"}, {"a", "activate"}, {"l", "import"}}
 	case 2:
-		return []actionItem{{"e", "network"}, {"h", "service"}, {"y", "system-proxy"}, {"n", "tun"}, {"p", "ports"}, {"m", "configure"}, {"c", "recover"}, {"w", "shell-proxy"}}
+		return []actionItem{{"e", "network"}, {"h", "service"}, {"y", "system-proxy"}, {"n", "tun"}, {"p", "mihomo"}, {"m", "configure"}, {"c", "recover"}, {"w", "shell-proxy"}}
 	case 3:
 		items := make([]actionItem, len(s.geoFiles))
 		for i := range items {
@@ -59,13 +59,15 @@ func (s State) actions() []actionItem {
 
 func (s State) choose(action string) (State, tea.Cmd) {
 	switch action {
+	case "mihomo":
+		return s.openTab(4)
 	case "geo-update":
 		if s.selected < 0 || s.selected >= len(s.geoFiles) || !s.geoFiles[s.selected].Updatable {
 			return s, nil
 		}
 		s.args = []string{s.geoFiles[s.selected].Key}
 		return s.begin(action)
-	case "network", "version", "import", "ports", "external", "service", "system-proxy", "tun", "configure", "recover", "shell-proxy":
+	case "network", "version", "import", "external", "service", "system-proxy", "tun", "configure", "recover", "shell-proxy":
 		return s.editForm(action)
 	default:
 		return s.begin(action)
@@ -73,6 +75,7 @@ func (s State) choose(action string) (State, tea.Cmd) {
 }
 
 func (s State) selectTab(tab int) State {
+	s.editor = s.editor.CancelEdit()
 	s.tab = (tab + len(tabs)) % len(tabs)
 	s.selected, s.scroll = 0, 0
 	s.followSelection = true

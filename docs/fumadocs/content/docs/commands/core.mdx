@@ -16,7 +16,7 @@ The baseline configuration provides direct connections, not proxy nodes. System 
 | Key | Action |
 | --- | --- |
 | `↑` / `↓`, `Enter` | Select / run an action (defaults to Set up and start on first use) |
-| `←` / `→` or `1` / `2` / `3` / `4` | Switch Everyday, Versions, Advanced and GEO sections |
+| `←` / `→` or `1` / `2` / `3` / `4` | Switch Everyday, Versions, Advanced, GEO and Mihomo configuration sections |
 | `v` / `t` | Open or refresh the release browser / look up a stable tag |
 | `Enter` / `i` (Versions), `a` | Download the selected release / activate it after installation |
 | `PgUp` / `PgDn` or `[` / `]` | Move up / down the continuous version list |
@@ -25,23 +25,23 @@ The baseline configuration provides direct connections, not proxy nodes. System 
 | `s` / `x` / `z` | Start / stop / restart |
 | `l` | Import a local executable using its independently verified SHA-256 |
 | `e` | Edit download proxy and accelerator settings |
-| `w` | Shell proxy preference and source script |
+| `w` | Shell proxy preference, automatic startup setup and refresh prompt |
 | `h` | Install, control and configure automatic startup of the background service |
 | `y` / `n` | Toggle system proxy / TUN |
 | `c` | Recover network settings after an unexpected exit |
-| `p` | Change managed ports after stopping the core |
+| `p` / `5` | Open unified Mihomo configuration |
 | `u` | Connect to an external API; leave the address empty for auto-discovery |
 | `r` | Refresh status and retry the connection; also refresh the list on Versions |
 | Mouse wheel | Move selection in Everyday, Advanced and GEO; scroll dialog contents |
 | `Esc` | Cancel the task or leave the form; downloads also have a clickable Cancel download control |
 
-Actions are grouped into Everyday, Versions, Advanced and GEO, each with a short explanation. Click an action to run it. The status panel shows core information; switches show saved preferences, whose effects depend on the running core. Wide terminals use 43% / 57% panels; narrow terminals stack the content. Use `Tab` and `Enter` inside forms. Exiting Mihosh stops the child owned by a session. A background service continues after the TUI exits. Existing external cores remain under their original owner.
+Actions are grouped into Everyday, Versions, Advanced, GEO and Mihomo configuration, each with a short explanation. Click an action to run it. The status panel shows core information; switches show saved preferences, whose effects depend on the running core. Wide terminals use 43% / 57% panels; narrow terminals stack the content. Use `Tab` and `Enter` inside forms. Exiting Mihosh stops the child owned by a session. A background service continues after the TUI exits. Existing external cores remain under their original owner.
 
 ## GEO management
 
 Press `4` in Core to inspect the managed core's `Country.mmdb`, `GeoIP.dat`, `GeoSite.dat` and `ASN.mmdb`. The list shows actual filenames, sizes and modification times, or Not downloaded for missing files. Select a file and press `Enter` or click to download or update it through the configured proxy/accelerator chain with SHA-256 verification. Press `z` after updating to restart the core and load the new data.
 
-Existing filename aliases and configured official lite datasets are preserved. Custom sources are marked for management through the core. External cores retain GEO updates in Settings > Mihomo.
+Existing filename aliases and configured official lite datasets are preserved. Custom sources are marked for management through the core. External cores retain GEO updates in Core > Mihomo config.
 
 ## Visual release browser
 
@@ -165,3 +165,7 @@ External API connections retain their original installation method. Explicit ext
 Profile activation validates a candidate before applying it and restores the previous configuration and active profile on failure. Managed imports preserve local controller and proxy settings, apply the explicit Core TUN choice and remove additional subscription-provided listeners. Imported data cannot enable TUN by itself. Interrupted version changes and configuration transactions are recovered during startup.
 
 Asset selection covers Linux/Windows amd64 compatible and arm64. Linux amd64 has real-core integration coverage; see implementation records in the proposal for build and runtime verification of other targets.
+
+## Mihomo configuration
+
+Open **Core > Mihomo config** (`p` or `5`) to edit `external-controller`, `secret`, `mixed-port`, `allow-lan` and `log-level` in one place. Select with arrows or the wheel, edit with `Enter`/double-click, save with `Enter`, and cancel with `Esc`. Enum values also support arrow keys and mouse selection. Saving retains YAML persistence and hot reload, with a restart warning if reload fails. Managed upgrades, restarts and GEO updates use their existing Core sections; the configuration page retains reload and cache clearing. External cores retain their API actions. Settings contains only Mihosh preferences.

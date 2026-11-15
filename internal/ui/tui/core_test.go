@@ -22,7 +22,7 @@ func TestOfflineStartupRoutesToCoreWithoutStartingStreams(t *testing.T) {
 	i18n.SetLanguageOverride("en-US")
 	svc := service.NewCoreService()
 	defer svc.Close()
-	m := Model{config: &config.Config{}, coreSvc: svc, coreState: corepage.NewState(svc), width: 100, height: 30}
+	m := Model{config: &config.Config{}, coreSvc: svc, coreState: corepage.NewState(svc, nil, nil), width: 100, height: 30}
 	updated, cmd := m.Update(messages.CoreConnectionMsg{Err: errors.New("not installed")})
 	m = updated.(Model)
 	if m.currentPage != layout.PageCore || m.wsStarted || cmd != nil {
@@ -37,7 +37,7 @@ func TestCoreGeoResultIsDeliveredWhileAnotherPageIsOpen(t *testing.T) {
 	i18n.Init()
 	svc := service.NewCoreService()
 	defer svc.Close()
-	s := corepage.NewState(svc)
+	s := corepage.NewState(svc, nil, nil)
 	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("4")})
 	m := Model{currentPage: layout.PageSub, coreSvc: svc, coreState: s}
 	updated, _ := m.Update(messages.CoreGeoDataMsg{Files: []service.GeoDataFile{{Key: "mmdb", Name: "Country.mmdb", Updatable: true}}})
@@ -90,7 +90,7 @@ func TestCoreReleaseCatalogueSurvivesPageChangeAndGlobalRefresh(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	svc := service.NewCoreService()
 	defer svc.Close()
-	s := corepage.NewState(svc)
+	s := corepage.NewState(svc, nil, nil)
 	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
 	defer s.Close()
 	m := Model{currentPage: layout.PageSub, coreSvc: svc, coreState: s, width: 120, height: 30}
@@ -120,7 +120,7 @@ func TestCoreDownloadTaskAllowsGlobalNavigationAndMouse(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	svc := service.NewCoreService()
 	defer svc.Close()
-	s := corepage.NewState(svc)
+	s := corepage.NewState(svc, nil, nil)
 	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
 	defer s.Close()
 	m := Model{currentPage: layout.PageCore, coreSvc: svc, coreState: s, width: 120, height: 30}
@@ -151,8 +151,8 @@ func TestCoreSettingsDialogsBlockGlobalNavigationAndMouse(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	svc := service.NewCoreService()
 	defer svc.Close()
-	for _, shortcut := range []string{"e", "h", "y", "n", "p", "m", "c"} {
-		s := corepage.NewState(svc)
+	for _, shortcut := range []string{"e", "h", "y", "n", "m", "c"} {
+		s := corepage.NewState(svc, nil, nil)
 		s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
 		s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(shortcut)})
 		m := Model{currentPage: layout.PageCore, coreState: s, width: 120, height: 30}
@@ -174,12 +174,29 @@ func TestCoreSettingsDialogsBlockGlobalNavigationAndMouse(t *testing.T) {
 	}
 }
 
+func TestCoreMihomoEditorCapturesGlobalKeys(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	svc := service.NewCoreService()
+	defer svc.Close()
+	s := corepage.NewState(svc, nil, nil)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m := Model{currentPage: layout.PageCore, coreState: s, width: 120, height: 30}
+	for _, text := range []string{"q", "?", "2"} {
+		next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(text)})
+		m = next.(Model)
+		if !m.coreState.IsMihomoPage() || !m.coreState.InputCapture().Active || m.showHelp || m.currentPage != layout.PageCore {
+			t.Fatal("global key escaped the Mihomo field editor")
+		}
+	}
+}
+
 func TestCoreVersionHelpUsesSelectedAssetAndCapturesScrolling(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	i18n.Init()
 	svc := service.NewCoreService()
 	defer svc.Close()
-	s := corepage.NewState(svc)
+	s := corepage.NewState(svc, nil, nil)
 	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
 	r := coreinfra.PinnedRelease()
 	r.Assets = []coreinfra.Asset{{Name: "selected-mihomo-build.gz"}}

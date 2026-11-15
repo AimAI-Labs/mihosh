@@ -43,7 +43,7 @@ func TestVersionTabQueriesListWithoutInstallingOrSwitching(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	svc := service.NewCoreService()
 	defer svc.Close()
-	s := NewState(svc)
+	s := NewState(svc, nil, nil)
 	s, cmd := s.Update(coreKey("2"))
 	defer s.Close()
 	if s.tab != 1 || !s.Busy || s.task != "releases" || s.catalog.requested != 1 || cmd == nil {
@@ -406,7 +406,7 @@ func TestInitialModelCloseCleansUpLatestLazySnapshot(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	svc := service.NewCoreService()
 	defer svc.Close()
-	initial := NewState(svc)
+	initial := NewState(svc, nil, nil)
 	defer initial.Close()
 	updated := initial.applyReleasePage(olderReleases(1, 3, true))
 	oldRoot := updated.catalog.store.root
@@ -480,7 +480,7 @@ func TestPrereleaseCacheDoesNotEnterStableCatalogue(t *testing.T) {
 	}
 	svc := service.NewCoreService()
 	defer svc.Close()
-	s := NewState(svc)
+	s := NewState(svc, nil, nil)
 	defer s.Close()
 	if release, ok := s.selectedRelease(); !ok || release.Prerelease || release.Draft || release.Tag != coreinfra.PinnedRelease().Tag {
 		t.Fatalf("cached prerelease entered the catalogue: %+v", release)
