@@ -38,6 +38,7 @@ type CoreService struct {
 	logging        atomic.Bool
 	processLogs    atomic.Bool
 	releaseJob     func()
+	releaseFetcher func(ctx context.Context, cfg *config.Config, page int, goos, goarch string, notify func(coreinfra.Progress)) (coreinfra.ReleasePage, error)
 	mu             sync.Mutex
 	process        *exec.Cmd
 	done           chan error

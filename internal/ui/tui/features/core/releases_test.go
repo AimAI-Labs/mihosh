@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -618,5 +619,72 @@ func TestReleasePageKeepsEssentialInformationAndFailuresWithoutStaticHints(t *te
 				t.Fatalf("operation failure was hidden: %s", want)
 			}
 		}
+	}
+}
+
+func TestOpenReleasesTabUsesDiskCacheWhileRefreshBypassesIt(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("MIHOSH_CONFIG_DIR", root)
+
+	pinned := coreinfra.PinnedRelease()
+	cacheDir := filepath.Join(root, "core", "releases-cache")
+	if err := os.MkdirAll(cacheDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	payload := struct {
+		FetchedAt time.Time             `json:"fetched_at"`
+		GOOS      string                `json:"goos"`
+		GOARCH    string                `json:"goarch"`
+		Page      coreinfra.ReleasePage `json:"page"`
+	}{
+		FetchedAt: time.Now().UTC(),
+		GOOS:      runtime.GOOS,
+		GOARCH:    runtime.GOARCH,
+		Page:      coreinfra.ReleasePage{Page: 1, HasNext: false, Releases: []coreinfra.Release{pinned}},
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cacheFile := filepath.Join(cacheDir, fmt.Sprintf("%s-%s-page-1.json", runtime.GOOS, runtime.GOARCH))
+	if err := os.WriteFile(cacheFile, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	svc := service.NewCoreService()
+	defer svc.Close()
+	s := NewState(svc, nil, nil)
+	defer s.Close()
+
+	s, cmd := s.openTab(1)
+	if cmd == nil || s.catalog.forceRefresh {
+		t.Fatalf("openTab(1) should load normally without forceRefresh: cmd=%v forceRefresh=%v", cmd != nil, s.catalog.forceRefresh)
+	}
+	batch, ok := cmd().(tea.BatchMsg)
+	if !ok {
+		t.Fatalf("expected BatchMsg from openTab(1), got %T", cmd())
+	}
+	var opMsg *messages.CoreOperationMsg
+	for _, sub := range batch {
+		if sub == nil {
+			continue
+		}
+		if msg, ok := sub().(messages.CoreOperationMsg); ok {
+			opMsg = &msg
+			break
+		}
+	}
+	if opMsg == nil || opMsg.Err != nil || opMsg.Releases == nil || len(opMsg.Releases.Releases) != 1 || opMsg.Releases.Releases[0].Tag != pinned.Tag {
+		t.Fatalf("openTab(1) did not load releases from disk cache without network: %+v", opMsg)
+	}
+	s, _ = s.Update(*opMsg)
+	if !s.catalog.loaded || s.releaseCount() != 1 {
+		t.Fatalf("cached release catalog was not applied: loaded=%v count=%d", s.catalog.loaded, s.releaseCount())
+	}
+
+	// Triggering refresh via 'r' sets forceRefresh so upstream is queried.
+	s, refreshCmd := s.releaseAction("refresh")
+	if refreshCmd == nil || !s.catalog.forceRefresh {
+		t.Fatalf("releaseAction(refresh) must bypass cache: cmd=%v forceRefresh=%v", refreshCmd != nil, s.catalog.forceRefresh)
 	}
 }

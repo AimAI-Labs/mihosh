@@ -15,9 +15,10 @@ type releaseCatalog struct {
 	lookup    *coreinfra.Release
 	scroll    int
 	store     *releaseStore
-	failed    bool
-	resume    bool
-	cleanup   *releaseCleanup
+	failed       bool
+	resume       bool
+	forceRefresh bool
+	cleanup      *releaseCleanup
 }
 
 // The initial Bubble Tea model is also closed on terminal errors. Share only
@@ -134,6 +135,7 @@ func (s State) openTab(tab int) (State, tea.Cmd) {
 	if s.tab == 1 {
 		s = s.selectRelease(0)
 		if !s.catalog.loaded {
+			s.catalog.forceRefresh = false
 			return s.loadReleasePage(1)
 		}
 	}
@@ -220,6 +222,7 @@ func (s State) releaseAction(action string) (State, tea.Cmd) {
 	switch action {
 	case "refresh":
 		s.catalog.resume = false
+		s.catalog.forceRefresh = true
 		return s.loadReleasePage(1)
 	case "retry":
 		s.catalog.resume = true
@@ -227,6 +230,7 @@ func (s State) releaseAction(action string) (State, tea.Cmd) {
 	case "next":
 		if s.catalog.page.HasNext {
 			s.catalog.resume = true
+			s.catalog.forceRefresh = false
 			return s.loadReleasePage(s.catalog.page.Page + 1)
 		}
 		return s, nil

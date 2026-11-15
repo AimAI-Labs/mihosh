@@ -126,6 +126,7 @@ func (s State) begin(action string) (State, tea.Cmd) {
 	s.args = nil
 	status := s.Status
 	releasePage := s.catalog.requested
+	forceRefresh := s.catalog.forceRefresh
 	return s, tea.Batch(s.poll(), func() tea.Msg {
 		defer cancel()
 		var err error
@@ -134,7 +135,15 @@ func (s State) begin(action string) (State, tea.Cmd) {
 		var releases *coreinfra.ReleasePage
 		switch action {
 		case "releases":
-			page, e := svc.Releases(ctx, releasePage, notify)
+			var (
+				page coreinfra.ReleasePage
+				e    error
+			)
+			if forceRefresh {
+				page, e = svc.RefreshReleases(ctx, releasePage, notify)
+			} else {
+				page, e = svc.Releases(ctx, releasePage, notify)
+			}
 			err = e
 			if e == nil {
 				releases = &page
@@ -282,6 +291,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 				s.catalog.failed = true
 			} else {
 				s.task = ""
+				s.catalog.forceRefresh = false
 			}
 		}
 		if msg.Release != nil {
