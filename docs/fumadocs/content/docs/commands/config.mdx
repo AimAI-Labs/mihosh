@@ -7,6 +7,20 @@ description: Configuration Management
 
 `mihosh config` provides a set of subcommands for managing Mihosh configurations.
 
+## Environment variables
+
+`MIHOSH_CONFIG_DIR` sets the Mihosh configuration root. Use an absolute path. Configuration, subscriptions, backups, and managed core runtime files use this directory. When the variable is unset or empty, Mihosh uses `~/.mihosh`.
+
+```bash
+export MIHOSH_CONFIG_DIR="$HOME/.mihosh-work"
+mihosh config show
+```
+
+```powershell
+$env:MIHOSH_CONFIG_DIR = Join-Path $env:USERPROFILE '.mihosh-work'
+mihosh config show
+```
+
 ## Subcommands
 
 ### init
