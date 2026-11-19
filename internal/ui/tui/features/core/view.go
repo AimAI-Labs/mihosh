@@ -276,7 +276,8 @@ func (s State) layout(width, height int) pageLayout {
 	for i := range result.tabs {
 		result.tabs[i].x -= tabOffset
 	}
-	tabText := ansi.Cut(strings.Join(labels, "│"), tabOffset, tabOffset+width-4)
+	separator := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted)).Render("│")
+	tabText := ansi.Cut(strings.Join(labels, separator), tabOffset, tabOffset+width-4)
 	parts := []string{panel(i18n.T("core.heading"), tabText, width), ""}
 	if s.tab == 1 {
 		return s.releaseLayout(width, height, parts, result)
