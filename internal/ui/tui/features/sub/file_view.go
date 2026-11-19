@@ -25,6 +25,15 @@ const (
 
 var fileOptions = []string{"sub.file.source", "sub.file.activated", "sub.file.diff"}
 
+var diffOptions = []struct {
+	key  string
+	flag profile.FileDiffOptions
+}{
+	{"sub.file.diff_indent", profile.DiffIgnoreIndent},
+	{"sub.file.diff_whitespace", profile.DiffIgnoreWhitespace},
+	{"sub.file.diff_format", profile.DiffIgnoreFormatCharacters},
+}
+
 type fileView struct {
 	mode                  fileMode
 	uid                   string
@@ -33,6 +42,9 @@ type fileView struct {
 	loading               bool
 	diff                  []profile.FileDiffRow
 	err                   error
+	optionsOpen           bool
+	option                int
+	ignore                profile.FileDiffOptions
 }
 
 func (s State) openFileMenu() State {
@@ -46,15 +58,22 @@ func (s State) openFileMenu() State {
 
 func (s State) loadFileView() (State, tea.Cmd) {
 	s.file.err = nil
-	s.file.request++
-	file := s.file
-	if file.selected < len(fileOptions)-1 {
+	if s.file.selected < len(fileOptions)-1 {
+		s.file.request++
+		file := s.file
 		return s, tea.Exec(&vimPreview{uid: file.uid, activated: file.selected == 1}, func(err error) tea.Msg {
 			return messages.SubFileViewerClosedMsg{Request: file.request, Err: err}
 		})
 	}
 	s.file.mode = fileDiff
+	return s.recomputeDiff()
+}
+
+func (s State) recomputeDiff() (State, tea.Cmd) {
 	s.file.loading = true
+	s.file.top = 0
+	s.file.request++
+	file := s.file
 	return s, func() tea.Msg {
 		result := messages.SubFileLoadedMsg{Request: file.request}
 		before, err := profile.ReadRawFile(file.uid)
@@ -68,7 +87,7 @@ func (s State) loadFileView() (State, tea.Cmd) {
 			return result
 		}
 		result.Err = generated.MergeErr
-		result.Diff = profile.DiffFiles(terminalFileText(before), terminalFileText(generated.Data))
+		result.Diff = profile.DiffFiles(string(before), string(generated.Data), file.ignore)
 		return result
 	}
 }
@@ -77,7 +96,7 @@ func terminalFileText(data []byte) string {
 	text := strings.ReplaceAll(ansi.Strip(string(data)), "\r\n", "\n")
 	text = strings.ReplaceAll(text, "\t", "    ")
 	return strings.Map(func(r rune) rune {
-		if r == '\n' || !unicode.IsControl(r) {
+		if r == '\n' || (!unicode.IsControl(r) && !unicode.Is(unicode.Cf, r)) {
 			return r
 		}
 		return -1
@@ -85,7 +104,7 @@ func terminalFileText(data []byte) string {
 }
 
 func (f fileView) rowBudget(width, height int) int {
-	rows := max(1, height-7)
+	rows := max(1, height-8)
 	if f.mode == fileDiff && width < 100 {
 		rows = max(1, (rows-3)/2)
 	}
@@ -93,6 +112,10 @@ func (f fileView) rowBudget(width, height int) int {
 }
 
 func (f *fileView) scroll(delta, width, height int) {
+	if f.optionsOpen {
+		f.option = min(max(0, f.option+delta), len(diffOptions)-1)
+		return
+	}
 	if f.mode == fileMenu {
 		f.selected = min(max(0, f.selected+delta), len(fileOptions)-1)
 		return
@@ -102,6 +125,19 @@ func (f *fileView) scroll(delta, width, height int) {
 }
 
 func (s State) handleFileKey(msg tea.KeyMsg) (State, tea.Cmd) {
+	if s.file.optionsOpen {
+		switch msg.String() {
+		case "esc", "o":
+			s.file.optionsOpen = false
+		case "up", "k":
+			s.file.scroll(-1, s.pageWidth, s.pageHeight)
+		case "down", "j":
+			s.file.scroll(1, s.pageWidth, s.pageHeight)
+		case "enter", " ":
+			return s.toggleDiffOption(s.file.option)
+		}
+		return s, nil
+	}
 	switch msg.String() {
 	case "esc":
 		mode := fileMenu
@@ -113,6 +149,8 @@ func (s State) handleFileKey(msg tea.KeyMsg) (State, tea.Cmd) {
 		if s.file.mode == fileMenu {
 			return s.loadFileView()
 		}
+	case "o":
+		s.file.optionsOpen = s.file.mode == fileDiff
 	case "up", "k":
 		s.file.scroll(-1, s.pageWidth, s.pageHeight)
 	case "down", "j":
@@ -132,21 +170,56 @@ func (s State) handleFileKey(msg tea.KeyMsg) (State, tea.Cmd) {
 func (s State) clickFile(msg messages.PageMouseClickMsg) (State, tea.Cmd) {
 	left, top, right, bottom := s.file.dialog(msg.Width, msg.Height).Bounds()
 	if msg.X < left || msg.X >= right || msg.Y < top || msg.Y >= bottom {
+		if s.file.optionsOpen {
+			s.file.optionsOpen = false
+			return s, nil
+		}
 		s.file = fileView{request: s.file.request + 1}
 		return s, nil
 	}
-	if idx := msg.Y - top - 1; s.file.mode == fileMenu && idx >= 0 && idx < len(fileOptions) {
+	idx := msg.Y - top - 1
+	if s.file.optionsOpen && idx >= 0 && idx < len(diffOptions) {
+		return s.toggleDiffOption(idx)
+	}
+	if s.file.mode == fileMenu && idx >= 0 && idx < len(fileOptions) {
 		s.file.selected = idx
 		return s.loadFileView()
 	}
+	if s.file.mode == fileDiff && idx == 0 {
+		s.file.optionsOpen = true
+	}
 	return s, nil
+}
+
+func (s State) toggleDiffOption(index int) (State, tea.Cmd) {
+	s.file.option = index
+	s.file.ignore ^= diffOptions[index].flag
+	return s.recomputeDiff()
 }
 
 func (f fileView) dialog(width, height int) dialog.Dialog {
 	w := max(24, width-4)
 	title := i18n.T("sub.file.menu")
+	hint := i18n.T("sub.file.hint")
 	var body string
-	if f.mode == fileMenu {
+	if f.optionsOpen {
+		w = min(52, w)
+		title = i18n.T("sub.file.diff_options")
+		hint = i18n.T("sub.file.diff_options_hint")
+		rows := make([]string, 0, len(diffOptions))
+		for i, option := range diffOptions {
+			check := "[ ] "
+			if f.ignore&option.flag != 0 {
+				check = "[x] "
+			}
+			row := check + i18n.T(option.key)
+			if i == f.option {
+				row = common.SelectedStyle().Render(row)
+			}
+			rows = append(rows, row)
+		}
+		body = strings.Join(rows, "\n")
+	} else if f.mode == fileMenu {
 		w = min(48, w)
 		items := make([]string, len(fileOptions))
 		for i, key := range fileOptions {
@@ -165,9 +238,9 @@ func (f fileView) dialog(width, height int) dialog.Dialog {
 		}
 	} else {
 		title = i18n.T(fileOptions[f.selected])
-		body = f.renderFile(w-4, width, height)
+		body = common.SelectedStyle().Render("[ o "+i18n.T("sub.file.diff_options")+" ]") + "\n" + f.renderFile(w-4, width, height)
 	}
-	body += "\n" + common.MutedStyle().Render(i18n.T("sub.file.hint"))
+	body += "\n" + common.MutedStyle().Render(hint)
 	content := common.RenderBorderedPanel(title, body, w, common.Primary(), common.Bright())
 	return dialog.New(content, width, height).Clipped()
 }
@@ -207,7 +280,7 @@ func renderDiffPane(rows []profile.FileDiffRow, before bool, column, width int) 
 		if before {
 			text = row.Before
 		}
-		text = common.PadString(ansi.Cut(text, column, column+width), width)
+		text = common.PadString(ansi.Cut(terminalFileText([]byte(text)), column, column+width), width)
 		if row.Changed {
 			text = style.Render(text)
 		}
