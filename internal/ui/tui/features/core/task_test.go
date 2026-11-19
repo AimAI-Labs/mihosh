@@ -79,7 +79,7 @@ func TestTaskFooterAllowsBrowsingAndCancelsWithoutStartingAnotherTask(t *testing
 		}
 	}
 	lines := strings.Split(view, "\n")
-	if !strings.Contains(lines[1], "Versions") {
+	if !strings.Contains(lines[1], "Downloads") || !strings.Contains(lines[2], "Versions") {
 		t.Fatal("task replaced the original header")
 	}
 	s, _ = s.Update(coreKey("down"))

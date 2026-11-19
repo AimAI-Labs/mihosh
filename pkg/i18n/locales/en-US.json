@@ -837,6 +837,7 @@
   "core.service.boot": "Start automatically at boot",
   "core.service.status": "Show background service status",
   "core.tab.daily": "Everyday",
+  "core.tab.downloads": "Downloads",
   "core.tab.versions": "Versions",
   "core.tab.advanced": "Advanced",
   "core.tab.geo": "GEO",

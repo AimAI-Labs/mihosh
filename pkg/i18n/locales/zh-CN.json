@@ -837,6 +837,7 @@
   "core.service.boot": "开机时自动启动",
   "core.service.status": "查看后台服务状态",
   "core.tab.daily": "日常使用",
+  "core.tab.downloads": "下载管理",
   "core.tab.versions": "版本管理",
   "core.tab.advanced": "高级设置",
   "core.tab.geo": "GEO 管理",

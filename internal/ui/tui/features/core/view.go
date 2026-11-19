@@ -249,7 +249,6 @@ func (s State) overview(width int) string {
 
 func (s State) layout(width, height int) pageLayout {
 	width = max(24, width)
-	t := theme.Current()
 	if s.Editing && s.form != "service" {
 		return s.formLayout(width)
 	}
@@ -258,26 +257,17 @@ func (s State) layout(width, height int) pageLayout {
 		return pageLayout{content: content, actions: hits, controls: controls}
 	}
 	var result pageLayout
-	var labels []string
-	x := 2
-	selectedEnd := 0
-	for i, tab := range tabs {
-		label := " " + i18n.T("core.tab."+tab) + " "
-		result.tabs = append(result.tabs, actionHit{x: x, y: 1, width: lipgloss.Width(label), height: 1, index: i})
-		x += lipgloss.Width(label) + 1
-		style := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted))
-		if s.tab == i {
-			style = style.Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true)
-			selectedEnd = x - 3
-		}
-		labels = append(labels, style.Render(label))
+	downloads := 1
+	if s.tab == 3 {
+		downloads = 3
 	}
-	tabOffset := max(0, selectedEnd-(width-4))
-	for i := range result.tabs {
-		result.tabs[i].x -= tabOffset
+	tabText, hits := renderCoreTabRow(width, 1, s.tab, []coreTabItem{{0, "daily"}, {downloads, "downloads"}, {2, "advanced"}, {4, "mihomo"}})
+	result.tabs = hits
+	if s.tab == 1 || s.tab == 3 {
+		sections, hits := renderCoreTabRow(width, 2, s.tab, []coreTabItem{{1, "versions"}, {3, "geo"}})
+		tabText += "\n" + sections
+		result.tabs = append(result.tabs, hits...)
 	}
-	separator := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted)).Render("│")
-	tabText := ansi.Cut(strings.Join(labels, separator), tabOffset, tabOffset+width-4)
 	parts := []string{panel(i18n.T("core.heading"), tabText, width), ""}
 	if s.tab == 1 {
 		return s.releaseLayout(width, height, parts, result)
@@ -320,6 +310,41 @@ func (s State) layout(width, height int) pageLayout {
 	}
 	result.content = strings.Join(parts, "\n")
 	return result
+}
+
+type coreTabItem struct {
+	id    int
+	label string
+}
+
+func renderCoreTabRow(width, y, selected int, items []coreTabItem) (string, []actionHit) {
+	t := theme.Current()
+	muted := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted))
+	active := lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true)
+	var labels []string
+	var hits []actionHit
+	x, selectedEnd := 0, 0
+	for _, item := range items {
+		label := " " + i18n.T("core.tab."+item.label) + " "
+		w := lipgloss.Width(label)
+		hits = append(hits, actionHit{x: x, y: y, width: w, height: 1, index: item.id})
+		style := muted
+		if selected == item.id {
+			selectedEnd = x + w
+			style = active
+		}
+		labels = append(labels, style.Render(label))
+		x += w + 1
+	}
+	inner := width - 4
+	offset := max(0, selectedEnd-inner)
+	for i := range hits {
+		hit := &hits[i]
+		start := max(0, hit.x-offset)
+		end := min(inner, hit.x+hit.width-offset)
+		hit.x, hit.width = start+2, max(0, end-start)
+	}
+	return ansi.Cut(strings.Join(labels, muted.Render("│")), offset, offset+inner), hits
 }
 
 func (s State) formLayout(width int) pageLayout {

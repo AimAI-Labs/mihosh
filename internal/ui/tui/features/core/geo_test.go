@@ -56,9 +56,9 @@ func TestGeoManagementLoadsFilesAndQueuesSelectedUpdate(t *testing.T) {
 						t.Fatalf("invalid GEO view line: %q", line)
 					}
 				}
-				header := strings.Split(s.layout(width, max(1, height-footerHeight)).content, "\n")[1]
-				if !strings.Contains(ansi.Strip(header), i18n.T("core.tab.geo")) {
-					t.Fatalf("%s width=%d: selected GEO tab is hidden in the header: %q", language, width, header)
+				header := strings.Split(s.layout(width, max(1, height-footerHeight)).content, "\n")
+				if !strings.Contains(ansi.Strip(header[1]), i18n.T("core.tab.downloads")) || !strings.Contains(ansi.Strip(header[2]), i18n.T("core.tab.geo")) {
+					t.Fatalf("%s width=%d: selected GEO section is hidden under Downloads: %q", language, width, header[:3])
 				}
 			}
 		}
@@ -105,6 +105,27 @@ func TestGeoManagementLoadsFilesAndQueuesSelectedUpdate(t *testing.T) {
 	if s.Editing || !s.Busy || s.task != "geo-update" || cmd == nil {
 		t.Fatal("confirmed GEO update was not queued")
 	}
+}
+
+func TestDownloadSectionsAreReachableUnderOneTab(t *testing.T) {
+	i18n.Init()
+	const width, height = 120, 30
+	s := State{tab: 1}
+	s.catalog.loaded = true
+	for _, hit := range s.layout(width, height-footerHeight).tabs {
+		if hit.y == 2 && hit.index == 3 {
+			s, _ = s.Update(messages.PageMouseClickMsg{X: hit.x, Y: hit.y, Width: width, Height: height})
+			if s.tab != 3 {
+				t.Fatal("GEO section click did not open GEO management")
+			}
+			s, _ = s.Update(coreKey("left"))
+			if s.tab != 1 {
+				t.Fatal("left from GEO did not return to versions")
+			}
+			return
+		}
+	}
+	t.Fatal("GEO section is missing from Downloads")
 }
 
 func TestGeoEmptyAndCustomSourceDoNotStartDownloads(t *testing.T) {

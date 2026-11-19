@@ -1,6 +1,7 @@
 package core
 
 import (
+	"slices"
 	"strconv"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -11,6 +12,7 @@ type actionItem struct {
 }
 
 var tabs = []string{"daily", "versions", "advanced", "geo", "mihomo"}
+var tabOrder = []int{0, 1, 3, 2, 4}
 var serviceActions = []string{"install", "start", "stop", "restart", "enable", "disable", "boot", "uninstall"}
 
 func (s State) primaryAction() actionItem {
@@ -113,4 +115,9 @@ func (s State) selectTab(tab int) State {
 	s.selected, s.scroll = 0, 0
 	s.followSelection = true
 	return s
+}
+
+func (s State) stepTab(delta int) (State, tea.Cmd) {
+	index := slices.Index(tabOrder, s.tab)
+	return s.openTab(tabOrder[(index+delta+len(tabOrder))%len(tabOrder)])
 }

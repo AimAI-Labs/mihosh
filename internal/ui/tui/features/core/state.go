@@ -417,9 +417,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case "1", "2", "3", "4", "5":
 			return s.openTab(int(msg.String()[0] - '1'))
 		case "left":
-			return s.openTab(s.tab - 1)
+			return s.stepTab(-1)
 		case "right":
-			return s.openTab(s.tab + 1)
+			return s.stepTab(1)
 		case "h":
 			return s.editForm("service")
 		case "y":
