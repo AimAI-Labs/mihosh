@@ -528,6 +528,13 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.notice = ""
 		m.noticeTicks = 0
 
+	case messages.SubSourceCopiedMsg:
+		m.notice = i18n.T("sub.copy_source_error")
+		if msg.Success {
+			m.notice = i18n.T("sub.copy_source_done")
+		}
+		m.noticeTicks = autoRefreshNoticeTicks
+
 	case messages.SubRawEditFinishedMsg:
 		reenableMouse := func() tea.Msg { return tea.EnableMouseCellMotion() }
 		if msg.Err != nil {

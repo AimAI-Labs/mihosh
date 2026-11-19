@@ -19,6 +19,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 const (
@@ -35,6 +36,7 @@ type addForm struct {
 	fieldCursor  int
 	kindRemote   bool // true=remote, false=local
 	kindExplicit bool
+	copySource   bool
 	errMsg       string
 }
 
@@ -119,8 +121,22 @@ func (f *addForm) resize(width, height int) {
 	_, fieldWidth, sourceHeight := formDimensions(width, height)
 	f.nameField.Width = fieldWidth
 	f.nameField.SetCursor(f.nameField.Position())
+	if button := f.copyButton(fieldWidth); button != "" {
+		fieldWidth -= lipgloss.Width(button) + 1
+	}
 	f.srcField.SetWidth(fieldWidth)
 	f.srcField.SetHeight(sourceHeight)
+}
+
+func (f addForm) copyButton(fieldWidth int) string {
+	if !f.copySource {
+		return ""
+	}
+	label := " " + i18n.T("sub.copy_source") + " "
+	if lipgloss.Width(label)+5 > fieldWidth {
+		return ""
+	}
+	return label
 }
 
 // buildSource keeps automatic detection until the user explicitly selects a type.

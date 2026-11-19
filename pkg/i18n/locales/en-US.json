@@ -701,6 +701,9 @@
   "sub.add_err_kind": "source does not match the selected type",
 
   "sub.edit_title": "Edit Subscription",
+  "sub.copy_source": "Copy",
+  "sub.copy_source_done": "Subscription source sent to clipboard",
+  "sub.copy_source_error": "Could not copy subscription source",
   "sub.edited_toast": "Subscription updated",
 
   "sub.delete_title": "Delete Subscription",

@@ -701,6 +701,9 @@
   "sub.add_err_kind": "来源与所选类型不匹配",
 
   "sub.edit_title": "编辑订阅",
+  "sub.copy_source": "复制",
+  "sub.copy_source_done": "已将来源发送到剪贴板",
+  "sub.copy_source_error": "无法复制订阅来源",
   "sub.edited_toast": "已更新订阅",
 
   "sub.delete_title": "删除订阅",

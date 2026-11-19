@@ -308,6 +308,7 @@ func (s State) openEditForm() (State, tea.Cmd) {
 	form.nameField.SetValue(p.Name)
 	form.srcField.SetValue(p.Source.Display())
 	form.kindRemote = p.Source.Kind == profile.SourceRemote
+	form.copySource = sourceClipboardAvailable()
 	form.resize(s.pageWidth, s.pageHeight)
 	// 焦点重新落到名称字段（SetValue 后 textinput 仍处于 Focus 状态）
 	form.focusCurrent()

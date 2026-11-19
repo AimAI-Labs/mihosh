@@ -270,6 +270,8 @@ type SubRenameDoneMsg struct{ UID string }
 // SubEditDoneMsg 订阅元数据已编辑（调用方负责刷新列表）。
 type SubEditDoneMsg struct{ UID string }
 
+type SubSourceCopiedMsg struct{ Success bool }
+
 // SubEditErrorMsg 编辑订阅失败。
 type SubEditErrorMsg struct {
 	UID string

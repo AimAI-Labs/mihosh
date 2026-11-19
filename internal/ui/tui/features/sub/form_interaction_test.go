@@ -25,7 +25,11 @@ func TestEditFormSizesMatchRenderedInputsAndMouseFields(t *testing.T) {
 				s, _ = s.Update(messages.PageResizeMsg{Width: width, Height: height})
 				s, _ = s.openEditForm()
 				_, fieldWidth, sourceHeight := formDimensions(width, height)
-				if s.editForm.nameField.Width != fieldWidth || s.editForm.srcField.Width() != fieldWidth || s.editForm.srcField.Height() != sourceHeight {
+				sourceWidth := fieldWidth
+				if button := s.editForm.copyButton(fieldWidth); button != "" {
+					sourceWidth -= lipgloss.Width(button) + 1
+				}
+				if s.editForm.nameField.Width != fieldWidth || s.editForm.srcField.Width() != sourceWidth || s.editForm.srcField.Height() != sourceHeight {
 					t.Fatal("input dimensions differ from layout")
 				}
 				modal := ansi.Strip(buildEditFormModal(s.ToPageState(width, height), width, height))
@@ -66,6 +70,27 @@ func TestEditFormSizesMatchRenderedInputsAndMouseFields(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestEditSourceCopyHitMatchesRenderedButton(t *testing.T) {
+	i18n.Init()
+	const width, height = 80, 24
+	s := State{}.ApplySubs([]profile.Profile{{UID: "test", Name: "profile", Source: profile.SubSource{Kind: profile.SourceRemote, URL: "https://example.org/profile"}}}, "")
+	s, _ = s.openEditForm()
+	s.editForm.copySource = true
+	s, _ = s.Update(messages.PageResizeMsg{Width: width, Height: height})
+	page := s.ToPageState(width, height)
+	left, top, _, _ := resolveFormBounds(page, width, height)
+	row := strings.Split(ansi.Strip(buildEditFormModal(page, width, height)), "\n")[3]
+	label := i18n.T("sub.copy_source")
+	before, _, found := strings.Cut(row, label)
+	if !found {
+		t.Fatalf("source row is missing copy button: %q", row)
+	}
+	s, cmd := s.HandleMouseLeft(left+lipgloss.Width(before), top+3, width, height)
+	if cmd == nil || !s.showEditForm || s.editUID != "test" {
+		t.Fatal("clicking Copy should dispatch a copy command and leave the editor open")
 	}
 }
 

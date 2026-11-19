@@ -445,7 +445,12 @@ func buildFormModal(title string, form addForm, width, height int) string {
 
 	// 来源值行
 	srcLabel := i18n.T("sub.add_field_src")
-	srcRow := renderFieldRow(srcLabel, form.srcField.View(), form.isSrcField(), innerWidth)
+	srcValue := form.srcField.View()
+	if button := form.copyButton(fieldWidth); button != "" {
+		style := lipgloss.NewStyle().Background(common.TokyoCyan()).Foreground(common.Background()).Bold(true)
+		srcValue = lipgloss.JoinHorizontal(lipgloss.Top, srcValue, " ", style.Render(button))
+	}
+	srcRow := renderFieldRow(srcLabel, srcValue, form.isSrcField(), innerWidth)
 
 	// 说明/错误行
 	var footer string
