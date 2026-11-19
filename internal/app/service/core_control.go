@@ -100,6 +100,8 @@ func (s *CoreService) startControl(root string) error {
 			err = s.ActivateVersion(r.Context(), "")
 		case "profile":
 			activation, err = s.ApplyProfile(r.Context(), request.Version, false)
+		case "basic-config":
+			activation, err = s.UseBasicConfig(r.Context())
 		case "system-proxy", "tun":
 			if request.Version != "on" && request.Version != "off" {
 				http.Error(w, "invalid network setting", 400)

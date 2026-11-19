@@ -33,7 +33,11 @@ func (s State) actions() []actionItem {
 	case 1:
 		return []actionItem{{"v", "check"}, {"g", "upgrade"}, {"b", "rollback"}, {"t", "version"}, {"i", "install"}, {"a", "activate"}, {"l", "import"}}
 	case 2:
-		return []actionItem{{"e", "network"}, {"h", "service"}, {"y", "system-proxy"}, {"n", "tun"}, {"m", "configure"}, {"c", "recover"}, {"w", "shell-proxy"}}
+		items := []actionItem{{"e", "network"}, {"h", "service"}, {"y", "system-proxy"}, {"n", "tun"}, {"m", "configure"}, {"c", "recover"}, {"w", "shell-proxy"}}
+		if s.Status.Mode == "managed" {
+			items = append(items, actionItem{"", "basic-config"})
+		}
+		return items
 	case 3:
 		items := make([]actionItem, len(s.geoFiles))
 		for i := range items {
@@ -102,7 +106,7 @@ func (s State) choose(action string) (State, tea.Cmd) {
 		return s.editForm(action)
 	case "system-proxy", "tun", "shell-proxy":
 		return s.toggleSwitch(action)
-	case "network", "version", "import", "external", "service", "configure", "recover":
+	case "network", "version", "import", "external", "service", "configure", "recover", "basic-config":
 		return s.editForm(action)
 	default:
 		return s.begin(action)

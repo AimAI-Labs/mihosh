@@ -64,6 +64,50 @@ func TestManagedProfileCanBeSavedOfflineAndSanitizesInbound(t *testing.T) {
 	_, err = os.Stat(filepath.Join(filepath.Dir(path), "profile-recovery.json"))
 	require.True(t, os.IsNotExist(err))
 }
+
+func TestUseBasicConfigKeepsEndpointAndBacksUpSubscription(t *testing.T) {
+	svc, uid, _ := prepareManagedProfile(t)
+	_, err := svc.ApplyProfile(context.Background(), uid, false)
+	require.NoError(t, err)
+	endpoint := config.ResolveMihomoEndpoint()
+	result, err := svc.UseBasicConfig(context.Background())
+	require.NoError(t, err)
+	require.NotEmpty(t, result.BackupName)
+	require.Equal(t, endpoint, config.ResolveMihomoEndpoint())
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	require.Empty(t, cfg.ActiveSub)
+	require.Len(t, cfg.Subs, 1)
+	path, err := config.ManagedMihomoConfigPath()
+	require.NoError(t, err)
+	data, err := config.ReadMihomoYAML(path)
+	require.NoError(t, err)
+	require.NotContains(t, data, "dns")
+	require.Equal(t, []any{"MATCH,DIRECT"}, data["rules"])
+}
+
+func TestStartCreatesBasicConfigWhenManagedFileIsMissing(t *testing.T) {
+	svc, uid, _ := prepareManagedProfile(t)
+	require.NoError(t, config.Update(func(cfg *config.Config) error { cfg.ActiveSub = uid; return nil }))
+	path, err := config.ManagedMihomoConfigPath()
+	require.NoError(t, err)
+	require.NoError(t, os.Remove(path))
+	root, err := config.GetConfigDir()
+	require.NoError(t, err)
+	binary, err := coreinfra.BinaryPath(root, "v1.2.3", runtime.GOOS)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(binary, []byte("#!/bin/sh\nexit 1\n"), 0700))
+	require.ErrorContains(t, svc.Start(context.Background()), "configuration validation failed")
+	data, err := config.ReadMihomoYAML(path)
+	require.NoError(t, err)
+	require.Equal(t, []any{"MATCH,DIRECT"}, data["rules"])
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	require.Empty(t, cfg.ActiveSub)
+	log, _, _ := svc.ReadLogs(0)
+	require.Contains(t, log, "Managed configuration was missing")
+}
+
 func TestManagedProfileReloadFailureRestoresFileAndMetadata(t *testing.T) {
 	svc, uid, _ := prepareManagedProfile(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "reload failed", 500) }))

@@ -60,7 +60,7 @@ func (m *Model) coreOperationCompleted(action string) tea.Cmd {
 	switch action {
 	case "stop", "service-stop", "service-uninstall":
 		return m.updateCoreTarget(config.ResolveMihomoEndpoint(), coreTargetStopped)
-	case "configure", "start", "setup", "connect", "external", "ports", "activate", "rollback", "restart", "upgrade", "profile", "service-install", "service-start", "service-restart", "tun":
+	case "configure", "basic-config", "start", "setup", "connect", "external", "ports", "activate", "rollback", "restart", "upgrade", "profile", "service-install", "service-start", "service-restart", "tun":
 		return m.updateCoreTarget(config.ResolveMihomoEndpoint(), coreTargetReconnect)
 	default:
 		return nil

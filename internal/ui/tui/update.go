@@ -47,6 +47,7 @@ func (m Model) Init() tea.Cmd {
 				if err := m.coreSvc.Start(m.wsCtx); err != nil {
 					return messages.CoreConnectionMsg{Epoch: m.connectionEpoch, Err: err}
 				}
+				return messages.ManagedCoreStartedMsg{Epoch: m.connectionEpoch}
 			}
 			version, err := m.client.GetVersion()
 			if err != nil {

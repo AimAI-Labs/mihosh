@@ -116,6 +116,18 @@ func TestStoppedOwnerRejectsQueuedHealthyResult(t *testing.T) {
 	require.Nil(t, cmd)
 }
 
+func TestManagedStartupBindsCredentialsCreatedByFallback(t *testing.T) {
+	m, path := targetTestModel(t)
+	oldWS := m.wsClient.Generation()
+	require.NoError(t, os.WriteFile(path, []byte("external-controller: 127.0.0.1:9090\nsecret: fallback\nmixed-port: 7890\n"), 0600))
+	updated, cmd := m.Update(messages.ManagedCoreStartedMsg{Epoch: m.connectionEpoch})
+	next := updated.(Model)
+	require.Equal(t, "fallback", next.client.EndpointSnapshot().Secret)
+	require.Greater(t, next.wsClient.Generation(), oldWS)
+	require.Greater(t, next.connectionEpoch, m.connectionEpoch)
+	require.NotNil(t, cmd)
+}
+
 func TestStoppedManagedStatusClearsReadyConnection(t *testing.T) {
 	m, _ := targetTestModel(t)
 	updated, cmd := m.Update(messages.CoreStatusMsg{

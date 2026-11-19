@@ -50,7 +50,7 @@ func (s State) inlineHelp(width int) string {
 		case "service":
 			hints[0] = common.InlineHelpHint{Key: "↑↓", Desc: i18n.T("core.inline.select")}
 			hints[1].Desc = i18n.T("core.inline.run")
-		case "configure", "recover", "geo-update":
+		case "configure", "recover", "geo-update", "basic-config":
 			hints = hints[1:]
 			hints[0].Desc = i18n.T("core.inline.run")
 		}

@@ -229,6 +229,8 @@ func (s State) begin(action string) (State, tea.Cmd) {
 			}
 		case "configure":
 			err = svc.Configure()
+		case "basic-config":
+			_, err = svc.UseBasicConfig(ctx)
 		case "start":
 			err = svc.Start(ctx)
 		case "stop":

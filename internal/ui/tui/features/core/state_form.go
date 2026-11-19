@@ -29,7 +29,7 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 		}
 		return s, nil
 	}
-	if kind == "configure" || kind == "recover" {
+	if isChoiceForm(kind) {
 		return s, nil
 	}
 	if kind == "service" {
@@ -99,12 +99,21 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 	s.fields[0].Focus()
 	return s, textinput.Blink
 }
+
+func isChoiceForm(kind string) bool {
+	switch kind {
+	case "configure", "recover", "geo-update", "basic-config":
+		return true
+	}
+	return false
+}
+
 func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 	s.formFollowFocus = true
 	if s.Busy && s.form != "network" && msg.String() == "enter" {
 		return s, nil
 	}
-	if s.form == "configure" || s.form == "recover" || s.form == "geo-update" {
+	if isChoiceForm(s.form) {
 		switch msg.String() {
 		case "esc":
 			return s.closeForm(), nil

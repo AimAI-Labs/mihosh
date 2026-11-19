@@ -226,8 +226,20 @@ func recoverManagedProfile(root string) error {
 // ApplyProfile is serialized with core installation and process operations. A journal
 // preserves the last committed configuration across interruption of the apply step.
 func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopped bool) (ActivateResult, error) {
+	return s.applyProfile(ctx, uid, startIfStopped, false)
+}
+
+func (s *CoreService) UseBasicConfig(ctx context.Context) (ActivateResult, error) {
+	return s.applyProfile(ctx, "", false, true)
+}
+
+func (s *CoreService) applyProfile(ctx context.Context, uid string, startIfStopped, basic bool) (ActivateResult, error) {
 	var result ActivateResult
-	if forwarded, err := s.forwardControl(ctx, "profile", uid, &result); forwarded {
+	action := "profile"
+	if basic {
+		action = "basic-config"
+	}
+	if forwarded, err := s.forwardControl(ctx, action, uid, &result); forwarded {
 		return result, err
 	}
 	if startIfStopped && s.usesService() {
@@ -255,6 +267,11 @@ func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopp
 		return ActivateResult{}, err
 	}
 	path := filepath.Join(root, "runtime", "config.yaml")
+	if basic {
+		if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			return ActivateResult{}, err
+		}
+	}
 	unlock, err := coreinfra.LockRuntime(filepath.Join(root, "runtime", "config.lock"))
 	if err != nil {
 		return ActivateResult{}, err
@@ -267,6 +284,9 @@ func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopp
 	if err != nil {
 		return ActivateResult{}, err
 	}
+	if basic && cfg.Core.Mode != "managed" {
+		return ActivateResult{}, errors.New("a basic configuration requires a managed core")
+	}
 	if s.process == nil {
 		// Do not mutate a live managed core owned by another Mihosh process.
 		unlockRuntime, e := coreinfra.LockRuntime(filepath.Join(root, "runtime", "process.lock"))
@@ -276,10 +296,29 @@ func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopp
 		unlockRuntime()
 	}
 	old, err := os.ReadFile(path)
+	if basic && os.IsNotExist(err) {
+		if s.process != nil {
+			return ActivateResult{}, errors.New("managed configuration is missing; restart the core to create a basic configuration")
+		}
+		_, err := prepareMissingManagedConfig(path)
+		return ActivateResult{}, err
+	}
 	if err != nil {
 		return ActivateResult{}, err
 	}
-	generated, err := profile.GenerateForUID(uid, path)
+	var generated profile.GeneratedConfig
+	if basic {
+		data, e := managedBaseConfig()
+		if e != nil {
+			return ActivateResult{}, e
+		}
+		var base yaml.Node
+		if err = yaml.Unmarshal(data, &base); err == nil {
+			generated.Data, err = profile.GenerateYAMLWithPreserve(&base, nil, path)
+		}
+	} else {
+		generated, err = profile.GenerateForUID(uid, path)
+	}
 	if err != nil {
 		return ActivateResult{}, err
 	}
@@ -374,6 +413,10 @@ func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopp
 		started = true
 	}
 	if err = config.Update(func(latest *config.Config) error {
+		if basic {
+			latest.ActiveSub = ""
+			return nil
+		}
 		for _, p := range latest.Subs {
 			if p.UID == uid {
 				latest.ActiveSub = uid

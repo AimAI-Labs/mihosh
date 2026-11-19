@@ -72,6 +72,9 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 	if err != nil {
 		return err
 	}
+	if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return err
+	}
 	unlock, err := coreinfra.LockRuntime(filepath.Join(root, "runtime", "process.lock"))
 	if err != nil {
 		return err
@@ -133,6 +136,12 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 		return err
 	}
 	raw, err := os.ReadFile(path)
+	if os.IsNotExist(err) && (len(skipRecovery) == 0 || !skipRecovery[0]) {
+		if err = s.createFallbackConfig(root, path); err != nil {
+			return fmt.Errorf("cannot prepare basic managed configuration: %w", err)
+		}
+		raw, err = os.ReadFile(path)
+	}
 	if err != nil {
 		return err
 	}
@@ -268,6 +277,26 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 		}
 	}
 }
+
+func (s *CoreService) createFallbackConfig(root, path string) error {
+	unlock, err := coreinfra.LockRuntime(filepath.Join(root, "runtime", "config.lock"))
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	created, err := prepareMissingManagedConfig(path)
+	if err != nil || !created {
+		return err
+	}
+	const notice = `level=warn msg="Managed configuration was missing; using a basic direct configuration"` + "\n"
+	s.processLogs.Store(true)
+	_, _ = io.WriteString(&s.logs, notice)
+	if s.daemon {
+		_, _ = io.WriteString(os.Stderr, notice)
+	}
+	return nil
+}
+
 func (s *CoreService) stopLocked() error {
 	if s.stop == nil {
 		return nil

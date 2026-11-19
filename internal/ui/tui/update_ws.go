@@ -86,6 +86,13 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m.handleWSMessages(msg.Payload)
 
+	case messages.ManagedCoreStartedMsg:
+		if msg.Epoch != m.connectionEpoch {
+			return m, nil
+		}
+		m.reloadStoredConfig()
+		return m, m.updateCoreTarget(config.ResolveMihomoEndpoint(), coreTargetReconnect)
+
 	case messages.CoreConnectionMsg:
 		if msg.Epoch != m.connectionEpoch {
 			return m, nil

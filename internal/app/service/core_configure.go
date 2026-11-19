@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -42,32 +41,54 @@ func (s *CoreService) Configure() error {
 	if err != nil {
 		return err
 	}
-	if _, err = os.Stat(path); os.IsNotExist(err) {
-		var secret [32]byte
-		if _, err = rand.Read(secret[:]); err != nil {
-			return err
-		}
-		if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-			return err
-		}
-		data := fmt.Sprintf("mixed-port: 7890\nexternal-controller: 127.0.0.1:9090\nsecret: %q\nallow-lan: false\nmode: rule\nlog-level: info\ntun:\n  enable: false\nrules:\n  - MATCH,DIRECT\n", hex.EncodeToString(secret[:]))
-		file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
-		if err != nil {
-			return err
-		}
-		_, writeErr := file.WriteString(data)
-		closeErr := file.Close()
-		if writeErr != nil {
-			return writeErr
-		}
-		if closeErr != nil {
-			return closeErr
-		}
-	} else if err != nil {
+	if _, err = createManagedBaseConfig(path, nil); err != nil {
 		return err
 	}
 	return config.Update(func(latest *config.Config) error { latest.Core.Mode = "managed"; return nil })
 }
+
+func managedBaseConfig() ([]byte, error) {
+	var secret [32]byte
+	if _, err := rand.Read(secret[:]); err != nil {
+		return nil, err
+	}
+	return fmt.Appendf(nil, "mixed-port: 7890\nexternal-controller: 127.0.0.1:9090\nsecret: %q\nallow-lan: false\nmode: rule\nlog-level: info\ntun:\n  enable: false\nrules:\n  - MATCH,DIRECT\n", hex.EncodeToString(secret[:])), nil
+}
+
+// The caller holds the config lock. Leave an existing file or symlink intact.
+func createManagedBaseConfig(path string, beforeCreate func() error) (bool, error) {
+	if _, err := os.Lstat(path); err == nil {
+		if _, err = os.Stat(path); err != nil {
+			return false, fmt.Errorf("managed configuration path has no usable target: %w", err)
+		}
+		return false, nil
+	} else if !os.IsNotExist(err) {
+		return false, err
+	}
+	data, err := managedBaseConfig()
+	if err != nil {
+		return false, err
+	}
+	if beforeCreate != nil {
+		if err = beforeCreate(); err != nil {
+			return false, err
+		}
+	}
+	if err = privateWrite(path, data); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func prepareMissingManagedConfig(path string) (bool, error) {
+	return createManagedBaseConfig(path, func() error {
+		return config.Update(func(latest *config.Config) error {
+			latest.ActiveSub = ""
+			return nil
+		})
+	})
+}
+
 func (s *CoreService) SaveNetwork(proxy string, accelerators []coreinfra.Accelerator, timeoutSeconds ...int) error {
 	// Fetchers snapshot these preferences; saving affects the next download.
 	// Validate settings before persisting. No network request is performed.

@@ -22,7 +22,7 @@ func (s State) choiceLayout(width int) pageLayout {
 	rows := strings.Split(wrap(desc, width-4), "\n")
 	rows = append(rows, "")
 	var controls []releaseControl
-	if s.form == "geo-update" {
+	if s.form == "geo-update" || s.form == "basic-config" {
 		confirmLabel := " " + i18n.T("core.dialog.confirm") + " "
 		cancelLabel := " " + i18n.T("core.dialog.cancel") + " "
 		x := 2
@@ -65,7 +65,7 @@ func (s State) formDialog(width, height int) (pageLayout, int) {
 	case "service":
 		page.content, page.actions, _ = s.actionPanel(popupWidth, true)
 		page.focusY = page.actions[s.selected].y
-	case "configure", "recover", "geo-update":
+	case "configure", "recover", "geo-update", "basic-config":
 		page = s.choiceLayout(popupWidth)
 		page.focusY = page.controls[0].y
 	default:

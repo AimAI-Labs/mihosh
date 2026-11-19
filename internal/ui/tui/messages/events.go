@@ -367,6 +367,8 @@ type CoreConnectionMsg struct {
 	Err     error
 }
 
+type ManagedCoreStartedMsg struct{ Epoch uint64 }
+
 type CoreTargetChangedMsg struct {
 	Reset      bool
 	Invalidate bool // In-flight requests are stale even when the endpoint is unchanged.
