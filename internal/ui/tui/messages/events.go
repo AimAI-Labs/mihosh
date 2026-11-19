@@ -314,8 +314,12 @@ type LocalSubImportedMsg struct {
 
 type SubFileLoadedMsg struct {
 	Request uint64
-	Lines   []string
 	Diff    []profile.FileDiffRow
+	Err     error
+}
+
+type SubFileViewerClosedMsg struct {
+	Request uint64
 	Err     error
 }
 

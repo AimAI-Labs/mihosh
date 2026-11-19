@@ -558,6 +558,10 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.SubFileLoadedMsg:
 		m.subState, _ = m.subState.Update(msg)
 
+	case messages.SubFileViewerClosedMsg:
+		m.subState, _ = m.subState.Update(msg)
+		return m, func() tea.Msg { return tea.EnableMouseCellMotion() }
+
 	case messages.MergeEditFinishedMsg:
 		// 外部编辑器结束：tea.ExecProcess 期间会 ReleaseTerminal（禁用鼠标），
 		// 但 RestoreTerminal 不恢复鼠标模式（Bubble Tea v1.3.10 缺陷），需显式重新启用。

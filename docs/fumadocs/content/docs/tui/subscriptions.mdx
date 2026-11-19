@@ -20,7 +20,7 @@ description: Manage remote proxy subscriptions
 
 Place `.yaml` or `.yml` profiles in `raw/` under the Mihosh configuration root. Mihosh imports them at startup and when you open or refresh the Subscriptions page. Each imported profile keeps a snapshot. Use `u` to refresh it after editing the source. To prevent a deleted subscription from being imported again, move its source out of `raw/`.
 
-Press `c` to choose the source snapshot, the activated configuration generated with `merge.yaml`, or a diff. The views are read-only and also work for inactive subscriptions. The diff uses side-by-side panes from 100 columns and stacked panes in narrower terminals.
+Press `c` to choose the source snapshot, the activated configuration generated with `merge.yaml`, or a diff. The source and activated views open read-only temporary copies in Vim and use One Dark Pro for YAML highlighting. Make sure `vim` is on PATH. The copies are removed when Vim exits. The views also work for inactive subscriptions. The diff uses side-by-side panes from 100 columns and stacked panes in narrower terminals.
 
 ## Interface Features
 

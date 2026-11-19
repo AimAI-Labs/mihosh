@@ -142,7 +142,12 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	case messages.SubFileLoadedMsg:
 		if s.file.loading && s.file.request == msg.Request {
 			s.file.loading = false
-			s.file.lines, s.file.diff, s.file.err = msg.Lines, msg.Diff, msg.Err
+			s.file.diff, s.file.err = msg.Diff, msg.Err
+		}
+		return s, nil
+	case messages.SubFileViewerClosedMsg:
+		if s.file.mode == fileMenu && s.file.request == msg.Request {
+			s.file.err = msg.Err
 		}
 		return s, nil
 	case messages.PageResizeMsg:

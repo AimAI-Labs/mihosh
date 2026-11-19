@@ -737,6 +737,7 @@
   "sub.file.diff": "差异 (diff)",
   "sub.file.same": "源文件和激活文件内容相同",
   "sub.file.loading": "正在读取文件…",
+  "sub.file.vim_missing": "查看 YAML 文件需要安装 Vim，并将它加入 PATH",
   "sub.file.hint": "↑↓ 滚动 · ←→ 横向移动 · Esc 返回",
   "sub.copy_source": "复制",
   "sub.copy_source_done": "已将来源发送到剪贴板",

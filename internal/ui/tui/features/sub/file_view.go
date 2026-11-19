@@ -20,8 +20,6 @@ type fileMode int
 const (
 	fileClosed fileMode = iota
 	fileMenu
-	fileSource
-	fileActivated
 	fileDiff
 )
 
@@ -33,7 +31,6 @@ type fileView struct {
 	request               uint64
 	selected, top, column int
 	loading               bool
-	lines                 []string
 	diff                  []profile.FileDiffRow
 	err                   error
 }
@@ -48,19 +45,21 @@ func (s State) openFileMenu() State {
 }
 
 func (s State) loadFileView() (State, tea.Cmd) {
-	s.file.mode = fileSource + fileMode(s.file.selected)
-	s.file.loading = true
+	s.file.err = nil
 	s.file.request++
 	file := s.file
+	if file.selected < len(fileOptions)-1 {
+		return s, tea.Exec(&vimPreview{uid: file.uid, activated: file.selected == 1}, func(err error) tea.Msg {
+			return messages.SubFileViewerClosedMsg{Request: file.request, Err: err}
+		})
+	}
+	s.file.mode = fileDiff
+	s.file.loading = true
 	return s, func() tea.Msg {
 		result := messages.SubFileLoadedMsg{Request: file.request}
 		before, err := profile.ReadRawFile(file.uid)
 		if err != nil {
 			result.Err = err
-			return result
-		}
-		if file.mode == fileSource {
-			result.Lines = strings.Split(terminalFileText(before), "\n")
 			return result
 		}
 		generated, err := profile.GenerateSourcePreview(before)
@@ -69,12 +68,7 @@ func (s State) loadFileView() (State, tea.Cmd) {
 			return result
 		}
 		result.Err = generated.MergeErr
-		effective := terminalFileText(generated.Data)
-		if file.mode == fileDiff {
-			result.Diff = profile.DiffFiles(terminalFileText(before), effective)
-		} else {
-			result.Lines = strings.Split(effective, "\n")
-		}
+		result.Diff = profile.DiffFiles(terminalFileText(before), terminalFileText(generated.Data))
 		return result
 	}
 }
@@ -103,7 +97,7 @@ func (f *fileView) scroll(delta, width, height int) {
 		f.selected = min(max(0, f.selected+delta), len(fileOptions)-1)
 		return
 	}
-	rows := max(len(f.lines), len(f.diff))
+	rows := len(f.diff)
 	f.top = min(max(0, f.top+delta), max(0, rows-f.rowBudget(width, height)))
 }
 
@@ -162,6 +156,13 @@ func (f fileView) dialog(width, height int) dialog.Dialog {
 			}
 		}
 		body = strings.Join(items, "\n")
+		if f.err != nil {
+			message := terminalFileText([]byte(f.err.Error()))
+			if errors.Is(f.err, profile.ErrRawNotFound) {
+				message = i18n.T("sub.err.raw_not_found")
+			}
+			body += "\n" + ansi.Wrap(message, w-4, "")
+		}
 	} else {
 		title = i18n.T(fileOptions[f.selected])
 		body = f.renderFile(w-4, width, height)
@@ -175,21 +176,13 @@ func (f fileView) renderFile(inner, pageWidth, height int) string {
 	if f.loading {
 		return i18n.T("sub.file.loading")
 	}
-	if f.err != nil && len(f.lines)+len(f.diff) == 0 {
+	if f.err != nil && len(f.diff) == 0 {
 		if errors.Is(f.err, profile.ErrRawNotFound) {
 			return i18n.T("sub.err.raw_not_found")
 		}
 		return terminalFileText([]byte(f.err.Error()))
 	}
 	budget := f.rowBudget(pageWidth, height)
-	if f.mode != fileDiff {
-		from := min(f.top, max(0, len(f.lines)-budget))
-		var body []string
-		for _, line := range f.lines[from:min(len(f.lines), from+budget)] {
-			body = append(body, ansi.Cut(line, f.column, f.column+inner))
-		}
-		return strings.Join(body, "\n")
-	}
 	if len(f.diff) == 0 {
 		return i18n.T("sub.file.same")
 	}
