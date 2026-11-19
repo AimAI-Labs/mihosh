@@ -106,6 +106,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // onPageChange 页面切换处理
 func (m *Model) onPageChange() tea.Cmd {
+	cmd := m.refreshMenu()
+	switch m.currentPage {
+	case layout.PageConnections:
+		if cmd != nil {
+			m.connsState = m.connsState.ResetPrevConnIDs()
+			return tea.Batch(cmd, connTick())
+		}
+	case layout.PageLogs:
+		return logsTick()
+	}
+	return cmd
+}
+
+func (m *Model) refreshMenu() tea.Cmd {
 	m.err = nil
 	if m.connectionChecked && !m.connectionReady && m.currentPage != layout.PageCore && m.currentPage != layout.PageSub && m.currentPage != layout.PageSettings && m.currentPage != layout.PageLogs {
 		return nil
@@ -113,17 +127,20 @@ func (m *Model) onPageChange() tea.Cmd {
 	switch m.currentPage {
 	case layout.PageCore:
 		return m.coreState.Refresh()
+	case layout.PageNodes:
+		return m.fetchNodes()
 	case layout.PageConnections:
-		m.connsState = m.connsState.ResetPrevConnIDs()
-		return tea.Batch(connections.FetchConnections(m.client), connTick())
+		return connections.FetchConnections(m.client)
 	case layout.PageLogs:
 		m.syncProcessLogs()
-		return logsTick()
 	case layout.PageRules:
 		return rules.FetchRules(m.client)
 	case layout.PageSub:
 		return sub.FetchSubs(m.profileSvc)
 	case layout.PageSettings:
+		if m.configSvc != nil {
+			m.reloadStoredConfig()
+		}
 		return preferences.FetchMihomoVersion(m.client)
 	}
 	return nil

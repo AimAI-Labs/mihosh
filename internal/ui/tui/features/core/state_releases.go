@@ -145,7 +145,7 @@ func (s State) openTab(tab int) (State, tea.Cmd) {
 	if s.tab == 4 {
 		return s, s.editor.Refresh()
 	}
-	return s, nil
+	return s, s.Refresh()
 }
 
 func (s State) applyReleasePage(page coreinfra.ReleasePage) State {

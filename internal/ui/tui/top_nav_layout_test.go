@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -96,6 +97,25 @@ func TestMouseClickTopNavDoesNotActivateTopNavBorder(t *testing.T) {
 
 	if next.(Model).topNavActive() {
 		t.Fatal("expected top nav mouse click not to activate top nav border")
+	}
+}
+
+func TestClickingCurrentNodesMenuRefreshesNodes(t *testing.T) {
+	m := Model{
+		currentPage:       layout.PageNodes,
+		width:             100,
+		height:            30,
+		client:            api.NewClient(config.MihomoEndpoint{ExternalController: "127.0.0.1:9090"}, 1000),
+		connectionChecked: true,
+		connectionReady:   true,
+	}
+	_, cmd := m.Update(tea.MouseMsg{X: 2, Y: 1, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	if cmd == nil {
+		t.Fatal("clicking the current Nodes menu should request updated data")
+	}
+	batch, ok := cmd().(tea.BatchMsg)
+	if !ok || len(batch) != 3 {
+		t.Fatalf("expected groups, proxies, and mode refresh, got %v", batch)
 	}
 }
 

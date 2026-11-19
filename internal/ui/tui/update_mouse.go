@@ -100,6 +100,9 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		if msg.Y >= 0 && msg.Y < layout.TopNavHeight {
 			clickedPage := layout.GetClickedTopNavPageForState(msg.X, msg.Y, m.width, m.currentPage, layout.TopNavRefreshStatus{Enabled: m.autoRefreshInterval() > 0, SecondsRemaining: m.autoRefreshRemaining, Interval: m.autoRefreshInterval(), Synced: m.autoRefreshSynced})
 			if clickedPage >= 0 && clickedPage < layout.PageCount {
+				if clickedPage == m.currentPage {
+					return m, m.refreshMenu()
+				}
 				m.onPageLeave()
 				m.currentPage = clickedPage
 				return m, m.onPageChange()
