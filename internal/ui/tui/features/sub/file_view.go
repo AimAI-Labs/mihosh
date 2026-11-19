@@ -32,6 +32,7 @@ var diffOptions = []struct {
 	{"sub.file.diff_indent", profile.DiffIgnoreIndent},
 	{"sub.file.diff_whitespace", profile.DiffIgnoreWhitespace},
 	{"sub.file.diff_format", profile.DiffIgnoreFormatCharacters},
+	{"sub.file.diff_punctuation", profile.DiffIgnorePunctuation},
 }
 
 type fileView struct {

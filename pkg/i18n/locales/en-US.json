@@ -743,6 +743,7 @@
   "sub.file.diff_indent": "Ignore indentation",
   "sub.file.diff_whitespace": "Ignore other whitespace",
   "sub.file.diff_format": "Ignore invisible characters",
+  "sub.file.diff_punctuation": "Ignore punctuation and symbols",
   "sub.file.hint": "↑↓ Scroll · ←→ Pan · Esc Back",
   "sub.copy_source": "Copy",
   "sub.copy_source_done": "Subscription source sent to clipboard",

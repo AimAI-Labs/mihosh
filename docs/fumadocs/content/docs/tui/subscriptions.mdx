@@ -22,7 +22,7 @@ Place `.yaml` or `.yml` profiles in `raw/` under the Mihosh configuration root. 
 
 Press `c` to choose the source snapshot, the activated configuration generated with `merge.yaml`, or a diff. The source and activated views open read-only temporary copies in Vim and use One Dark Pro for YAML highlighting. Make sure `vim` is on PATH. The copies are removed when Vim exits. The views also work for inactive subscriptions. The diff uses side-by-side panes from 100 columns and stacked panes in narrower terminals.
 
-In a diff, press `o` or click **Diff options** to ignore indentation, other whitespace, or invisible format characters such as a BOM and zero-width characters. The options affect comparisons. The panes still show the source and generated lines.
+In a diff, press `o` or click **Diff options** to ignore indentation, other whitespace, invisible format characters such as a BOM, or punctuation and symbols. All options start off because some of these characters have meaning in YAML. The panes still show the source and generated lines.
 
 ## Interface Features
 

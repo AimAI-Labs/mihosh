@@ -20,6 +20,7 @@ const (
 	DiffIgnoreIndent FileDiffOptions = 1 << iota
 	DiffIgnoreWhitespace
 	DiffIgnoreFormatCharacters
+	DiffIgnorePunctuation
 )
 
 func DiffFiles(before, after string, options FileDiffOptions) []FileDiffRow {
@@ -76,6 +77,14 @@ func diffKeys(lines []string, options FileDiffOptions) []string {
 		if options&DiffIgnoreWhitespace != 0 {
 			text = strings.Map(func(r rune) rune {
 				if unicode.IsSpace(r) {
+					return -1
+				}
+				return r
+			}, text)
+		}
+		if options&DiffIgnorePunctuation != 0 {
+			text = strings.Map(func(r rune) rune {
+				if unicode.IsPunct(r) || unicode.IsSymbol(r) {
 					return -1
 				}
 				return r
