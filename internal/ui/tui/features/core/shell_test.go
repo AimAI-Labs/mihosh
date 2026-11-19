@@ -62,7 +62,7 @@ func TestShellProxyDialogInstallsStartupAndShowsRefreshCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	startup, err := os.ReadFile(s.shellPath)
-	if err != nil || !strings.Contains(string(startup), "proxy.sh") {
+	if err != nil || !strings.Contains(string(startup), " activate zsh)") {
 		t.Fatal("TUI did not install shell startup", err)
 	}
 	if !strings.Contains(ansi.Strip(s.Render(120, 30)), "source '") {

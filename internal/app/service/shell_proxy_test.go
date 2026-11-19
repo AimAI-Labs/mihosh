@@ -14,6 +14,7 @@ import (
 
 const fakeShellProxy = `#!/bin/sh
 printf '%s\n' "$MIHOSH_CONFIG_DIR" >> "$MIHOSH_SHELL_ROOT_LOG"
+if [ "$1" = proxy ]; then shift; fi
 case "$1" in
 on)
   if [ "${MIHOSH_SHELL_FAIL-}" = 1 ]; then
@@ -32,7 +33,7 @@ off)
 test)
   printf 'arg:%s\n' "$@" >> "$MIHOSH_SHELL_ARGS_FILE"
   ;;
-env)
+env|activate)
   cat "$MIHOSH_SHELL_ENV_SCRIPT"
   ;;
 *) exit 24 ;;
@@ -130,13 +131,14 @@ func TestSaveShellProxyPersistsPreferenceAndPrivateDynamicLoader(t *testing.T) {
 	path := filepath.Join(root, "proxy.sh")
 	rc, err := os.ReadFile(startup)
 	require.NoError(t, err)
-	require.Contains(t, string(rc), ShellProxySourceCommand(path))
+	require.Contains(t, string(rc), "eval \"$(MIHOSH_CONFIG_DIR=")
+	require.Contains(t, string(rc), " activate bash)\"")
 	cfg, err := config.Load()
 	require.NoError(t, err)
 	require.True(t, cfg.ShellProxy)
 	loader, err := os.ReadFile(path)
 	require.NoError(t, err)
-	require.Contains(t, string(loader), " env) || return\n")
+	require.Contains(t, string(loader), " activate bash) || return\n")
 	require.NotContains(t, string(loader), "export ")
 	require.NotContains(t, string(loader), "http://")
 	info, err := os.Stat(path)
@@ -187,20 +189,54 @@ func TestSaveShellProxyPersistsPreferenceAndPrivateDynamicLoader(t *testing.T) {
 	require.Contains(t, output, "source-failed:1\n")
 }
 
+func TestActivationWrapsProxyCommandsWithoutChangingOtherArguments(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake executable uses a POSIX shebang")
+	}
+	for _, name := range []string{"bash", "zsh"} {
+		t.Run(name, func(t *testing.T) {
+			shell, err := exec.LookPath(name)
+			if err != nil {
+				t.Skip("shell unavailable")
+			}
+			f := newShellProxyFixture(t)
+			script, err := ShellActivationScript(name, false, f.executable, f.root)
+			require.NoError(t, err)
+			output := f.run(t, shell, script+`
+mihosh proxy on || exit
+printf 'enabled:%s\n' "$HTTP_PROXY"
+mihosh proxy test --output json || exit
+mihosh proxy off || exit
+printf 'disabled:%s\n' "${HTTP_PROXY-}"
+export HTTP_PROXY=existing MIHOSH_SHELL_FAIL=1
+mihosh proxy on
+printf 'failed:%s:%s\n' "$?" "$HTTP_PROXY"
+`)
+			require.Contains(t, output, "enabled:http://127.0.0.1:7890\n")
+			require.Contains(t, output, "disabled:\n")
+			require.Contains(t, output, "failed:23:existing\n")
+			args, err := os.ReadFile(f.args)
+			require.NoError(t, err)
+			require.Equal(t, "arg:test\narg:--output\narg:json\n", string(args))
+		})
+	}
+}
+
 func TestShellProxyStartupPreservesDotfilesAndUpdatesLoader(t *testing.T) {
 	for _, newline := range []string{"\n", "\r\n"} {
 		t.Run(strings.ReplaceAll(newline, "\n", "LF"), func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), ".zshrc")
 			original := "export MY_SETTING=keep" + newline
 			require.NoError(t, os.WriteFile(path, []byte(original), 0640))
-			require.NoError(t, installShellProxyStartup(path, "/old/proxy.sh"))
-			require.NoError(t, installShellProxyStartup(path, "/new ' $(touch injected)/proxy.sh"))
+			require.NoError(t, installShellProxyStartup(path, ShellProxySourceCommand("/old/proxy.sh")))
+			activation := "eval \"$(" + quoteShellProxy("/new ' $(touch injected)/mihosh") + " activate zsh)\""
+			require.NoError(t, installShellProxyStartup(path, activation))
 			data, err := os.ReadFile(path)
 			require.NoError(t, err)
 			require.True(t, strings.HasPrefix(string(data), original))
 			require.Equal(t, 1, strings.Count(string(data), "# >>> mihosh proxy >>>"))
 			require.NotContains(t, string(data), "/old/proxy.sh")
-			require.Contains(t, string(data), ShellProxySourceCommand("/new ' $(touch injected)/proxy.sh"))
+			require.Contains(t, string(data), activation)
 			info, err := os.Stat(path)
 			require.NoError(t, err)
 			if runtime.GOOS != "windows" {
@@ -213,7 +249,7 @@ func TestShellProxyStartupPreservesDotfilesAndUpdatesLoader(t *testing.T) {
 		target, link := filepath.Join(dir, "dotfile"), filepath.Join(dir, ".bashrc")
 		require.NoError(t, os.WriteFile(target, []byte("# keep\n"), 0600))
 		require.NoError(t, os.Symlink(target, link))
-		require.NoError(t, installShellProxyStartup(link, "/proxy.sh"))
+		require.NoError(t, installShellProxyStartup(link, ShellProxySourceCommand("/proxy.sh")))
 		actual, err := os.Readlink(link)
 		require.NoError(t, err)
 		require.Equal(t, target, actual)
@@ -244,7 +280,7 @@ func TestShellProxyStartupRejectsInvalidFilesAndUnsupportedShell(t *testing.T) {
 func TestShellProxyZshStartupUsesZdotdir(t *testing.T) {
 	t.Setenv("SHELL", "/bin/zsh")
 	t.Setenv("ZDOTDIR", t.TempDir())
-	path, err := shellProxyStartupFile()
+	path, err := shellProxyStartupFile("zsh")
 	require.NoError(t, err)
 	require.Equal(t, filepath.Join(os.Getenv("ZDOTDIR"), ".zshrc"), path)
 }

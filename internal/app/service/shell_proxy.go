@@ -22,15 +22,39 @@ func shellProxyCommand(executable, root string) string {
 
 // ShellProxyScript defines bash/zsh helpers and applies the saved preference to its caller.
 func ShellProxyScript(enabled bool, executable, root string) string {
-	command := shellProxyCommand(executable, root)
+	return shellProxyHelpers(enabled, shellProxyCommand(executable, root), "")
+}
+
+func ShellActivationScript(shell string, enabled bool, executable, root string) (string, error) {
+	if shell != "bash" && shell != "zsh" {
+		return "", errors.New("shell activation requires Bash or Zsh")
+	}
+	command := "command " + quoteShellProxy(executable)
+	proxyCommand := "MIHOSH_CONFIG_DIR=" + quoteShellProxy(root) + " " + command
+	wrapper := fmt.Sprintf(`mihosh() {
+  if [ "$#" -eq 2 ] && [ "$1" = proxy ] && { [ "$2" = on ] || [ "$2" = off ]; }; then
+    local _mihosh_exports
+    _mihosh_exports=$(%s proxy "$2") || return
+    eval "$_mihosh_exports"
+  elif [ "${1-}" = proxy ]; then
+    %s "$@"
+  else
+    %s "$@"
+  fi
+}
+`, proxyCommand, proxyCommand, command)
+	return wrapper + shellProxyHelpers(enabled, proxyCommand, "proxy "), nil
+}
+
+func shellProxyHelpers(enabled bool, command, prefix string) string {
 	var script strings.Builder
 	for _, action := range []string{"on", "off"} {
 		fmt.Fprintf(&script, `mihosh_proxy_%s() {
   local _mihosh_proxy_exports
-  _mihosh_proxy_exports=$(%s %s) || return
+  _mihosh_proxy_exports=$(%s %s%s) || return
   eval "$_mihosh_proxy_exports"
 }
-`, action, command, action)
+`, action, command, prefix, action)
 	}
 	script.WriteString("mihosh_proxy_status() {\n")
 	for _, name := range []string{"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "all_proxy", "no_proxy"} {
@@ -54,7 +78,8 @@ mihosh_proxy_test() {
 
 // SaveShellProxy installs a dynamic loader in the shell startup file and returns that file.
 func SaveShellProxy(enabled bool) (string, error) {
-	startup, err := shellProxyStartupFile()
+	shell := filepath.Base(os.Getenv("SHELL"))
+	startup, err := shellProxyStartupFile(shell)
 	if err != nil {
 		return "", err
 	}
@@ -74,11 +99,12 @@ func SaveShellProxy(enabled bool) (string, error) {
 		return "", err
 	}
 	path := filepath.Join(root, "proxy.sh")
-	loader := "_mihosh_proxy_script=$(" + shellProxyCommand(executable, root) + " env) || return\neval \"$_mihosh_proxy_script\" || {\n  unset _mihosh_proxy_script\n  return 1\n}\nunset _mihosh_proxy_script\n"
+	activate := shellProxyCommand(executable, root) + " activate " + shell
+	loader := "_mihosh_proxy_script=$(" + activate + ") || return\neval \"$_mihosh_proxy_script\" || {\n  unset _mihosh_proxy_script\n  return 1\n}\nunset _mihosh_proxy_script\n"
 	if err := privateWrite(path, []byte(loader)); err != nil {
 		return "", err
 	}
-	if err := installShellProxyStartup(startup, path); err != nil {
+	if err := installShellProxyStartup(startup, "eval \"$("+activate+")\""); err != nil {
 		return "", err
 	}
 	if err := config.Update(func(cfg *config.Config) error {
@@ -90,12 +116,12 @@ func SaveShellProxy(enabled bool) (string, error) {
 	return startup, nil
 }
 
-func shellProxyStartupFile() (string, error) {
+func shellProxyStartupFile(shell string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	switch filepath.Base(os.Getenv("SHELL")) {
+	switch shell {
 	case "bash":
 		return filepath.Join(home, ".bashrc"), nil
 	case "zsh":
@@ -108,7 +134,7 @@ func shellProxyStartupFile() (string, error) {
 	}
 }
 
-func installShellProxyStartup(startup, loader string) error {
+func installShellProxyStartup(startup, activation string) error {
 	// Follow dotfile symlinks so an atomic replacement keeps the user's dotfile layout.
 	if info, err := os.Lstat(startup); err == nil && info.Mode()&os.ModeSymlink != 0 {
 		target, err := filepath.EvalSymlinks(startup)
@@ -129,7 +155,7 @@ func installShellProxyStartup(startup, loader string) error {
 	if strings.Contains(text, "\r\n") {
 		newline = "\r\n"
 	}
-	block := strings.Join([]string{begin, "if [ -r " + quoteShellProxy(loader) + " ]; then", "  " + ShellProxySourceCommand(loader), "fi", end}, newline)
+	block := strings.Join([]string{begin, activation, end}, newline)
 	start, finish := strings.Index(text, begin), strings.Index(text, end)
 	if start >= 0 || finish >= 0 {
 		if start < 0 || finish < start || strings.Count(text, begin) != 1 || strings.Count(text, end) != 1 {

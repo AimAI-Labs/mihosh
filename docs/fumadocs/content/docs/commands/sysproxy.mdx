@@ -1,33 +1,21 @@
 ---
-title: "mihosh env / on/off"
-description: Apply proxy settings and test helpers in the current Bash/Zsh shell
+title: "mihosh activate and proxy"
+description: Manage the Mihomo proxy from Bash or Zsh
 ---
 
-## Description
-
-These commands print Bash/Zsh scripts. Use `eval` or `source` to apply both uppercase and lowercase `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` and `NO_PROXY` in the current shell. The proxy address follows the core's current mixed-port, and `NO_PROXY` excludes local addresses.
-
-- `mihosh env on/off`: Save the shell proxy preference, generate `~/.mihosh/proxy.sh`, automatically update your Bash/Zsh startup file, and prompt you to refresh your shell. Standard output still contains environment settings and test helpers.
-- `mihosh env`: Print a script using the saved preference; supports `--output plain|table|json`, with `plain` suitable for `eval`.
-- `mihosh on/off`: Print export/unset statements for the current shell without saving a preference.
-
-## Examples
+Initialize Bash with the saved proxy preference, then use `mihosh proxy` in that shell. For Zsh, pass `zsh` to `activate`.
 
 ```bash
-eval "$(mihosh env on)"
-mihosh_proxy_status
-mihosh_proxy_ip
-mihosh_proxy_test node 'Node name'
-mihosh_proxy_test group 'Proxy group'
-eval "$(mihosh env off)"
+eval "$(mihosh activate bash)"
+mihosh proxy on
+mihosh proxy test --output table
+mihosh proxy off
 ```
 
-`mihosh_proxy_on` / `mihosh_proxy_off` temporarily toggle the current shell. `mihosh_proxy_status` displays proxy variables. `mihosh_proxy_ip` checks the current node's delay, chain and exit IP. `mihosh_proxy_test` forwards arguments to `mihosh test`. Node checks require a running core and a reachable controller.
+`on` and `off` change the current shell's proxy variables. The address follows Mihomo's mixed port. Both uppercase and lowercase proxy variables are supported.
 
-In the TUI, open **Core > Advanced > Shell proxy environment** (shortcut `w`), select a preference and press `Enter`. Mihosh uses `SHELL` to update Bash's `~/.bashrc` or Zsh's `${ZDOTDIR:-$HOME}/.zshrc`, preserving existing settings without duplicate entries. Refresh your shell as prompted, for example:
+`proxy test` uses the configured Mihomo proxy to query two IP sources and shows the IP address, latency and any error for each source. For machine-readable results, pass `--output json`. [IP.SB API](https://ip.sb/api/) · [ipify API](https://www.ipify.org/)
 
-```bash
-source ~/.zshrc
-```
+In the TUI, toggle **Shell proxy environment** under **Core > Advanced** with `w`. Mihosh installs the initialization call in Bash's `~/.bashrc` or Zsh's `${ZDOTDIR:-$HOME}/.zshrc`. Reopen or reload the shell to apply it. Saving again updates the existing Mihosh block and keeps the rest of the startup file. After moving the executable, save again to update its path.
 
-With `MIHOSH_CONFIG_DIR`, the script lives in that directory. It binds the executable and configuration paths used when generated; save again after moving the executable. Other shells return an unsupported-shell error without editing startup files. Existing terminals need a shell refresh; new terminals apply the saved setting automatically. Exiting a session-mode TUI stops its owned core; use a background service or an existing external core to keep the proxy available afterward.
+The legacy `mihosh env`, `mihosh on` and `mihosh off` commands continue to work for existing scripts.

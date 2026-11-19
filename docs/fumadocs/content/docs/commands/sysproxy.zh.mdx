@@ -1,33 +1,21 @@
 ---
-title: mihosh env / on/off
-description: 在当前 Bash/Zsh 设置代理环境并加载测试函数
+title: mihosh activate 与 proxy
+description: 在 Bash 或 Zsh 中管理 Mihomo 代理
 ---
 
-## 说明
-
-这些命令输出 Bash/Zsh 脚本。通过 `eval` 或 `source` 在当前 shell 应用，设置大小写两组 `HTTP_PROXY`、`HTTPS_PROXY`、`ALL_PROXY`、`NO_PROXY`。代理地址每次从当前内核的 mixed-port 读取，`NO_PROXY` 排除本地地址。
-
-- `mihosh env on/off`：保存终端代理偏好，生成 `~/.mihosh/proxy.sh`，自动写入当前 Bash/Zsh 启动文件，并提示刷新 shell。标准输出仍为环境设置和测试函数。
-- `mihosh env`：按保存的偏好输出脚本；支持 `--output plain|table|json`，默认 `plain` 可供 `eval` 使用。
-- `mihosh on/off`：只输出当前 shell 的 export/unset，不保存偏好。
-
-## 示例
+先加载保存的终端代理设置，再在当前 shell 使用 `mihosh proxy`。Zsh 用户将 `bash` 换成 `zsh`。
 
 ```bash
-eval "$(mihosh env on)"
-mihosh_proxy_status
-mihosh_proxy_ip
-mihosh_proxy_test node '节点名称'
-mihosh_proxy_test group '代理组名称'
-eval "$(mihosh env off)"
+eval "$(mihosh activate bash)"
+mihosh proxy on
+mihosh proxy test --output table
+mihosh proxy off
 ```
 
-`mihosh_proxy_on` / `mihosh_proxy_off` 临时切换当前 shell；`mihosh_proxy_status` 显示代理变量；`mihosh_proxy_ip` 执行当前节点的延迟、链路与出口 IP 检查；`mihosh_proxy_test` 将参数交给 `mihosh test`。节点检查需要内核运行且控制器可连接。
+`on` 和 `off` 切换当前 shell 的代理变量。代理地址取自 Mihomo 的 mixed-port，同时支持大小写两组代理环境变量。
 
-TUI 中进入 **Core → 高级设置 → 终端代理环境**（快捷键 `w`），选择开关并按 `Enter` 保存。程序根据 `SHELL` 自动更新 Bash 的 `~/.bashrc` 或 Zsh 的 `${ZDOTDIR:-$HOME}/.zshrc`，保留已有配置，重复保存不会重复添加。按界面提示刷新 shell，例如：
+`proxy test` 通过已配置的 Mihomo 代理查询两个 IP 数据源，逐项显示出口 IP、延迟和错误。`--output json` 可输出供脚本读取的结果。 [IP.SB API](https://ip.sb/api/) · [ipify API](https://www.ipify.org/)
 
-```bash
-source ~/.zshrc
-```
+在 TUI 的 **Core → 高级设置 → 终端代理环境** 按 `w` 切换偏好。Mihosh 会将初始化命令写入 Bash 的 `~/.bashrc` 或 Zsh 的 `${ZDOTDIR:-$HOME}/.zshrc`。重新打开或刷新 shell 后生效。重复保存会更新已有的 Mihosh 区块，并保留文件中的其他设置。移动可执行文件后可重新保存以更新路径。
 
-设置 `MIHOSH_CONFIG_DIR` 时，脚本位于该配置目录。脚本绑定生成时的 Mihosh 路径与配置目录；移动可执行文件后重新保存。其他 shell 会提示不支持，不会写入启动文件。现有终端需刷新 shell 或打开新终端才会应用。会话模式退出 TUI 会停止它拥有的内核；若退出后继续使用代理，请使用后台服务或已有外部内核。
+现有脚本仍可使用 `mihosh env`、`mihosh on` 和 `mihosh off`。

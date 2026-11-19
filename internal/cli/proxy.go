@@ -88,12 +88,12 @@ var proxyOffCmd = &cobra.Command{
 	RunE:    runProxyOff,
 }
 
-func runProxyOn(cmd *cobra.Command, args []string) error {
+func configuredProxyAddress() (string, error) {
 	// 代理地址由 mihomo 配置文件的 mixed-port 派生；自动发现失败回退默认端口。
 	// 先确保配置目录存在（首次运行）：on 是"开关"型命令，不应因缺配置卡住。
 	if _, err := config.Load(); err != nil {
 		if !errors.Is(err, config.ErrConfigNotFound) {
-			return wrapConfigError(fmt.Errorf(i18n.T("cli.proxy.err_load_config")+": %w", err))
+			return "", wrapConfigError(fmt.Errorf(i18n.T("cli.proxy.err_load_config")+": %w", err))
 		}
 	}
 
@@ -103,18 +103,24 @@ func runProxyOn(cmd *cobra.Command, args []string) error {
 	parsed, err := normalizeDoctorProxyURL(addr)
 	if err != nil {
 		if strings.TrimSpace(addr) == "" {
-			return wrapParameterError(fmt.Errorf("%s", i18n.T("cli.proxy.empty_address")))
+			return "", wrapParameterError(fmt.Errorf("%s", i18n.T("cli.proxy.empty_address")))
 		}
-		return wrapParameterError(fmt.Errorf(i18n.T("cli.proxy.invalid_address"), addr))
+		return "", wrapParameterError(fmt.Errorf(i18n.T("cli.proxy.invalid_address"), addr))
 	}
-	addr = parsed.String()
+	return parsed.String(), nil
+}
 
-	writeProxyOn(os.Stdout, os.Stderr, addr)
+func runProxyOn(cmd *cobra.Command, _ []string) error {
+	addr, err := configuredProxyAddress()
+	if err != nil {
+		return err
+	}
+	writeProxyOn(cmd.OutOrStdout(), cmd.ErrOrStderr(), addr)
 	return nil
 }
 
-func runProxyOff(cmd *cobra.Command, args []string) error {
-	writeProxyOff(os.Stdout, os.Stderr)
+func runProxyOff(cmd *cobra.Command, _ []string) error {
+	writeProxyOff(cmd.OutOrStdout(), cmd.ErrOrStderr())
 	return nil
 }
 

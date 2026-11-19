@@ -45,7 +45,7 @@ func TestEnvCommandPersistsSettingsAndSupportsAllFormats(t *testing.T) {
 				t.Fatal("CLI did not create a source script", err)
 			}
 			startup, err := os.ReadFile(filepath.Join(root, ".bashrc"))
-			if err != nil || !strings.Contains(string(startup), "proxy.sh") {
+			if err != nil || !strings.Contains(string(startup), " activate bash)") {
 				t.Fatal("CLI did not install shell startup", err)
 			}
 			switch format {

@@ -16,6 +16,7 @@ func newEnvCommand() *cobra.Command {
 	var output string
 	cmd := &cobra.Command{
 		Use:     "env [on|off]",
+		Hidden:  true,
 		Example: "  eval \"$(mihosh env on)\"\n  eval \"$(mihosh env off)\"\n  mihosh env --output json",
 		Args: func(_ *cobra.Command, args []string) error {
 			if len(args) > 1 || len(args) == 1 && args[0] != "on" && args[0] != "off" {
