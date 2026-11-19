@@ -26,6 +26,18 @@ func coreKey(key string) tea.KeyMsg {
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)}
 }
 
+func selectTestAction(t *testing.T, state State, action string) State {
+	t.Helper()
+	for index, item := range state.actions() {
+		if item.action == action {
+			state.selected = index
+			return state
+		}
+	}
+	t.Fatalf("action %q is missing", action)
+	return state
+}
+
 func TestCoreFirstUseExplainsNextStepWithoutConnectionDiagnostics(t *testing.T) {
 	i18n.Init()
 	i18n.SetLanguageOverride("zh-CN")
@@ -65,6 +77,8 @@ func TestCoreEnterFollowsSelectionAndServiceMenuCapturesKeys(t *testing.T) {
 		t.Fatal("removed subscription shortcut still performs an action")
 	}
 	s, _ = s.Update(coreKey("3"))
+	s = selectTestAction(t, s, "service")
+	s.selected--
 	s, _ = s.Update(coreKey("down"))
 	s, cmd = s.Update(coreKey("enter"))
 	if !s.Editing || s.form != "service" || s.Busy || cmd != nil {
@@ -121,6 +135,8 @@ func TestCoreMenuWheelSelectsAndKeepsActionsVisible(t *testing.T) {
 		}
 	}
 	s := State{tab: 2, followSelection: true}
+	s = selectTestAction(t, s, "service")
+	s.selected--
 	s, _ = s.Update(messages.PageMouseScrollMsg{Width: 120, Height: 30})
 	s, cmd := s.Update(coreKey("enter"))
 	if !s.Editing || s.form != "service" || cmd != nil {
@@ -144,7 +160,7 @@ func TestCoreTabsCanBeSelectedByMouse(t *testing.T) {
 	i18n.Init()
 	i18n.SetLanguageOverride("en-US")
 	t.Cleanup(func() { i18n.SetLanguageOverride("") })
-	s := State{followSelection: true}
+	s := State{tab: 1, followSelection: true}
 	view := ansi.Strip(s.Render(120, 28))
 	for _, label := range []string{"1 Daily use", "2 Versions", "3 Advanced"} {
 		if strings.Contains(view, label) {
@@ -154,7 +170,7 @@ func TestCoreTabsCanBeSelectedByMouse(t *testing.T) {
 	for y, line := range strings.Split(view, "\n") {
 		if at := strings.Index(line, "Advanced"); at >= 0 {
 			next, cmd := s.Update(messages.PageMouseClickMsg{X: lipgloss.Width(line[:at]), Y: y, Width: 120, Height: 28})
-			if next.tab != 2 || next.Busy || next.Editing || cmd != nil {
+			if next.tab != 0 || next.Busy || next.Editing || cmd != nil {
 				t.Fatal("tab click did not change section without running an action")
 			}
 			return
@@ -189,13 +205,10 @@ func TestCoreVisibleMouseTargetsMatchAfterViewportScrolling(t *testing.T) {
 		i18n.SetLanguageOverride(language)
 		for _, width := range []int{64, 80, 100, 120} {
 			for _, height := range []int{12, 28} {
-				for _, target := range []struct {
-					index  int
-					action string
-				}{{0, "network"}, {4, "configure"}} {
+				for _, action := range []string{"network", "configure"} {
 					s := NewState(svc, nil, nil).selectTab(2)
-					s.selected = target.index
-					label := i18n.T("core.action." + target.action)
+					s = selectTestAction(t, s, action)
+					label := i18n.T("core.action." + action)
 					view := ansi.Strip(s.Render(width, height))
 					found := false
 					for y, line := range strings.Split(view, "\n") {
@@ -205,14 +218,14 @@ func TestCoreVisibleMouseTargetsMatchAfterViewportScrolling(t *testing.T) {
 						}
 						x := lipgloss.Width(line[:at]) + 1
 						next, _ := s.Update(messages.PageMouseClickMsg{X: x, Y: y, Width: width, Height: height})
-						if !next.Editing || next.form != target.action {
-							t.Fatalf("%s %dx%d: click on visible %s did not open its form", language, width, height, target.action)
+						if !next.Editing || next.form != action {
+							t.Fatalf("%s %dx%d: click on visible %s did not open its form", language, width, height, action)
 						}
 						found = true
 						break
 					}
 					if !found {
-						t.Fatalf("%s %dx%d: selected %s is not visible:\n%s", language, width, height, target.action, view)
+						t.Fatalf("%s %dx%d: selected %s is not visible:\n%s", language, width, height, action, view)
 					}
 				}
 			}

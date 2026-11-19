@@ -102,7 +102,7 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 
 func isChoiceForm(kind string) bool {
 	switch kind {
-	case "configure", "recover", "geo-update", "basic-config":
+	case "configure", "recover", "geo-update", "basic-config", "stop", "restart", "api:restart", "api:update_geo":
 		return true
 	}
 	return false
@@ -222,6 +222,9 @@ func (s State) submitChoice() (State, tea.Cmd) {
 	s = s.closeForm()
 	if action == "geo-update" {
 		s.args = args
+	}
+	if id, ok := strings.CutPrefix(action, "api:"); ok {
+		return s.runCoreAPIAction(id)
 	}
 	return s.begin(action)
 }

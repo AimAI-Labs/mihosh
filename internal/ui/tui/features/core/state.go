@@ -82,6 +82,9 @@ func (s State) Refresh() tea.Cmd {
 	if s.tab == 4 {
 		return tea.Batch(status, s.editor.Refresh())
 	}
+	if s.isAdvancedPage() && runtime.GOOS == "linux" && s.Status.Mode != "managed" {
+		return tea.Batch(status, preferences.FetchSysStatusCmd())
+	}
 	return status
 }
 func (s *State) Close() {
@@ -256,6 +259,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		return s, nil
 	case messages.CoreActionDoneMsg, messages.CoreActionErrorMsg:
 		s.editor = s.editor.ClearActionStates()
+		return s, nil
+	case messages.SysStatusResultMsg:
+		s.editor.SysStatus.Update(msg)
 		return s, nil
 	case messages.CoreConnectionMsg:
 		s.connected = msg.Err == nil
@@ -465,7 +471,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case "b":
 			return s.begin("rollback")
 		case "z":
-			return s.begin("restart")
+			return s.choose("restart")
 		case "u":
 			return s.editForm("external")
 		case "p":
@@ -480,7 +486,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case "s":
 			return s.begin("start")
 		case "x":
-			return s.begin("stop")
+			return s.choose("stop")
 		case "e":
 			return s.editForm("network")
 		case "w":

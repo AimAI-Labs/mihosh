@@ -258,6 +258,7 @@ type Status struct {
 	MixedPort        int      `json:"mixed_port"`
 	Runtime          string   `json:"runtime"`
 	ServiceInstalled bool     `json:"service_installed"`
+	ServiceRunning   bool     `json:"service_running"`
 	AutoStart        bool     `json:"auto_start"`
 	SystemProxy      bool     `json:"system_proxy"`
 	TUN              bool     `json:"tun"`

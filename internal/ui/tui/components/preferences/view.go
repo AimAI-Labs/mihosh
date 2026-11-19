@@ -67,17 +67,13 @@ type PageState struct {
 
 	MihomoVersion string
 
-	ActiveTab         int
-	MihomoConfig      *model.MihomoConfig
-	MihomoLoaded      bool
-	MihomoLoadErr     error
-	MihomoFromFile    bool // API 不可达时从 YAML 降级读取
-	IsCoreUpgrading   bool
-	IsCoreRestarting  bool
-	IsConfigReloading bool
-	IsGeoUpdating     bool
-	SysStatus         SysStatusState
-	SysLogs           []model.LogEntry
+	ActiveTab      int
+	MihomoConfig   *model.MihomoConfig
+	MihomoLoaded   bool
+	MihomoLoadErr  error
+	MihomoFromFile bool // API 不可达时从 YAML 降级读取
+	SysStatus      SysStatusState
+	SysLogs        []model.LogEntry
 }
 
 func (p PageState) activeKeys() []string {
@@ -149,7 +145,7 @@ func buildSettingsLayoutBase(state PageState, width int) (parts []string, descRo
 	listContent := strings.Join(settingItems, "\n")
 	settingsPanel := common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width)
 
-	var actionsPanel, warningText string
+	var warningText string
 	if state.ActiveTab == 1 {
 		if !state.MihomoLoaded {
 			listContent = "\n  " + i18n.T("settings.mihomo.loading") + "\n"
@@ -161,44 +157,6 @@ func buildSettingsLayoutBase(state PageState, width int) (parts []string, descRo
 			warningText = "⚠ " + i18n.T("settings.mihomo.offline_warning")
 		}
 
-		loadingBtn := lipgloss.NewStyle().Background(common.TokyoMuted()).Foreground(common.TokyoForeground()).Padding(0, 1).MarginRight(1)
-		renderBtn := func(btn ActionButton) string {
-			isLoading := false
-			bgColor := common.TokyoCyan()
-			switch btn.ID {
-			case "upgrade_auto", "upgrade_release", "upgrade_alpha":
-				isLoading = state.IsCoreUpgrading
-				bgColor = common.TokyoCyan()
-			case "restart":
-				isLoading = state.IsCoreRestarting
-				bgColor = common.TokyoRed()
-			case "reload":
-				isLoading = state.IsConfigReloading
-				bgColor = common.TokyoGreen()
-			case "update_geo":
-				isLoading = state.IsGeoUpdating
-				bgColor = common.TokyoGreen()
-			case "flush_dns", "flush_fakeip":
-				bgColor = common.TokyoYellow()
-			}
-			if isLoading {
-				return loadingBtn.Render(btn.Label + "...")
-			}
-			return lipgloss.NewStyle().Background(bgColor).Foreground(common.Background()).Padding(0, 1).MarginRight(1).Render(btn.Label)
-		}
-
-		rows := LayoutActionButtons(width, state.Config)
-		var rowStrings []string
-		for _, row := range rows {
-			var rowNodes []string
-			for _, btn := range row {
-				rowNodes = append(rowNodes, renderBtn(btn))
-			}
-			rowStrings = append(rowStrings, lipgloss.JoinHorizontal(lipgloss.Left, rowNodes...))
-		}
-
-		actionsBody := "\n" + strings.Join(rowStrings, "\n\n") + "\n"
-		actionsPanel = lipgloss.NewStyle().MarginTop(1).Render(common.RenderTokyoPanel(i18n.T("settings.action.panel_title"), actionsBody, width))
 	}
 
 	// 渲染选中项描述（信息行右侧，配置框右下方提示）已按需求取消
@@ -234,9 +192,6 @@ func buildSettingsLayoutBase(state PageState, width int) (parts []string, descRo
 		Render(descRowContent)
 
 	parts = []string{tabBar, "", settingsPanel}
-	if actionsPanel != "" {
-		parts = append(parts, actionsPanel)
-	}
 
 	return parts, descRow, versionText
 }
@@ -269,7 +224,7 @@ func renderSettingsPage(state PageState, width, height int, standalone bool) str
 		parts = parts[2:] // Core already supplies the section header.
 	}
 
-	if state.ActiveTab == 1 && state.SysStatus.Supported && state.SysStatus.Viewport.Height > 0 {
+	if standalone && state.ActiveTab == 1 && state.SysStatus.Supported && state.SysStatus.Viewport.Height > 0 {
 		statusView := lipgloss.NewStyle().MarginTop(1).Render(common.RenderTokyoPanel(
 			i18n.T("settings.sys_status.panel_title"),
 			"\n"+state.SysStatus.Viewport.View()+"\n",

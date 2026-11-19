@@ -80,6 +80,9 @@ func (s State) actionPanel(width int, serviceMenu bool) (string, []actionHit, []
 	}
 	for i, item := range items {
 		prefix, titleKey, descKey := "  ", "core.action."+item.action, "core.desc."+item.action
+		if id, ok := strings.CutPrefix(item.action, "api:"); ok {
+			titleKey, descKey = "settings.action."+id, ""
+		}
 		if serviceMenu {
 			titleKey, descKey = "core.service."+item.action, "core.service.desc."+item.action
 		}
@@ -90,7 +93,10 @@ func (s State) actionPanel(width int, serviceMenu bool) (string, []actionHit, []
 		if item.key != "" && item.key != "enter" {
 			label += " [" + item.key + "]"
 		}
-		desc := "  " + strings.ReplaceAll(wrap(i18n.T(descKey), width-6), "\n", "\n  ")
+		var desc string
+		if descKey != "" {
+			desc = "  " + strings.ReplaceAll(wrap(i18n.T(descKey), width-6), "\n", "\n  ")
+		}
 		if enabled, isSwitch := s.switchValue(item.action); isSwitch && !serviceMenu {
 			switchStr, offOff, offW, onOff, onW := renderInlineSwitch(enabled, innerW)
 			switchW := lipgloss.Width(switchStr)
@@ -135,10 +141,16 @@ func (s State) actionPanel(width int, serviceMenu bool) (string, []actionHit, []
 		if i == s.selected {
 			label = selected.Render(common.PadString(label, innerW))
 		}
-		hit := actionHit{x: 1, y: len(rows) + 1, width: width - 2, height: 1 + lipgloss.Height(desc), index: i}
+		height := 1
+		if desc != "" {
+			height += lipgloss.Height(desc)
+		}
+		hit := actionHit{x: 1, y: len(rows) + 1, width: width - 2, height: height, index: i}
 		hits = append(hits, hit)
 		rows = append(rows, label)
-		rows = append(rows, strings.Split(muted.Render(desc), "\n")...)
+		if desc != "" {
+			rows = append(rows, strings.Split(muted.Render(desc), "\n")...)
+		}
 	}
 	title := "core.tab." + tabs[s.tab]
 	if serviceMenu {
@@ -185,7 +197,7 @@ func (s State) overview(width int) string {
 		rows = append(rows, lipgloss.NewStyle().Foreground(theme.Resolve(t.Warning)).Render(wrap(i18n.T("core.connection_unavailable"), width-4)))
 	}
 	switch s.tab {
-	case 0:
+	case 0, 2:
 		value := func(text string) string {
 			if text == "" {
 				return i18n.T("core.unknown_version")
@@ -217,6 +229,26 @@ func (s State) overview(width int) string {
 				runtime = "core.runtime.service"
 			}
 			rows = append(rows, i18n.T("core.runtime")+": "+i18n.T(runtime))
+			if s.Status.Runtime == "service" {
+				state := "core.service.status_not_installed"
+				if s.Status.ServiceInstalled {
+					state = "core.service.status_stopped"
+					if s.Status.ServiceRunning {
+						state = "core.service.status_running"
+					}
+				}
+				rows = append(rows, wrap(i18n.T("settings.sys_status.panel_title")+": "+i18n.T(state), width-4))
+				autoStart := "core.disabled"
+				if s.Status.AutoStart {
+					autoStart = "core.enabled"
+				}
+				rows = append(rows, wrap(i18n.T("core.autostart")+": "+i18n.T(autoStart), width-4))
+			}
+		} else if s.editor.SysStatus.LastOutput != "" {
+			rows = append(rows, "", wrap(s.editor.SysStatus.LastOutput, width-4))
+		}
+		if s.Status.RecoveryPending {
+			rows = append(rows, lipgloss.NewStyle().Foreground(theme.Resolve(t.Warning)).Render(wrap(i18n.T("core.hint.recovery"), width-4)))
 		}
 	case 1:
 		tag := s.Release.Tag
@@ -261,7 +293,11 @@ func (s State) layout(width, height int) pageLayout {
 	if s.tab == 3 {
 		downloads = 3
 	}
-	tabText, hits := renderCoreTabRow(width, 1, s.tab, []coreTabItem{{0, "daily"}, {downloads, "downloads"}, {2, "advanced"}, {4, "mihomo"}})
+	selectedTab := s.tab
+	if s.isAdvancedPage() {
+		selectedTab = 0
+	}
+	tabText, hits := renderCoreTabRow(width, 1, selectedTab, []coreTabItem{{0, "advanced"}, {downloads, "downloads"}, {4, "mihomo"}})
 	result.tabs = hits
 	if s.tab == 1 || s.tab == 3 {
 		sections, hits := renderCoreTabRow(width, 2, s.tab, []coreTabItem{{1, "versions"}, {3, "geo"}})

@@ -8,7 +8,6 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/preferences"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
@@ -57,9 +56,14 @@ func TestCoreMihomoConfigRetainsEnumSaveAndSingleManagedActions(t *testing.T) {
 	require.False(t, s.InputCapture().Active)
 	cfg, err := config.Load()
 	require.NoError(t, err)
+	advanced := s.selectTab(2)
+	advanced.Status.Mode = cfg.Core.Mode
+	advanced.connected = true
 	var actions []string
-	for _, button := range preferences.GetActionButtons(cfg) {
-		actions = append(actions, button.ID)
+	for _, item := range advanced.actions() {
+		if id, ok := strings.CutPrefix(item.action, "api:"); ok {
+			actions = append(actions, id)
+		}
 	}
 	require.Equal(t, []string{"reload", "flush_dns", "flush_fakeip"}, actions)
 	for _, action := range (State{tab: 2}).actions() {
@@ -70,7 +74,7 @@ func TestCoreMihomoConfigRetainsEnumSaveAndSingleManagedActions(t *testing.T) {
 		for _, width := range []int{80, 120} {
 			view := ansi.Strip(s.Render(width, 24))
 			require.Contains(t, view, i18n.T("settings.label.log-level"))
-			require.Contains(t, view, i18n.T("settings.action.flush_fakeip"))
+			require.NotContains(t, view, i18n.T("settings.action.flush_fakeip"))
 			require.NotContains(t, view, "core.desc.")
 		}
 	}

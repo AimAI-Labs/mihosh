@@ -15,33 +15,30 @@ import (
 
 func (s State) choiceLayout(width int) pageLayout {
 	t := theme.Current()
+	title := i18n.T("core.action." + s.form)
 	desc := i18n.T("core.desc." + s.form)
+	if id, ok := strings.CutPrefix(s.form, "api:"); ok {
+		title = i18n.T("settings.action." + id)
+		desc = i18n.T("core.desc." + id)
+	}
 	if s.form == "geo-update" {
 		desc = i18n.Tf("core.desc.geo-update", s.geoConfirmTarget())
 	}
 	rows := strings.Split(wrap(desc, width-4), "\n")
 	rows = append(rows, "")
-	var controls []releaseControl
-	if s.form == "geo-update" || s.form == "basic-config" {
-		confirmLabel := " " + i18n.T("core.dialog.confirm") + " "
-		cancelLabel := " " + i18n.T("core.dialog.cancel") + " "
-		x := 2
-		controls = append(controls,
-			releaseControl{actionHit: actionHit{x: x, y: len(rows) + 1, width: lipgloss.Width(confirmLabel), height: 1}, action: "confirm"},
-			releaseControl{actionHit: actionHit{x: x + lipgloss.Width(confirmLabel) + 2, y: len(rows) + 1, width: lipgloss.Width(cancelLabel), height: 1}, action: "cancel"},
-		)
-		confirmBtn := lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true).Render(confirmLabel)
-		cancelBtn := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted)).Render(cancelLabel)
-		rows = append(rows, confirmBtn+"  "+cancelBtn)
-	} else {
-		label := i18n.T("core.dialog.confirm")
-		controls = append(controls, releaseControl{actionHit: actionHit{x: 2, y: len(rows) + 1, width: lipgloss.Width(label), height: 1}, action: "confirm"})
-		rows = append(rows, lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true).Render(label))
+	confirmLabel := " " + i18n.T("core.dialog.confirm") + " "
+	cancelLabel := " " + i18n.T("core.dialog.cancel") + " "
+	controls := []releaseControl{
+		{actionHit: actionHit{x: 2, y: len(rows) + 1, width: lipgloss.Width(confirmLabel), height: 1}, action: "confirm"},
+		{actionHit: actionHit{x: 4 + lipgloss.Width(confirmLabel), y: len(rows) + 1, width: lipgloss.Width(cancelLabel), height: 1}, action: "cancel"},
 	}
+	confirmBtn := lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true).Render(confirmLabel)
+	cancelBtn := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted)).Render(cancelLabel)
+	rows = append(rows, confirmBtn+"  "+cancelBtn)
 	if s.formErr != nil {
 		rows = append(rows, "", lipgloss.NewStyle().Foreground(theme.Resolve(t.Danger)).Render(wrap(s.formErr.Error(), width-4)))
 	}
-	return pageLayout{content: panel(i18n.T("core.action."+s.form), strings.Join(rows, "\n"), width), controls: controls}
+	return pageLayout{content: panel(title, strings.Join(rows, "\n"), width), controls: controls}
 }
 
 func (s State) geoConfirmTarget() string {
@@ -65,11 +62,13 @@ func (s State) formDialog(width, height int) (pageLayout, int) {
 	case "service":
 		page.content, page.actions, _ = s.actionPanel(popupWidth, true)
 		page.focusY = page.actions[s.selected].y
-	case "configure", "recover", "geo-update", "basic-config":
-		page = s.choiceLayout(popupWidth)
-		page.focusY = page.controls[0].y
 	default:
-		page = s.formLayout(popupWidth)
+		if isChoiceForm(s.form) {
+			page = s.choiceLayout(popupWidth)
+			page.focusY = page.controls[0].y
+		} else {
+			page = s.formLayout(popupWidth)
+		}
 	}
 	lines := strings.Split(page.content, "\n")
 	budget := max(1, height-5)

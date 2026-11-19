@@ -97,6 +97,7 @@ func (s *CoreService) Status() (CoreStatus, error) {
 		service, serviceErr := s.serviceManager(root).Status(ctx)
 		cancel()
 		state.ServiceInstalled = service.Installed
+		state.ServiceRunning = service.Running
 		state.AutoStart = service.Enabled
 		if serviceErr != nil {
 			return state, serviceErr

@@ -15,7 +15,6 @@ import (
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 const (
@@ -80,7 +79,7 @@ func NewMihomoState(configSvc *service.ConfigService, client *api.Client) State 
 }
 
 func (s State) Refresh() tea.Cmd {
-	return tea.Batch(FetchMihomoConfig(s.configSvc, s.client), FetchMihomoVersion(s.client), FetchSysStatusCmd())
+	return tea.Batch(FetchMihomoConfig(s.configSvc, s.client), FetchMihomoVersion(s.client))
 }
 
 func (s State) CancelEdit() State {
@@ -140,24 +139,20 @@ func (s State) ToPageState(cfg *config.Config, sysLogs []model.LogEntry) PageSta
 		s.toastManager = common.NewToastManager()
 	}
 	return PageState{
-		Config:            cfg,
-		SelectedSetting:   s.selectedSetting,
-		EditMode:          s.editMode,
-		EditValue:         s.editValue,
-		EditCursor:        s.editCursor,
-		Toast:             s.toastManager,
-		MihomoVersion:     s.mihomoVersion,
-		ActiveTab:         s.activeTab,
-		MihomoConfig:      s.mihomoConfig,
-		MihomoLoaded:      s.mihomoLoaded,
-		MihomoLoadErr:     s.mihomoLoadErr,
-		MihomoFromFile:    s.mihomoFromFile,
-		IsCoreUpgrading:   s.IsCoreUpgrading,
-		IsCoreRestarting:  s.IsCoreRestarting,
-		IsConfigReloading: s.IsConfigReloading,
-		IsGeoUpdating:     s.IsGeoUpdating,
-		SysStatus:         s.SysStatus,
-		SysLogs:           sysLogs,
+		Config:          cfg,
+		SelectedSetting: s.selectedSetting,
+		EditMode:        s.editMode,
+		EditValue:       s.editValue,
+		EditCursor:      s.editCursor,
+		Toast:           s.toastManager,
+		MihomoVersion:   s.mihomoVersion,
+		ActiveTab:       s.activeTab,
+		MihomoConfig:    s.mihomoConfig,
+		MihomoLoaded:    s.mihomoLoaded,
+		MihomoLoadErr:   s.mihomoLoadErr,
+		MihomoFromFile:  s.mihomoFromFile,
+		SysStatus:       s.SysStatus,
+		SysLogs:         sysLogs,
 	}
 }
 
@@ -241,76 +236,6 @@ func (s State) HandleMouseScroll(up bool, pageY, pageHeight, actionsPanelBottomY
 
 // HandleMouseLeft 处理 settings 页面左键单击/双击
 func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, tea.Cmd) {
-	// 检查是否点击了底部核心操作按钮
-	if s.activeTab == 1 {
-		settingsPanelHeight := 0
-		if !s.mihomoLoaded {
-			settingsPanelHeight = 5 // "\n  Loading...\n" len is 3, + 2 = 5
-		} else if s.mihomoLoadErr != nil && s.mihomoConfig == nil {
-			settingsPanelHeight = 5
-		} else {
-			height := 0
-			pageState := s.ToPageState(s.Config, nil)
-			for i, key := range s.activeKeys() {
-				item := renderSettingItem(pageState, i, key, GetSettingLabel(key), pageWidth)
-				height += lipgloss.Height(item)
-			}
-			settingsPanelHeight = height + 2
-		}
-
-		actionsPanelTop := 4 + settingsPanelHeight + 1
-		rows := LayoutActionButtons(pageWidth, s.Config)
-
-		for i := 0; i < len(rows); i++ {
-			if pageY == actionsPanelTop+2+i*2 {
-				row := rows[i]
-				cur := 2 // Left border "│ " occupies 2 chars
-				for _, btn := range row {
-					if pageX >= cur && pageX < cur+btn.Width {
-						switch btn.ID {
-						case "upgrade_auto":
-							if !s.IsCoreUpgrading {
-								s.IsCoreUpgrading = true
-								return s, UpgradeCoreCmd(s.client, "")
-							}
-						case "upgrade_release":
-							if !s.IsCoreUpgrading {
-								s.IsCoreUpgrading = true
-								return s, UpgradeCoreCmd(s.client, "release")
-							}
-						case "upgrade_alpha":
-							if !s.IsCoreUpgrading {
-								s.IsCoreUpgrading = true
-								return s, UpgradeCoreCmd(s.client, "alpha")
-							}
-						case "restart":
-							if !s.IsCoreRestarting {
-								s.IsCoreRestarting = true
-								return s, RestartCoreCmd(s.client)
-							}
-						case "reload":
-							if !s.IsConfigReloading {
-								s.IsConfigReloading = true
-								return s, ReloadConfigsCmd(s.client)
-							}
-						case "update_geo":
-							if !s.IsGeoUpdating {
-								s.IsGeoUpdating = true
-								return s, UpdateGeoDataCmd(s.client)
-							}
-						case "flush_dns":
-							return s, FlushDNSCacheCmd(s.client)
-						case "flush_fakeip":
-							return s, FlushFakeIPCmd(s.client)
-						}
-						return s, nil
-					}
-					cur += btn.Width
-				}
-			}
-		}
-	}
-
 	settingIdx := resolveMouseSettingIndex(s, pageY)
 
 	if s.editMode {
@@ -844,7 +769,7 @@ func resolveEnumMouseTarget(pageX int, modes []string) (string, bool) {
 }
 
 func settingsTabDisplayWidth(label string) int {
-	return len(label) + settingsTabContentPadding + settingsTabHorizontalPadding
+	return common.DisplayWidth(label) + settingsTabContentPadding + settingsTabHorizontalPadding
 }
 
 func (s State) getEditValue(cfg *config.Config, settingKey string) string {
@@ -867,6 +792,46 @@ func (s State) getEditValue(cfg *config.Config, settingKey string) string {
 		return ""
 	}
 	return GetSettingValue(s.ToPageState(s.Config, nil), settingKey)
+}
+
+func (s State) RunCoreAction(action string) (State, tea.Cmd) {
+	switch action {
+	case "upgrade_auto":
+		if !s.IsCoreUpgrading {
+			s.IsCoreUpgrading = true
+			return s, UpgradeCoreCmd(s.client, "")
+		}
+	case "upgrade_release":
+		if !s.IsCoreUpgrading {
+			s.IsCoreUpgrading = true
+			return s, UpgradeCoreCmd(s.client, "release")
+		}
+	case "upgrade_alpha":
+		if !s.IsCoreUpgrading {
+			s.IsCoreUpgrading = true
+			return s, UpgradeCoreCmd(s.client, "alpha")
+		}
+	case "restart":
+		if !s.IsCoreRestarting {
+			s.IsCoreRestarting = true
+			return s, RestartCoreCmd(s.client)
+		}
+	case "reload":
+		if !s.IsConfigReloading {
+			s.IsConfigReloading = true
+			return s, ReloadConfigsCmd(s.client)
+		}
+	case "update_geo":
+		if !s.IsGeoUpdating {
+			s.IsGeoUpdating = true
+			return s, UpdateGeoDataCmd(s.client)
+		}
+	case "flush_dns":
+		return s, FlushDNSCacheCmd(s.client)
+	case "flush_fakeip":
+		return s, FlushFakeIPCmd(s.client)
+	}
+	return s, nil
 }
 
 // Core Actions

@@ -67,12 +67,17 @@ func FetchSysStatusCmd() tea.Cmd {
 		defer cancel()
 
 		args := []string{"status", "mihomo", "--no-pager", "-n", "0"}
-		if cfg, err := config.Load(); err == nil && cfg.Core.Mode == "managed" {
-			if cfg.Core.Runtime != "service" {
+		if cfg, err := config.Load(); err == nil {
+			if cfg.Core.Mode != "managed" && cfg.Core.ExternalController != "" {
 				return messages.SysStatusResultMsg{}
 			}
-			if root, err := config.GetConfigDir(); err == nil {
-				args = []string{"--user", "status", host.ServiceName(root), "--no-pager", "-n", "0"}
+			if cfg.Core.Mode == "managed" {
+				if cfg.Core.Runtime != "service" {
+					return messages.SysStatusResultMsg{}
+				}
+				if root, err := config.GetConfigDir(); err == nil {
+					args = []string{"--user", "status", host.ServiceName(root), "--no-pager", "-n", "0"}
+				}
 			}
 		}
 		cmd := exec.CommandContext(ctx, "systemctl", args...)
@@ -109,6 +114,8 @@ func (s *SysStatusState) Update(msg tea.Msg) tea.Cmd {
 			}
 		} else if msg.Err != nil {
 			s.LastOutput = msg.Err.Error()
+		} else {
+			s.LastOutput = ""
 		}
 		return TickSysStatusCmd()
 

@@ -28,6 +28,7 @@ func TestDownloadAllowsNetworkPreferencesWithoutReplacingActiveTask(t *testing.T
 	id := s.generation
 	s.Progress = coreinfra.Progress{Downloaded: 1, Total: 2}
 	s, _ = s.Update(coreKey("3"))
+	s = selectTestAction(t, s, "network")
 	s, _ = s.Update(coreKey("enter"))
 	if s.tab != 2 || !s.Editing || s.form != "network" || !s.Busy || s.task != "install" || s.generation != id {
 		t.Fatal("download blocked settings or lost its active task")
@@ -99,7 +100,7 @@ func TestAdvancedDialogsCancelWithoutOperationsAndRestoreSelection(t *testing.T)
 			t.Fatal("duplicate mihomo action must not appear on the advanced tab")
 		}
 		s := NewState(svc, nil, nil).selectTab(2)
-		if _, isSwitch := s.switchValue(item.action); isSwitch {
+		if _, isSwitch := s.switchValue(item.action); isSwitch || item.action == "setup" {
 			continue // Two-option settings toggle inline without opening a dialog.
 		}
 		s.selected, s.scroll = i, 3
@@ -139,19 +140,15 @@ func TestAdvancedInlineSwitchesRenderAndApplyDirectTargets(t *testing.T) {
 		for _, width := range []int{24, 40, 80, 120} {
 			for _, height := range []int{12, 24, 30} {
 				for _, action := range []string{"system-proxy", "tun", "shell-proxy"} {
-					actionIdx := 0
-					for idx, item := range (State{tab: 2}).actions() {
-						if item.action == action {
-							actionIdx = idx
-							break
-						}
-					}
 					for _, enabled := range []bool{false, true} {
-						s := State{svc: svc, tab: 2, selected: actionIdx, followSelection: true, Status: service.CoreStatus{
+						s := State{svc: svc, tab: 2, followSelection: true, Status: service.CoreStatus{
+							Mode:        "managed",
+							Version:     "v1",
 							SystemProxy: enabled,
 							TUN:         enabled,
 							ShellProxy:  enabled,
 						}}
+						s = selectTestAction(t, s, action)
 						view := ansi.Strip(s.Render(width, height))
 						if lipgloss.Height(view) != height {
 							t.Fatalf("%s %dx%d: inline switch view exceeded height", language, width, height)
@@ -265,7 +262,7 @@ func TestAdvancedDialogsPreserveBackgroundAndMouseMatchesVisibleControls(t *test
 						hit := page.actions[s.selected]
 						next, cmd = s.Update(messages.PageMouseClickMsg{X: hit.x, Y: hit.y, Width: width, Height: height})
 					} else {
-						hit := page.controls[len(page.controls)-1]
+						hit := page.controls[0]
 						next, cmd = s.Update(messages.PageMouseClickMsg{X: hit.x, Y: hit.y, Width: width, Height: height})
 					}
 					defer next.Close()
@@ -356,5 +353,28 @@ func TestServiceDialogWheelSelectsVisibleActions(t *testing.T) {
 				t.Fatal("closing service dialog did not restore parent")
 			}
 		}
+	}
+}
+func TestStopAndRestartShortcutsRequireConfirmation(t *testing.T) {
+	for shortcut, action := range map[string]string{"x": "stop", "z": "restart"} {
+		t.Run(action, func(t *testing.T) {
+			svc := service.NewCoreService()
+			t.Cleanup(svc.Close)
+			s := State{svc: svc, tab: 2, Status: service.CoreStatus{Mode: "managed", Version: "v1.2.3", Running: true}}
+			s, cmd := s.Update(coreKey(shortcut))
+			if !s.Editing || s.form != action || s.Busy || cmd != nil {
+				t.Fatal("shortcut started the action before confirmation")
+			}
+			s, cmd = s.Update(coreKey("esc"))
+			if s.Editing || s.Busy || cmd != nil {
+				t.Fatal("cancel left the action pending")
+			}
+			s, _ = s.Update(coreKey(shortcut))
+			s, cmd = s.Update(coreKey("enter"))
+			defer s.Close()
+			if s.Editing || !s.Busy || s.task != action || cmd == nil {
+				t.Fatal("confirmation did not queue the requested action")
+			}
+		})
 	}
 }

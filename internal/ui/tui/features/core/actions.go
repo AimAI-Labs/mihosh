@@ -3,6 +3,7 @@ package core
 import (
 	"slices"
 	"strconv"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -11,9 +12,11 @@ type actionItem struct {
 	key, action string
 }
 
-var tabs = []string{"daily", "versions", "advanced", "geo", "mihomo"}
-var tabOrder = []int{0, 1, 3, 2, 4}
+var tabs = []string{"advanced", "versions", "advanced", "geo", "mihomo"}
+var tabOrder = []int{0, 1, 3, 4}
 var serviceActions = []string{"install", "start", "stop", "restart", "enable", "disable", "boot", "uninstall"}
+
+func (s State) isAdvancedPage() bool { return s.tab == 0 || s.tab == 2 }
 
 func (s State) primaryAction() actionItem {
 	switch {
@@ -32,12 +35,6 @@ func (s State) actions() []actionItem {
 	switch s.tab {
 	case 1:
 		return []actionItem{{"v", "check"}, {"g", "upgrade"}, {"b", "rollback"}, {"t", "version"}, {"i", "install"}, {"a", "activate"}, {"l", "import"}}
-	case 2:
-		items := []actionItem{{"e", "network"}, {"h", "service"}, {"y", "system-proxy"}, {"n", "tun"}, {"m", "configure"}, {"c", "recover"}, {"w", "shell-proxy"}}
-		if s.Status.Mode == "managed" {
-			items = append(items, actionItem{"", "basic-config"})
-		}
-		return items
 	case 3:
 		items := make([]actionItem, len(s.geoFiles))
 		for i := range items {
@@ -62,6 +59,24 @@ func (s State) actions() []actionItem {
 	for _, item := range others {
 		if item.action != primary.action {
 			items = append(items, item)
+		}
+	}
+	items = append(items, actionItem{"h", "service"}, actionItem{"e", "network"}, actionItem{"y", "system-proxy"}, actionItem{"w", "shell-proxy"})
+	if s.Status.Mode == "managed" || s.Status.RecoveryPending {
+		items = append(items, actionItem{"c", "recover"})
+	}
+	if s.Status.Mode == "managed" {
+		items = append(items, actionItem{"n", "tun"}, actionItem{"", "basic-config"})
+	} else {
+		items = append(items, actionItem{"m", "configure"})
+	}
+	if s.connected {
+		apiActions := []string{"reload", "flush_dns", "flush_fakeip"}
+		if s.Status.Mode != "managed" {
+			apiActions = append(apiActions, "restart", "upgrade_auto", "upgrade_release", "upgrade_alpha", "update_geo")
+		}
+		for _, id := range apiActions {
+			items = append(items, actionItem{"", "api:" + id})
 		}
 	}
 	return items
@@ -106,9 +121,12 @@ func (s State) choose(action string) (State, tea.Cmd) {
 		return s.editForm(action)
 	case "system-proxy", "tun", "shell-proxy":
 		return s.toggleSwitch(action)
-	case "network", "version", "import", "external", "service", "configure", "recover", "basic-config":
+	case "network", "version", "import", "external", "service", "configure", "recover", "basic-config", "stop", "restart", "api:restart", "api:update_geo":
 		return s.editForm(action)
 	default:
+		if id, ok := strings.CutPrefix(action, "api:"); ok {
+			return s.runCoreAPIAction(id)
+		}
 		return s.begin(action)
 	}
 }
@@ -122,6 +140,15 @@ func (s State) selectTab(tab int) State {
 }
 
 func (s State) stepTab(delta int) (State, tea.Cmd) {
-	index := slices.Index(tabOrder, s.tab)
+	index := max(0, slices.Index(tabOrder, s.tab))
 	return s.openTab(tabOrder[(index+delta+len(tabOrder))%len(tabOrder)])
+}
+
+func (s State) runCoreAPIAction(id string) (State, tea.Cmd) {
+	if s.Busy || !s.connected {
+		return s, nil
+	}
+	var cmd tea.Cmd
+	s.editor, cmd = s.editor.RunCoreAction(id)
+	return s, cmd
 }

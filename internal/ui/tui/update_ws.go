@@ -116,7 +116,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(stream, m.refreshOnConnect())
 
-	case messages.CoreStatusMsg, messages.CoreGeoDataMsg, messages.CoreProgressTickMsg, messages.CoreOperationMsg:
+	case messages.CoreStatusMsg, messages.CoreGeoDataMsg, messages.CoreProgressTickMsg, messages.CoreOperationMsg, messages.SysStatusResultMsg:
 		if result, ok := msg.(messages.CoreOperationMsg); ok && result.ID != m.coreState.OperationID() {
 			return m, nil
 		}
@@ -326,14 +326,6 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.LogsTickMsg:
 		if m.currentPage == layout.PageLogs {
 			return m, logsTick()
-		}
-
-	case messages.SysStatusTickMsg, messages.SysStatusResultMsg:
-		if m.currentPage == layout.PageCore && m.coreState.IsMihomoPage() {
-			var cmd tea.Cmd
-			pw, ph := m.getPageSize()
-			m.coreState, cmd = m.coreState.HandleEditorMsg(msg, pw, ph, m.logsState.GetSysLogs())
-			return m, cmd
 		}
 
 	case messages.AutoRefreshTickMsg:
