@@ -9,6 +9,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -187,6 +188,8 @@ func renderLevelBar(selectedLevel int, width int) string {
 	contentWidth := lipgloss.Width(content)
 	if contentWidth < innerWidth {
 		content += strings.Repeat(" ", innerWidth-contentWidth)
+	} else {
+		content = ansi.Truncate(content, innerWidth, "")
 	}
 
 	// 渲染带边框的级别栏
@@ -200,24 +203,13 @@ func renderLevelBar(selectedLevel int, width int) string {
 
 func renderLogLevelTab(level string, active bool) string {
 	style := resolveLogLevelTabStyle(level, active)
-
+	indicator := lipgloss.NewStyle().Foreground(style.Indicator)
+	label := lipgloss.NewStyle().Foreground(style.Foreground).Bold(style.Bold)
 	if active {
-		// 激活状态：只有文字部分有背景
-		indicator := lipgloss.NewStyle().Foreground(style.Indicator).Render("●")
-		text := lipgloss.NewStyle().
-			Background(style.Background).
-			Foreground(style.Foreground).
-			Bold(style.Bold).
-			Render(" " + level + " ")
-		return indicator + text
+		indicator = indicator.Background(style.Background)
+		label = label.Background(style.Background)
 	}
-
-	// 非激活状态：无背景
-	indicator := lipgloss.NewStyle().Foreground(style.Indicator).Render("●")
-	text := lipgloss.NewStyle().
-		Foreground(style.Foreground).
-		Render(" " + level + " ")
-	return indicator + text
+	return indicator.Render(" ●") + label.Render(" "+level+" ")
 }
 
 func resolveLogLevelTabStyle(level string, active bool) logLevelTabStyle {
@@ -237,45 +229,18 @@ func resolveLogLevelTabStyle(level string, active bool) logLevelTabStyle {
 	return style
 }
 
-// LevelBarPositions 返回每个级别标签的起始位置（用于鼠标点击检测）
-func LevelBarPositions(pageWidth int) []int {
-	positions := make([]int, len(logLevels))
-	currentPos := 0
-
-	// 使用实际渲染宽度计算（考虑 lipgloss 样式）
-	activeStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(common.Bright()).
-		Background(common.TokyoBlue())
-
-	for i, level := range logLevels {
-		positions[i] = currentPos
-		tag := activeStyle.Render(" ● " + level + " ")
-		currentPos += lipgloss.Width(tag)
-		// 级别之间没有空格分隔（因为 tab 自身有背景）
-	}
-
-	return positions
-}
-
 // ClickedLevel 根据点击的 X 坐标返回对应的级别索引，未点击级别栏返回 -1
 func ClickedLevel(pageX int, pageWidth int, selectedLevel int) int {
-	positions := LevelBarPositions(pageWidth)
-
-	// 计算每个标签的结束位置
-	for i := 0; i < len(positions); i++ {
-		var endPos int
-		if i < len(positions)-1 {
-			endPos = positions[i+1] - 1 // 下一个标签开始位置减 1（减去间隔空格）
-		} else {
-			endPos = pageWidth
-		}
-
-		if pageX >= positions[i] && pageX < endPos {
+	if pageX < 1 || pageX >= pageWidth-1 {
+		return -1
+	}
+	end := 1 // 左边框占一列。
+	for i, level := range logLevels {
+		end += lipgloss.Width(renderLogLevelTab(level, i == selectedLevel))
+		if pageX < end {
 			return i
 		}
 	}
-
 	return -1
 }
 

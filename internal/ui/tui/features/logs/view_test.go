@@ -8,6 +8,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func init() {
@@ -167,5 +168,27 @@ func TestResolveLogLevelTabStyle_InactiveUsesCommonInactiveColors(t *testing.T) 
 	}
 	if style.Bold {
 		t.Fatal("expected inactive tab not to be bold")
+	}
+}
+
+func TestClickedLevelMatchesVisibleButtons(t *testing.T) {
+	const width = 80
+	const selected = 1
+	x := 1
+	for i, level := range logLevels {
+		end := x + lipgloss.Width(renderLogLevelTab(level, i == selected))
+		for ; x < end; x++ {
+			if got := ClickedLevel(x, width, selected); got != i {
+				t.Errorf("column %d: expected %s (%d), got %d", x, level, i, got)
+			}
+		}
+	}
+	for _, outside := range []int{0, x, width - 1} {
+		if got := ClickedLevel(outside, width, selected); got != -1 {
+			t.Errorf("column %d is outside buttons, got %d", outside, got)
+		}
+	}
+	if got := ClickedLevel(9, 10, selected); got != -1 {
+		t.Errorf("right border of narrow level bar is outside buttons, got %d", got)
 	}
 }
