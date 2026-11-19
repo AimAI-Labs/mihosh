@@ -62,6 +62,11 @@ func TestOverlayPreservesBackgroundAndANSI(t *testing.T) {
 	if strings.Contains(plain, "\x1b[2m") {
 		t.Fatal("background was dimmed without request")
 	}
+	styled := "\x1b[34m│\x1b[0mabcdefghij\x1b[34m│\x1b[0m"
+	row := strings.Split(d.Overlay(styled+"\n"+styled+"\n"+styled, true), "\n")[1]
+	if want := "\x1b[2m│abc\x1b[0m" + content + "\x1b[2mhij│\x1b[0m"; row != want {
+		t.Fatalf("expected dimmed background on both sides, got %q", row)
+	}
 	if got := dialog.New("AB", 6, 3).Overlay("x", false); got != "x\n  AB\n" {
 		t.Fatalf("short background was not padded: %q", got)
 	}

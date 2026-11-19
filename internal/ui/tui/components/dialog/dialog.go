@@ -80,25 +80,29 @@ func (d Dialog) Overlay(base string, dim bool) string {
 		lines = append(lines, "")
 	}
 	lines = lines[:d.height]
-	if dim {
-		faint := lipgloss.NewStyle().Faint(true)
-		for i := range lines {
-			lines[i] = faint.Render(lines[i])
+	faint := lipgloss.NewStyle().Faint(true)
+	backdrop := func(line string) string {
+		if dim {
+			return faint.Render(ansi.Strip(line))
 		}
+		return line
 	}
 	left, top, right, _ := d.Bounds()
-	for i, line := range strings.Split(d.content, "\n") {
-		y := top + i
-		if y >= d.height {
-			break
+	content := strings.Split(d.content, "\n")
+	for y, line := range lines {
+		i := y - top
+		if i < 0 || i >= len(content) {
+			lines[y] = backdrop(line)
+			continue
 		}
-		prefix := ansi.Cut(lines[y], 0, left)
+		prefix := ansi.Cut(line, 0, left)
 		prefix += strings.Repeat(" ", max(0, left-lipgloss.Width(prefix)))
-		suffix := ansi.Cut(lines[y], right, d.width)
+		suffix := ansi.Cut(line, right, d.width)
+		popup := content[i]
 		if d.clip {
-			line = ansi.Truncate(line, right-left, "")
+			popup = ansi.Truncate(popup, right-left, "")
 		}
-		lines[y] = prefix + line + suffix
+		lines[y] = backdrop(prefix) + popup + backdrop(suffix)
 		if d.clip {
 			lines[y] = ansi.Truncate(lines[y], d.width, "")
 		}

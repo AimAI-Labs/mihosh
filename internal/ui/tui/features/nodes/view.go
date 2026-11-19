@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -88,12 +87,11 @@ func RenderNodesPage(state PageState) string {
 		append([]string{modeSwitch, "", cardArea}, bottomParts...)...,
 	)
 
+	mainContent = renderNodesInlineHelp(mainContent, state)
 	if state.ShowTestDetail {
 		modal := buildTestResultModal(state)
-		mainContent = dialog.New(modal, state.Width, state.Height).Overlay(mainContent, false)
+		mainContent = dialog.New(modal, state.Width, state.Height).Clipped().Overlay(mainContent, true)
 	}
-	// 始终显示右下角内联帮助提示面板
-	mainContent = renderNodesInlineHelp(mainContent, state)
 	return mainContent
 }
 
@@ -118,13 +116,7 @@ func buildTestResultModal(state PageState) string {
 	results := state.TestResults
 
 	// 弹窗内容区宽度（去掉左右边框各1 + 内边距各1 = 4）
-	modalWidth := state.Width - 10
-	if modalWidth < 50 {
-		modalWidth = 50
-	}
-	if modalWidth > 100 {
-		modalWidth = 100
-	}
+	modalWidth := min(state.Width, max(24, min(100, state.Width-10)))
 	innerWidth := modalWidth - 4
 
 	// 可显示的最大行数（去掉标题、分隔线、空行、帮助行 = 4行）
@@ -174,20 +166,14 @@ func buildTestResultModal(state PageState) string {
 			failCount++
 		}
 	}
-	title := common.TableHeaderStyle().Render(i18n.Tf("nodes.result_modal_title", len(results)))
+	title := i18n.Tf("nodes.result_modal_title", len(results))
 	if failCount > 0 {
 		title += " " + common.ErrorStyle().Render(i18n.Tf("nodes.result_fail_count", failCount))
 	}
 	subtitle := common.DimStyle().Render(i18n.T("nodes.result_modal_subtitle"))
-	separator := common.DimStyle().Render(strings.Repeat("─", innerWidth))
-	content := lipgloss.JoinVertical(lipgloss.Left, title, subtitle, separator, body)
-
-	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(theme.Resolve(common.TokyoBlue())).
-		Padding(0, 1).
-		Width(modalWidth).
-		Render(content)
+	separator := common.DimStyle().Render(strings.Repeat("─", max(1, innerWidth)))
+	content := lipgloss.JoinVertical(lipgloss.Left, subtitle, separator, body)
+	return common.RenderBorderedPanel(title, content, modalWidth, common.TokyoBlue(), common.TokyoForeground())
 }
 
 func buildTestResultDetailLines(results []TestResultEntry, width int) []string {
