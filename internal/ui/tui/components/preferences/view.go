@@ -67,13 +67,16 @@ type PageState struct {
 
 	MihomoVersion string
 
-	ActiveTab      int
-	MihomoConfig   *model.MihomoConfig
-	MihomoLoaded   bool
-	MihomoLoadErr  error
-	MihomoFromFile bool // API 不可达时从 YAML 降级读取
-	SysStatus      SysStatusState
-	SysLogs        []model.LogEntry
+	ActiveTab       int
+	MihomoConfig    *model.MihomoConfig
+	MihomoOverrides map[string]string
+	MihomoDirty     bool
+	MihomoSaving    bool
+	MihomoLoaded    bool
+	MihomoLoadErr   error
+	MihomoFromFile  bool // API 不可达时从 YAML 文件降级读取
+	SysStatus       SysStatusState
+	SysLogs         []model.LogEntry
 }
 
 func (p PageState) activeKeys() []string {
@@ -109,18 +112,23 @@ func GetSettingValue(state PageState, key string) string {
 			}
 			return "rounded"
 		}
-	} else if state.ActiveTab == 1 && state.MihomoConfig != nil {
-		switch key {
-		case "external-controller":
-			return state.MihomoConfig.ExternalController
-		case "secret":
-			return state.MihomoConfig.Secret
-		case "mixed-port":
-			return fmt.Sprintf("%d", state.MihomoConfig.MixedPort)
-		case "allow-lan":
-			return fmt.Sprintf("%t", state.MihomoConfig.AllowLan)
-		case "log-level":
-			return state.MihomoConfig.LogLevel
+	} else if state.ActiveTab == 1 {
+		if state.MihomoOverrides != nil {
+			return state.MihomoOverrides[key]
+		}
+		if state.MihomoConfig != nil {
+			switch key {
+			case "external-controller":
+				return state.MihomoConfig.ExternalController
+			case "secret":
+				return state.MihomoConfig.Secret
+			case "mixed-port":
+				return fmt.Sprintf("%d", state.MihomoConfig.MixedPort)
+			case "allow-lan":
+				return fmt.Sprintf("%t", state.MihomoConfig.AllowLan)
+			case "log-level":
+				return state.MihomoConfig.LogLevel
+			}
 		}
 	}
 	return ""
@@ -141,6 +149,9 @@ func buildSettingsLayoutBase(state PageState, width int) (parts []string, descRo
 	for i := 0; i < len(keys); i++ {
 		item := renderSettingItem(state, i, keys[i], GetSettingLabel(keys[i]), width)
 		settingItems = append(settingItems, item)
+	}
+	if state.ActiveTab == 1 {
+		settingItems = append(settingItems, "", renderMihomoApplyRow(state, width))
 	}
 	listContent := strings.Join(settingItems, "\n")
 	settingsPanel := common.RenderTokyoPanel(i18n.T("settings.panel_title"), listContent, width)
@@ -321,11 +332,37 @@ func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
 				{Key: "Esc", Desc: i18n.T("help.settings_edit_theme.cancel")},
 			}
 		}
+		if state.ActiveTab == 1 && state.SelectedSetting >= 0 && state.SelectedSetting < len(MihomoSettingKeys) {
+			k := MihomoSettingKeys[state.SelectedSetting]
+			if k == "allow-lan" || k == "log-level" {
+				return []common.InlineHelpHint{
+					{Key: "←→/Tab", Desc: i18n.T("help.settings_edit_lang.switch")},
+					{Key: "↵", Desc: i18n.T("help.settings_edit_config.confirm")},
+					{Key: "Esc", Desc: i18n.T("help.settings_edit_config.cancel")},
+				}
+			}
+		}
 		// 普通编辑项：移动光标 + 保存 + 取消
 		return []common.InlineHelpHint{
 			{Key: "←→", Desc: i18n.T("help.settings_edit_config.move")},
 			{Key: "↵", Desc: i18n.T("help.settings_edit_config.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.settings_edit_config.cancel")},
+		}
+	}
+
+	if state.ActiveTab == 1 {
+		if state.SelectedSetting == mihomoApplyIndex {
+			return []common.InlineHelpHint{
+				{Key: "↑↓", Desc: i18n.T("help.settings.hint_select")},
+				{Key: "↵", Desc: i18n.T("settings.mihomo.apply_button")},
+				{Key: "r", Desc: i18n.T("help.settings.hint_refresh")},
+			}
+		}
+		return []common.InlineHelpHint{
+			{Key: "↑↓", Desc: i18n.T("help.settings.hint_select")},
+			{Key: "↵", Desc: i18n.T("help.settings.hint_edit")},
+			{Key: "Ctrl+S", Desc: i18n.T("settings.mihomo.apply_button")},
+			{Key: "r", Desc: i18n.T("help.settings.hint_refresh")},
 		}
 	}
 
@@ -419,13 +456,13 @@ func renderSettingItem(state PageState, index int, key string, label string, wid
 		if state.EditMode && index == state.SelectedSetting {
 			valToRender = state.EditValue
 		}
-		renderedValue = renderAllowLanTabs(valToRender, state.EditMode && index == state.SelectedSetting)
+		renderedValue = renderAllowLanTabs(valToRender, state.EditMode && index == state.SelectedSetting, width)
 	} else if key == "log-level" {
 		valToRender := value
 		if state.EditMode && index == state.SelectedSetting {
 			valToRender = state.EditValue
 		}
-		renderedValue = renderLogLevelTabs(valToRender, state.EditMode && index == state.SelectedSetting)
+		renderedValue = renderLogLevelTabs(valToRender, state.EditMode && index == state.SelectedSetting, width)
 	} else if state.EditMode && index == state.SelectedSetting {
 		// 在光标位置渲染真实光标指示符
 		cursorPos := state.EditCursor
@@ -450,8 +487,11 @@ func renderSettingItem(state PageState, index int, key string, label string, wid
 
 		displayValue := leftPart + cursorStyle.Render(cursorChar) + rightPart
 		renderedValue = editBoxStyle.Render(displayValue)
+	} else if state.ActiveTab == 1 && value == "" {
+		renderedValue = lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render(i18n.T("settings.mihomo.empty"))
 	} else {
-		renderedValue = valueStyle.Render(value)
+		maxValWidth := max(1, width-4-settingsRowPaddingLeft-settingsLabelWidth)
+		renderedValue = valueStyle.Render(ansi.Truncate(value, maxValWidth, "…"))
 	}
 
 	// 拼装每行的内容
@@ -476,9 +516,13 @@ func borderStyleOptions() []string {
 }
 
 func themeTabsWindow(current string, width int) (offset, visible int) {
+	return enumTabsWindow(current, theme.Names(), width)
+}
+
+func enumTabsWindow(current string, labels []string, width int) (offset, visible int) {
 	visible = max(0, width-4-settingsRowPaddingLeft-settingsLabelWidth)
 	end := 0
-	for _, name := range theme.Names() {
+	for _, name := range labels {
 		end += settingsTabDisplayWidth(name)
 		if name == current {
 			return max(0, end-visible), visible
@@ -557,14 +601,64 @@ func renderThemeTabs(currentTheme string, editMode bool) string {
 	return lipgloss.JoinHorizontal(lipgloss.Left, parts...)
 }
 
-func renderAllowLanTabs(current string, editMode bool) string {
-	modes := []string{"true", "false"}
-	return renderEnumTabs(current, modes, editMode)
+func renderAllowLanTabs(current string, editMode bool, width int) string {
+	labels := overrideOptionLabels(allowLanValues)
+	currentLabel := overrideOptionLabel(current)
+	offset, visible := enumTabsWindow(currentLabel, labels, width)
+	return ansi.Cut(renderEnumTabs(currentLabel, labels, editMode), offset, offset+visible)
 }
 
-func renderLogLevelTabs(current string, editMode bool) string {
-	modes := []string{"info", "warning", "error", "debug", "silent"}
-	return renderEnumTabs(current, modes, editMode)
+func renderLogLevelTabs(current string, editMode bool, width int) string {
+	labels := overrideOptionLabels(logLevelValues)
+	currentLabel := overrideOptionLabel(current)
+	offset, visible := enumTabsWindow(currentLabel, labels, width)
+	return ansi.Cut(renderEnumTabs(currentLabel, labels, editMode), offset, offset+visible)
+}
+
+func renderMihomoApplyRow(state PageState, width int) string {
+	labelSpacer := lipgloss.NewStyle().
+		Width(settingsLabelWidth).
+		PaddingRight(1).
+		Render("")
+
+	btnLabel := mihomoApplyButtonLabel(state.MihomoSaving)
+	btnStyle := lipgloss.NewStyle().
+		Background(common.TokyoSelected()).
+		Foreground(common.TokyoCyan()).
+		Bold(true).
+		Padding(0, 1)
+	if state.SelectedSetting == mihomoApplyIndex {
+		btnStyle = btnStyle.Background(common.TokyoBlue()).Foreground(common.Bright())
+		if state.MihomoDirty {
+			btnStyle = btnStyle.Background(common.TokyoGreen())
+		}
+	} else if state.MihomoDirty {
+		btnStyle = btnStyle.Background(common.TokyoBlue()).Foreground(common.Bright())
+	}
+	renderedBtn := btnStyle.Render(" " + btnLabel + " ")
+
+	rowWidth := width - 4
+	if rowWidth < settingsMinRowWidth {
+		rowWidth = settingsMinRowWidth
+	}
+	availHint := max(0, rowWidth-settingsRowPaddingLeft-settingsLabelWidth-lipgloss.Width(renderedBtn))
+	var renderedHint string
+	if !state.MihomoSaving && availHint > 2 {
+		hintText := i18n.T("settings.mihomo.apply_hint")
+		hintStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted())
+		if state.MihomoDirty {
+			hintText = i18n.T("settings.mihomo.dirty_hint")
+			hintStyle = lipgloss.NewStyle().Foreground(common.TokyoYellow())
+		}
+		renderedHint = hintStyle.Render(ansi.Truncate("  "+hintText, availHint, "…"))
+	}
+
+	lineInner := lipgloss.JoinHorizontal(lipgloss.Top, labelSpacer, renderedBtn, renderedHint)
+	rowStyle := lipgloss.NewStyle().Width(rowWidth).PaddingLeft(1)
+	if state.SelectedSetting == mihomoApplyIndex {
+		rowStyle = rowStyle.Inherit(lipgloss.NewStyle().Background(common.TokyoSelected()))
+	}
+	return rowStyle.Render(lineInner)
 }
 
 // settingsTabBarContentY 标签栏内容行（可点击行）相对页面内容顶部的 Y 坐标。

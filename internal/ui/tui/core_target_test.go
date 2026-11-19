@@ -1,7 +1,10 @@
 package tui
 
 import (
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,8 +12,10 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/require"
 )
@@ -44,6 +49,9 @@ func TestTargetChangeInvalidatesOldHealthAndPageData(t *testing.T) {
 		{"settings-loaded", messages.MihomoConfigMsg{Config: &model.MihomoConfig{ExternalController: "127.0.0.1:9091", Secret: "new", MixedPort: 7891}}},
 		{"settings-saved", messages.MihomoConfigSavedMsg{WriteOK: true}},
 		{"settings-reload-failed", messages.MihomoConfigSavedMsg{WriteOK: true, Err: errors.New("old endpoint closed")}},
+		{"override-restarted", messages.MihomoOverridesSavedMsg{WriteOK: true, Applied: true, Restarted: true}},
+		{"merge-restarted", messages.SubMergeAppliedMsg{Restarted: true}},
+		{"activation-restarted", messages.SubActivatedMsg{Restarted: true}},
 		{"connect", messages.CoreOperationMsg{Action: "connect"}},
 		{"ports", messages.CoreOperationMsg{Action: "ports"}},
 		{"profile", messages.CoreOperationMsg{Action: "profile"}},
@@ -73,6 +81,131 @@ func TestTargetChangeInvalidatesOldHealthAndPageData(t *testing.T) {
 			require.Nil(t, cmd)
 		})
 	}
+}
+
+func TestOverrideResultsKeepLiveTargetUntilManualRefresh(t *testing.T) {
+	i18n.Init()
+	for _, entry := range []struct {
+		name    string
+		msg     tea.Msg
+		pending bool
+		notice  string
+	}{
+		{"partial", messages.MihomoOverridesSavedMsg{WriteOK: true, Applied: true, EndpointChanged: true, NeedsRestart: true},
+			true, "settings.toast.mihomo_override_needs_restart_partial"},
+		{"remote", messages.MihomoOverridesSavedMsg{WriteOK: true, Applied: true, EndpointChanged: true, Remote: true, RemoteNotPersisted: true},
+			false, "settings.toast.mihomo_override_remote_applied"},
+		{"rollback", messages.MihomoOverridesSavedMsg{EndpointChanged: true, Restored: true, Err: errors.New("reload rejected")},
+			false, ""},
+		{"merge-partial", messages.SubMergeAppliedMsg{NeedsRestart: true},
+			true, "settings.toast.mihomo_override_needs_restart_partial"},
+	} {
+		t.Run(entry.name, func(t *testing.T) {
+			m, path := targetTestModel(t)
+			wsGeneration := m.wsClient.Generation()
+			require.NoError(t, os.WriteFile(path, []byte("external-controller: 127.0.0.1:9091\nsecret: new\nmixed-port: 7891\n"), 0600))
+			updated, _ := m.Update(entry.msg)
+			next := updated.(Model)
+			require.Equal(t, m.connectionEpoch, next.connectionEpoch)
+			require.Equal(t, wsGeneration, next.wsClient.Generation())
+			require.Equal(t, "old", next.client.EndpointSnapshot().Secret)
+			require.True(t, next.connectionReady)
+			if entry.notice == "" {
+				require.Empty(t, next.notice)
+				require.ErrorContains(t, next.err, i18n.T("settings.toast.mihomo_override_restored"))
+			} else {
+				require.Equal(t, i18n.T(entry.notice), next.notice)
+			}
+			if entry.pending {
+				next.currentPage = layout.PageCore
+				refreshed, cmd := next.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+				after := refreshed.(Model)
+				require.NotNil(t, cmd)
+				require.Greater(t, after.connectionEpoch, next.connectionEpoch)
+				require.Greater(t, after.wsClient.Generation(), wsGeneration)
+				require.Equal(t, "new", after.client.EndpointSnapshot().Secret)
+			}
+		})
+	}
+}
+
+func TestMergeEditorRefreshReachesMihomoForm(t *testing.T) {
+	i18n.Init()
+	m, _ := targetTestModel(t)
+	m.width, m.height = 120, 34
+	require.NoError(t, profile.WriteMerge([]byte("mixed-port: 8021\nlog-level: debug\n")))
+	updated, cmd := m.Update(messages.MergeEditFinishedMsg{})
+	require.NotNil(t, cmd)
+	var read messages.MihomoOverridesMsg
+	for _, child := range cmd().(tea.BatchMsg) {
+		if msg, ok := child().(messages.MihomoOverridesMsg); ok {
+			read = msg
+		}
+	}
+	require.NoError(t, read.Err)
+	require.Equal(t, "8021", read.Overrides["mixed-port"])
+	updated, _ = updated.Update(read)
+	next := updated.(Model)
+	next.coreState, _ = next.coreState.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	require.Contains(t, next.coreState.Render(120, 34), "8021")
+	require.Equal(t, m.connectionEpoch, next.connectionEpoch)
+}
+
+func TestMergeEditorAppliesActiveSubscriptionToRemoteCore(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	i18n.Init()
+	payload := make(chan string, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut || r.URL.Path != "/configs" {
+			http.NotFound(w, r)
+			return
+		}
+		var body struct{ Payload string }
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		payload <- body.Payload
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(server.Close)
+
+	cfg := config.DefaultConfig
+	cfg.Core.Mode, cfg.Core.ExternalController = "external", server.Listener.Addr().String()
+	require.NoError(t, config.Save(&cfg))
+	m := NewModel(api.NewClient(config.ResolveMihomoEndpoint(), 500), "", 500)
+	t.Cleanup(m.Close)
+	subscription, err := m.profileSvc.AddProfile("local", profile.SubSource{Kind: profile.SourceLocal, Path: "unused"})
+	require.NoError(t, err)
+	require.NoError(t, profile.WriteRaw(subscription.UID, []byte("log-level: info\nrules:\n  - MATCH,DIRECT\n")))
+	require.NoError(t, m.profileSvc.SetActiveSub(subscription.UID))
+	m.currentPage = layout.PageSub
+	m.subState = m.subState.ApplySubs([]profile.Profile{subscription}, subscription.UID)
+	require.NoError(t, profile.WriteMerge([]byte("allow-lan: false\n")))
+
+	updated, cmd := m.Update(messages.MergeEditFinishedMsg{ClearedOverrides: []string{"log-level"}})
+	var applied messages.SubMergeAppliedMsg
+	for _, child := range cmd().(tea.BatchMsg) {
+		if msg, ok := child().(messages.SubMergeAppliedMsg); ok {
+			applied = msg
+		}
+	}
+	require.NoError(t, applied.Err)
+	require.Equal(t, subscription.UID, applied.UID)
+	require.True(t, applied.Remote)
+	select {
+	case data := <-payload:
+		require.Contains(t, data, "allow-lan: false")
+		require.Contains(t, data, "log-level: info")
+		require.Contains(t, data, "MATCH,DIRECT")
+	default:
+		t.Fatal("remote controller received no configuration")
+	}
+
+	updated, cmd = updated.Update(applied)
+	require.Equal(t, i18n.T("settings.toast.mihomo_override_remote_applied"), updated.(Model).notice)
+	require.NotNil(t, cmd)
+	require.Equal(t, m.connectionEpoch, updated.(Model).connectionEpoch)
 }
 
 func TestUnchangedSettingsDoNotInvalidateTarget(t *testing.T) {

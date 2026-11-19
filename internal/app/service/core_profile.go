@@ -27,8 +27,11 @@ import (
 )
 
 type profileRecovery struct {
-	Config    []byte `json:"config"`
-	ActiveSub string `json:"active_sub"`
+	Config       []byte `json:"config"`
+	ActiveSub    string `json:"active_sub"`
+	HasMerge     bool   `json:"has_merge,omitempty"`
+	MergeExisted bool   `json:"merge_existed,omitempty"`
+	Merge        []byte `json:"merge,omitempty"`
 }
 
 var validationURL = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.-]*://[^\s"'<>]+`)
@@ -208,6 +211,11 @@ func recoverManagedProfile(root string) error {
 	if err = privateWrite(filepath.Join(root, "runtime", "config.yaml"), recovery.Config); err != nil {
 		return err
 	}
+	if recovery.HasMerge {
+		if err = restoreMergeFile(filepath.Join(root, "merge.yaml"), recovery.MergeExisted, recovery.Merge); err != nil {
+			return err
+		}
+	}
 	if err = config.Update(func(latest *config.Config) error {
 		latest.ActiveSub = ""
 		for _, p := range latest.Subs {
@@ -226,27 +234,31 @@ func recoverManagedProfile(root string) error {
 // ApplyProfile is serialized with core installation and process operations. A journal
 // preserves the last committed configuration across interruption of the apply step.
 func (s *CoreService) ApplyProfile(ctx context.Context, uid string, startIfStopped bool) (ActivateResult, error) {
-	return s.applyProfile(ctx, uid, startIfStopped, false)
+	return s.applyProfile(ctx, uid, startIfStopped, false, nil)
+}
+
+func (s *CoreService) ApplyProfileCleared(ctx context.Context, uid string, startIfStopped bool, cleared []string) (ActivateResult, error) {
+	return s.applyProfile(ctx, uid, startIfStopped, false, cleared)
 }
 
 func (s *CoreService) UseBasicConfig(ctx context.Context) (ActivateResult, error) {
-	return s.applyProfile(ctx, "", false, true)
+	return s.applyProfile(ctx, "", false, true, nil)
 }
 
-func (s *CoreService) applyProfile(ctx context.Context, uid string, startIfStopped, basic bool) (ActivateResult, error) {
+func (s *CoreService) applyProfile(ctx context.Context, uid string, startIfStopped, basic bool, cleared []string) (ActivateResult, error) {
 	var result ActivateResult
 	action := "profile"
 	if basic {
 		action = "basic-config"
 	}
-	if forwarded, err := s.forwardControl(ctx, action, uid, &result); forwarded {
+	if forwarded, err := s.forwardControlRequest(ctx, coreControlRequest{Action: action, Version: uid, Cleared: cleared}, &result, nil); forwarded {
 		return result, err
 	}
 	if startIfStopped && s.usesService() {
 		if err := s.Start(ctx); err != nil {
 			return ActivateResult{}, err
 		}
-		forwarded, err := s.forwardControl(ctx, "profile", uid, &result)
+		forwarded, err := s.forwardControlRequest(ctx, coreControlRequest{Action: "profile", Version: uid, Cleared: cleared}, &result, nil)
 		if !forwarded && err == nil {
 			err = errors.New("background core owner disappeared before applying the subscription")
 		}
@@ -317,7 +329,7 @@ func (s *CoreService) applyProfile(ctx context.Context, uid string, startIfStopp
 			generated.Data, err = profile.GenerateYAMLWithPreserve(&base, nil, path)
 		}
 	} else {
-		generated, err = profile.GenerateForUID(uid, path)
+		generated, err = profile.GenerateForUIDWithCleared(uid, path, cleared, true)
 	}
 	if err != nil {
 		return ActivateResult{}, err
@@ -368,15 +380,43 @@ func (s *CoreService) applyProfile(ctx context.Context, uid string, startIfStopp
 			return ActivateResult{}, err
 		}
 	}
-	recovery := profileRecovery{old, cfg.ActiveSub}
+	recovery := profileRecovery{Config: old, ActiveSub: cfg.ActiveSub}
 	journal := filepath.Join(root, "runtime", "profile-recovery.json")
+	running := s.process != nil
+	if running && controllerIdentityChanged(old, data) {
+		updateActiveSub := func() error {
+			return config.Update(func(latest *config.Config) error {
+				if basic {
+					latest.ActiveSub = ""
+					return nil
+				}
+				for _, p := range latest.Subs {
+					if p.UID == uid {
+						latest.ActiveSub = uid
+						return nil
+					}
+				}
+				return ErrSubNotFound
+			})
+		}
+		change := &managedConfigReplacement{
+			root:      root,
+			path:      path,
+			recovery:  recovery,
+			candidate: data,
+			afterSave: updateActiveSub,
+		}
+		if err = s.replaceCore(ctx, change); err != nil {
+			return ActivateResult{}, err
+		}
+		return ActivateResult{BackupName: backup, MergeErr: generated.MergeErr, Restarted: true}, nil
+	}
 	record, _ := json.Marshal(recovery)
 	if err = privateWrite(journal, record); err != nil {
 		return ActivateResult{}, err
 	}
 	endpoint := config.ResolveMihomoEndpoint()
 	client := api.NewClient(endpoint, 1000)
-	running := s.process != nil
 	started := false
 	rollback := func(cause error) (ActivateResult, error) {
 		var stopErr error

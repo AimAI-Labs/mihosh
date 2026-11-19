@@ -180,6 +180,7 @@ func TestCoreMihomoEditorCapturesGlobalKeys(t *testing.T) {
 	defer svc.Close()
 	s := corepage.NewState(svc, nil, nil)
 	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	s, _ = s.Update(messages.MihomoOverridesMsg{})
 	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m := Model{currentPage: layout.PageCore, coreState: s, width: 120, height: 30}
 	for _, text := range []string{"q", "?", "2"} {

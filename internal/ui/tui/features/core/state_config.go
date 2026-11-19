@@ -17,7 +17,7 @@ func isCoreTabKey(key string) bool {
 func (s State) IsMihomoPage() bool { return s.tab == 4 }
 
 func (s State) updateEditorMouse(msg tea.Msg, top int) (State, tea.Cmd) {
-	if s.Busy {
+	if s.Busy || s.editor.IsSaving() {
 		return s, nil
 	}
 	switch event := msg.(type) {

@@ -143,8 +143,16 @@ func (c *Client) GetRules() (*model.RulesResponse, error) {
 func (c *Client) ReloadConfig(configPath string) error {
 	// 无论 configPath 是什么，传递 path: "" 让 mihomo 重新加载其启动时的配置文件。
 	// 这避免了 Windows 下绝对路径可能导致的 400 Bad Request（路径无法解析或不匹配）问题。
-	payload := map[string]string{"path": ""}
-	_, err := c.DoRequest("PUT", "/configs?force=true", payload)
+	return c.reloadConfig(map[string]string{"path": ""})
+}
+
+// ReloadConfigPayload applies the supplied configuration through the controller API.
+func (c *Client) ReloadConfigPayload(payload []byte) error {
+	return c.reloadConfig(map[string]string{"payload": string(payload)})
+}
+
+func (c *Client) reloadConfig(body map[string]string) error {
+	_, err := c.DoRequest("PUT", "/configs?force=true", body)
 	return err
 }
 
@@ -166,6 +174,12 @@ func (c *Client) GetConfigs() (*model.ConfigsResponse, error) {
 // UpdateConfig 更新代理配置
 func (c *Client) UpdateConfig(reqBody model.UpdateConfigRequest) error {
 	_, err := c.DoRequest("PATCH", "/configs", reqBody)
+	return err
+}
+
+// PatchConfig patches individual runtime configuration fields via PATCH /configs.
+func (c *Client) PatchConfig(patch map[string]any) error {
+	_, err := c.DoRequest("PATCH", "/configs", patch)
 	return err
 }
 

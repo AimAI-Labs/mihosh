@@ -219,8 +219,11 @@ func (s *ProfileService) SaveMerge(content []byte) error {
 
 // ActivateResult 激活流程的结果。
 type ActivateResult struct {
-	BackupName string // 产生的备份文件名（首次生成时为空）
-	MergeErr   error  // merge.yaml 解析错误（非致命，已降级忽略覆写）
+	BackupName   string // 产生的备份文件名（首次生成时为空）
+	MergeErr     error  // merge.yaml 解析错误（非致命，已降级忽略覆写）
+	Restarted    bool   // external-controller 或 secret 变更后已重启内核
+	NeedsRestart bool   // 外部/远程内核需要手动重启才能应用控制器地址或密钥变更
+	Remote       bool   // 仅通过远程控制器内存重载应用（未写入远端磁盘）
 }
 
 // Activate 激活订阅：生成 → 备份 → 写入 mihomo 配置 → 热重载。
@@ -232,6 +235,15 @@ type ActivateResult struct {
 //   - 写入成功但重载失败时不回滚文件，由调用方提示「配置已写入但重载失败」；
 //   - 重载成功后同步把 active_sub 更新为 uid。
 func (s *ProfileService) Activate(uid string) (ActivateResult, error) {
+	return s.activate(uid, nil)
+}
+
+// ApplyActiveMerge 在编辑全局 merge.yaml 后重新生成并应用当前激活订阅。
+func (s *ProfileService) ApplyActiveMerge(uid string, cleared []string) (ActivateResult, error) {
+	return s.activate(uid, cleared)
+}
+
+func (s *ProfileService) activate(uid string, cleared []string) (ActivateResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -254,23 +266,46 @@ func (s *ProfileService) Activate(uid string) (ActivateResult, error) {
 			}
 		}
 	}
-	if cfg, err := config.Load(); err == nil && cfg.Core.Mode == "managed" {
+	cfg, cfgErr := config.Load()
+	if cfgErr == nil && cfg.Core.Mode == "managed" {
 		if s.core != nil {
-			return s.core.ApplyProfile(context.Background(), uid, true)
+			return s.core.ApplyProfileCleared(context.Background(), uid, true, cleared)
 		}
 		runtime := NewCoreService()
 		defer runtime.Close()
-		return runtime.ApplyProfile(context.Background(), uid, false)
+		return runtime.ApplyProfileCleared(context.Background(), uid, false, cleared)
 	}
 
 	// 1. 解析 mihomo 配置路径（提前获取用于保留字段）
 	mihomoPath, err := config.GetMihomoConfigPath()
+	if errors.Is(err, config.ErrExternalConfig) {
+		generated, genErr := profile.GenerateForUID(uid, "")
+		if genErr != nil {
+			return ActivateResult{}, genErr
+		}
+		if s.client == nil {
+			return ActivateResult{}, errors.New("未配置 mihomo 客户端，无法重载核心")
+		}
+		if reloadErr := s.client.ReloadConfigPayload(generated.Data); reloadErr != nil {
+			return ActivateResult{}, fmt.Errorf("核心重载失败: %w", reloadErr)
+		}
+		if err := s.SetActiveSub(uid); err != nil {
+			_ = err
+		}
+		needsRestart := false
+		if cfgErr == nil {
+			if overrides, oerr := profile.ReadMihomoOverrides(); oerr == nil {
+				needsRestart = identityRequestedForRemote(overrides, cfg.Core.ExternalController, cfg.Core.ExternalSecret)
+			}
+		}
+		return ActivateResult{MergeErr: generated.MergeErr, Remote: true, NeedsRestart: needsRestart}, nil
+	}
 	if err != nil {
 		return ActivateResult{}, ErrMihomoPathMissing
 	}
 
-	// 2. 生成（merge 损坏时降级；保留现有 mihomo 配置中的托管字段）
-	generated, err := profile.GenerateForUID(uid, mihomoPath)
+	// 2. 生成（merge 损坏时降级；显式 merge.yaml 覆写优先于现有文件）
+	generated, err := profile.GenerateForUIDWithCleared(uid, mihomoPath, cleared, false)
 	if err != nil {
 		return ActivateResult{}, err
 	}
@@ -280,12 +315,14 @@ func (s *ProfileService) Activate(uid string) (ActivateResult, error) {
 	// yaml.v3 序列化确定性保证：相同 raw+merge 生成字节一致。
 	// 跳过可避免重复触发 mihomo ApplyConfig 重建 proxies/rules/providers
 	// （其固有内存峰值是用户感知"切换订阅内存升高"的直接来源）。
-	if existing, rerr := os.ReadFile(mihomoPath); rerr == nil && bytes.Equal(existing, data) {
+	existing, rerr := os.ReadFile(mihomoPath)
+	identityChanged := rerr == nil && localControllerIdentityChanged(existing, data, s.client)
+	if rerr == nil && bytes.Equal(existing, data) {
 		// 仅同步激活 UID 后返回（BackupName 为空表示未产生新备份）。
 		if err := s.SetActiveSub(uid); err != nil {
 			_ = err
 		}
-		return ActivateResult{MergeErr: generated.MergeErr}, nil
+		return ActivateResult{MergeErr: generated.MergeErr, NeedsRestart: identityChanged}, nil
 	}
 
 	// 4. 备份现有 config.yaml
@@ -299,11 +336,21 @@ func (s *ProfileService) Activate(uid string) (ActivateResult, error) {
 		return ActivateResult{}, fmt.Errorf("写入最终配置失败: %w", err)
 	}
 
-	// 6. 热重载核心
+	// 6. 热重载或重启核心
 	if s.client == nil {
 		return ActivateResult{}, errors.New("未配置 mihomo 客户端，无法重载核心")
 	}
-	if err := s.client.ReloadConfig(mihomoPath); err != nil {
+	restarted, needsRestart := false, false
+	if identityChanged {
+		if config.RestartMihomoService() == nil {
+			restarted = true
+		} else {
+			if err := s.client.ReloadConfig(mihomoPath); err != nil {
+				return ActivateResult{}, fmt.Errorf("核心重载失败（配置已写入）: %w", err)
+			}
+			needsRestart = true
+		}
+	} else if err := s.client.ReloadConfig(mihomoPath); err != nil {
 		// 重载失败：文件已写入，不回滚。返回错误供调用方提示。
 		return ActivateResult{}, fmt.Errorf("核心重载失败（配置已写入）: %w", err)
 	}
@@ -314,7 +361,12 @@ func (s *ProfileService) Activate(uid string) (ActivateResult, error) {
 		_ = err
 	}
 
-	return ActivateResult{BackupName: backupName, MergeErr: generated.MergeErr}, nil
+	return ActivateResult{
+		BackupName:   backupName,
+		MergeErr:     generated.MergeErr,
+		Restarted:    restarted,
+		NeedsRestart: needsRestart,
+	}, nil
 }
 
 // ===== 内部辅助 =====

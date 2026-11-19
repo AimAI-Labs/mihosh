@@ -12,9 +12,10 @@ import (
 
 // ConfigService 配置管理服务
 type ConfigService struct {
-	mihomoConfigPath func() (string, error)
-	writeMihomoField func(string, string, interface{}) error
-	restartMihomo    func() error
+	mihomoConfigPath  func() (string, error)
+	localExternalPath func() (string, error)
+	writeMihomoField  func(string, string, interface{}) error
+	restartMihomo     func() error
 }
 
 // MihomoConfigSaveResult separates persisted data from runtime application.
@@ -27,9 +28,10 @@ type MihomoConfigSaveResult struct {
 // NewConfigService 创建配置服务
 func NewConfigService() *ConfigService {
 	return &ConfigService{
-		mihomoConfigPath: config.GetMihomoConfigPathForWrite,
-		writeMihomoField: config.WriteMihomoField,
-		restartMihomo:    config.RestartMihomoService,
+		mihomoConfigPath:  config.GetMihomoConfigPathForWrite,
+		localExternalPath: config.GetMihomoConfigPath,
+		writeMihomoField:  config.WriteMihomoField,
+		restartMihomo:     config.RestartMihomoService,
 	}
 }
 

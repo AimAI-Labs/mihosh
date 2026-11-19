@@ -1,9 +1,10 @@
 package messages
 
 import (
+	"time"
+
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
-	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
@@ -38,6 +39,25 @@ type MihomoConfigMsg struct {
 type MihomoConfigSavedMsg struct {
 	Err     error
 	WriteOK bool // YAML 已写入成功（即使 reload 失败也应刷新端点）
+}
+
+type MihomoOverridesMsg struct {
+	Overrides map[string]string
+	ReadAt    time.Time
+	Err       error
+}
+
+type MihomoOverridesSavedMsg struct {
+	Overrides          map[string]string
+	WriteOK            bool
+	Applied            bool
+	Restarted          bool
+	NeedsRestart       bool
+	EndpointChanged    bool
+	Remote             bool
+	RemoteNotPersisted bool
+	Restored           bool
+	Err                error
 }
 
 type ShowGuideModalMsg struct {
@@ -213,10 +233,13 @@ func (m SubFetchErrorMsg) Error() string { return m.Err.Error() }
 // Err != nil 表示生成/备份/写入/重载中某步失败（配置可能已写入，见 ProfileService.Activate）。
 // MergeErr != nil 表示 merge.yaml 语法错误（已降级忽略覆写，非致命）。
 type SubActivatedMsg struct {
-	UID        string
-	BackupName string // 产生的备份文件名（首次生成时为空）
-	Err        error
-	MergeErr   error
+	UID          string
+	BackupName   string // 产生的备份文件名（首次生成时为空）
+	Err          error
+	MergeErr     error
+	Restarted    bool
+	NeedsRestart bool
+	Remote       bool
 }
 
 // SubAddDoneMsg 订阅已新增（调用方负责刷新列表）。
@@ -249,19 +272,21 @@ func (m SubMergeSaveErrorMsg) Error() string { return m.Err.Error() }
 // MergeEditFinishedMsg 外部编辑器编辑全局 merge.yaml 结束。
 // Err 为 nil 表示编辑器正常退出（文件已写盘）；非 nil 表示启动或退出失败。
 type MergeEditFinishedMsg struct {
-	Err                         error
-	HasUnsupportedManagedFields bool
+	Err              error
+	ClearedOverrides []string
 }
 
 // SubMergeAppliedMsg 激活订阅流程（覆写编辑后触发的重载）结束。
 // Err != nil 表示生成/备份/写入/重载中某步失败；
 // MergeErr != nil 表示 merge.yaml 语法错误（已降级忽略覆写，非致命）。
 type SubMergeAppliedMsg struct {
-	UID                         string
-	BackupName                  string
-	Err                         error
-	MergeErr                    error
-	HasUnsupportedManagedFields bool
+	UID          string
+	BackupName   string
+	Err          error
+	MergeErr     error
+	Restarted    bool
+	NeedsRestart bool
+	Remote       bool
 }
 
 // SubRenameDoneMsg 订阅已重命名。

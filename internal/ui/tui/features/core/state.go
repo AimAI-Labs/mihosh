@@ -69,7 +69,7 @@ func NewState(svc *service.CoreService, configSvc *service.ConfigService, client
 	if cfg, err := config.Load(); err == nil && cfg != nil {
 		status.ShellProxy = cfg.ShellProxy
 	}
-	return State{svc: svc, Status: status, editor: preferences.NewMihomoState(configSvc, client), Release: release, followSelection: true, catalog: releaseCatalog{page: coreinfra.ReleasePage{Releases: []coreinfra.Release{release}}, cleanup: &releaseCleanup{}}}
+	return State{svc: svc, Status: status, editor: preferences.NewMihomoState(configSvc, client, svc), Release: release, followSelection: true, catalog: releaseCatalog{page: coreinfra.ReleasePage{Releases: []coreinfra.Release{release}}, cleanup: &releaseCleanup{}}}
 }
 func (s State) Refresh() tea.Cmd {
 	if s.svc == nil {
@@ -254,6 +254,12 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	case messages.MihomoConfigMsg:
 		s.editor = s.editor.ApplyMihomoConfig(&msg)
 		return s, nil
+	case messages.MihomoOverridesMsg:
+		s.editor = s.editor.ApplyMihomoOverrides(&msg)
+		return s, nil
+	case messages.MihomoOverridesSavedMsg:
+		s.editor = s.editor.CompleteMihomoOverridesSave(&msg)
+		return s, nil
 	case messages.MihomoVersionMsg:
 		s.editor = s.editor.ApplyMihomoVersion(msg.Version)
 		return s, nil
@@ -400,7 +406,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	case tea.KeyMsg:
 		if s.tab == 4 && !s.Editing {
 			if s.editor.IsEditing() || !isCoreTabKey(msg.String()) {
-				if s.Busy {
+				if s.Busy || s.editor.IsSaving() {
 					return s, nil
 				}
 				var cmd tea.Cmd

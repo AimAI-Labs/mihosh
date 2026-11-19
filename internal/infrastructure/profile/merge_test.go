@@ -307,20 +307,33 @@ func TestGenerateYAMLWithPreserve_InvalidManagedYAMLReturnsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "解析现有 mihomo 配置失败")
 }
 
-func TestMergeManagedFieldOverrideKeys(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("USERPROFILE", home)
+func TestGenerateYAMLWithPreserve_ExplicitMergeOverridesManagedFile(t *testing.T) {
+	dir := t.TempDir()
+	managedPath := filepath.Join(dir, "config.yaml")
+	require.NoError(t, os.WriteFile(managedPath, []byte(""+
+		"external-controller: 127.0.0.1:9090\n"+
+		"secret: old-secret\n"+
+		"mixed-port: 7890\n"+
+		"allow-lan: true\n"+
+		"log-level: info\n"), 0644))
 
-	require.NoError(t, WriteMerge([]byte(`mixed-port: 17890
+	raw := parseDoc(t, "mode: rule\nproxies: []\n")
+	merge := parseDoc(t, `mixed-port: 17890
 allow-lan: false
-mode: rule
 secret: from-override
-`)))
+`)
 
-	keys, err := MergeManagedFieldOverrideKeys()
+	out, err := GenerateYAMLWithPreserve(raw, merge, managedPath)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"secret", "mixed-port", "allow-lan"}, keys)
+	got := string(out)
+	assert.Contains(t, got, "external-controller: 127.0.0.1:9090")
+	assert.Contains(t, got, "log-level: info")
+	assert.Contains(t, got, "mixed-port: 17890")
+	assert.Contains(t, got, "allow-lan: false")
+	assert.Contains(t, got, "secret: from-override")
+	assert.NotContains(t, got, "secret: old-secret")
+	assert.NotContains(t, got, "mixed-port: 7890")
+	assert.NotContains(t, got, "allow-lan: true")
 }
 
 func TestApplyMerge_DeepMergeSequenceReplaced(t *testing.T) {

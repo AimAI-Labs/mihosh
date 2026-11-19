@@ -168,4 +168,6 @@ core:
 
 ## Mihomo 配置
 
-进入 **Core → Mihomo 配置**（`p` 或 `5`），统一编辑 `external-controller`、`secret`、`mixed-port`、`allow-lan`、`log-level`。方向键或滚轮选择，`Enter`/双击编辑，`Enter` 保存，`Esc` 取消；枚举项支持方向键及鼠标选择。保存沿用 YAML 写入与热重载，重载失败会提示重启。托管内核的升级、重启与 GEO 管理使用对应的 Core 菜单，配置页仅保留重载与缓存清理；外部内核保留原有 API 操作。设置菜单只保留 Mihosh 偏好。
+进入 **Core → Mihomo 配置**（`p` 或 `5`），可编辑 `merge.yaml` 中的五项覆写，包括 `external-controller`、`secret`、`mixed-port`、`allow-lan` 和 `log-level`。用方向键或滚轮选择，按 `Enter` 或双击进入编辑，再按 `Enter` 保留草稿，或按 `Esc` 取消本次编辑。枚举值也可直接点击。将 `allow-lan` 或 `log-level` 选为「空」会从 `merge.yaml` 删除对应键。选择 `false` 会显式写入 `allow-lan: false`。
+
+点击「覆写」、选中按钮后按 `Enter`，或按 `Ctrl+S`，即可写入 `merge.yaml` 并立即重新生成和应用激活配置。从订阅页编辑 `merge.yaml` 后，表单也会刷新。若提示本地外部内核需要重启，重启后在 Core 按 `r` 重新连接。远程控制器应用的配置在内存中生效，持久化需更新远端的配置文件。

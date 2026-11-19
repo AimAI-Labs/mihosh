@@ -1,9 +1,11 @@
 package tui
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/preferences"
-	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
@@ -383,7 +385,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 				nodes.FetchConfigMode(m.client),
 				rules.FetchRules(m.client),
 				preferences.FetchMihomoVersion(m.client),
-				preferences.FetchMihomoConfig(m.configSvc, m.client),
+				preferences.FetchMihomoOverrides(m.configSvc),
 			}
 			if msg.DelayMs > 0 {
 				return m, tea.Sequence(
@@ -403,6 +405,34 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.MihomoVersionMsg:
 		m.settingsState = m.settingsState.ApplyMihomoVersion(msg.Version)
 		m.coreState, _ = m.coreState.Update(msg)
+
+	case messages.MihomoOverridesMsg:
+		m.coreState, _ = m.coreState.Update(msg)
+
+	case messages.MihomoOverridesSavedMsg:
+		m.coreState, _ = m.coreState.Update(msg)
+		if !msg.WriteOK {
+			if msg.Err != nil {
+				err := msg.Err
+				if msg.Restored {
+					err = fmt.Errorf("%s (%w)", i18n.T("settings.toast.mihomo_override_restored"), err)
+				}
+				m.err = messages.ErrMsg{Err: err}
+			}
+			m.notice, m.noticeTicks = "", 0
+			return m, nil
+		}
+		m.err = nil
+		m.notice = i18n.T(mihomoOverrideNotice(msg))
+		m.noticeTicks = autoRefreshNoticeTicks
+		var targetCmd tea.Cmd
+		if !msg.Remote && (msg.Restarted || msg.EndpointChanged || msg.NeedsRestart && !msg.Applied) {
+			targetCmd = m.syncAppliedCore(msg.Restarted, msg.NeedsRestart && msg.Applied)
+		}
+		if targetCmd == nil && msg.Applied && m.connectionReady {
+			return m, m.refreshOnConnect()
+		}
+		return m, tea.Batch(targetCmd, m.coreState.Refresh())
 
 	case messages.MihomoConfigMsg:
 		// Mihomo 标签页配置加载完成（成功或失败）。
@@ -495,18 +525,9 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.noticeTicks = 0
 			return m, nil
 		}
-		notice := i18n.T("sub.activated_toast")
-		if msg.MergeErr != nil {
-			notice = i18n.T("sub.activated_merge_warn_toast")
-		}
-		m.notice = notice
-		m.noticeTicks = autoRefreshNoticeTicks
-		// 刷新订阅列表（更新激活态）+ 刷新节点信息（配置已重载）
-		return m, tea.Batch(
-			sub.FetchSubs(m.profileSvc),
-			nodes.FetchGroups(m.client),
-			nodes.FetchProxies(m.client),
-		)
+		cmd := m.finishSubConfigApply(msg.MergeErr, msg.Restarted, msg.NeedsRestart, msg.Remote,
+			"sub.activated_toast", "sub.activated_merge_warn_toast")
+		return m, cmd
 
 	case messages.SubMergeSavedMsg:
 		m.notice = i18n.T("sub.merge_saved_toast")
@@ -545,25 +566,18 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = messages.ErrMsg{Err: msg.Err}
 			m.notice = ""
 			m.noticeTicks = 0
-			return m, reenableMouse
+			return m, tea.Batch(reenableMouse, preferences.FetchMihomoOverrides(m.configSvc))
 		}
+		m.err = nil
 		// 如果有激活的订阅，则立即应用这份全局覆写并热重载
 		if m.subState.ActiveUID() != "" {
-			if msg.HasUnsupportedManagedFields {
-				m.notice = i18n.T("sub.merge_applied_unsupported_toast")
-			} else {
-				m.notice = i18n.T("sub.merge_applied_toast")
-			}
+			m.notice = i18n.T("settings.toast.mihomo_override_applying")
 			m.noticeTicks = autoRefreshNoticeTicks
-			return m, tea.Batch(reenableMouse, sub.ApplyActiveMergeCmd(m.profileSvc, m.subState.ActiveUID(), msg.HasUnsupportedManagedFields))
+			return m, tea.Batch(reenableMouse, sub.ApplyActiveMergeCmd(m.profileSvc, m.subState.ActiveUID(), msg.ClearedOverrides))
 		}
-		if msg.HasUnsupportedManagedFields {
-			m.notice = i18n.T("sub.merge_saved_unsupported_toast")
-		} else {
-			m.notice = i18n.T("sub.merge_saved_toast")
-		}
+		m.notice = i18n.T("sub.merge_saved_toast")
 		m.noticeTicks = autoRefreshNoticeTicks
-		return m, reenableMouse
+		return m, tea.Batch(reenableMouse, preferences.FetchMihomoOverrides(m.configSvc))
 
 	case messages.SubMergeAppliedMsg:
 		// 覆写编辑后触发的重载流程结束（仅激活订阅会走到此分支）。
@@ -571,22 +585,11 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = messages.ErrMsg{Err: msg.Err}
 			m.notice = ""
 			m.noticeTicks = 0
-			return m, nil
+			return m, preferences.FetchMihomoOverrides(m.configSvc)
 		}
-		notice := i18n.T("sub.merge_applied_toast")
-		if msg.HasUnsupportedManagedFields {
-			notice = i18n.T("sub.merge_applied_unsupported_toast")
-		} else if msg.MergeErr != nil {
-			notice = i18n.T("sub.merge_applied_warn_toast")
-		}
-		m.notice = notice
-		m.noticeTicks = autoRefreshNoticeTicks
-		// 刷新订阅列表 + 刷新节点信息（核心已重载）
-		return m, tea.Batch(
-			sub.FetchSubs(m.profileSvc),
-			nodes.FetchGroups(m.client),
-			nodes.FetchProxies(m.client),
-		)
+		cmd := m.finishSubConfigApply(msg.MergeErr, msg.Restarted, msg.NeedsRestart, msg.Remote,
+			"sub.merge_applied_toast", "sub.merge_applied_warn_toast")
+		return m, tea.Batch(cmd, preferences.FetchMihomoOverrides(m.configSvc))
 
 	case messages.LocalSubImportedMsg:
 		// 首次启动自动导入本地订阅完成（成功时刷新列表，失败时静默忽略）
@@ -597,6 +600,47 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, nil
+}
+
+func mihomoOverrideNotice(msg messages.MihomoOverridesSavedMsg) string {
+	switch {
+	case msg.Remote && !msg.Applied:
+		return "settings.toast.mihomo_override_remote_saved_only"
+	case msg.Remote && msg.NeedsRestart:
+		return "settings.toast.mihomo_override_remote_restart"
+	case msg.Remote:
+		return "settings.toast.mihomo_override_remote_applied"
+	case msg.Restarted:
+		return "settings.toast.mihomo_override_restarted"
+	case msg.NeedsRestart && msg.Applied:
+		return "settings.toast.mihomo_override_needs_restart_partial"
+	case msg.NeedsRestart:
+		return "settings.toast.mihomo_override_needs_restart"
+	case msg.Applied:
+		return "settings.toast.mihomo_override_applied"
+	default:
+		return "settings.toast.mihomo_override_saved_offline"
+	}
+}
+
+func (m *Model) finishSubConfigApply(mergeErr error, restarted, needsRestart, remote bool, successKey, warningKey string) tea.Cmd {
+	m.err = nil
+	m.noticeTicks = autoRefreshNoticeTicks
+	if mergeErr != nil {
+		m.notice = i18n.T(warningKey)
+	} else if restarted || needsRestart || remote {
+		m.notice = i18n.T(mihomoOverrideNotice(messages.MihomoOverridesSavedMsg{
+			Applied: true, Restarted: restarted, NeedsRestart: needsRestart, Remote: remote,
+		}))
+	} else {
+		m.notice = i18n.T(successKey)
+	}
+	if !remote {
+		if cmd := m.syncAppliedCore(restarted, needsRestart); cmd != nil {
+			return tea.Batch(cmd, sub.FetchSubs(m.profileSvc), m.coreState.Refresh())
+		}
+	}
+	return m.refreshOnConnect()
 }
 
 func (m *Model) advanceAutoRefreshTransientState() {

@@ -3,7 +3,6 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -14,6 +13,17 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
+
+// APIError represents an HTTP non-success response returned by the Mihomo controller.
+type APIError struct {
+	StatusCode int
+	Status     string
+	Body       string
+}
+
+func (e *APIError) Error() string {
+	return i18n.Tf("api.client.err_request_failed", e.Status, e.Body)
+}
 
 // Client mihomo API 客户端
 //
@@ -128,7 +138,11 @@ func (c *Client) doRawRequest(method, path string, body interface{}) (*http.Resp
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
-		return nil, fmt.Errorf("%s", i18n.Tf("api.client.err_request_failed", resp.Status, string(bodyBytes)))
+		return nil, &APIError{
+			StatusCode: resp.StatusCode,
+			Status:     resp.Status,
+			Body:       string(bodyBytes),
+		}
 	}
 
 	return resp, nil

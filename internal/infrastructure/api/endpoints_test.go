@@ -1,14 +1,61 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestReloadConfigPayloadSendsConfigurationWithoutPath(t *testing.T) {
+	const payload = "mode: rule\nrules:\n  - MATCH,DIRECT\n"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPut, r.Method)
+		assert.Equal(t, "/configs", r.URL.Path)
+		assert.Equal(t, "true", r.URL.Query().Get("force"))
+		var body map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		assert.Equal(t, map[string]string{"payload": payload}, body)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client := NewClient(config.MihomoEndpoint{ExternalController: server.URL}, 1000)
+	require.NoError(t, client.ReloadConfigPayload([]byte(payload)))
+}
+
+func TestPatchConfigAndAPIError(t *testing.T) {
+	var got map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPatch && r.URL.Path == "/configs" {
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		http.Error(w, "bad config", http.StatusBadRequest)
+	}))
+	defer server.Close()
+
+	client := NewClient(config.MihomoEndpoint{ExternalController: server.URL}, 1000)
+	require.NoError(t, client.PatchConfig(map[string]any{"allow-lan": false, "log-level": "debug", "mixed-port": 7891}))
+	assert.Equal(t, false, got["allow-lan"])
+	assert.Equal(t, "debug", got["log-level"])
+	assert.Equal(t, float64(7891), got["mixed-port"])
+
+	err := client.ReloadConfigPayload([]byte("invalid"))
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, http.StatusBadRequest, apiErr.StatusCode)
+	assert.Contains(t, apiErr.Body, "bad config")
+}
 
 func TestGetMemoryDecodesFirstObjectFromOpenStream(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

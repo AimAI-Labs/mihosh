@@ -148,7 +148,8 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.onPageChange()
 
 	case key.Matches(msg, common.Keys.Refresh):
-		return m, m.refreshCurrentPage()
+		cmd := m.refreshCurrentPage()
+		return m, cmd
 
 	case msg.String() == "ctrl+u" && m.hasUpdate:
 		m.showUpdateDialog = true
@@ -197,7 +198,6 @@ func (m Model) dispatchToPage(msg tea.Msg) (tea.Model, tea.Cmd) {
 			common.InitKeyBindings()
 			cmd = tea.Batch(cmd, tea.ClearScreen)
 		}
-		// 连接信息热刷新改由 MihomoConfigSavedMsg 驱动（Mihosh 配置不再含连接信息）。
 		if newCfg != nil {
 			m.autoRefreshRemaining = newCfg.AutoRefreshInterval
 			m.autoRefreshSynced = false

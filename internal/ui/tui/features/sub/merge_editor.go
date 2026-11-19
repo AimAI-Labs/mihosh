@@ -26,6 +26,7 @@ func (s State) openMergeExternalEditor() (State, tea.Cmd) {
 	if editor == "" {
 		return s, mergeEditError(errors.New("未找到可用的编辑器，请在 ~/.bashrc 或 ~/.zshrc 中设置 EDITOR 变量"))
 	}
+	beforeOverrides, _ := profile.ReadMihomoOverrides()
 	fields := utils.SplitEditorCommand(editor)
 	args := make([]string, 0, len(fields))
 	args = append(args, fields[1:]...)
@@ -34,8 +35,8 @@ func (s State) openMergeExternalEditor() (State, tea.Cmd) {
 	return s, tea.ExecProcess(c, func(err error) tea.Msg {
 		msg := messages.MergeEditFinishedMsg{Err: err}
 		if err == nil {
-			if keys, detectErr := profile.MergeManagedFieldOverrideKeys(); detectErr == nil && len(keys) > 0 {
-				msg.HasUnsupportedManagedFields = true
+			if afterOverrides, readErr := profile.ReadMihomoOverrides(); readErr == nil {
+				msg.ClearedOverrides = profile.ClearedOverrideKeys(beforeOverrides, afterOverrides)
 			}
 		}
 		return msg

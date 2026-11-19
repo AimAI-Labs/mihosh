@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
-	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHandleMouseLeft_SingleClickSelectsSetting(t *testing.T) {
@@ -192,74 +192,57 @@ func TestHandleMouseLeft_LanguageClickSaveFailure(t *testing.T) {
 }
 
 func TestHandleMouseLeft_ClickAllowLanRowToggles(t *testing.T) {
-	// allow-lan index=3 in MihomoSettingKeys, offset=5 => rowY=8
-	const allowLanRowY = 8
-	state := State{
-		activeTab:    1,
-		mihomoConfig: &model.MihomoConfig{AllowLan: false},
+	state := State{activeTab: 1, mihomoLoaded: true}
+	const tabStart = settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth
+	emptyWidth := settingsTabDisplayWidth(overrideOptionLabel(""))
+	for _, tab := range []struct {
+		x     int
+		value string
+	}{
+		{tabStart + emptyWidth + 1, "true"},
+		{tabStart + emptyWidth + 2 + settingsTabDisplayWidth("true"), "false"},
+		{tabStart, ""},
+	} {
+		next, cmd := state.HandleMouseLeft(tab.x, 8, 100, 30)
+		require.Nil(t, cmd)
+		require.Equal(t, 3, next.selectedSetting)
+		require.False(t, next.editMode)
+		require.Equal(t, tab.value, next.getDraftOverride("allow-lan"))
+		state = next
 	}
-	configSvc := service.NewConfigService()
-
-	trueTabX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth + 1
-	state.Config = &config.Config{}
-	state.configSvc = configSvc
-	next, cmd := state.HandleMouseLeft(trueTabX, allowLanRowY, 100, 30)
-	if next.selectedSetting != 3 {
-		t.Fatalf("expected allow-lan row selected, got %d", next.selectedSetting)
-	}
-	if next.editMode {
-		t.Fatalf("expected click allow-lan row does not enter edit mode")
-	}
-	if cmd == nil {
-		t.Fatalf("expected save command after clicking allow-lan row")
-	}
+	next, cmd := state.HandleMouseLeft(tabStart, mihomoApplyButtonRowY, 100, 30)
+	require.NotNil(t, cmd)
+	require.True(t, next.IsSaving())
 }
 
 func TestHandleMouseLeft_ClickLogLevelRowSets(t *testing.T) {
-	// log-level index=4 in MihomoSettingKeys, offset=5 => rowY=9
-	const logLevelRowY = 9
 	state := State{
 		activeTab:    1,
-		mihomoConfig: &model.MihomoConfig{LogLevel: "info"},
+		mihomoLoaded: true,
 	}
-	configSvc := service.NewConfigService()
-
-	// "warning" is the second tab.
-	// info tab width = 4 + 4 = 8. + 1 (separator) = 9
-	warningTabX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth + 9 + 1
-	state.Config = &config.Config{}
-	state.configSvc = configSvc
-	next, cmd := state.HandleMouseLeft(warningTabX, logLevelRowY, 100, 30)
-	if next.selectedSetting != 4 {
-		t.Fatalf("expected log-level row selected, got %d", next.selectedSetting)
-	}
-	if next.editMode {
-		t.Fatalf("expected click log-level row does not enter edit mode")
-	}
-	if cmd == nil {
-		t.Fatalf("expected save command after clicking log-level row")
+	x := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth
+	for _, value := range logLevelValues {
+		next, cmd := state.HandleMouseLeft(x, 9, 120, 30)
+		require.Nil(t, cmd)
+		require.Equal(t, 4, next.selectedSetting)
+		require.False(t, next.editMode)
+		require.Equal(t, value, next.getDraftOverride("log-level"))
+		state = next
+		x += settingsTabDisplayWidth(overrideOptionLabel(value)) + 1
 	}
 }
 
 func TestHandleMouseLeft_EditModeAllowLanClickToggles(t *testing.T) {
-	const allowLanRowY = 8
 	state := State{
 		activeTab:       1,
 		selectedSetting: 3,
 		editMode:        true,
 		editValue:       "false",
-		mihomoConfig:    &model.MihomoConfig{AllowLan: false},
+		mihomoLoaded:    true,
 	}
-	configSvc := service.NewConfigService()
-
-	trueTabX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth + 1
-	state.Config = &config.Config{}
-	state.configSvc = configSvc
-	next, cmd := state.HandleMouseLeft(trueTabX, allowLanRowY, 100, 30)
-	if next.editMode {
-		t.Fatalf("expected editMode to exit after clicking allow-lan row")
-	}
-	if cmd == nil {
-		t.Fatalf("expected save command after edit-mode allow-lan click")
-	}
+	trueTabX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth + settingsTabDisplayWidth(overrideOptionLabel("")) + 1
+	next, cmd := state.HandleMouseLeft(trueTabX, 8, 100, 30)
+	require.False(t, next.editMode)
+	require.Nil(t, cmd)
+	require.Equal(t, "true", next.getDraftOverride("allow-lan"))
 }

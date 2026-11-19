@@ -175,7 +175,11 @@ func (m *Model) refreshCurrentPage() tea.Cmd {
 	case layout.PageCore:
 		var cmd tea.Cmd
 		m.coreState, cmd = m.coreState.RefreshCurrent()
-		return tea.Batch(cmd, m.checkCoreConnection())
+		check := m.updateCoreTarget(config.ResolveMihomoEndpoint(), coreTargetSync)
+		if check == nil {
+			check = m.checkCoreConnection()
+		}
+		return tea.Batch(cmd, check)
 	case layout.PageNodes:
 		return tea.Batch(nodes.FetchGroups(m.client), nodes.FetchProxies(m.client))
 	case layout.PageRules:
@@ -185,10 +189,7 @@ func (m *Model) refreshCurrentPage() tea.Cmd {
 	case layout.PageSettings:
 		cfg, _ := m.configSvc.LoadConfig()
 		m.config = cfg
-		return tea.Batch(
-			preferences.FetchMihomoVersion(m.client),
-			preferences.FetchMihomoConfig(m.configSvc, m.client),
-		)
+		return preferences.FetchMihomoVersion(m.client)
 	}
 	return nil
 }

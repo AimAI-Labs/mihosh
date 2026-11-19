@@ -55,6 +55,19 @@ func (m *Model) updateCoreTarget(endpoint config.MihomoEndpoint, update coreTarg
 	return nil
 }
 
+func (m *Model) syncAppliedCore(restarted, pendingRestart bool) tea.Cmd {
+	endpoint := config.ResolveMihomoEndpoint()
+	if restarted {
+		return m.updateCoreTarget(endpoint, coreTargetReconnect)
+	}
+	if pendingRestart && m.client != nil {
+		// The live controller still uses its old address and secret after hot reload.
+		current := m.client.EndpointSnapshot()
+		endpoint.ExternalController, endpoint.Secret = current.ExternalController, current.Secret
+	}
+	return m.updateCoreTarget(endpoint, coreTargetSync)
+}
+
 func (m *Model) coreOperationCompleted(action string) tea.Cmd {
 	m.reloadStoredConfig()
 	switch action {

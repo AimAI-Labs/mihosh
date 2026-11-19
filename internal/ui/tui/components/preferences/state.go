@@ -3,12 +3,14 @@ package preferences
 import (
 	"fmt"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
@@ -26,6 +28,14 @@ const (
 	settingsRowPaddingLeft       = 1
 	settingsTabHorizontalPadding = 2
 	settingsTabContentPadding    = 2
+	mihomoApplyIndex             = 5
+	mihomoApplyRowOffset         = 6 // 5 fields (0..4) + 1 blank line + apply button row
+	mihomoApplyButtonRowY        = settingsMouseRowsOffset + mihomoApplyRowOffset
+)
+
+var (
+	allowLanValues = []string{"", "true", "false"}
+	logLevelValues = []string{"", "info", "warning", "error", "debug", "silent"}
 )
 
 // State 设置页面完整状态
@@ -46,6 +56,10 @@ type State struct {
 
 	activeTab         int // 0=Mihosh, 1=Mihomo
 	mihomoConfig      *model.MihomoConfig
+	savedOverrides    map[string]string
+	draftOverrides    map[string]string
+	overridesSaving   bool
+	overridesReadAt   time.Time
 	mihomoLoaded      bool
 	mihomoLoadErr     error
 	mihomoFromFile    bool // API 不可达时从 YAML 文件降级读取
@@ -57,6 +71,7 @@ type State struct {
 	SysStatus SysStatusState
 
 	configSvc *service.ConfigService
+	coreSvc   *service.CoreService
 	client    *api.Client
 	Config    *config.Config
 }
@@ -71,15 +86,39 @@ func NewState(configSvc *service.ConfigService, client *api.Client) State {
 	}
 }
 
-func NewMihomoState(configSvc *service.ConfigService, client *api.Client) State {
+func NewMihomoState(configSvc *service.ConfigService, client *api.Client, coreSvcs ...*service.CoreService) State {
 	s := NewState(configSvc, client)
 	s.activeTab = 1
+	s.savedOverrides = map[string]string{}
+	s.draftOverrides = map[string]string{}
+	if len(coreSvcs) > 0 {
+		s.coreSvc = coreSvcs[0]
+	}
 	s.Config, _ = config.Load()
 	return s
 }
 
 func (s State) Refresh() tea.Cmd {
-	return tea.Batch(FetchMihomoConfig(s.configSvc, s.client), FetchMihomoVersion(s.client))
+	if s.overridesSaving {
+		return FetchMihomoVersion(s.client)
+	}
+	return tea.Batch(FetchMihomoOverrides(s.configSvc), FetchMihomoVersion(s.client))
+}
+
+func (s State) IsSaving() bool {
+	return s.overridesSaving
+}
+
+func (s State) HasUnsavedOverrides() bool {
+	if s.activeTab != 1 {
+		return false
+	}
+	for _, k := range MihomoSettingKeys {
+		if s.getSavedOverride(k) != s.getDraftOverride(k) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s State) CancelEdit() State {
@@ -148,6 +187,9 @@ func (s State) ToPageState(cfg *config.Config, sysLogs []model.LogEntry) PageSta
 		MihomoVersion:   s.mihomoVersion,
 		ActiveTab:       s.activeTab,
 		MihomoConfig:    s.mihomoConfig,
+		MihomoOverrides: cloneOverridesMap(s.draftOverrides),
+		MihomoDirty:     s.HasUnsavedOverrides(),
+		MihomoSaving:    s.overridesSaving,
 		MihomoLoaded:    s.mihomoLoaded,
 		MihomoLoadErr:   s.mihomoLoadErr,
 		MihomoFromFile:  s.mihomoFromFile,
@@ -167,16 +209,26 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		newState, cmd := s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
 		return newState, cmd
 	case tea.KeyMsg:
-		if s.editMode {
-			return s.handleEditMode(msg)
-		}
-
-		if msg.String() == "r" {
-			if s.activeTab == 0 {
+		if s.activeTab == 1 {
+			if s.overridesSaving {
 				return s, nil
 			}
-			s.mihomoLoaded = false
-			return s, tea.Batch(FetchMihomoVersion(s.client), FetchMihomoConfig(s.configSvc, s.client))
+			if msg.String() == "r" && !s.editMode {
+				return s, s.Refresh()
+			}
+			if !s.mihomoLoaded || s.mihomoLoadErr != nil {
+				return s, nil
+			}
+			if msg.String() == "ctrl+s" {
+				next, ok := s.commitCurrentEditDraft()
+				if !ok {
+					return next, nil
+				}
+				return next.submitMihomoOverrides()
+			}
+		}
+		if s.editMode {
+			return s.handleEditMode(msg)
 		}
 
 		switch {
@@ -185,11 +237,14 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 				s.selectedSetting--
 			}
 		case key.Matches(msg, common.Keys.Down):
-			if s.selectedSetting < len(s.activeKeys())-1 {
+			if s.selectedSetting < s.maxSelectionIndex() {
 				s.selectedSetting++
 			}
 		case key.Matches(msg, common.Keys.Enter):
-			if s.activeKeys()[s.selectedSetting] == "border-style" {
+			if s.activeTab == 1 && s.selectedSetting == mihomoApplyIndex {
+				return s.submitMihomoOverrides()
+			}
+			if s.activeTab == 0 && s.activeKeys()[s.selectedSetting] == "border-style" {
 				return s.toggleBorderStyle()
 			}
 			s.editMode = true
@@ -227,7 +282,7 @@ func (s State) HandleMouseScroll(up bool, pageY, pageHeight, actionsPanelBottomY
 			s.selectedSetting--
 		}
 	} else {
-		if s.selectedSetting < len(s.activeKeys())-1 {
+		if s.selectedSetting < s.maxSelectionIndex() {
 			s.selectedSetting++
 		}
 	}
@@ -236,6 +291,9 @@ func (s State) HandleMouseScroll(up bool, pageY, pageHeight, actionsPanelBottomY
 
 // HandleMouseLeft 处理 settings 页面左键单击/双击
 func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, tea.Cmd) {
+	if s.activeTab == 1 {
+		return s.handleMihomoMouseLeft(pageX, pageY, pageWidth)
+	}
 	settingIdx := resolveMouseSettingIndex(s, pageY)
 
 	if s.editMode {
@@ -266,33 +324,6 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 				}
 				s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
 				return s, nil
-			}
-		}
-
-		if s.activeTab == 1 {
-			settingKey := s.activeKeys()[s.selectedSetting]
-			if settingKey == "allow-lan" {
-				if val, ok := resolveEnumMouseTarget(pageX, []string{"true", "false"}); ok {
-					boolVal := val == "true"
-					s.editMode = false
-					s.editValue = ""
-					s.editCursor = 0
-					if boolVal != s.mihomoConfig.AllowLan {
-						return s, tea.Batch(SaveMihomoConfigField(s.configSvc, s.client, "allow-lan", boolVal), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
-					}
-					return s, nil
-				}
-			}
-			if settingKey == "log-level" {
-				if level, ok := resolveEnumMouseTarget(pageX, []string{"info", "warning", "error", "debug", "silent"}); ok {
-					s.editMode = false
-					s.editValue = ""
-					s.editCursor = 0
-					if level != s.mihomoConfig.LogLevel {
-						return s, tea.Batch(SaveMihomoConfigField(s.configSvc, s.client, "log-level", level), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
-					}
-					return s, nil
-				}
 			}
 		}
 
@@ -342,25 +373,6 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		}
 	}
 
-	if s.activeTab == 1 {
-		settingKey := s.activeKeys()[settingIdx]
-		if settingKey == "allow-lan" {
-			if val, ok := resolveEnumMouseTarget(pageX, []string{"true", "false"}); ok {
-				boolVal := val == "true"
-				if boolVal != s.mihomoConfig.AllowLan {
-					return s, tea.Batch(SaveMihomoConfigField(s.configSvc, s.client, "allow-lan", boolVal), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
-				}
-			}
-		}
-		if settingKey == "log-level" {
-			if level, ok := resolveEnumMouseTarget(pageX, []string{"info", "warning", "error", "debug", "silent"}); ok {
-				if level != s.mihomoConfig.LogLevel {
-					return s, tea.Batch(SaveMihomoConfigField(s.configSvc, s.client, "log-level", level), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
-				}
-			}
-		}
-	}
-
 	now := time.Now()
 	if s.doubleClickDetector.IsDoubleClick(struct{}{}, settingIdx, now) {
 		s.editMode = true
@@ -368,6 +380,80 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		s.editCursor = len([]rune(s.editValue))
 	}
 
+	return s, nil
+}
+
+func (s State) handleMihomoMouseLeft(pageX, pageY, pageWidth int) (State, tea.Cmd) {
+	if s.overridesSaving || !s.mihomoLoaded || s.mihomoLoadErr != nil {
+		return s, nil
+	}
+	if pageY == mihomoApplyButtonRowY {
+		if s.editMode {
+			if resolveMihomoApplyButtonClick(pageX, s.overridesSaving) {
+				next, ok := s.commitCurrentEditDraft()
+				if !ok {
+					return next, nil
+				}
+				next.selectedSetting = mihomoApplyIndex
+				return next.submitMihomoOverrides()
+			}
+			s = s.CancelEdit()
+			s.selectedSetting = mihomoApplyIndex
+			return s, nil
+		}
+		s.selectedSetting = mihomoApplyIndex
+		if resolveMihomoApplyButtonClick(pageX, s.overridesSaving) {
+			return s.submitMihomoOverrides()
+		}
+		return s, nil
+	}
+
+	settingIdx := resolveMouseSettingIndex(s, pageY)
+	if s.editMode {
+		if settingIdx == s.selectedSetting && settingIdx >= 0 && settingIdx < len(MihomoSettingKeys) {
+			settingKey := MihomoSettingKeys[settingIdx]
+			if settingKey == "allow-lan" {
+				if val, ok := resolveVisibleEnumMouseTarget(pageX, pageWidth, s.editValue, allowLanValues); ok {
+					s.setDraftOverride("allow-lan", val)
+					return s.CancelEdit(), nil
+				}
+			}
+			if settingKey == "log-level" {
+				if val, ok := resolveVisibleEnumMouseTarget(pageX, pageWidth, s.editValue, logLevelValues); ok {
+					s.setDraftOverride("log-level", val)
+					return s.CancelEdit(), nil
+				}
+			}
+		}
+		if settingIdx < 0 || settingIdx >= len(MihomoSettingKeys) {
+			return s.CancelEdit(), nil
+		}
+		return s, nil
+	}
+
+	if settingIdx < 0 || settingIdx >= len(MihomoSettingKeys) {
+		return s, nil
+	}
+	s.selectedSetting = settingIdx
+	settingKey := MihomoSettingKeys[settingIdx]
+	if settingKey == "allow-lan" {
+		if val, ok := resolveVisibleEnumMouseTarget(pageX, pageWidth, s.getDraftOverride("allow-lan"), allowLanValues); ok {
+			s.setDraftOverride("allow-lan", val)
+			return s, nil
+		}
+	}
+	if settingKey == "log-level" {
+		if val, ok := resolveVisibleEnumMouseTarget(pageX, pageWidth, s.getDraftOverride("log-level"), logLevelValues); ok {
+			s.setDraftOverride("log-level", val)
+			return s, nil
+		}
+	}
+	now := time.Now()
+	if s.doubleClickDetector.IsDoubleClick(struct{}{}, settingIdx, now) {
+		s.editMode = true
+		s.editValue = s.getDraftOverride(settingKey)
+		s.editCursor = len([]rune(s.editValue))
+	}
 	return s, nil
 }
 
@@ -398,60 +484,33 @@ func (s State) handleEditMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		keys := s.activeKeys()
 		settingKey := keys[s.selectedSetting]
 
-		// allow-lan tab toggle
+		// allow-lan tab toggle (empty / true / false) -> updates draft only
 		if settingKey == "allow-lan" {
 			switch {
 			case key.Matches(msg, common.Keys.Escape):
-				s.editMode = false
+				return s.CancelEdit(), nil
 			case key.Matches(msg, common.Keys.Enter):
-				val := s.editValue == "true"
-				s.editMode = false
-				s.editValue = ""
-				return s, tea.Batch(SaveMihomoConfigField(s.configSvc, s.client, "allow-lan", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
-			case msg.String() == "left", msg.String() == "right", msg.String() == "tab":
-				if s.editValue == "true" {
-					s.editValue = "false"
-				} else {
-					s.editValue = "true"
-				}
+				s.setDraftOverride("allow-lan", s.editValue)
+				return s.CancelEdit(), nil
+			case msg.String() == "left":
+				s.editValue = cycleOption(allowLanValues, s.editValue, -1)
+			case msg.String() == "right", msg.String() == "tab":
+				s.editValue = cycleOption(allowLanValues, s.editValue, 1)
 			}
 			return s, nil
 		}
-		// log-level tab toggle
+		// log-level tab toggle (empty / info / warning / error / debug / silent) -> updates draft only
 		if settingKey == "log-level" {
-			levels := []string{"info", "warning", "error", "debug", "silent"}
 			switch {
 			case key.Matches(msg, common.Keys.Escape):
-				s.editMode = false
+				return s.CancelEdit(), nil
 			case key.Matches(msg, common.Keys.Enter):
-				val := s.editValue
-				s.editMode = false
-				s.editValue = ""
-				return s, tea.Batch(SaveMihomoConfigField(s.configSvc, s.client, "log-level", val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+				s.setDraftOverride("log-level", s.editValue)
+				return s.CancelEdit(), nil
 			case msg.String() == "left":
-				matched := false
-				for i, l := range levels {
-					if l == s.editValue {
-						s.editValue = levels[(i+len(levels)-1)%len(levels)]
-						matched = true
-						break
-					}
-				}
-				if !matched && len(levels) > 0 {
-					s.editValue = levels[0]
-				}
+				s.editValue = cycleOption(logLevelValues, s.editValue, -1)
 			case msg.String() == "right", msg.String() == "tab":
-				matched := false
-				for i, l := range levels {
-					if l == s.editValue {
-						s.editValue = levels[(i+1)%len(levels)]
-						matched = true
-						break
-					}
-				}
-				if !matched && len(levels) > 0 {
-					s.editValue = levels[0]
-				}
+				s.editValue = cycleOption(logLevelValues, s.editValue, 1)
 			}
 			return s, nil
 		}
@@ -514,20 +573,8 @@ func (s State) handleEditMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	case key.Matches(msg, common.Keys.Enter):
 		settingKey := s.activeKeys()[s.selectedSetting]
 		if s.activeTab == 1 {
-			var val interface{} = s.editValue
-			if settingKey == "mixed-port" {
-				var port int
-				if _, err := fmt.Sscanf(s.editValue, "%d", &port); err == nil {
-					val = port
-				} else {
-					s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
-					return s, nil
-				}
-			}
-			s.editMode = false
-			s.editValue = ""
-			s.editCursor = 0
-			return s, tea.Batch(SaveMihomoConfigField(s.configSvc, s.client, settingKey, val), noticeCmd(i18n.T("settings.toast.mihomo_reloading")))
+			next, _ := s.commitCurrentEditDraft()
+			return next, nil
 		}
 
 		if err := s.configSvc.SetConfigValue(settingKey, s.editValue); err != nil {
@@ -666,6 +713,50 @@ func (s *State) activeKeys() []string {
 	return MihoshSettingKeys
 }
 
+func (s *State) maxSelectionIndex() int {
+	if s.activeTab == 1 {
+		return mihomoApplyIndex
+	}
+	return len(MihoshSettingKeys) - 1
+}
+
+func (s State) ApplyMihomoOverrides(msg *messages.MihomoOverridesMsg) State {
+	if s.overridesSaving || msg.ReadAt.Before(s.overridesReadAt) {
+		return s
+	}
+	s.overridesReadAt = msg.ReadAt
+	s.Config, _ = config.Load()
+	s.SysStatus.Supported = runtime.GOOS == "linux" && (s.Config == nil || s.Config.Core.Mode != "managed" || s.Config.Core.Runtime == "service")
+	s.mihomoLoaded = true
+	s.mihomoFromFile = true
+	s.mihomoLoadErr = msg.Err
+	if msg.Err == nil {
+		previousSaved, previousDraft := s.savedOverrides, s.draftOverrides
+		s.savedOverrides = msg.Overrides
+		s.draftOverrides = cloneOverridesMap(msg.Overrides)
+		for _, k := range MihomoSettingKeys {
+			if previousDraft[k] != previousSaved[k] {
+				s.setDraftOverride(k, previousDraft[k])
+			}
+		}
+	} else {
+		s = s.CancelEdit()
+	}
+	return s
+}
+
+func (s State) CompleteMihomoOverridesSave(msg *messages.MihomoOverridesSavedMsg) State {
+	s.overridesSaving = false
+	if msg.WriteOK {
+		s.overridesReadAt = time.Now()
+		s.savedOverrides = cloneOverridesMap(msg.Overrides)
+		s.draftOverrides = cloneOverridesMap(msg.Overrides)
+		s.mihomoLoaded = true
+		s.mihomoLoadErr = nil
+	}
+	return s
+}
+
 func (s State) ApplyMihomoConfig(msg *messages.MihomoConfigMsg) State {
 	s.Config, _ = config.Load()
 	s.SysStatus.Supported = runtime.GOOS == "linux" && (s.Config == nil || s.Config.Core.Mode != "managed" || s.Config.Core.Runtime == "service")
@@ -773,25 +864,136 @@ func settingsTabDisplayWidth(label string) int {
 }
 
 func (s State) getEditValue(cfg *config.Config, settingKey string) string {
-	if s.activeTab == 1 && s.mihomoConfig != nil {
-		switch settingKey {
-		case "external-controller":
-			return s.mihomoConfig.ExternalController
-		case "secret":
-			return s.mihomoConfig.Secret
-		case "mixed-port":
-			return fmt.Sprintf("%d", s.mihomoConfig.MixedPort)
-		case "allow-lan":
-			if s.mihomoConfig.AllowLan {
-				return "true"
-			}
-			return "false"
-		case "log-level":
-			return s.mihomoConfig.LogLevel
-		}
-		return ""
+	if s.activeTab == 1 {
+		return s.getDraftOverride(settingKey)
 	}
 	return GetSettingValue(s.ToPageState(s.Config, nil), settingKey)
+}
+
+func (s State) getDraftOverride(key string) string {
+	if s.draftOverrides != nil {
+		return s.draftOverrides[key]
+	}
+	return ""
+}
+
+func (s State) getSavedOverride(key string) string {
+	if s.savedOverrides != nil {
+		return s.savedOverrides[key]
+	}
+	return ""
+}
+
+func (s *State) setDraftOverride(key, value string) {
+	s.draftOverrides = cloneOverridesMap(s.draftOverrides)
+	if key != "secret" {
+		value = strings.TrimSpace(value)
+	}
+	if value == "" {
+		delete(s.draftOverrides, key)
+		return
+	}
+	s.draftOverrides[key] = value
+}
+
+func (s State) commitCurrentEditDraft() (State, bool) {
+	if !s.editMode || s.selectedSetting < 0 || s.selectedSetting >= len(MihomoSettingKeys) {
+		return s.CancelEdit(), true
+	}
+	settingKey := MihomoSettingKeys[s.selectedSetting]
+	val := s.editValue
+	if settingKey != "secret" {
+		val = strings.TrimSpace(val)
+	}
+	if err := profile.ValidateMihomoOverride(settingKey, val); err != nil {
+		s.showToast(i18n.Tf("settings.toast.save_failed_with_err", err.Error()), common.ToastError)
+		return s, false
+	}
+	s.setDraftOverride(settingKey, val)
+	return s.CancelEdit(), true
+}
+
+func (s State) submitMihomoOverrides() (State, tea.Cmd) {
+	if s.overridesSaving || !s.mihomoLoaded || s.mihomoLoadErr != nil {
+		return s, nil
+	}
+	for _, k := range MihomoSettingKeys {
+		if err := profile.ValidateMihomoOverride(k, s.getDraftOverride(k)); err != nil {
+			s.showToast(i18n.Tf("settings.toast.save_failed_with_err", err.Error()), common.ToastError)
+			return s, nil
+		}
+	}
+	s.overridesSaving = true
+	return s, ApplyMihomoOverrides(s.configSvc, s.coreSvc, s.client, s.draftOverrides)
+}
+
+func cloneOverridesMap(in map[string]string) map[string]string {
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		if v != "" {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+func cycleOption(options []string, current string, delta int) string {
+	for i, opt := range options {
+		if opt == current {
+			return options[(i+delta+len(options))%len(options)]
+		}
+	}
+	if len(options) > 0 {
+		return options[0]
+	}
+	return ""
+}
+
+func overrideOptionLabel(val string) string {
+	if val == "" {
+		return i18n.T("settings.mihomo.empty")
+	}
+	return val
+}
+
+func overrideOptionLabels(values []string) []string {
+	labels := make([]string, len(values))
+	for i, v := range values {
+		labels[i] = overrideOptionLabel(v)
+	}
+	return labels
+}
+
+func resolveVisibleEnumMouseTarget(pageX, pageWidth int, current string, values []string) (string, bool) {
+	const start = settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth
+	labels := overrideOptionLabels(values)
+	offset, visible := enumTabsWindow(overrideOptionLabel(current), labels, pageWidth)
+	if pageX < start || pageX >= start+visible {
+		return "", false
+	}
+	label, ok := resolveEnumMouseTarget(pageX+offset, labels)
+	if !ok {
+		return "", false
+	}
+	for i, candidate := range labels {
+		if candidate == label {
+			return values[i], true
+		}
+	}
+	return "", false
+}
+
+func mihomoApplyButtonLabel(saving bool) string {
+	if saving {
+		return i18n.T("settings.mihomo.applying")
+	}
+	return i18n.T("settings.mihomo.apply_button")
+}
+
+func resolveMihomoApplyButtonClick(pageX int, saving bool) bool {
+	const start = settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth
+	width := settingsTabDisplayWidth(mihomoApplyButtonLabel(saving))
+	return pageX >= start && pageX < start+width
 }
 
 func (s State) RunCoreAction(action string) (State, tea.Cmd) {

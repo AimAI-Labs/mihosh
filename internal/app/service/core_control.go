@@ -27,14 +27,27 @@ type coreOwner struct {
 	Token string `json:"token"`
 }
 type coreControlRequest struct {
-	Action  string `json:"action"`
-	Version string `json:"version,omitempty"`
+	Action    string            `json:"action"`
+	Version   string            `json:"version,omitempty"`
+	Cleared   []string          `json:"cleared,omitempty"`
+	Overrides map[string]string `json:"overrides,omitempty"`
 }
 
 type coreControlResponse struct {
-	Result       string `json:"result"`
-	BackupName   string `json:"backup_name,omitempty"`
-	MergeWarning string `json:"merge_warning,omitempty"`
+	Result          string            `json:"result"`
+	BackupName      string            `json:"backup_name,omitempty"`
+	MergeWarning    string            `json:"merge_warning,omitempty"`
+	Overrides       map[string]string `json:"overrides,omitempty"`
+	WriteOK         bool              `json:"write_ok,omitempty"`
+	Applied         bool              `json:"applied,omitempty"`
+	Restarted       bool              `json:"restarted,omitempty"`
+	EndpointChanged bool              `json:"endpoint_changed,omitempty"`
+	Restored        bool              `json:"restored,omitempty"`
+}
+
+type coreControlErrorResponse struct {
+	Error    string `json:"error"`
+	Restored bool   `json:"restored,omitempty"`
 }
 
 // startControl runs only in a session that successfully started its own child. It
@@ -79,12 +92,13 @@ func (s *CoreService) startControl(root string) error {
 			return
 		}
 		var request coreControlRequest
-		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&request) != nil {
+		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&request) != nil {
 			http.Error(w, "invalid local control request", 400)
 			return
 		}
 		var err error
 		var activation ActivateResult
+		var overrideRes MihomoOverridesSaveResult
 		switch request.Action {
 		case "status":
 			_, err = s.Status()
@@ -99,9 +113,11 @@ func (s *CoreService) startControl(root string) error {
 		case "rollback":
 			err = s.ActivateVersion(r.Context(), "")
 		case "profile":
-			activation, err = s.ApplyProfile(r.Context(), request.Version, false)
+			activation, err = s.ApplyProfileCleared(r.Context(), request.Version, false, request.Cleared)
 		case "basic-config":
 			activation, err = s.UseBasicConfig(r.Context())
+		case "overrides":
+			overrideRes, err = s.ApplyOverrides(r.Context(), request.Overrides)
 		case "system-proxy", "tun":
 			if request.Version != "on" && request.Version != "off" {
 				http.Error(w, "invalid network setting", 400)
@@ -118,11 +134,23 @@ func (s *CoreService) startControl(root string) error {
 		}
 		if err != nil {
 			w.WriteHeader(http.StatusConflict)
-			_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			_ = json.NewEncoder(w).Encode(coreControlErrorResponse{Error: err.Error(), Restored: overrideRes.Restored})
 			return
 		}
 		s.notifyOwner(request.Action)
-		response := coreControlResponse{Result: "ok", BackupName: activation.BackupName}
+		response := coreControlResponse{
+			Result:          "ok",
+			BackupName:      activation.BackupName,
+			Restarted:       activation.Restarted,
+			Overrides:       overrideRes.Overrides,
+			WriteOK:         overrideRes.WriteOK,
+			Applied:         overrideRes.Applied,
+			EndpointChanged: overrideRes.EndpointChanged,
+		}
+		if request.Action == "overrides" {
+			response.BackupName = overrideRes.BackupName
+			response.Restarted = overrideRes.Restarted
+		}
 		if activation.MergeErr != nil {
 			response.MergeWarning = activation.MergeErr.Error()
 		}
@@ -162,10 +190,10 @@ func removeOwner(root, token string) {
 // Control routes a command to the private local owner. It never falls back to
 // scanning or signalling unrelated OS processes.
 func (s *CoreService) Control(ctx context.Context, action, version string) error {
-	return s.sendControl(ctx, action, version, nil)
+	return s.sendControlRequest(ctx, coreControlRequest{Action: action, Version: version}, nil, nil)
 }
 
-func (s *CoreService) sendControl(ctx context.Context, action, version string, activation *ActivateResult) error {
+func (s *CoreService) sendControlRequest(ctx context.Context, request coreControlRequest, activation *ActivateResult, overrideRes *MihomoOverridesSaveResult) error {
 	root, err := config.GetConfigDir()
 	if err != nil {
 		return err
@@ -185,7 +213,10 @@ func (s *CoreService) sendControl(ctx context.Context, action, version string, a
 	if err != nil || u.Scheme != "http" || u.Hostname() != "127.0.0.1" || u.Port() == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
 		return errors.New("invalid local core owner address")
 	}
-	body, _ := json.Marshal(coreControlRequest{action, version})
+	body, err := json.Marshal(request)
+	if err != nil {
+		return err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, owner.URL+"/control", strings.NewReader(string(body)))
 	if err != nil {
 		return err
@@ -205,14 +236,17 @@ func (s *CoreService) sendControl(ctx context.Context, action, version string, a
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		var result map[string]string
+		var result coreControlErrorResponse
 		_ = json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&result)
-		if result["error"] != "" {
-			return errors.New(result["error"])
+		if overrideRes != nil {
+			overrideRes.Restored = result.Restored
+		}
+		if result.Error != "" {
+			return errors.New(result.Error)
 		}
 		return fmt.Errorf("local core owner returned HTTP %d", resp.StatusCode)
 	}
-	if activation != nil {
+	if activation != nil || overrideRes != nil {
 		var response coreControlResponse
 		if err := json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&response); err != nil {
 			return fmt.Errorf("invalid local core profile response: %w", err)
@@ -220,9 +254,20 @@ func (s *CoreService) sendControl(ctx context.Context, action, version string, a
 		if response.Result != "ok" {
 			return errors.New("invalid local core profile response")
 		}
-		activation.BackupName = response.BackupName
-		if response.MergeWarning != "" {
-			activation.MergeErr = errors.New(response.MergeWarning)
+		if activation != nil {
+			activation.BackupName = response.BackupName
+			activation.Restarted = response.Restarted
+			if response.MergeWarning != "" {
+				activation.MergeErr = errors.New(response.MergeWarning)
+			}
+		}
+		if overrideRes != nil {
+			overrideRes.Overrides = response.Overrides
+			overrideRes.WriteOK = response.WriteOK
+			overrideRes.Applied = response.Applied
+			overrideRes.Restarted = response.Restarted
+			overrideRes.EndpointChanged = response.EndpointChanged
+			overrideRes.BackupName = response.BackupName
 		}
 	}
 	return nil
