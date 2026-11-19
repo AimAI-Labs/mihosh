@@ -173,6 +173,19 @@ func GenerateForUID(uid, managedPath string) (GeneratedConfig, error) {
 	if err != nil {
 		return GeneratedConfig{}, err
 	}
+	return generateFromRaw(raw, managedPath)
+}
+
+// GenerateSourcePreview merges the exact source bytes shown in the file viewer.
+func GenerateSourcePreview(source []byte) (GeneratedConfig, error) {
+	var raw yaml.Node
+	if err := yaml.Unmarshal(source, &raw); err != nil {
+		return GeneratedConfig{}, err
+	}
+	return generateFromRaw(&raw, "")
+}
+
+func generateFromRaw(raw *yaml.Node, managedPath string) (GeneratedConfig, error) {
 	merge, mergeErr := ReadMergeNode()
 	if mergeErr != nil {
 		merge = nil // 降级：忽略覆写

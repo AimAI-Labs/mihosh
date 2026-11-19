@@ -26,6 +26,18 @@ func FetchSubs(svc *service.ProfileService) tea.Cmd {
 	}
 }
 
+func RefreshSubs(svc *service.ProfileService) tea.Cmd {
+	if svc == nil {
+		return FetchSubs(svc)
+	}
+	return func() tea.Msg {
+		if err := svc.ImportRawDirectory(); err != nil {
+			return tea.Batch(FetchSubs(svc), func() tea.Msg { return messages.ErrMsg{Err: err} })()
+		}
+		return FetchSubs(svc)()
+	}
+}
+
 // AddSubCmd 新增订阅。
 func AddSubCmd(svc *service.ProfileService, name string, src profile.SubSource) tea.Cmd {
 	return func() tea.Msg {

@@ -3,7 +3,7 @@ package profile
 // store.go — 订阅的磁盘读写。
 //
 // 布局（相对 mihosh 配置目录 ~/.mihosh）：
-//   profiles/<uid>/raw.yaml    订阅原始配置快照（fetcher 写入）
+//   raw/<uid>/raw.yaml         订阅原始配置快照（旧路径 profiles/<uid>/raw.yaml 仍可读写）
 //   merge.yaml                 全局覆写 YAML（TUI 编辑器写入）
 //
 // 元数据（Profile 列表）不在此处持久化，由 mihosh config 包管理（存 config.yaml
@@ -24,35 +24,41 @@ import (
 // ErrRawNotFound 表示某订阅尚未拉取（raw.yaml 不存在）。
 var ErrRawNotFound = errors.New("订阅尚未拉取，请先更新")
 
-// profilesRoot 返回 ~/.mihosh/profiles 根目录。
-func profilesRoot() (string, error) {
-	mihoshDir, err := mihoshConfigDir()
+func RawDirectory() (string, error) {
+	root, err := mihoshConfigDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(mihoshDir, "profiles"), nil
+	return filepath.Join(root, "raw"), nil
 }
 
-// profileDir 返回某订阅的专属目录，并确保已创建。
-func profileDir(uid string) (string, error) {
-	root, err := profilesRoot()
+func rawStoragePath(uid string) (string, error) {
+	if uid == "" || uid == "." || uid == ".." || filepath.Base(uid) != uid {
+		return "", errors.New("invalid profile ID")
+	}
+	root, err := mihoshConfigDir()
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(root, uid)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return "", fmt.Errorf("创建订阅目录失败: %w", err)
+	legacy := filepath.Join(root, "profiles", uid, "raw.yaml")
+	if _, err := os.Lstat(legacy); err == nil {
+		return legacy, nil
+	} else if !os.IsNotExist(err) {
+		return "", err
 	}
-	return dir, nil
+	return filepath.Join(root, "raw", uid, "raw.yaml"), nil
 }
 
 // RawPath 返回某订阅 raw.yaml 的完整路径（不保证文件存在）。
 func RawPath(uid string) (string, error) {
-	dir, err := profileDir(uid)
+	path, err := rawStoragePath(uid)
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "raw.yaml"), nil
+	if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return "", fmt.Errorf("创建订阅目录失败: %w", err)
+	}
+	return path, nil
 }
 
 // MergePath 返回全局 merge.yaml 的完整路径。
@@ -67,22 +73,30 @@ func MergePath() (string, error) {
 // ReadRaw 读取并解析某订阅的 raw.yaml 为 yaml.Node。
 // 文件不存在返回 ErrRawNotFound。
 func ReadRaw(uid string) (*yaml.Node, error) {
-	p, err := RawPath(uid)
+	data, err := ReadRawFile(uid)
 	if err != nil {
 		return nil, err
-	}
-	data, err := os.ReadFile(p)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, ErrRawNotFound
-		}
-		return nil, fmt.Errorf("读取订阅原始配置失败: %w", err)
 	}
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return nil, fmt.Errorf("解析订阅原始配置失败: %w", err)
 	}
 	return &doc, nil
+}
+
+func ReadRawFile(uid string) ([]byte, error) {
+	path, err := rawStoragePath(uid)
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil, ErrRawNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("读取订阅原始配置失败: %w", err)
+	}
+	return data, nil
 }
 
 // WriteRaw 原子写入 raw.yaml（覆盖）。
@@ -211,12 +225,11 @@ func WriteMerge(data []byte) error {
 // DeleteProfileDir 删除某订阅的整个目录（raw + merge）。
 // 目录不存在不报错。
 func DeleteProfileDir(uid string) error {
-	root, err := profilesRoot()
+	path, err := rawStoragePath(uid)
 	if err != nil {
 		return err
 	}
-	dir := filepath.Join(root, uid)
-	if err := os.RemoveAll(dir); err != nil {
+	if err := os.RemoveAll(filepath.Dir(path)); err != nil {
 		return fmt.Errorf("删除订阅目录失败: %w", err)
 	}
 	return nil

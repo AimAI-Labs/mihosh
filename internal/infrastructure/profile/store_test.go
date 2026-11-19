@@ -175,6 +175,23 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
+func TestLegacyRawSnapshotRemainsAtItsExistingPath(t *testing.T) {
+	mockMihoshConfigDir(t)
+	root, err := mihoshConfigDir()
+	require.NoError(t, err)
+	old := filepath.Join(root, "profiles", "old", "raw.yaml")
+	require.NoError(t, os.MkdirAll(filepath.Dir(old), 0700))
+	require.NoError(t, os.WriteFile(old, []byte("mode: rule\n"), 0600))
+	read, err := ReadRawFile("old")
+	require.NoError(t, err)
+	require.Equal(t, "mode: rule\n", string(read))
+	require.NoError(t, WriteRaw("old", []byte("mode: global\n")))
+	read, err = os.ReadFile(old)
+	require.NoError(t, err)
+	require.Equal(t, "mode: global\n", string(read))
+	require.False(t, fileExists(filepath.Join(root, "raw", "old", "raw.yaml")))
+}
+
 func TestStore_WriteMergeField(t *testing.T) {
 	mockMihoshConfigDir(t)
 

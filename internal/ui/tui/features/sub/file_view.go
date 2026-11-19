@@ -1,0 +1,224 @@
+package sub
+
+import (
+	"errors"
+	"strings"
+	"unicode"
+
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
+)
+
+type fileMode int
+
+const (
+	fileClosed fileMode = iota
+	fileMenu
+	fileSource
+	fileActivated
+	fileDiff
+)
+
+var fileOptions = []string{"sub.file.source", "sub.file.activated", "sub.file.diff"}
+
+type fileView struct {
+	mode                  fileMode
+	uid                   string
+	request               uint64
+	selected, top, column int
+	loading               bool
+	lines                 []string
+	diff                  []profile.FileDiffRow
+	err                   error
+}
+
+func (s State) openFileMenu() State {
+	if s.selected < 0 || s.selected >= len(s.filteredIdx) {
+		return s
+	}
+	uid := s.subs[s.filteredIdx[s.selected]].UID
+	s.file = fileView{mode: fileMenu, uid: uid, request: s.file.request + 1}
+	return s
+}
+
+func (s State) loadFileView() (State, tea.Cmd) {
+	s.file.mode = fileSource + fileMode(s.file.selected)
+	s.file.loading = true
+	s.file.request++
+	file := s.file
+	return s, func() tea.Msg {
+		result := messages.SubFileLoadedMsg{Request: file.request}
+		before, err := profile.ReadRawFile(file.uid)
+		if err != nil {
+			result.Err = err
+			return result
+		}
+		if file.mode == fileSource {
+			result.Lines = strings.Split(terminalFileText(before), "\n")
+			return result
+		}
+		generated, err := profile.GenerateSourcePreview(before)
+		if err != nil {
+			result.Err = err
+			return result
+		}
+		result.Err = generated.MergeErr
+		effective := terminalFileText(generated.Data)
+		if file.mode == fileDiff {
+			result.Diff = profile.DiffFiles(terminalFileText(before), effective)
+		} else {
+			result.Lines = strings.Split(effective, "\n")
+		}
+		return result
+	}
+}
+
+func terminalFileText(data []byte) string {
+	text := strings.ReplaceAll(ansi.Strip(string(data)), "\r\n", "\n")
+	text = strings.ReplaceAll(text, "\t", "    ")
+	return strings.Map(func(r rune) rune {
+		if r == '\n' || !unicode.IsControl(r) {
+			return r
+		}
+		return -1
+	}, text)
+}
+
+func (f fileView) rowBudget(width, height int) int {
+	rows := max(1, height-7)
+	if f.mode == fileDiff && width < 100 {
+		rows = max(1, (rows-3)/2)
+	}
+	return rows
+}
+
+func (f *fileView) scroll(delta, width, height int) {
+	if f.mode == fileMenu {
+		f.selected = min(max(0, f.selected+delta), len(fileOptions)-1)
+		return
+	}
+	rows := max(len(f.lines), len(f.diff))
+	f.top = min(max(0, f.top+delta), max(0, rows-f.rowBudget(width, height)))
+}
+
+func (s State) handleFileKey(msg tea.KeyMsg) (State, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		mode := fileMenu
+		if s.file.mode == fileMenu {
+			mode = fileClosed
+		}
+		s.file = fileView{mode: mode, uid: s.file.uid, selected: s.file.selected, request: s.file.request + 1}
+	case "enter":
+		if s.file.mode == fileMenu {
+			return s.loadFileView()
+		}
+	case "up", "k":
+		s.file.scroll(-1, s.pageWidth, s.pageHeight)
+	case "down", "j":
+		s.file.scroll(1, s.pageWidth, s.pageHeight)
+	case "pgup":
+		s.file.scroll(-s.file.rowBudget(s.pageWidth, s.pageHeight), s.pageWidth, s.pageHeight)
+	case "pgdown":
+		s.file.scroll(s.file.rowBudget(s.pageWidth, s.pageHeight), s.pageWidth, s.pageHeight)
+	case "left":
+		s.file.column = max(0, s.file.column-8)
+	case "right":
+		s.file.column += 8
+	}
+	return s, nil
+}
+
+func (s State) clickFile(msg messages.PageMouseClickMsg) (State, tea.Cmd) {
+	left, top, right, bottom := s.file.dialog(msg.Width, msg.Height).Bounds()
+	if msg.X < left || msg.X >= right || msg.Y < top || msg.Y >= bottom {
+		s.file = fileView{request: s.file.request + 1}
+		return s, nil
+	}
+	if idx := msg.Y - top - 1; s.file.mode == fileMenu && idx >= 0 && idx < len(fileOptions) {
+		s.file.selected = idx
+		return s.loadFileView()
+	}
+	return s, nil
+}
+
+func (f fileView) dialog(width, height int) dialog.Dialog {
+	w := max(24, width-4)
+	title := i18n.T("sub.file.menu")
+	var body string
+	if f.mode == fileMenu {
+		w = min(48, w)
+		items := make([]string, len(fileOptions))
+		for i, key := range fileOptions {
+			items[i] = "  " + i18n.T(key)
+			if i == f.selected {
+				items[i] = common.SelectedStyle().Render("› " + i18n.T(key))
+			}
+		}
+		body = strings.Join(items, "\n")
+	} else {
+		title = i18n.T(fileOptions[f.selected])
+		body = f.renderFile(w-4, width, height)
+	}
+	body += "\n" + common.MutedStyle().Render(i18n.T("sub.file.hint"))
+	content := common.RenderBorderedPanel(title, body, w, common.Primary(), common.Bright())
+	return dialog.New(content, width, height).Clipped()
+}
+
+func (f fileView) renderFile(inner, pageWidth, height int) string {
+	if f.loading {
+		return i18n.T("sub.file.loading")
+	}
+	if f.err != nil && len(f.lines)+len(f.diff) == 0 {
+		if errors.Is(f.err, profile.ErrRawNotFound) {
+			return i18n.T("sub.err.raw_not_found")
+		}
+		return terminalFileText([]byte(f.err.Error()))
+	}
+	budget := f.rowBudget(pageWidth, height)
+	if f.mode != fileDiff {
+		from := min(f.top, max(0, len(f.lines)-budget))
+		var body []string
+		for _, line := range f.lines[from:min(len(f.lines), from+budget)] {
+			body = append(body, ansi.Cut(line, f.column, f.column+inner))
+		}
+		return strings.Join(body, "\n")
+	}
+	if len(f.diff) == 0 {
+		return i18n.T("sub.file.same")
+	}
+	from := min(f.top, max(0, len(f.diff)-budget))
+	rows := f.diff[from:min(len(f.diff), from+budget)]
+	if pageWidth >= 100 {
+		left := inner * 43 / 100
+		return lipgloss.JoinHorizontal(lipgloss.Top, renderDiffPane(rows, true, f.column, left), " ", renderDiffPane(rows, false, f.column, inner-left-1))
+	}
+	return renderDiffPane(rows, true, f.column, inner) + "\n" + renderDiffPane(rows, false, f.column, inner)
+}
+
+func renderDiffPane(rows []profile.FileDiffRow, before bool, column, width int) string {
+	label, color := "sub.file.activated", common.Success()
+	if before {
+		label, color = "sub.file.source", common.Danger()
+	}
+	style := lipgloss.NewStyle().Foreground(color)
+	lines := []string{common.TableHeaderStyle().Render(i18n.T(label))}
+	for _, row := range rows {
+		text := row.After
+		if before {
+			text = row.Before
+		}
+		text = common.PadString(ansi.Cut(text, column, column+width), width)
+		if row.Changed {
+			text = style.Render(text)
+		}
+		lines = append(lines, text)
+	}
+	return strings.Join(lines, "\n")
+}

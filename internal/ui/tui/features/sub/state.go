@@ -46,6 +46,7 @@ type State struct {
 	editForm       *addForm
 	showDeleteConf bool
 	deleteUID      string // 待删除订阅 UID
+	file           fileView
 
 	// 鼠标双击
 	doubleClickDetector common.DoubleClickDetector[struct{}]
@@ -98,6 +99,7 @@ func (s State) ToPageState(width, height int) PageState {
 		ShowDeleteConf: s.showDeleteConf,
 		DeleteUID:      s.deleteUID,
 		UpdatingUID:    s.updatingUID,
+		File:           s.file,
 	}
 }
 
@@ -120,7 +122,7 @@ func (s State) Mode() int {
 
 // Querying 是否处于输入捕获模式（供主 Model 的 isInputCapturing 判断）。
 func (s State) Querying() bool {
-	return s.filterMode || s.showAddForm || s.showEditForm || s.showDeleteConf
+	return s.filterMode || s.showAddForm || s.showEditForm || s.showDeleteConf || s.file.mode != fileClosed
 }
 
 // ApplySubs 应用加载的订阅列表与激活 UID，并重建过滤缓存。
@@ -137,6 +139,12 @@ func (s State) ApplySubs(subs []profile.Profile, active string) State {
 // Update 处理按键，分派到当前激活的子模式。
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
+	case messages.SubFileLoadedMsg:
+		if s.file.loading && s.file.request == msg.Request {
+			s.file.loading = false
+			s.file.lines, s.file.diff, s.file.err = msg.Lines, msg.Diff, msg.Err
+		}
+		return s, nil
 	case messages.PageResizeMsg:
 		s.pageWidth = msg.Width
 		s.pageHeight = msg.Height
@@ -154,14 +162,28 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		return s, nil
 	case messages.PageMouseScrollMsg:
 		s.pageHeight = msg.Height
+		if s.file.mode != fileClosed {
+			delta := 1
+			if msg.Up {
+				delta = -1
+			}
+			s.file.scroll(delta, msg.Width, msg.Height)
+			return s, nil
+		}
 		if s.showAddForm || s.showEditForm {
 			return s.scrollForm(msg)
 		}
 		return s.HandleMouseScroll(msg.Up), nil
 	case messages.PageMouseClickMsg:
+		if s.file.mode != fileClosed {
+			return s.clickFile(msg)
+		}
 		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
 	case tea.KeyMsg:
 		// 弹窗优先拦截
+		if s.file.mode != fileClosed {
+			return s.handleFileKey(msg)
+		}
 		if s.showDeleteConf {
 			return s.handleDeleteConfirm(msg)
 		}
@@ -193,7 +215,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case msg.String() == "m":
 			return s.openMergeExternalEditor()
 		case msg.String() == "c":
-			return s.openRawExternalEditor()
+			return s.openFileMenu(), nil
 		case msg.String() == "e":
 			return s.openEditForm()
 		case msg.String() == "n":
@@ -207,7 +229,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			s.filterMode = true
 			s.filter = ""
 		case key.Matches(msg, common.Keys.Refresh):
-			return s, FetchSubs(s.svc)
+			return s, RefreshSubs(s.svc)
 		case key.Matches(msg, common.Keys.Escape):
 			if s.filter != "" {
 				s.filter = ""

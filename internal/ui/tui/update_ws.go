@@ -534,14 +534,8 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.noticeTicks = autoRefreshNoticeTicks
 
-	case messages.SubRawEditFinishedMsg:
-		reenableMouse := func() tea.Msg { return tea.EnableMouseCellMotion() }
-		if msg.Err != nil {
-			m.err = messages.ErrMsg{Err: msg.Err}
-		}
-		m.notice = ""
-		m.noticeTicks = 0
-		return m, reenableMouse
+	case messages.SubFileLoadedMsg:
+		m.subState, _ = m.subState.Update(msg)
 
 	case messages.MergeEditFinishedMsg:
 		// 外部编辑器结束：tea.ExecProcess 期间会 ReleaseTerminal（禁用鼠标），

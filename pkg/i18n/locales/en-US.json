@@ -705,6 +705,13 @@
   "sub.add_err_kind": "source does not match the selected type",
 
   "sub.edit_title": "Edit Subscription",
+  "sub.file.menu": "View files",
+  "sub.file.source": "Source file",
+  "sub.file.activated": "Activated file",
+  "sub.file.diff": "Diff",
+  "sub.file.same": "The source and activated files match",
+  "sub.file.loading": "Reading files…",
+  "sub.file.hint": "↑↓ Scroll · ←→ Pan · Esc Back",
   "sub.copy_source": "Copy",
   "sub.copy_source_done": "Subscription source sent to clipboard",
   "sub.copy_source_error": "Could not copy subscription source",

@@ -287,10 +287,11 @@ type LocalSubImportedMsg struct {
 	Err     error
 }
 
-// SubRawEditFinishedMsg 外部编辑器查看/编辑具体的订阅 raw.yaml 结束。
-type SubRawEditFinishedMsg struct {
-	UID string
-	Err error
+type SubFileLoadedMsg struct {
+	Request uint64
+	Lines   []string
+	Diff    []profile.FileDiffRow
+	Err     error
 }
 
 // ========= System Status Messages =========

@@ -48,6 +48,7 @@ type PageState struct {
 	ShowDeleteConf bool
 	DeleteUID      string
 	UpdatingUID    string
+	File           fileView
 }
 
 // RenderSubPage 渲染订阅页。
@@ -88,6 +89,9 @@ func RenderSubPage(state PageState) string {
 	}
 
 	result = renderInlineHelp(result, state)
+	if state.File.mode != fileClosed {
+		return state.File.dialog(state.Width, state.Height).Overlay(result, true)
+	}
 	if (state.ShowAddForm || state.ShowEditForm) && state.Width > 0 && state.Height > 0 {
 		lines := strings.Split(result, "\n")
 		lines = lines[:min(len(lines), state.Height)]

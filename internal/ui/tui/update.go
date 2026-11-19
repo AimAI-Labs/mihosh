@@ -64,10 +64,10 @@ func (m Model) Init() tea.Cmd {
 			}
 			return messages.UpdateCheckedMsg{Info: info}
 		},
-		func() tea.Msg {
+		tea.Sequence(sub.RefreshSubs(m.profileSvc), func() tea.Msg {
 			p, err := m.profileSvc.AutoImportLocalSub()
 			return messages.LocalSubImportedMsg{Profile: p, Err: err}
-		},
+		}),
 	)
 }
 
@@ -137,7 +137,7 @@ func (m *Model) refreshMenu() tea.Cmd {
 	case layout.PageRules:
 		return rules.FetchRules(m.client)
 	case layout.PageSub:
-		return sub.FetchSubs(m.profileSvc)
+		return sub.RefreshSubs(m.profileSvc)
 	case layout.PageSettings:
 		if m.configSvc != nil {
 			m.reloadStoredConfig()
@@ -181,7 +181,7 @@ func (m *Model) refreshCurrentPage() tea.Cmd {
 	case layout.PageRules:
 		return rules.FetchRules(m.client)
 	case layout.PageSub:
-		return sub.FetchSubs(m.profileSvc)
+		return sub.RefreshSubs(m.profileSvc)
 	case layout.PageSettings:
 		cfg, _ := m.configSvc.LoadConfig()
 		m.config = cfg

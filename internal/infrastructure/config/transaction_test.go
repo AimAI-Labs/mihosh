@@ -36,7 +36,7 @@ func TestExplicitServiceRootIsSharedByConfigProfilesAndBackups(t *testing.T) {
 	require.NoError(t, Save(&DefaultConfig))
 	path, err := profile.RawPath("root-test")
 	require.NoError(t, err)
-	require.Equal(t, filepath.Join(root, "profiles", "root-test", "raw.yaml"), path)
+	require.Equal(t, filepath.Join(root, "raw", "root-test", "raw.yaml"), path)
 	actual, err := GetConfigDir()
 	require.NoError(t, err)
 	require.Equal(t, root, actual)

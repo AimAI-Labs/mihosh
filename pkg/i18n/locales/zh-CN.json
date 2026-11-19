@@ -705,6 +705,13 @@
   "sub.add_err_kind": "来源与所选类型不匹配",
 
   "sub.edit_title": "编辑订阅",
+  "sub.file.menu": "看文件",
+  "sub.file.source": "源文件",
+  "sub.file.activated": "激活文件",
+  "sub.file.diff": "差异 (diff)",
+  "sub.file.same": "源文件和激活文件内容相同",
+  "sub.file.loading": "正在读取文件…",
+  "sub.file.hint": "↑↓ 滚动 · ←→ 横向移动 · Esc 返回",
   "sub.copy_source": "复制",
   "sub.copy_source_done": "已将来源发送到剪贴板",
   "sub.copy_source_error": "无法复制订阅来源",
