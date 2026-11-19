@@ -1,10 +1,14 @@
 package preferences
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
@@ -101,12 +105,50 @@ func TestHandleMouseLeft_ClickLanguageTabSavesImmediately(t *testing.T) {
 func TestResolveThemeMouseTargetIncludesRenderedTabPadding(t *testing.T) {
 	valueStartX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth
 
-	themeName, ok := resolveThemeMouseTarget(valueStartX + len("tokyo-night") + 3)
+	themeName, ok := resolveThemeMouseTarget(valueStartX+len("tokyo-night")+3, settingsMouseRowsOffset+ThemeSettingIndex(), 160)
 	if !ok {
 		t.Fatalf("expected click in rendered theme tab padding to resolve")
 	}
 	if themeName != "tokyo-night" {
 		t.Fatalf("expected tokyo-night, got %q", themeName)
+	}
+}
+
+func TestThemeButtonsWrapAndMatchRenderedClickTargets(t *testing.T) {
+	svc, cfg := setupTestConfig(t, nil)
+	t.Cleanup(func() {
+		theme.SetTheme("tokyo-night")
+		theme.SetBorderStyle("rounded")
+	})
+	for _, width := range []int{38, 80, 160} {
+		state := State{Config: cfg, configSvc: svc}
+		parts, _, _ := buildSettingsLayoutBase(state.ToPageState(cfg, nil), width)
+		lines := strings.Split(ansi.Strip(strings.Join(parts, "\n")), "\n")
+		var lastRow int
+		for _, name := range theme.Names() {
+			found := false
+			for y, line := range lines {
+				index := strings.Index(line, name)
+				if index == -1 {
+					continue
+				}
+				x := common.DisplayWidth(line[:index])
+				actual, ok := resolveThemeMouseTarget(x, y, width)
+				require.True(t, ok, "%s at width %d", name, width)
+				require.Equal(t, name, actual, "width %d at %d,%d in %q", width, x, y, lines)
+				lastRow = y
+				found = true
+				if name == "solarized-light" {
+					next, cmd := state.HandleMouseLeft(x, y, width, 30)
+					require.NotNil(t, cmd)
+					require.Equal(t, name, next.Config.Theme)
+					require.Equal(t, ThemeSettingIndex(), next.selectedSetting)
+				}
+				break
+			}
+			require.True(t, found, "%s should be fully visible at width %d", name, width)
+		}
+		require.Equal(t, ThemeSettingIndex()+1, resolveMouseSettingIndex(state, lastRow+1, width))
 	}
 }
 

@@ -387,7 +387,16 @@ func renderSettingsInlineHelp(page string, state PageState, width, height int) s
 
 // renderSettingItem 渲染单个设置项
 func renderSettingItem(state PageState, index int, key string, label string, width int) string {
+	width = max(24, width)
 	value := GetSettingValue(state, key)
+	labelWidth := settingsLabelWidth
+	var themeRows [][]string
+	if key == "theme" {
+		labelWidth, themeRows = themeButtonLayout(width)
+		label = ansi.Truncate(label+":", labelWidth-1, "…")
+	} else {
+		label += ":"
+	}
 
 	// 密钥特殊处理
 	if state.ActiveTab == 1 && key == "secret" && value != "" {
@@ -396,7 +405,7 @@ func renderSettingItem(state PageState, index int, key string, label string, wid
 
 	// 标签样式
 	labelStyle := lipgloss.NewStyle().
-		Width(settingsLabelWidth).
+		Width(labelWidth).
 		Align(lipgloss.Right).
 		Foreground(common.TokyoMuted()).
 		PaddingRight(1)
@@ -427,9 +436,9 @@ func renderSettingItem(state PageState, index int, key string, label string, wid
 	// 渲染标签
 	var renderedLabel string
 	if index == state.SelectedSetting {
-		renderedLabel = selectedLabelStyle.Render(label + ":")
+		renderedLabel = selectedLabelStyle.Render(label)
 	} else {
-		renderedLabel = labelStyle.Render(label + ":")
+		renderedLabel = labelStyle.Render(label)
 	}
 
 	// 渲染值
@@ -447,8 +456,11 @@ func renderSettingItem(state PageState, index int, key string, label string, wid
 		if state.EditMode && index == state.SelectedSetting {
 			valToRender = state.EditValue
 		}
-		offset, visible := themeTabsWindow(valToRender, width)
-		renderedValue = ansi.Cut(renderThemeTabs(valToRender, state.EditMode && index == state.SelectedSetting), offset, offset+visible)
+		var rows []string
+		for _, names := range themeRows {
+			rows = append(rows, renderEnumTabs(valToRender, names, state.EditMode && index == state.SelectedSetting))
+		}
+		renderedValue = strings.Join(rows, "\n")
 	} else if key == "border-style" {
 		renderedValue = renderEnumTabs(i18n.T("settings.border."+value), borderStyleOptions(), false)
 	} else if key == "allow-lan" {
@@ -498,12 +510,10 @@ func renderSettingItem(state PageState, index int, key string, label string, wid
 	lineInner := lipgloss.JoinHorizontal(lipgloss.Top, renderedLabel, renderedValue)
 
 	// 定义单行块的样式
-	rowWidth := width - 4
-	if rowWidth < settingsMinRowWidth {
-		rowWidth = settingsMinRowWidth
+	rowStyle := lipgloss.NewStyle().Width(width - 4).PaddingLeft(1)
+	if key != "theme" {
+		rowStyle = rowStyle.MaxHeight(1)
 	}
-
-	rowStyle := lipgloss.NewStyle().Width(rowWidth).PaddingLeft(1)
 	if index == state.SelectedSetting {
 		rowStyle = rowStyle.Inherit(selectedBg)
 	}
@@ -515,8 +525,29 @@ func borderStyleOptions() []string {
 	return []string{i18n.T("settings.border.rounded"), i18n.T("settings.border.square")}
 }
 
-func themeTabsWindow(current string, width int) (offset, visible int) {
-	return enumTabsWindow(current, theme.Names(), width)
+func themeButtonLayout(width int) (labelWidth int, rows [][]string) {
+	names := theme.Names()
+	longest := 0
+	for _, name := range names {
+		longest = max(longest, settingsTabDisplayWidth(name))
+	}
+	room := max(24, width) - 4 - settingsRowPaddingLeft
+	labelWidth = min(settingsLabelWidth, max(1, room-longest))
+	available := room - labelWidth
+	start, used := 0, 0
+	for i, name := range names {
+		// The separator takes one column between adjacent buttons.
+		buttonWidth := settingsTabDisplayWidth(name)
+		if i > start && used+1+buttonWidth > available {
+			rows = append(rows, names[start:i])
+			start, used = i, 0
+		}
+		if i > start {
+			used++
+		}
+		used += buttonWidth
+	}
+	return labelWidth, append(rows, names[start:])
 }
 
 func enumTabsWindow(current string, labels []string, width int) (offset, visible int) {
@@ -560,41 +591,6 @@ func renderLanguageTabs(currentLang string, editMode bool) string {
 			parts = append(parts, inactiveStyle.Render(" "+m+" "))
 		}
 		if i < len(modes)-1 {
-			parts = append(parts, separatorStyle.Render("│"))
-		}
-	}
-	return lipgloss.JoinHorizontal(lipgloss.Left, parts...)
-}
-
-// renderThemeTabs 渲染主题切换 Tab（仿 renderLanguageTabs）
-func renderThemeTabs(currentTheme string, editMode bool) string {
-	themes := theme.Names()
-	var parts []string
-
-	activeStyle := lipgloss.NewStyle().
-		Background(common.TokyoBlue()).
-		Foreground(common.Bright()).
-		Bold(true).
-		Padding(0, 1)
-
-	if editMode {
-		activeStyle = activeStyle.Background(common.TokyoGreen())
-	}
-
-	inactiveStyle := lipgloss.NewStyle().
-		Foreground(common.TokyoMuted()).
-		Background(common.Background()).
-		Padding(0, 1)
-
-	separatorStyle := lipgloss.NewStyle().Foreground(common.TokyoMuted())
-
-	for i, m := range themes {
-		if currentTheme == m {
-			parts = append(parts, activeStyle.Render(" "+m+" "))
-		} else {
-			parts = append(parts, inactiveStyle.Render(" "+m+" "))
-		}
-		if i < len(themes)-1 {
 			parts = append(parts, separatorStyle.Render("│"))
 		}
 	}

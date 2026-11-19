@@ -294,7 +294,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 	if s.activeTab == 1 {
 		return s.handleMihomoMouseLeft(pageX, pageY, pageWidth)
 	}
-	settingIdx := resolveMouseSettingIndex(s, pageY)
+	settingIdx := resolveMouseSettingIndex(s, pageY, pageWidth)
 
 	if s.editMode {
 		if s.activeTab == 0 && s.selectedSetting == LanguageSettingIndex() {
@@ -311,8 +311,8 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 				return s, nil
 			}
 		}
-		if s.activeTab == 0 && s.selectedSetting == ThemeSettingIndex() {
-			if t, ok := resolveVisibleThemeMouseTarget(pageX, pageWidth, s.editValue); ok {
+		if s.selectedSetting == ThemeSettingIndex() && settingIdx == s.selectedSetting {
+			if t, ok := resolveThemeMouseTarget(pageX, pageY, pageWidth); ok {
 				if err := s.configSvc.SetConfigValue("theme", t); err == nil {
 					newCfg, _ := s.configSvc.LoadConfig()
 					s.Config = newCfg
@@ -362,7 +362,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		}
 	}
 	if s.activeTab == 0 && settingIdx == ThemeSettingIndex() {
-		if t, ok := resolveVisibleThemeMouseTarget(pageX, pageWidth, s.getEditValue(s.Config, "theme")); ok {
+		if t, ok := resolveThemeMouseTarget(pageX, pageY, pageWidth); ok {
 			if err := s.configSvc.SetConfigValue("theme", t); err == nil {
 				newCfg, _ := s.configSvc.LoadConfig()
 				s.Config = newCfg
@@ -408,7 +408,7 @@ func (s State) handleMihomoMouseLeft(pageX, pageY, pageWidth int) (State, tea.Cm
 		return s, nil
 	}
 
-	settingIdx := resolveMouseSettingIndex(s, pageY)
+	settingIdx := resolveMouseSettingIndex(s, pageY, pageWidth)
 	if s.editMode {
 		if settingIdx == s.selectedSetting && settingIdx >= 0 && settingIdx < len(MihomoSettingKeys) {
 			settingKey := MihomoSettingKeys[settingIdx]
@@ -659,8 +659,15 @@ func noticeCmd(text string) tea.Cmd {
 	}
 }
 
-func resolveMouseSettingIndex(s State, pageY int) int {
+func resolveMouseSettingIndex(s State, pageY, width int) int {
 	settingIdx := pageY - settingsMouseRowsOffset
+	if s.activeTab == 0 && settingIdx >= ThemeSettingIndex() {
+		_, rows := themeButtonLayout(width)
+		if settingIdx < ThemeSettingIndex()+len(rows) {
+			return ThemeSettingIndex()
+		}
+		settingIdx -= len(rows) - 1
+	}
 	if settingIdx < 0 || settingIdx >= len(s.activeKeys()) {
 		return -1
 	}
@@ -797,38 +804,13 @@ func prevTheme(t string) string {
 	return themes[0]
 }
 
-func resolveVisibleThemeMouseTarget(pageX, pageWidth int, current string) (string, bool) {
-	const start = settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth
-	offset, visible := themeTabsWindow(current, pageWidth)
-	if pageX < start || pageX >= start+visible {
+func resolveThemeMouseTarget(pageX, pageY, width int) (string, bool) {
+	labelWidth, rows := themeButtonLayout(width)
+	row := pageY - settingsMouseRowsOffset - ThemeSettingIndex()
+	if row < 0 || row >= len(rows) {
 		return "", false
 	}
-	return resolveThemeMouseTarget(pageX + offset)
-}
-
-// resolveThemeMouseTarget 解析完整主题行的鼠标点击目标。
-func resolveThemeMouseTarget(pageX int) (string, bool) {
-	if pageX < 0 {
-		return "", false
-	}
-
-	// 2 是 TokyoPanel 的左侧边框和空格 (`│ `) 的宽度
-	valueStartX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth
-	themes := theme.Names()
-	cursor := valueStartX
-
-	for i, m := range themes {
-		tabWidth := settingsTabDisplayWidth(m)
-		if pageX >= cursor && pageX < cursor+tabWidth {
-			return m, true
-		}
-		cursor += tabWidth
-		if i < len(themes)-1 {
-			cursor++
-		}
-	}
-
-	return "", false
+	return resolveEnumMouseTarget(pageX+settingsLabelWidth-labelWidth, rows[row])
 }
 
 func resolveLanguageMouseTarget(pageX int) (string, bool) {
