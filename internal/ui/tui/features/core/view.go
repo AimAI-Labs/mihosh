@@ -25,6 +25,7 @@ type pageLayout struct {
 	tabs                    []actionHit
 	focusY                  int
 	releases                []actionHit
+	geoBounds               actionHit
 	controls                []releaseControl
 	listRows                int
 	scrollOffset, maxScroll int
@@ -60,10 +61,6 @@ func renderInlineSwitch(enabled bool, width int) (control string, offOffset, off
 }
 
 func (s State) actionPanel(width int, serviceMenu bool) (string, []actionHit, []releaseControl) {
-	if s.tab == 3 && !serviceMenu {
-		content, hits := s.geoPanel(width)
-		return content, hits, nil
-	}
 	t := theme.Current()
 	muted := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted))
 	selected := lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true)
@@ -160,9 +157,6 @@ func (s State) actionPanel(width int, serviceMenu bool) (string, []actionHit, []
 }
 
 func (s State) overview(width int) string {
-	if s.tab == 3 {
-		return s.geoOverview(width)
-	}
 	t := theme.Current()
 	status, color := "core.state.external", t.Info
 	if s.Status.Mode == "managed" {
@@ -289,24 +283,18 @@ func (s State) layout(width, height int) pageLayout {
 		return pageLayout{content: content, actions: hits, controls: controls}
 	}
 	var result pageLayout
-	downloads := 1
-	if s.tab == 3 {
-		downloads = 3
-	}
 	selectedTab := s.tab
 	if s.isAdvancedPage() {
 		selectedTab = 0
 	}
-	tabText, hits := renderCoreTabRow(width, 1, selectedTab, []coreTabItem{{0, "advanced"}, {downloads, "downloads"}, {4, "mihomo"}})
-	result.tabs = hits
-	if s.tab == 1 || s.tab == 3 {
-		sections, hits := renderCoreTabRow(width, 2, s.tab, []coreTabItem{{1, "versions"}, {3, "geo"}})
-		tabText += "\n" + sections
-		result.tabs = append(result.tabs, hits...)
+	if s.isDownloadsPage() {
+		selectedTab = 1
 	}
+	tabText, hits := renderCoreTabRow(width, 1, selectedTab, []coreTabItem{{0, "advanced"}, {1, "downloads"}, {4, "mihomo"}})
+	result.tabs = hits
 	parts := []string{panel(i18n.T("core.heading"), tabText, width), ""}
-	if s.tab == 1 {
-		return s.releaseLayout(width, height, parts, result)
+	if s.isDownloadsPage() {
+		return s.downloadsLayout(width, height, parts, result)
 	}
 	top := lipgloss.Height(strings.Join(parts, "\n"))
 	if s.tab == 4 {
@@ -345,6 +333,43 @@ func (s State) layout(width, height int) pageLayout {
 		parts = append(parts, left, "", right)
 	}
 	result.content = strings.Join(parts, "\n")
+	return result
+}
+
+func (s State) downloadsLayout(width, height int, parts []string, result pageLayout) pageLayout {
+	top := lipgloss.Height(strings.Join(parts, "\n"))
+	releaseWidth, geoWidth := width, width
+	releaseHeight := max(3, height-top)
+	if width >= 100 {
+		releaseWidth = width * 43 / 100
+		geoWidth = width - releaseWidth
+	} else {
+		releaseHeight = max(3, releaseHeight/2)
+	}
+	versions := s
+	if s.tab == 3 {
+		versions.selected, _ = s.releaseIndex(s.Release.Tag)
+	}
+	releases := versions.releaseLayout(releaseWidth, releaseHeight)
+	result.listRows, result.releases = releases.listRows, releases.releases
+	for i := range result.releases {
+		result.releases[i].y += top
+	}
+	geo, hits := s.geoPanel(geoWidth)
+	geo += "\n" + s.geoOverview(geoWidth)
+	geoX, geoY := releaseWidth, top
+	if width >= 100 {
+		parts = append(parts, lipgloss.JoinHorizontal(lipgloss.Top, releases.content, geo))
+	} else {
+		geoX, geoY = 0, top+lipgloss.Height(releases.content)+1
+		parts = append(parts, releases.content, "", geo)
+	}
+	for i := range hits {
+		hits[i].x += geoX
+		hits[i].y += geoY
+	}
+	result.geoBounds = actionHit{x: geoX, y: geoY, width: geoWidth, height: lipgloss.Height(geo)}
+	result.actions, result.content = hits, strings.Join(parts, "\n")
 	return result
 }
 
@@ -425,6 +450,8 @@ func (s State) viewportOffset(page pageLayout, height int) int {
 		if hit.y < offset {
 			offset = hit.y
 		}
+	} else if s.tab == 3 && s.followSelection {
+		offset = max(0, page.geoBounds.y-height+2)
 	}
 	return min(max(0, offset), max(0, lipgloss.Height(page.content)-height))
 }

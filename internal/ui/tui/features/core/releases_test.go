@@ -433,9 +433,13 @@ func TestReleaseRowsUseOneLineAndPreserveMouseBounds(t *testing.T) {
 			t.Fatal("release rows are not visible")
 		}
 		lines := strings.Split(ansi.Strip(page.content), "\n")
+		listWidth := width
+		if width >= 100 {
+			listWidth = width * 43 / 100
+		}
 		for i, hit := range page.releases {
-			if lipgloss.Width(lines[hit.y]) != width || hit.x != 1 || hit.width != width-2 {
-				t.Fatal("release list does not use the full available width")
+			if lipgloss.Width(lines[hit.y]) != width || hit.x != 1 || hit.width != listWidth-2 {
+				t.Fatal("release row does not fit the download panel")
 			}
 			if hit.height != 1 || (i > 0 && hit.y != page.releases[i-1].y+1) {
 				t.Fatal("release rows still consume two lines")
@@ -665,12 +669,18 @@ func TestOpenReleasesTabUsesDiskCacheWhileRefreshBypassesIt(t *testing.T) {
 		t.Fatalf("expected BatchMsg from openTab(1), got %T", cmd())
 	}
 	var opMsg *messages.CoreOperationMsg
-	for _, sub := range batch {
+	for i := 0; i < len(batch); i++ {
+		sub := batch[i]
 		if sub == nil {
 			continue
 		}
-		if msg, ok := sub().(messages.CoreOperationMsg); ok {
+		switch msg := sub().(type) {
+		case tea.BatchMsg:
+			batch = append(batch, msg...)
+		case messages.CoreOperationMsg:
 			opMsg = &msg
+		}
+		if opMsg != nil {
 			break
 		}
 	}

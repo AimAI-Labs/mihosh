@@ -16,6 +16,9 @@ import (
 )
 
 func (s State) refreshGeoData() tea.Cmd {
+	if s.svc == nil {
+		return nil
+	}
 	return func() tea.Msg {
 		files, err := s.svc.GeoDataFiles()
 		return messages.CoreGeoDataMsg{Files: files, Err: err}
@@ -46,11 +49,11 @@ func (s State) geoPanel(width int) (string, []actionHit) {
 	var hits []actionHit
 	for i, file := range s.geoFiles {
 		prefix := "  "
-		if i == s.selected {
+		if s.tab == 3 && i == s.selected {
 			prefix = "› "
 		}
 		label := ansi.Truncate(prefix+file.Name, max(1, width-4), "…")
-		if i == s.selected {
+		if s.tab == 3 && i == s.selected {
 			label = selected.Render(common.PadString(label, max(1, width-4)))
 		}
 		detail := i18n.T("core.geo.missing")

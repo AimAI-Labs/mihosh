@@ -57,8 +57,8 @@ func TestGeoManagementLoadsFilesAndQueuesSelectedUpdate(t *testing.T) {
 					}
 				}
 				header := strings.Split(s.layout(width, max(1, height-footerHeight)).content, "\n")
-				if !strings.Contains(ansi.Strip(header[1]), i18n.T("core.tab.downloads")) || !strings.Contains(ansi.Strip(header[2]), i18n.T("core.tab.geo")) {
-					t.Fatalf("%s width=%d: selected GEO section is hidden under Downloads: %q", language, width, header[:3])
+				if !strings.Contains(ansi.Strip(header[1]), i18n.T("core.tab.downloads")) {
+					t.Fatalf("%s width=%d: Downloads is missing from the main tab row: %q", language, width, header[:3])
 				}
 			}
 		}
@@ -109,23 +109,36 @@ func TestGeoManagementLoadsFilesAndQueuesSelectedUpdate(t *testing.T) {
 
 func TestDownloadSectionsAreReachableUnderOneTab(t *testing.T) {
 	i18n.Init()
-	const width, height = 120, 30
-	s := State{tab: 1}
-	s.catalog.loaded = true
-	for _, hit := range s.layout(width, height-footerHeight).tabs {
-		if hit.y == 2 && hit.index == 3 {
-			s, _ = s.Update(messages.PageMouseClickMsg{X: hit.x, Y: hit.y, Width: width, Height: height})
-			if s.tab != 3 {
-				t.Fatal("GEO section click did not open GEO management")
-			}
-			s, _ = s.Update(coreKey("left"))
-			if s.tab != 1 {
-				t.Fatal("left from GEO did not return to versions")
-			}
-			return
+	const height = 30
+	s := releaseFixture(t)
+	s.geoFiles = []service.GeoDataFile{{Key: "mmdb", Name: "Country.mmdb", Updatable: true}}
+	for _, width := range []int{80, 120} {
+		page := s.layout(width, height-footerHeight)
+		if len(page.tabs) != 3 || len(page.releases) == 0 || len(page.actions) != 1 {
+			t.Fatal("both download panels must be present with a single top-level tab row")
+		}
+		version, geo := page.releases[0], page.actions[0]
+		if width >= 100 && (geo.x <= version.x || geo.y != version.y) {
+			t.Fatal("wide layout did not place the lists side by side")
+		}
+		if width < 100 && (geo.x != version.x || geo.y <= version.y) {
+			t.Fatal("narrow layout did not stack GEO below the versions")
+		}
+		next, _ := s.Update(messages.PageMouseClickMsg{X: geo.x, Y: geo.y, Width: width, Height: height})
+		if next.tab != 3 || !next.Editing || next.form != "geo-update" {
+			t.Fatal("GEO row click did not open its confirmation from Downloads")
+		}
+		next, _ = next.Update(coreKey("esc"))
+		next, _ = next.Update(coreKey("2"))
+		if next.tab != 1 || next.Release.Tag != s.Release.Tag {
+			t.Fatal("version focus did not restore the selected release")
+		}
+		next, _ = next.Update(coreKey("4"))
+		next, _ = next.Update(coreKey("right"))
+		if next.tab != 4 {
+			t.Fatal("main navigation treated GEO as a separate tab")
 		}
 	}
-	t.Fatal("GEO section is missing from Downloads")
 }
 
 func TestGeoEmptyAndCustomSourceDoNotStartDownloads(t *testing.T) {

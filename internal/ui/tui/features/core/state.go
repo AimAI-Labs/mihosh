@@ -76,7 +76,7 @@ func (s State) Refresh() tea.Cmd {
 		return nil
 	}
 	status := func() tea.Msg { status, err := s.svc.Status(); return messages.CoreStatusMsg{Status: status, Err: err} }
-	if s.tab == 3 {
+	if s.isDownloadsPage() {
 		return tea.Batch(status, s.refreshGeoData())
 	}
 	if s.tab == 4 {
@@ -360,8 +360,17 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 				return s.openTab(hit.index)
 			}
 		}
-		if s.tab == 1 {
-			return s.clickReleasePage(page, msg.X, msg.Y)
+		if s.isDownloadsPage() {
+			for _, hit := range page.actions {
+				if msg.X >= hit.x && msg.X < hit.x+hit.width && y >= hit.y && y < hit.y+hit.height {
+					if s.tab != 3 {
+						s = s.selectTab(3)
+					}
+					s.selected, s.followSelection = hit.index, true
+					return s.choose("geo-update")
+				}
+			}
+			return s.clickReleasePage(page, msg.X, y)
 		}
 		if s.tab == 4 {
 			return s.updateEditorMouse(msg, page.editorY)
@@ -390,8 +399,23 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		if s.Editing {
 			return s.scrollForm(msg)
 		}
-		if s.tab == 1 {
-			return s.scrollReleasePage(msg)
+		if s.isDownloadsPage() {
+			height := max(1, msg.Height-footerHeight)
+			page := s.layout(msg.Width, height)
+			y := msg.Y + s.viewportOffset(page, height)
+			if msg.Y > 0 && msg.X >= 0 {
+				geo := page.geoBounds
+				if msg.X >= geo.x && y >= geo.y && y < geo.y+geo.height {
+					if s.tab != 3 {
+						s = s.selectTab(3)
+					}
+				} else if s.tab == 3 && (y < geo.y || msg.X < geo.x) {
+					s = s.selectTab(1)
+				}
+			}
+			if s.tab == 1 {
+				return s.scrollReleasePage(msg)
+			}
 		}
 		if s.tab == 4 {
 			return s.updateEditorMouse(msg, 4)

@@ -16,7 +16,8 @@ The baseline configuration provides direct connections, not proxy nodes. System 
 | Key | Action |
 | --- | --- |
 | `↑` / `↓`, `Enter` | Select / run an action (defaults to Set up and start on first use) |
-| `←` / `→` or `1` / `2` / `4` / `5` | Switch Advanced, Versions, GEO and Mihomo configuration |
+| `←` / `→` or `1` / `2` / `5` | Switch Advanced, Downloads and Mihomo configuration |
+| `2` / `4` | Focus the version list or GEO files in Downloads |
 | `v` / `t` | Open or refresh the release browser / look up a stable tag |
 | `Enter` / `i` (Versions), `a` | Download the selected release / activate it after installation |
 | `PgUp` / `PgDn` or `[` / `]` | Move up / down the continuous version list |
@@ -31,11 +32,11 @@ The baseline configuration provides direct connections, not proxy nodes. System 
 | `c` | Recover network settings after an unexpected exit |
 | `p` / `5` | Open unified Mihomo configuration |
 | `u` | Connect to an external API; leave the address empty for auto-discovery |
-| `r` | Refresh status and retry the connection; also refresh the list on Versions |
+| `r` | Refresh status and retry the connection. In Downloads, also refresh versions and GEO files |
 | Mouse wheel | Move selection in Advanced and GEO, or scroll dialog contents |
 | `Esc` | Cancel the task or leave the form; downloads also have a clickable Cancel download control |
 
-**Advanced** shows core details, service state and lifecycle controls. Stopping or restarting the core requires confirmation. Choose **Downloads** for versions and GEO data, and **Mihomo configuration** to edit settings. Switches show saved preferences, whose effects depend on the running core. Wide terminals use 43% / 57% panels. Narrow terminals stack the content. Use `Tab` and `Enter` inside forms. Exiting Mihosh stops the child owned by a session. A background service continues after the TUI exits. Existing external cores remain under their original owner.
+**Advanced** shows core details, service state and lifecycle controls. Stopping or restarting the core requires confirmation. **Downloads** shows versions and GEO files on the same page. **Mihomo configuration** contains the override form. Switches show saved preferences, whose effects depend on the running core. Wide terminals use 43% / 57% panels. Narrow terminals stack the content. Use `Tab` and `Enter` inside forms. Exiting Mihosh stops the child owned by a session. A background service continues after the TUI exits. Existing external cores remain under their original owner.
 
 ## GEO management
 

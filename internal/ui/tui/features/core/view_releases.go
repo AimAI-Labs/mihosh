@@ -146,11 +146,11 @@ func (s State) releaseStart(visible int) int {
 	return max(0, min(start, s.releaseCount()-visible))
 }
 
-func (s State) releaseLayout(width, height int, parts []string, result pageLayout) pageLayout {
+func (s State) releaseLayout(width, height int) pageLayout {
+	var result pageLayout
 	t := theme.Current()
 	selected := lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true)
-	top := lipgloss.Height(strings.Join(parts, "\n"))
-	visible := max(1, height-top-2)
+	visible := max(1, height-2)
 	result.listRows = visible
 	start := s.releaseStart(visible)
 	var rows []string
@@ -170,16 +170,16 @@ func (s State) releaseLayout(width, height int, parts []string, result pageLayou
 			continue
 		}
 		marker := "  "
-		if i == s.selected {
+		if s.tab == 1 && i == s.selected {
 			marker = "› "
 		}
 		label := s.releaseRow(r, marker, columns, rowWidth)
 		rc := theme.Resolve(s.releaseColor(r))
 		label = lipgloss.NewStyle().Foreground(rc).Render(label)
-		if i == s.selected {
+		if s.tab == 1 && i == s.selected {
 			label = selected.Foreground(rc).Render(common.PadString(label, rowWidth))
 		}
-		result.releases = append(result.releases, actionHit{x: 1, y: top + len(rows) + 1, width: width - 2, height: 1, index: i})
+		result.releases = append(result.releases, actionHit{x: 1, y: len(rows) + 1, width: width - 2, height: 1, index: i})
 		rows = append(rows, label)
 	}
 	if scrollbar != "" {
@@ -188,14 +188,16 @@ func (s State) releaseLayout(width, height int, parts []string, result pageLayou
 			rows[i] = common.PadString(rows[i], rowWidth) + " " + tracks[i]
 		}
 	}
-	parts = append(parts, panel(i18n.T("core.catalog.title"), strings.Join(rows, "\n"), width))
-	result.content = strings.Join(parts, "\n")
+	result.content = panel(i18n.T("core.catalog.title"), strings.Join(rows, "\n"), width)
 	return result
 }
 
 func (s State) clickReleasePage(page pageLayout, x, y int) (State, tea.Cmd) {
 	for _, hit := range page.releases {
 		if x >= hit.x && x < hit.x+hit.width && y >= hit.y && y < hit.y+hit.height {
+			if s.tab != 1 {
+				s = s.selectTab(1)
+			}
 			next := s.selectRelease(hit.index)
 			return next.maybeLoadMore()
 		}

@@ -9,12 +9,12 @@ import (
 )
 
 type releaseCatalog struct {
-	page      coreinfra.ReleasePage
-	requested int
-	loaded    bool
-	lookup    *coreinfra.Release
-	scroll    int
-	store     *releaseStore
+	page         coreinfra.ReleasePage
+	requested    int
+	loaded       bool
+	lookup       *coreinfra.Release
+	scroll       int
+	store        *releaseStore
 	failed       bool
 	resume       bool
 	forceRefresh bool
@@ -133,10 +133,10 @@ func (s State) loadReleasePage(page int) (State, tea.Cmd) {
 func (s State) openTab(tab int) (State, tea.Cmd) {
 	s = s.selectTab(tab)
 	if s.tab == 1 {
-		s = s.selectRelease(0)
 		if !s.catalog.loaded {
 			s.catalog.forceRefresh = false
-			return s.loadReleasePage(1)
+			next, cmd := s.loadReleasePage(1)
+			return next, tea.Batch(cmd, next.Refresh())
 		}
 	}
 	if s.tab == 3 {
@@ -315,11 +315,13 @@ func (s State) BrowsingReleases() bool { return s.tab == 1 && !s.Editing }
 
 // RefreshCurrent also refreshes the catalogue when the global r binding is used.
 func (s State) RefreshCurrent() (State, tea.Cmd) {
-	if !s.Editing && s.tab == 1 {
+	if !s.Editing && s.isDownloadsPage() {
+		action := "refresh"
 		if s.catalog.failed {
-			return s.releaseAction("retry")
+			action = "retry"
 		}
-		return s.releaseAction("refresh")
+		next, cmd := s.releaseAction(action)
+		return next, tea.Batch(cmd, next.Refresh())
 	}
 	return s, s.Refresh()
 }

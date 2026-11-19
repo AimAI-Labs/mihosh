@@ -13,10 +13,11 @@ type actionItem struct {
 }
 
 var tabs = []string{"advanced", "versions", "advanced", "geo", "mihomo"}
-var tabOrder = []int{0, 1, 3, 4}
+var tabOrder = []int{0, 1, 4}
 var serviceActions = []string{"install", "start", "stop", "restart", "enable", "disable", "boot", "uninstall"}
 
-func (s State) isAdvancedPage() bool { return s.tab == 0 || s.tab == 2 }
+func (s State) isAdvancedPage() bool  { return s.tab == 0 || s.tab == 2 }
+func (s State) isDownloadsPage() bool { return s.tab == 1 || s.tab == 3 }
 
 func (s State) primaryAction() actionItem {
 	switch {
@@ -136,11 +137,19 @@ func (s State) selectTab(tab int) State {
 	s.tab = (tab + len(tabs)) % len(tabs)
 	s.selected, s.scroll = 0, 0
 	s.followSelection = true
+	if s.tab == 1 {
+		index, _ := s.releaseIndex(s.Release.Tag)
+		s = s.selectRelease(index)
+	}
 	return s
 }
 
 func (s State) stepTab(delta int) (State, tea.Cmd) {
-	index := max(0, slices.Index(tabOrder, s.tab))
+	active := s.tab
+	if s.isDownloadsPage() {
+		active = 1
+	}
+	index := max(0, slices.Index(tabOrder, active))
 	return s.openTab(tabOrder[(index+delta+len(tabOrder))%len(tabOrder)])
 }
 
