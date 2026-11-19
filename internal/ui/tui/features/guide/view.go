@@ -123,7 +123,7 @@ func (s State) Render(width, height int) string {
 	)
 
 	dialogBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
+		Border(theme.Frame()).
 		BorderForeground(t.Primary).
 		Padding(1, 2).
 		Width(dialogWidth).

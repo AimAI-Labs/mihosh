@@ -371,7 +371,7 @@ func renderGroupCard(state PageState, b cardBox) []string {
 	group := state.Groups[name]
 
 	lines := make([]string, 0, b.Height)
-	lines = append(lines, frame.Render("╭"+strings.Repeat("─", b.Width-2)+"╮"))
+	lines = append(lines, frame.Render(theme.Frame().TopLeft+strings.Repeat("─", b.Width-2)+theme.Frame().TopRight))
 	lines = append(lines, cardContentLine(leftEdge, rightEdge, cardHeader(state, name, group, b), b.Width))
 	lines = append(lines, cardContentLine(leftEdge, rightEdge, cardSubtitle(state, group), b.Width))
 	if b.Expanded {
@@ -380,7 +380,7 @@ func renderGroupCard(state PageState, b cardBox) []string {
 	} else {
 		lines = append(lines, cardDotLines(state, group, b, leftEdge, rightEdge)...)
 	}
-	lines = append(lines, frame.Render("╰"+strings.Repeat("─", b.Width-2)+"╯"))
+	lines = append(lines, frame.Render(theme.Frame().BottomLeft+strings.Repeat("─", b.Width-2)+theme.Frame().BottomRight))
 
 	return lines
 }

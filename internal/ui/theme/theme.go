@@ -44,6 +44,7 @@ type Theme struct {
 }
 
 var current atomic.Pointer[Theme]
+var squareBorders atomic.Bool
 
 func init() {
 	t := builtinThemes["tokyo-night"]
@@ -74,7 +75,16 @@ func IsValid(name string) bool {
 
 // Names 返回所有内置主题名（顺序稳定）
 func Names() []string {
-	return []string{"tokyo-night", "catppuccin", "gruvbox", "nord", "dracula"}
+	return []string{"tokyo-night", "catppuccin", "gruvbox", "nord", "dracula", "kanagawa", "solarized-light"}
+}
+
+func SetBorderStyle(style string) { squareBorders.Store(style == "square") }
+
+func Frame() lipgloss.Border {
+	if squareBorders.Load() {
+		return lipgloss.NormalBorder()
+	}
+	return lipgloss.RoundedBorder()
 }
 
 var resolvedColorCache sync.Map

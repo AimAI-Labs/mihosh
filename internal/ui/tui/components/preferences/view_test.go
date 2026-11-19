@@ -25,8 +25,8 @@ func TestRenderSettingsPageToastUsesReservedTopLine(t *testing.T) {
 	}, 80, 20))
 
 	lines := strings.Split(rendered, "\n")
-	if len(MihoshSettingKeys) != 5 {
-		t.Fatalf("expected 5 setting keys, got %d", len(MihoshSettingKeys))
+	if len(MihoshSettingKeys) != 6 || MihoshSettingKeys[5] != "border-style" {
+		t.Fatalf("expected six setting keys ending in border-style, got %v", MihoshSettingKeys)
 	}
 	if MihoshSettingKeys[3] != "auto-refresh-interval" {
 		t.Fatalf("expected auto-refresh-interval setting key, got %q", MihoshSettingKeys[3])

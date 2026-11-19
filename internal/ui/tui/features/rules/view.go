@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
@@ -266,8 +267,8 @@ func RenderRulesHeaderComponent(stats string, searchBox string, width int) strin
 			borderStyle.Render("│")
 	}
 
-	topLine := borderStyle.Render("╭" + strings.Repeat("─", innerWidth) + "╮")
-	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
+	topLine := borderStyle.Render(theme.Frame().TopLeft + strings.Repeat("─", innerWidth) + theme.Frame().TopRight)
+	bottomLine := borderStyle.Render(theme.Frame().BottomLeft + strings.Repeat("─", innerWidth) + theme.Frame().BottomRight)
 
 	return topLine + "\n" + searchRow + "\n" + bottomLine
 }

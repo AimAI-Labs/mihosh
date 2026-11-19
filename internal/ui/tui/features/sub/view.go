@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -126,8 +127,8 @@ func renderHeader(stats, searchBox string, width int) string {
 			borderStyle.Render("│")
 	}
 
-	top := borderStyle.Render("╭" + strings.Repeat("─", innerWidth) + "╮")
-	bottom := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
+	top := borderStyle.Render(theme.Frame().TopLeft + strings.Repeat("─", innerWidth) + theme.Frame().TopRight)
+	bottom := borderStyle.Render(theme.Frame().BottomLeft + strings.Repeat("─", innerWidth) + theme.Frame().BottomRight)
 	return top + "\n" + searchRow + "\n" + bottom
 }
 

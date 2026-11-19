@@ -194,6 +194,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 				s.selectedSetting++
 			}
 		case key.Matches(msg, common.Keys.Enter):
+			if s.activeKeys()[s.selectedSetting] == "border-style" {
+				return s.toggleBorderStyle()
+			}
 			s.editMode = true
 			s.editValue = s.getEditValue(s.Config, s.activeKeys()[s.selectedSetting])
 			s.editCursor = len([]rune(s.editValue))
@@ -326,7 +329,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 			}
 		}
 		if s.activeTab == 0 && s.selectedSetting == ThemeSettingIndex() {
-			if t, ok := resolveThemeMouseTarget(pageX); ok {
+			if t, ok := resolveVisibleThemeMouseTarget(pageX, pageWidth, s.editValue); ok {
 				if err := s.configSvc.SetConfigValue("theme", t); err == nil {
 					newCfg, _ := s.configSvc.LoadConfig()
 					s.Config = newCfg
@@ -382,6 +385,16 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 	}
 
 	s.selectedSetting = settingIdx
+	if s.activeKeys()[settingIdx] == "border-style" {
+		if choice, ok := resolveEnumMouseTarget(pageX, borderStyleOptions()); ok {
+			style := "rounded"
+			if choice == i18n.T("settings.border.square") {
+				style = "square"
+			}
+			return s.saveBorderStyle(style)
+		}
+		return s, nil
+	}
 	if s.activeTab == 0 && settingIdx == LanguageSettingIndex() {
 		if lang, ok := resolveLanguageMouseTarget(pageX); ok {
 			if err := s.configSvc.SetConfigValue(s.activeKeys()[settingIdx], lang); err == nil {
@@ -393,7 +406,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		}
 	}
 	if s.activeTab == 0 && settingIdx == ThemeSettingIndex() {
-		if t, ok := resolveThemeMouseTarget(pageX); ok {
+		if t, ok := resolveVisibleThemeMouseTarget(pageX, pageWidth, s.getEditValue(s.Config, "theme")); ok {
 			if err := s.configSvc.SetConfigValue("theme", t); err == nil {
 				newCfg, _ := s.configSvc.LoadConfig()
 				s.Config = newCfg
@@ -431,6 +444,27 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 	}
 
 	return s, nil
+}
+
+func (s State) toggleBorderStyle() (State, tea.Cmd) {
+	style := "square"
+	if s.Config != nil && s.Config.BorderStyle == style {
+		style = "rounded"
+	}
+	return s.saveBorderStyle(style)
+}
+
+func (s State) saveBorderStyle(style string) (State, tea.Cmd) {
+	if s.configSvc == nil {
+		return s, nil
+	}
+	if err := s.configSvc.SetConfigValue("border-style", style); err != nil {
+		s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
+		return s, nil
+	}
+	s.Config, _ = s.configSvc.LoadConfig()
+	theme.SetBorderStyle(style)
+	return s, tea.ClearScreen
 }
 
 // handleEditMode 处理编辑模式按键
@@ -747,7 +781,16 @@ func prevTheme(t string) string {
 	return themes[0]
 }
 
-// resolveThemeMouseTarget 解析主题 Tab 区域的鼠标点击目标
+func resolveVisibleThemeMouseTarget(pageX, pageWidth int, current string) (string, bool) {
+	const start = settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth
+	offset, visible := themeTabsWindow(current, pageWidth)
+	if pageX < start || pageX >= start+visible {
+		return "", false
+	}
+	return resolveThemeMouseTarget(pageX + offset)
+}
+
+// resolveThemeMouseTarget 解析完整主题行的鼠标点击目标。
 func resolveThemeMouseTarget(pageX int) (string, bool) {
 	if pageX < 0 {
 		return "", false

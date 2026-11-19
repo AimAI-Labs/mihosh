@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -235,9 +236,9 @@ func RenderConnModeSwitchComponent(viewMode int, width int, inlineMode bool) str
 
 	// 渲染带边框的模式切换栏
 	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
-	topLine := borderStyle.Render("╭" + strings.Repeat("─", innerWidth) + "╮")
+	topLine := borderStyle.Render(theme.Frame().TopLeft + strings.Repeat("─", innerWidth) + theme.Frame().TopRight)
 	middleLine := borderStyle.Render("│") + content + borderStyle.Render("│")
-	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
+	bottomLine := borderStyle.Render(theme.Frame().BottomLeft + strings.Repeat("─", innerWidth) + theme.Frame().BottomRight)
 
 	return topLine + "\n" + middleLine + "\n" + bottomLine
 }

@@ -3,6 +3,7 @@ package common
 import (
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -92,13 +93,13 @@ func RenderTokyoPanel(title, body string, width int) string {
 	}
 
 	// 逐字符填充顶部边框，确保总宽度精确等于 innerWidth+2（含 ╭ 和 ╮）
-	topBorder := "╭─ " + title + " "
+	topBorder := theme.Frame().TopLeft + "─ " + title + " "
 	for lipgloss.Width(topBorder) < innerWidth+1 {
 		topBorder += "─"
 	}
-	topBorder += "╮"
+	topBorder += theme.Frame().TopRight
 	topLine := TokyoBlueStyle().Render(topBorder)
-	bottomLine := TokyoBlueStyle().Render("╰" + strings.Repeat("─", innerWidth) + "╯")
+	bottomLine := TokyoBlueStyle().Render(theme.Frame().BottomLeft + strings.Repeat("─", innerWidth) + theme.Frame().BottomRight)
 
 	bodyLines := strings.Split(body, "\n")
 	var middleLines []string
@@ -138,16 +139,16 @@ func RenderBorderedPanel(title, body string, width int, borderColor lipgloss.Col
 	borderStyle := lipgloss.NewStyle().Foreground(resolve(borderColor))
 	titleStyle := lipgloss.NewStyle().Foreground(resolve(titleColor)).Bold(true)
 
-	topBorderStart := "╭─ "
+	topBorderStart := theme.Frame().TopLeft + "─ "
 	topBorderEnd := " "
 	dashCount := innerWidth + 1 - DisplayWidth(topBorderStart) - DisplayWidth(title) - DisplayWidth(topBorderEnd)
 	if dashCount < 0 {
 		dashCount = 0
 	}
-	topBorderEnd += strings.Repeat("─", dashCount) + "╮"
+	topBorderEnd += strings.Repeat("─", dashCount) + theme.Frame().TopRight
 
 	topLine := borderStyle.Render(topBorderStart) + titleStyle.Render(title) + borderStyle.Render(topBorderEnd)
-	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
+	bottomLine := borderStyle.Render(theme.Frame().BottomLeft + strings.Repeat("─", innerWidth) + theme.Frame().BottomRight)
 
 	bodyLines := strings.Split(body, "\n")
 	var middleLines []string

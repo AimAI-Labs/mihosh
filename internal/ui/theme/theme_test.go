@@ -61,7 +61,7 @@ func TestIsValid(t *testing.T) {
 }
 
 func TestNamesStableOrder(t *testing.T) {
-	want := []string{"tokyo-night", "catppuccin", "gruvbox", "nord", "dracula"}
+	want := []string{"tokyo-night", "catppuccin", "gruvbox", "nord", "dracula", "kanagawa", "solarized-light"}
 	got := Names()
 	if len(got) != len(want) {
 		t.Fatalf("Names() len = %d, want %d", len(got), len(want))

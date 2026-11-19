@@ -378,6 +378,7 @@ func loadLocked() (*Config, error) {
 	reader.SetDefault("language", DefaultConfig.Language)
 	reader.SetDefault("auto_refresh_interval", DefaultConfig.AutoRefreshInterval)
 	reader.SetDefault("theme", DefaultConfig.Theme)
+	reader.SetDefault("border_style", DefaultConfig.BorderStyle)
 	// 订阅：subs 默认空列表（旧配置文件无此键时保持空），active_sub 默认空（未启用）
 	reader.SetDefault("subs", []profile.Profile{})
 	reader.SetDefault("active_sub", "")

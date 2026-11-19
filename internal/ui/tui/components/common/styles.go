@@ -42,7 +42,7 @@ func SelectedStyle() lipgloss.Style {
 func PageHeaderStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Bold(true).
 		Foreground(resolve(Warning())).
-		BorderStyle(lipgloss.NormalBorder()).
+		BorderStyle(theme.Frame()).
 		BorderBottom(true).
 		BorderForeground(resolve(Border()))
 }

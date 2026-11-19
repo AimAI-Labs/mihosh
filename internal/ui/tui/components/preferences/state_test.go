@@ -614,8 +614,8 @@ func TestThemeTabSwitchNext(t *testing.T) {
 	if nextTheme("tokyo-night") != "catppuccin" {
 		t.Errorf("expected catppuccin, got %q", nextTheme("tokyo-night"))
 	}
-	if nextTheme("dracula") != "tokyo-night" {
-		t.Errorf("expected tokyo-night (wrap), got %q", nextTheme("dracula"))
+	if nextTheme("solarized-light") != "tokyo-night" {
+		t.Errorf("expected tokyo-night (wrap), got %q", nextTheme("solarized-light"))
 	}
 }
 
@@ -623,8 +623,8 @@ func TestThemeTabSwitchPrev(t *testing.T) {
 	if prevTheme("catppuccin") != "tokyo-night" {
 		t.Errorf("expected tokyo-night, got %q", prevTheme("catppuccin"))
 	}
-	if prevTheme("tokyo-night") != "dracula" {
-		t.Errorf("expected dracula (wrap), got %q", prevTheme("tokyo-night"))
+	if prevTheme("tokyo-night") != "solarized-light" {
+		t.Errorf("expected solarized-light (wrap), got %q", prevTheme("tokyo-night"))
 	}
 }
 
@@ -653,6 +653,23 @@ func TestThemeSwitchHotSwap(t *testing.T) {
 	}
 	if next.Config.Theme != "catppuccin" {
 		t.Fatalf("expected cfg.Theme=catppuccin, got %q", next.Config.Theme)
+	}
+}
+
+func TestBorderStyleSwitchUpdatesFrameAndPersists(t *testing.T) {
+	theme.SetBorderStyle("rounded")
+	t.Cleanup(func() { theme.SetBorderStyle("rounded") })
+	configSvc, cfg := setupTestConfig(t, nil)
+	s := State{Config: cfg, configSvc: configSvc, selectedSetting: len(MihoshSettingKeys) - 1}
+	for _, expected := range []struct{ style, corner string }{{"square", "┌"}, {"rounded", "╭"}} {
+		s, _ = s.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		stored, err := configSvc.LoadConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if stored.BorderStyle != expected.style || theme.Frame().TopLeft != expected.corner {
+			t.Fatalf("expected %s borders, saved %q and drew %q", expected.style, stored.BorderStyle, theme.Frame().TopLeft)
+		}
 	}
 }
 

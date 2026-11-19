@@ -31,6 +31,7 @@ type Config struct {
 	Language            string     `mapstructure:"language"`
 	AutoRefreshInterval int        `mapstructure:"auto_refresh_interval"`
 	Theme               string     `mapstructure:"theme"`
+	BorderStyle         string     `mapstructure:"border_style"`
 	ShellProxy          bool       `mapstructure:"shell_proxy"`
 
 	// 订阅管理：subs 为订阅元数据列表，active_sub 为当前激活订阅 UID（空=未启用）。
@@ -46,4 +47,5 @@ var DefaultConfig = Config{
 	Language:            "auto",
 	AutoRefreshInterval: 5,
 	Theme:               "tokyo-night",
+	BorderStyle:         "rounded",
 }

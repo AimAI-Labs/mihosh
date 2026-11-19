@@ -7,16 +7,24 @@ Mihosh has a powerful built-in multi-theme engine, allowing you to freely switch
 
 ## Built-in Themes
 
-Currently, 5 preset themes are supported:
+Mihosh includes seven themes.
 - **`tokyo-night`** (Default): Dark blue-gray background with high-saturation cool tones.
 - **`catppuccin`**: Soft, low-contrast macaron color palette.
 - **`gruvbox`**: Retro, warm dark theme.
 - **`nord`**: Cool gray colors inspired by Nordic ice and snow.
 - **`dracula`**: Classic purplish dark theme.
+- **`kanagawa`** brings the muted colors of Kanagawa Wave to the TUI. [Kanagawa palette](https://github.com/rebelot/kanagawa.nvim/blob/master/lua/kanagawa/colors.lua)
+- **`solarized-light`** uses a light cream background and subdued accents. [Solarized palette](https://ethanschoonover.com/solarized/)
 
 You can switch them via the settings page or command line:
 ```bash
 mihosh config set theme catppuccin
+```
+
+In Settings, choose **Border style** to switch the interface between rounded and square borders. The border style applies to every theme.
+
+```bash
+mihosh config set border-style square
 ```
 
 ## Semantic Color System

@@ -110,6 +110,7 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 	if cfg.Theme != "" {
 		theme.SetTheme(cfg.Theme)
 	}
+	theme.SetBorderStyle(cfg.BorderStyle)
 
 	configSvc := service.NewConfigService()
 	connSvc := service.NewConnectionService(client)

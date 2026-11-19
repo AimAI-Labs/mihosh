@@ -7,16 +7,24 @@ Mihosh 内置了强大的多主题引擎，允许你根据终端和个人喜好�
 
 ## 内置主题
 
-目前支持 5 款预设主题：
+Mihosh 内置七款主题。
 - **`tokyo-night`** (默认)：深蓝灰背景与高饱和冷色调。
 - **`catppuccin`**：柔和、低对比度的马卡龙配色。
 - **`gruvbox`**：复古、偏暖的暗色主题。
 - **`nord`**：源自北欧冰雪的冷灰色系。
 - **`dracula`**：偏紫色的经典暗色主题。
+- **`kanagawa`** 使用 Kanagawa Wave 的柔和深色配色。 [Kanagawa 配色](https://github.com/rebelot/kanagawa.nvim/blob/master/lua/kanagawa/colors.lua)
+- **`solarized-light`** 使用奶油色背景与柔和的强调色。 [Solarized 配色](https://ethanschoonover.com/solarized/)
 
 可以通过设置页面或命令行切换：
 ```bash
 mihosh config set theme catppuccin
+```
+
+在设置页的「边框样式」中切换圆角与直角。边框样式适用于所有主题。
+
+```bash
+mihosh config set border-style square
 ```
 
 ## 语义化颜色系统

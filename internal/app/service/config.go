@@ -76,8 +76,13 @@ func (s *ConfigService) SetConfigValue(key, value string) error {
 				return fmt.Errorf("theme 必须是: %s", strings.Join(theme.Names(), ", "))
 			}
 			cfg.Theme = value
+		case "border_style", "border-style":
+			if value != "rounded" && value != "square" {
+				return fmt.Errorf("border-style must be rounded or square")
+			}
+			cfg.BorderStyle = value
 		default:
-			return fmt.Errorf("未知的配置项: %s (可用: test_url, timeout, language, auto_refresh_interval, theme)", key)
+			return fmt.Errorf("未知的配置项: %s (可用: test_url, timeout, language, auto_refresh_interval, theme, border_style)", key)
 		}
 
 		return nil

@@ -3,6 +3,7 @@ package help
 import (
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -599,7 +600,7 @@ func renderScrollablePopup(termWidth, termHeight int, ctx HelpContext) (string, 
 
 	// ── 弹窗外壳：圆角边框，无背景色 ──
 	popupStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
+		Border(theme.Frame()).
 		BorderForeground(common.TokyoBlue()).
 		Padding(1, 2).
 		Width(max(1, popupWidth-2))

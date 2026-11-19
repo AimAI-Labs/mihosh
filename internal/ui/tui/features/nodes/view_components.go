@@ -81,9 +81,9 @@ func RenderModeSwitchComponent(currentMode string, width int) string {
 	}
 
 	borderStyle := lipgloss.NewStyle().Foreground(theme.Resolve(common.TokyoBlue()))
-	topLine := borderStyle.Render("╭" + strings.Repeat("─", innerWidth) + "╮")
+	topLine := borderStyle.Render(theme.Frame().TopLeft + strings.Repeat("─", innerWidth) + theme.Frame().TopRight)
 	middleLine := borderStyle.Render("│") + content + borderStyle.Render("│")
-	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
+	bottomLine := borderStyle.Render(theme.Frame().BottomLeft + strings.Repeat("─", innerWidth) + theme.Frame().BottomRight)
 
 	return topLine + "\n" + middleLine + "\n" + bottomLine
 }

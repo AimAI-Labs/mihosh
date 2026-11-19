@@ -20,7 +20,7 @@ const (
 	settingsDescWidth   = 30
 )
 
-var MihoshSettingKeys = []string{"test-url", "timeout", "language", "auto-refresh-interval", "theme"}
+var MihoshSettingKeys = []string{"test-url", "timeout", "language", "auto-refresh-interval", "theme", "border-style"}
 var MihomoSettingKeys = []string{"external-controller", "secret", "mixed-port", "allow-lan", "log-level"}
 
 func GetSettingLabel(key string) string {
@@ -39,6 +39,8 @@ func GetSettingLabel(key string) string {
 		return i18n.T("settings.label.auto_refresh_interval")
 	case "theme":
 		return i18n.T("settings.label.theme")
+	case "border-style":
+		return i18n.T("settings.label.border-style")
 	case "mixed-port":
 		return i18n.T("settings.label.mixed-port")
 	case "allow-lan":
@@ -105,6 +107,11 @@ func GetSettingValue(state PageState, key string) string {
 				return "tokyo-night"
 			}
 			return state.Config.Theme
+		case "border-style":
+			if state.Config.BorderStyle == "square" {
+				return "square"
+			}
+			return "rounded"
 		}
 	} else if state.ActiveTab == 1 && state.MihomoConfig != nil {
 		switch key {
@@ -448,7 +455,10 @@ func renderSettingItem(state PageState, index int, key string, label string, wid
 		if state.EditMode && index == state.SelectedSetting {
 			valToRender = state.EditValue
 		}
-		renderedValue = renderThemeTabs(valToRender, state.EditMode && index == state.SelectedSetting)
+		offset, visible := themeTabsWindow(valToRender, width)
+		renderedValue = ansi.Cut(renderThemeTabs(valToRender, state.EditMode && index == state.SelectedSetting), offset, offset+visible)
+	} else if key == "border-style" {
+		renderedValue = renderEnumTabs(i18n.T("settings.border."+value), borderStyleOptions(), false)
 	} else if key == "allow-lan" {
 		valToRender := value
 		if state.EditMode && index == state.SelectedSetting {
@@ -504,6 +514,23 @@ func renderSettingItem(state PageState, index int, key string, label string, wid
 	}
 
 	return rowStyle.Render(lineInner)
+}
+
+func borderStyleOptions() []string {
+	return []string{i18n.T("settings.border.rounded"), i18n.T("settings.border.square")}
+}
+
+func themeTabsWindow(current string, width int) (offset, visible int) {
+	visible = max(0, width-4-settingsRowPaddingLeft-settingsLabelWidth)
+	end := 0
+	for _, name := range theme.Names() {
+		end += settingsTabDisplayWidth(name)
+		if name == current {
+			return max(0, end-visible), visible
+		}
+		end++
+	}
+	return 0, visible
 }
 
 func renderLanguageTabs(currentLang string, editMode bool) string {
@@ -629,9 +656,9 @@ func renderSettingsTabBar(labels []string, active int, width int) string {
 	}
 
 	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
-	topLine := borderStyle.Render("╭" + strings.Repeat("─", innerWidth) + "╮")
+	topLine := borderStyle.Render(theme.Frame().TopLeft + strings.Repeat("─", innerWidth) + theme.Frame().TopRight)
 	middleLine := borderStyle.Render("│") + content + borderStyle.Render("│")
-	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
+	bottomLine := borderStyle.Render(theme.Frame().BottomLeft + strings.Repeat("─", innerWidth) + theme.Frame().BottomRight)
 
 	return topLine + "\n" + middleLine + "\n" + bottomLine
 }

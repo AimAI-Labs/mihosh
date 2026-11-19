@@ -5,6 +5,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/styles"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -74,7 +75,7 @@ func RenderSiteCard(site model.SiteTest, selected bool, width int) string {
 		Width(width).
 		Padding(0, 1).
 		MarginRight(1).
-		BorderStyle(lipgloss.RoundedBorder()).
+		BorderStyle(theme.Frame()).
 		BorderForeground(borderColor)
 
 	// 图标

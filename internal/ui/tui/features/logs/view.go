@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
@@ -194,9 +195,9 @@ func renderLevelBar(selectedLevel int, width int) string {
 
 	// 渲染带边框的级别栏
 	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
-	topLine := borderStyle.Render("╭" + strings.Repeat("─", innerWidth) + "╮")
+	topLine := borderStyle.Render(theme.Frame().TopLeft + strings.Repeat("─", innerWidth) + theme.Frame().TopRight)
 	middleLine := borderStyle.Render("│") + content + borderStyle.Render("│")
-	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
+	bottomLine := borderStyle.Render(theme.Frame().BottomLeft + strings.Repeat("─", innerWidth) + theme.Frame().BottomRight)
 
 	return topLine + "\n" + middleLine + "\n" + bottomLine
 }

@@ -684,4 +684,5 @@ func (m *Model) reloadStoredConfig() {
 	if cfg.Theme != "" && cfg.Theme != previousTheme {
 		theme.SetTheme(cfg.Theme)
 	}
+	theme.SetBorderStyle(cfg.BorderStyle)
 }
