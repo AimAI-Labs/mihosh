@@ -9,7 +9,11 @@ description: Browse and manage proxy rules
 | --- | --- |
 | `↑` / `↓` | Scroll through all currently active routing rules |
 | `/` | Open the multi-keyword search box for complex rule filtering |
-| `Enter` | View detailed information on the policy group or node associated with the selected rule |
+| `n` | Add a rule |
+| `Enter` | Edit the selected rule |
+| `d` | Confirm deletion of the selected rule |
+
+Mihosh records these changes under `rule-edits` in `merge.yaml` and applies them to the core. Additions use the selected position. Edits and deletions match the original rule by its content, so they continue to apply when that rule is still present after a subscription refresh. The subscription snapshot stays intact. Remote rule editing requires an active subscription and applies in memory on the remote core.
 
 ## Interface Features
 

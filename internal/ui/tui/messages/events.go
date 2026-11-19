@@ -108,29 +108,15 @@ type SiteTestMsg struct {
 
 type RulesMsg []model.Rule
 
-// RuleAddedMsg 自定义规则已成功写入配置文件（调用方负责热重载与刷新）。
-type RuleAddedMsg struct{}
-
-// RuleAddErrorMsg 写入自定义规则失败（解析/校验/写盘）。
-type RuleAddErrorMsg struct{ Err error }
-
-func (m RuleAddErrorMsg) Error() string { return m.Err.Error() }
-
-// RuleDeletedMsg 规则已从配置文件删除（调用方负责热重载与刷新）。
-type RuleDeletedMsg struct{}
-
-// RuleDeleteErrorMsg 删除规则失败（未找到 / 写盘失败）。
-type RuleDeleteErrorMsg struct{ Err error }
-
-func (m RuleDeleteErrorMsg) Error() string { return m.Err.Error() }
-
-// RuleEditedMsg 规则已成功修改（调用方负责热重载与刷新）。
-type RuleEditedMsg struct{}
-
-// RuleEditErrorMsg 修改规则失败（未找到旧规则 / 写盘失败）。
-type RuleEditErrorMsg struct{ Err error }
-
-func (m RuleEditErrorMsg) Error() string { return m.Err.Error() }
+type RuleEditAppliedMsg struct {
+	NoticeKey       string
+	Applied         bool
+	Remote          bool
+	NeedsRestart    bool
+	Restarted       bool
+	EndpointChanged bool
+	Err             error
+}
 
 // ConfigReloadedMsg 调用 mihomo 核心 ReloadConfig 的结果。
 type ConfigReloadedMsg struct{ Err error }

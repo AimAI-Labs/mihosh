@@ -1,12 +1,17 @@
 package rules
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -19,19 +24,30 @@ func FetchRules(client *api.Client) tea.Cmd {
 		}
 
 		// 从配置文件解析 no-resolve 信息（API 不返回此字段）
-		if configPath, pathErr := config.GetMihomoConfigPath(); pathErr == nil {
-			nrMap := config.ParseRulesNoResolve(configPath)
-			for i := range rules.Rules {
-				r := &rules.Rules[i]
-				key := normalizeRuleType(r.Type) + "," + r.Payload + "," + r.Proxy
-				if nrMap[key] {
-					r.NoResolve = true
-				}
-			}
+		nrMap := ruleNoResolveFlags()
+		for i := range rules.Rules {
+			r := &rules.Rules[i]
+			key := normalizeRuleType(r.Type) + "," + r.Payload + "," + r.Proxy
+			r.NoResolve = nrMap[key]
 		}
 
 		return messages.RulesMsg(rules.Rules)
 	})
+}
+
+func ruleNoResolveFlags() map[string]bool {
+	path, err := config.GetMihomoConfigPath()
+	if err == nil {
+		return config.ParseRulesNoResolve(path)
+	}
+	if errors.Is(err, config.ErrExternalConfig) {
+		if cfg, loadErr := config.Load(); loadErr == nil && cfg.ActiveSub != "" {
+			if generated, generateErr := profile.GenerateForUID(cfg.ActiveSub, ""); generateErr == nil {
+				return config.ParseRulesNoResolveYAML(generated.Data)
+			}
+		}
+	}
+	return nil
 }
 
 // camelToConfigType 将 Mihomo API 返回的 CamelCase 类型名转换为配置文件中使用的大写横杠分隔格式。
@@ -59,53 +75,36 @@ func normalizeRuleType(apiType string) string {
 	return strings.ToUpper(apiType)
 }
 
-// AddRuleCmd 把一条自定义规则写入 Mihomo 配置文件的 rules 列表。
-//
-// ruleType / payload / proxy 为表单输入；index 为 1-based 插入位置，
-// index <= 0 表示插入到顶部（最高优先级）。
-// noResolve 为 true 时在规则末尾追加 ,no-resolve（仅 IP 类规则有效）。
-// 成功返回 RuleAddedMsg，失败返回 RuleAddErrorMsg。
-func AddRuleCmd(configPath, ruleType, payload, proxy string, index int, noResolve bool) tea.Cmd {
-	rule := buildRuleLine(ruleType, payload, proxy, noResolve)
+func (s State) applyRuleEdit(noticeKey string, edit profile.RuleEdit) tea.Cmd {
+	configSvc := s.configSvc
+	if configSvc == nil {
+		configSvc = service.NewConfigService()
+	}
 	return func() tea.Msg {
-		if err := config.InsertRule(configPath, rule, index); err != nil {
-			return messages.RuleAddErrorMsg{Err: err}
+		result := configSvc.ApplyRuleEdit(context.Background(), s.coreSvc, s.client, edit)
+		err := result.Err
+		switch {
+		case errors.Is(err, profile.ErrRuleEditTarget):
+			err = errors.New(i18n.T("rules.write.not_found"))
+		case errors.Is(err, service.ErrRemoteRuleEditRequiresSubscription):
+			err = errors.New(i18n.T("rules.write.remote_needs_subscription"))
+		case err != nil && result.Restored:
+			err = fmt.Errorf("%s (%w)", i18n.T("settings.toast.mihomo_override_restored"), err)
 		}
-		return messages.RuleAddedMsg{}
+		return messages.RuleEditAppliedMsg{
+			NoticeKey: noticeKey, Applied: result.Applied, Remote: result.Remote,
+			NeedsRestart: result.NeedsRestart, Restarted: result.Restarted,
+			EndpointChanged: result.EndpointChanged, Err: err,
+		}
 	}
 }
 
-// DeleteRuleCmd 从 Mihomo 配置文件的 rules 列表中删除指定规则。
-//
-// 匹配基于内容（type + payload + proxy + no-resolve），见 config.DeleteRule。
-// ruleType 必须为配置文件格式（大写横杠分隔），调用方负责把 API 返回的
-// CamelCase 类型经 normalizeRuleType 转换后传入。
-// 成功返回 RuleDeletedMsg，未匹配或写盘失败返回 RuleDeleteErrorMsg。
-func DeleteRuleCmd(configPath, ruleType, payload, proxy string, noResolve bool) tea.Cmd {
-	return func() tea.Msg {
-		if err := config.DeleteRule(configPath, ruleType, payload, proxy, noResolve); err != nil {
-			return messages.RuleDeleteErrorMsg{Err: err}
-		}
-		return messages.RuleDeletedMsg{}
+func originalRuleLine(ruleType, payload, proxy string, noResolve bool) string {
+	line := buildRuleLine(ruleType, payload, proxy, false)
+	if noResolve && !strings.EqualFold(ruleType, "MATCH") {
+		line += ",no-resolve"
 	}
-}
-
-// EditRuleCmd 修改一条自定义规则：先删除旧规则再插入新规则（ReplaceRule）。
-//
-// oldType/oldPayload/oldProxy/oldNoResolve 为旧规则的匹配键。
-// newType/newPayload/newProxy 为新规则值。
-// newIndex 为 1-based 插入位置。
-// newNoResolve 为新规则是否带 no-resolve。
-// 成功返回 RuleEditedMsg，未匹配或写盘失败返回 RuleEditErrorMsg。
-func EditRuleCmd(configPath, oldType, oldPayload, oldProxy string, oldNoResolve bool,
-	newType, newPayload, newProxy string, newIndex int, newNoResolve bool) tea.Cmd {
-	newRule := buildRuleLine(newType, newPayload, newProxy, newNoResolve)
-	return func() tea.Msg {
-		if err := config.ReplaceRule(configPath, oldType, oldPayload, oldProxy, oldNoResolve, newRule, newIndex); err != nil {
-			return messages.RuleEditErrorMsg{Err: err}
-		}
-		return messages.RuleEditedMsg{}
-	}
+	return line
 }
 
 // buildRuleLine 按 Mihomo 源格式 `TYPE,PAYLOAD,PROXY` 组装规则字符串。

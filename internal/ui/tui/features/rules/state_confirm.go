@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
@@ -26,33 +27,14 @@ func (s State) openDeleteConfirmForIndex(origIdx int) (State, tea.Cmd) {
 	if origIdx < 0 || origIdx >= len(s.rules) {
 		return s, nil
 	}
-	return State{
-		rules:               s.rules,
-		filteredRuleIndices: s.filteredRuleIndices,
-		ruleFilter:          s.ruleFilter,
-		ruleFilterMode:      s.ruleFilterMode,
-		FilterEngine:        s.FilterEngine,
-		selectedRule:        s.selectedRule,
-		ruleScrollTop:       s.ruleScrollTop,
-		showTypeFilter:      s.showTypeFilter,
-		selectedTypes:       s.selectedTypes,
-		availableTypes:      s.availableTypes,
-		typeFilterCursor:    s.typeFilterCursor,
-		showAddForm:         s.showAddForm,
-		addForm:             s.addForm,
-		configPath:          s.configPath,
-		showDeleteConfirm:   true,
-		deleteTarget:        s.rules[origIdx],
-		deleteTargetIndex:   origIdx,
-		showEditForm:        s.showEditForm,
-		editOriginIndex:     s.editOriginIndex,
-		ColorAdjustLight:    s.ColorAdjustLight,
-		ColorAdjustDark:     s.ColorAdjustDark,
-	}, nil
+	s.showDeleteConfirm = true
+	s.deleteTarget = s.rules[origIdx]
+	s.deleteTargetIndex = origIdx
+	return s, nil
 }
 
 // handleDeleteConfirmMode 处理删除确认弹窗按键（吞掉所有按键）。
-//   - Enter / y：确认，发起 DeleteRuleCmd 并关闭弹窗；
+//   - Enter / y：确认，记录删除覆写并关闭弹窗；
 //   - Esc / n / 其它：取消关闭，不修改配置。
 func (s State) handleDeleteConfirmMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	switch {
@@ -61,13 +43,9 @@ func (s State) handleDeleteConfirmMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		s.showDeleteConfirm = false
 		s.deleteTarget = model.Rule{}
 		s.deleteTargetIndex = 0
-		return s, DeleteRuleCmd(
-			s.configPath,
-			normalizeRuleType(target.Type),
-			target.Payload,
-			target.Proxy,
-			target.NoResolve,
-		)
+		return s, s.applyRuleEdit("rules.deleted_toast", profile.RuleEdit{
+			Match: originalRuleLine(normalizeRuleType(target.Type), target.Payload, target.Proxy, target.NoResolve),
+		})
 
 	case key.Matches(msg, common.Keys.Escape), msg.String() == "n":
 		s.showDeleteConfirm = false

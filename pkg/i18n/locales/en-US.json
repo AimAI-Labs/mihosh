@@ -407,6 +407,9 @@
   "rules.edit_proxy_hint": "Policies are from the source config; ↵ to open picker",
   "rules.edit_proxy_change": "(↵ to change)",
   "rules.edit_toast": "Rule updated and core reloaded",
+  "rules.write.saved": "Rule change saved to merge.yaml",
+  "rules.write.not_found": "The rule was not found in the effective configuration. Refresh the rule list and retry.",
+  "rules.write.remote_needs_subscription": "Activate a subscription before changing rules on a remote controller",
 
   "settings.panel_title": "Settings",
   "settings.sys_status.panel_title": "Mihomo Service Status (systemctl)",

@@ -239,11 +239,32 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.RulesMsg:
 		m.rulesState = m.rulesState.ApplyRules(msg)
 
-	case messages.RuleAddedMsg:
-		// 规则已写入配置文件：热重载核心 + 刷新规则列表 + 显示成功提示
-		m.notice = i18n.T("rules.added_toast")
+	case messages.RuleEditAppliedMsg:
+		if msg.Err != nil {
+			m.err = messages.ErrMsg{Err: msg.Err}
+			m.notice, m.noticeTicks = "", 0
+			return m, nil
+		}
+		m.err = nil
+		notice := msg.NoticeKey
+		if msg.Remote || msg.NeedsRestart || msg.Restarted {
+			notice = mihomoOverrideNotice(messages.MihomoOverridesSavedMsg{
+				Applied: msg.Applied, Remote: msg.Remote, NeedsRestart: msg.NeedsRestart, Restarted: msg.Restarted,
+			})
+		} else if !msg.Applied {
+			notice = "rules.write.saved"
+		}
+		m.notice = i18n.T(notice)
 		m.noticeTicks = autoRefreshNoticeTicks
-		return m, reloadConfigCmd(m.client)
+		if !msg.Remote && (msg.Restarted || msg.EndpointChanged) {
+			if cmd := m.syncAppliedCore(msg.Restarted, msg.NeedsRestart && msg.Applied); cmd != nil {
+				return m, cmd
+			}
+		}
+		if msg.Applied && m.client != nil {
+			return m, rules.FetchRules(m.client)
+		}
+		return m, nil
 
 	case messages.ConfigReloadedMsg:
 		if msg.Err != nil {
@@ -253,36 +274,6 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.currentPage == layout.PageRules {
 			return m, rules.FetchRules(m.client)
 		}
-
-	case messages.RuleAddErrorMsg:
-		// 写入失败：沿用全局错误显示
-		m.err = msg
-		m.notice = ""
-		m.noticeTicks = 0
-
-	case messages.RuleDeletedMsg:
-		// 规则已从配置文件删除：热重载核心 + 刷新规则列表 + 显示成功提示
-		m.notice = i18n.T("rules.deleted_toast")
-		m.noticeTicks = autoRefreshNoticeTicks
-		return m, reloadConfigCmd(m.client)
-
-	case messages.RuleDeleteErrorMsg:
-		// 删除失败：沿用全局错误显示
-		m.err = msg
-		m.notice = ""
-		m.noticeTicks = 0
-
-	case messages.RuleEditedMsg:
-		// 规则已修改：热重载核心 + 刷新规则列表 + 显示成功提示
-		m.notice = i18n.T("rules.edit_toast")
-		m.noticeTicks = autoRefreshNoticeTicks
-		return m, reloadConfigCmd(m.client)
-
-	case messages.RuleEditErrorMsg:
-		// 修改失败：沿用全局错误显示
-		m.err = msg
-		m.notice = ""
-		m.noticeTicks = 0
 
 	case messages.ConfigEditFinishedMsg:
 		// 外部编辑器结束：失败沿用全局错误显示；成功热重载核心（随后刷新规则列表）

@@ -163,8 +163,8 @@ func TestUpdate_DataMessages(t *testing.T) {
 	newM, _ = m.Update(logMsg)
 	m = newM.(Model)
 
-	// Test RuleAddedMsg
-	newM, _ = m.Update(messages.RuleAddedMsg{})
+	// A successful rule edit reports the persisted and applied result.
+	newM, _ = m.Update(messages.RuleEditAppliedMsg{NoticeKey: "rules.added_toast", Applied: true})
 	m = newM.(Model)
 	if m.notice == "" {
 		t.Errorf("Expected notice to be set for rule added")

@@ -43,9 +43,19 @@ func (s *ConfigService) ReadMihomoOverrides() (map[string]string, error) {
 // ApplyMihomoOverrides persists the five overrides to merge.yaml and regenerates/applies
 // the active configuration across managed, local external, and remote-only controllers.
 func (s *ConfigService) ApplyMihomoOverrides(ctx context.Context, coreSvc *CoreService, client *api.Client, overrides map[string]string) MihomoOverridesSaveResult {
+	return s.applyMergeMutation(ctx, coreSvc, client, mergeMutation{overrides: overrides})
+}
+
+func (s *ConfigService) ApplyRuleEdit(ctx context.Context, coreSvc *CoreService, client *api.Client, edit profile.RuleEdit) MihomoOverridesSaveResult {
+	return s.applyMergeMutation(ctx, coreSvc, client, mergeMutation{rule: &edit})
+}
+
+func (s *ConfigService) applyMergeMutation(ctx context.Context, coreSvc *CoreService, client *api.Client, change mergeMutation) MihomoOverridesSaveResult {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	s.mergeMu.Lock()
+	defer s.mergeMu.Unlock()
 	cfg, err := loadCoreConfig()
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
@@ -56,26 +66,33 @@ func (s *ConfigService) ApplyMihomoOverrides(ctx context.Context, coreSvc *CoreS
 			svc = NewCoreService()
 			defer svc.Close()
 		}
-		res, applyErr := svc.ApplyOverrides(ctx, overrides)
+		res, applyErr := svc.applyMergeMutation(ctx, change)
 		if applyErr != nil && res.Err == nil {
 			res.Err = applyErr
 		}
 		return res
 	}
-	if cfg.Core.ExternalController != "" {
-		return s.applyRemoteExternalOverrides(cfg, client, overrides)
+	if client != nil {
+		client = client.Snapshot()
 	}
-	return s.applyLocalExternalOverrides(cfg, client, overrides)
+	if cfg.Core.ExternalController != "" {
+		return s.applyRemoteExternalOverrides(cfg, client, change)
+	}
+	return s.applyLocalExternalOverrides(cfg, client, change)
 }
 
 // ApplyOverrides updates merge.yaml and applies regenerated configuration for a managed core,
 // forwarding to any live background core owner and rolling back on validation/reload/restart failure.
 func (s *CoreService) ApplyOverrides(ctx context.Context, overrides map[string]string) (MihomoOverridesSaveResult, error) {
+	return s.applyMergeMutation(ctx, mergeMutation{overrides: overrides})
+}
+
+func (s *CoreService) applyMergeMutation(ctx context.Context, mutation mergeMutation) (MihomoOverridesSaveResult, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	var forwardedRes MihomoOverridesSaveResult
-	if forwarded, err := s.forwardControlRequest(ctx, coreControlRequest{Action: "overrides", Overrides: overrides}, nil, &forwardedRes); forwarded {
+	if forwarded, err := s.forwardControlRequest(ctx, mutation.controlRequest(), nil, &forwardedRes); forwarded {
 		if err != nil && forwardedRes.Err == nil {
 			forwardedRes.Err = err
 		}
@@ -143,21 +160,13 @@ func (s *CoreService) ApplyOverrides(ctx context.Context, overrides map[string]s
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}, err
 	}
-	beforeOverrides, err := profile.ReadMihomoOverridesFrom(oldMerge)
-	if err != nil {
-		return MihomoOverridesSaveResult{Err: err}, err
-	}
-	newMerge, err := profile.EncodeMihomoOverrides(oldMerge, overrides)
-	if err != nil {
-		return MihomoOverridesSaveResult{Err: err}, err
-	}
-	savedOverrides, err := profile.ReadMihomoOverridesFrom(newMerge)
-	if err != nil {
-		return MihomoOverridesSaveResult{Err: err}, err
-	}
-	cleared := profile.ClearedOverrideKeys(beforeOverrides, overrides)
 	uid := activeSubUID(cfg)
-	generated, err := profile.GenerateOverrideConfigWithMerge(uid, path, newMerge, cleared, true)
+	next, err := mutation.prepare(oldMerge, uid, path, true)
+	if err != nil {
+		return MihomoOverridesSaveResult{Err: err}, err
+	}
+	newMerge, savedOverrides := next.data, next.overrides
+	generated, err := mutation.candidate(uid, path, oldMerge, next, true)
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}, err
 	}
@@ -293,10 +302,7 @@ func (s *CoreService) ApplyOverrides(ctx context.Context, overrides map[string]s
 	}, nil
 }
 
-func (s *ConfigService) applyLocalExternalOverrides(cfg *config.Config, client *api.Client, overrides map[string]string) MihomoOverridesSaveResult {
-	if client != nil {
-		client = client.Snapshot()
-	}
+func (s *ConfigService) applyLocalExternalOverrides(cfg *config.Config, client *api.Client, mutation mergeMutation) MihomoOverridesSaveResult {
 	uid := activeSubUID(cfg)
 	pathFn := s.localExternalPath
 	if pathFn == nil {
@@ -320,19 +326,11 @@ func (s *ConfigService) applyLocalExternalOverrides(cfg *config.Config, client *
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
 	}
-	beforeOverrides, err := profile.ReadMihomoOverridesFrom(oldMerge)
+	next, err := mutation.prepare(oldMerge, uid, path, false)
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
 	}
-	newMerge, err := profile.EncodeMihomoOverrides(oldMerge, overrides)
-	if err != nil {
-		return MihomoOverridesSaveResult{Err: err}
-	}
-	savedOverrides, err := profile.ReadMihomoOverridesFrom(newMerge)
-	if err != nil {
-		return MihomoOverridesSaveResult{Err: err}
-	}
-	cleared := profile.ClearedOverrideKeys(beforeOverrides, overrides)
+	newMerge, savedOverrides := next.data, next.overrides
 	oldConfig, configExisted, err := readOptionalFile(path)
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
@@ -340,7 +338,7 @@ func (s *ConfigService) applyLocalExternalOverrides(cfg *config.Config, client *
 	if uid == "" && !configExisted {
 		return MihomoOverridesSaveResult{Err: os.ErrNotExist}
 	}
-	data, err := profile.GenerateOverrideConfigWithMerge(uid, path, newMerge, cleared, false)
+	data, err := mutation.candidate(uid, path, oldMerge, next, false)
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
 	}
@@ -437,7 +435,11 @@ func (s *ConfigService) applyLocalExternalOverrides(cfg *config.Config, client *
 	}
 }
 
-func (s *ConfigService) applyRemoteExternalOverrides(cfg *config.Config, client *api.Client, overrides map[string]string) MihomoOverridesSaveResult {
+func (s *ConfigService) applyRemoteExternalOverrides(cfg *config.Config, client *api.Client, mutation mergeMutation) MihomoOverridesSaveResult {
+	uid := activeSubUID(cfg)
+	if mutation.rule != nil && uid == "" {
+		return MihomoOverridesSaveResult{Remote: true, Err: ErrRemoteRuleEditRequiresSubscription}
+	}
 	mergePath, err := profile.MergePath()
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
@@ -446,24 +448,15 @@ func (s *ConfigService) applyRemoteExternalOverrides(cfg *config.Config, client 
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
 	}
-	beforeOverrides, err := profile.ReadMihomoOverridesFrom(oldMerge)
+	next, err := mutation.prepare(oldMerge, uid, "", false)
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
 	}
-	newMerge, err := profile.EncodeMihomoOverrides(oldMerge, overrides)
-	if err != nil {
-		return MihomoOverridesSaveResult{Err: err}
-	}
-	savedOverrides, err := profile.ReadMihomoOverridesFrom(newMerge)
-	if err != nil {
-		return MihomoOverridesSaveResult{Err: err}
-	}
-	cleared := profile.ClearedOverrideKeys(beforeOverrides, overrides)
+	newMerge, savedOverrides := next.data, next.overrides
 	identityPending := identityRequestedForRemote(savedOverrides, cfg.Core.ExternalController, cfg.Core.ExternalSecret)
-	uid := activeSubUID(cfg)
 
 	if uid != "" {
-		data, genErr := profile.GenerateOverrideConfigWithMerge(uid, "", newMerge, cleared, false)
+		data, genErr := mutation.candidate(uid, "", oldMerge, next, false)
 		if genErr != nil {
 			return MihomoOverridesSaveResult{Remote: true, Err: genErr}
 		}
@@ -502,7 +495,7 @@ func (s *ConfigService) applyRemoteExternalOverrides(cfg *config.Config, client 
 	// explicit runtime fields via PATCH /configs.
 	patch := buildRuntimePatch(savedOverrides)
 	hasClearedRuntime := false
-	for _, key := range cleared {
+	for _, key := range next.cleared {
 		if key == "mixed-port" || key == "allow-lan" || key == "log-level" {
 			hasClearedRuntime = true
 			break

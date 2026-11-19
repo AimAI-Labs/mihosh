@@ -169,7 +169,8 @@ func GenerateOverrideConfigWithMerge(uid, path string, mergeBytes []byte, cleare
 		}
 		merge = &mergeDoc
 	}
-	final, err := ApplyMerge(&raw, merge)
+	// A runtime file already incorporates applied rule edits. Replay them only from a raw subscription.
+	final, err := applyMerge(&raw, merge, uid != "")
 	if err != nil {
 		return nil, err
 	}

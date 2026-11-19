@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 )
 
 var ErrNoCoreOwner = errors.New("no live Mihosh core owner")
@@ -31,6 +32,7 @@ type coreControlRequest struct {
 	Version   string            `json:"version,omitempty"`
 	Cleared   []string          `json:"cleared,omitempty"`
 	Overrides map[string]string `json:"overrides,omitempty"`
+	RuleEdit  *profile.RuleEdit `json:"rule_edit,omitempty"`
 }
 
 type coreControlResponse struct {
@@ -118,6 +120,12 @@ func (s *CoreService) startControl(root string) error {
 			activation, err = s.UseBasicConfig(r.Context())
 		case "overrides":
 			overrideRes, err = s.ApplyOverrides(r.Context(), request.Overrides)
+		case "rule-edit":
+			if request.RuleEdit == nil {
+				http.Error(w, "missing rule edit", http.StatusBadRequest)
+				return
+			}
+			overrideRes, err = s.applyMergeMutation(r.Context(), mergeMutation{rule: request.RuleEdit})
 		case "system-proxy", "tun":
 			if request.Version != "on" && request.Version != "off" {
 				http.Error(w, "invalid network setting", 400)
@@ -147,7 +155,7 @@ func (s *CoreService) startControl(root string) error {
 			Applied:         overrideRes.Applied,
 			EndpointChanged: overrideRes.EndpointChanged,
 		}
-		if request.Action == "overrides" {
+		if request.Action == "overrides" || request.Action == "rule-edit" {
 			response.BackupName = overrideRes.BackupName
 			response.Restarted = overrideRes.Restarted
 		}

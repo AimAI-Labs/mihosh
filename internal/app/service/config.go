@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
@@ -12,6 +13,7 @@ import (
 
 // ConfigService 配置管理服务
 type ConfigService struct {
+	mergeMu           sync.Mutex
 	mihomoConfigPath  func() (string, error)
 	localExternalPath func() (string, error)
 	writeMihomoField  func(string, string, interface{}) error

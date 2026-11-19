@@ -205,6 +205,72 @@ func TestManagedOverridesForwardedToBackgroundOwner(t *testing.T) {
 	require.True(t, res.WriteOK)
 	require.Equal(t, "false", res.Overrides["allow-lan"])
 	require.Equal(t, "warning", res.Overrides["log-level"])
+
+	outcome := NewConfigService().ApplyRuleEdit(context.Background(), caller, nil, profile.RuleEdit{
+		Rule: "DOMAIN,forwarded.example,DIRECT", Index: 1,
+	})
+	require.NoError(t, outcome.Err)
+	require.True(t, outcome.WriteOK)
+	merge, err := profile.ReadMerge()
+	require.NoError(t, err)
+	require.Contains(t, string(merge), "rule-edits:")
+	require.Contains(t, string(merge), "DOMAIN,forwarded.example,DIRECT")
+}
+
+func TestManagedRuleEditsPersistAndDoNotReplayAgainstRuntime(t *testing.T) {
+	ctx := context.Background()
+	svc, uid, _ := prepareManagedProfile(t)
+	cfgSvc := NewConfigService()
+	result := cfgSvc.ApplyRuleEdit(ctx, svc, nil, profile.RuleEdit{Rule: "DOMAIN,persisted.example,DIRECT", Index: 1})
+	require.NoError(t, result.Err)
+	require.True(t, result.WriteOK)
+	require.False(t, result.Applied)
+	result = cfgSvc.ApplyMihomoOverrides(ctx, svc, nil, map[string]string{"log-level": "debug"})
+	require.NoError(t, result.Err)
+	path, err := config.ManagedMihomoConfigPath()
+	require.NoError(t, err)
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, 1, strings.Count(string(data), "DOMAIN,persisted.example,DIRECT"))
+
+	raw, err := profile.ReadRawFile(uid)
+	require.NoError(t, err)
+	_, err = svc.ApplyProfile(ctx, uid, false)
+	require.NoError(t, err)
+	data, err = os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, 1, strings.Count(string(data), "DOMAIN,persisted.example,DIRECT"))
+	require.NotContains(t, string(data), "rule-edits")
+	actualRaw, err := profile.ReadRawFile(uid)
+	require.NoError(t, err)
+	require.Equal(t, raw, actualRaw)
+}
+
+func TestRuleEditPreservesLegacyRuntimeRules(t *testing.T) {
+	ctx := context.Background()
+	svc, uid, _ := prepareManagedProfile(t)
+	_, err := svc.ApplyProfile(ctx, uid, false)
+	require.NoError(t, err)
+	path, err := config.ManagedMihomoConfigPath()
+	require.NoError(t, err)
+	old := "DOMAIN,legacy.example,DIRECT"
+	unchanged := "DOMAIN,keep-local.example,DIRECT"
+	require.NoError(t, config.InsertRule(path, old, 1))
+	require.NoError(t, config.InsertRule(path, unchanged, 1))
+
+	result := NewConfigService().ApplyRuleEdit(ctx, svc, nil, profile.RuleEdit{
+		Match: old, Rule: "DOMAIN,migrated.example,REJECT", Index: 2,
+	})
+	require.NoError(t, result.Err)
+	require.True(t, result.WriteOK)
+	runtimeData, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Contains(t, string(runtimeData), unchanged)
+	require.NotContains(t, string(runtimeData), old)
+
+	generated, err := profile.GenerateForUID(uid, path)
+	require.NoError(t, err)
+	require.Contains(t, string(generated.Data), "DOMAIN,migrated.example,REJECT")
 }
 
 func TestLocalExternalOverridesApplyReloadRestartAndRollback(t *testing.T) {

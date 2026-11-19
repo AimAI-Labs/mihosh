@@ -542,11 +542,15 @@ func isSpaceByte(c byte) bool {
 // 值为 true 表示该规则带有 no-resolve。
 // 配置文件不可读或解析失败时返回空 map（不报错，避免阻塞 UI）。
 func ParseRulesNoResolve(configPath string) map[string]bool {
-	result := make(map[string]bool)
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return result
+		return map[string]bool{}
 	}
+	return ParseRulesNoResolveYAML(data)
+}
+
+func ParseRulesNoResolveYAML(data []byte) map[string]bool {
+	result := make(map[string]bool)
 	if len(bytesTrimSpace(data)) == 0 {
 		return result
 	}

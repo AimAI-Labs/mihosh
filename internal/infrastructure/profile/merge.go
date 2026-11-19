@@ -17,6 +17,7 @@ package profile
 // 注释安全：基于 yaml.Node 操作，序列化用 2 空格缩进（见 generate.go）。
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -59,6 +60,10 @@ func classifyMergeKey(key string) (mergeKind, string) {
 // raw / merge 都应是 YAML 文档的顶层 mapping 节点；若传入 DocumentNode 会自动取首个 mapping。
 // 两者为空时返回空 mapping。
 func ApplyMerge(raw, merge *yaml.Node) (*yaml.Node, error) {
+	return applyMerge(raw, merge, true)
+}
+
+func applyMerge(raw, merge *yaml.Node, applyRuleEdits bool) (*yaml.Node, error) {
 	rawRoot := topLevelMapping(raw)
 	mergeRoot := topLevelMapping(merge)
 
@@ -72,12 +77,21 @@ func ApplyMerge(raw, merge *yaml.Node) (*yaml.Node, error) {
 		return result, nil
 	}
 
+	var ruleEdits []RuleEdit
 	// merge 的键值成对出现。
 	for i := 0; i+1 < len(mergeRoot.Content); i += 2 {
 		keyNode := mergeRoot.Content[i]
 		valNode := mergeRoot.Content[i+1]
 		if keyNode.Kind != yaml.ScalarNode {
 			// 非 scalar 键（极少见）跳过，避免破坏结构。
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(keyNode.Value), ruleEditsKey) {
+			if applyRuleEdits {
+				if err := valNode.Decode(&ruleEdits); err != nil {
+					return nil, fmt.Errorf("invalid %s: %w", ruleEditsKey, err)
+				}
+			}
 			continue
 		}
 		kind, targetKey := classifyMergeKey(keyNode.Value)
@@ -96,6 +110,12 @@ func ApplyMerge(raw, merge *yaml.Node) (*yaml.Node, error) {
 		}
 	}
 
+	for _, edit := range ruleEdits {
+		// The same merge file is used for all subscriptions. Other sources may not contain the target.
+		if err := applyRuleEdit(result, edit); err != nil && !errors.Is(err, ErrRuleEditTarget) {
+			return nil, err
+		}
+	}
 	return result, nil
 }
 

@@ -407,6 +407,9 @@
   "rules.edit_proxy_hint": "策略来自源配置文件；↵ 打开选择器",
   "rules.edit_proxy_change": "(↵ 改)",
   "rules.edit_toast": "已修改规则并重载核心",
+  "rules.write.saved": "规则变更已保存到 merge.yaml",
+  "rules.write.not_found": "当前配置中没有找到这条规则，请刷新列表后重试",
+  "rules.write.remote_needs_subscription": "修改远程内核的规则前，请先激活一个订阅",
 
   "settings.panel_title": "配置项",
   "settings.sys_status.panel_title": "Mihomo 服务状态 (systemctl)",

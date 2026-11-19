@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 
@@ -43,15 +44,10 @@ func (s State) handleAddFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		submit := form
 		s.showAddForm = false
 		s.addForm = newAddForm(s.configPath)
-		cmd := AddRuleCmd(
-			s.configPath,
-			submit.currentType(),
-			submit.fields[addFieldPayload].Value(),
-			submit.currentProxy(),
-			submit.resolveIndex(),
-			submit.noResolve,
-		)
-		return s, cmd
+		return s, s.applyRuleEdit("rules.added_toast", profile.RuleEdit{
+			Rule:  buildRuleLine(submit.currentType(), submit.fields[addFieldPayload].Value(), submit.currentProxy(), submit.noResolve),
+			Index: submit.resolveIndex(),
+		})
 
 	case msg.String() == "tab":
 		form.cycleField(1)
@@ -125,7 +121,7 @@ func (s State) handleAddFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 
 // handleEditFormMode 处理编辑规则弹窗按键（吞掉所有按键）。
 // 逻辑与 handleAddFormMode 完全相同（复用 addForm），仅在提交时：
-//   - 调用 EditRuleCmd（ReplaceRule：删旧+插新）而非 AddRuleCmd。
+//   - 提交时记录原始匹配项和新规则。
 func (s State) handleEditFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	form := s.addForm
 
@@ -160,19 +156,12 @@ func (s State) handleEditFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		s.showEditForm = false
 		s.addForm = addForm{}
 		s.editOriginIndex = 0
-		cmd := EditRuleCmd(
-			s.configPath,
-			submit.editOrigin.ruleType,
-			submit.editOrigin.payload,
-			submit.editOrigin.proxy,
-			submit.editOrigin.noResolve,
-			submit.currentType(),
-			submit.fields[addFieldPayload].Value(),
-			submit.currentProxy(),
-			submit.resolveIndex(),
-			submit.noResolve,
-		)
-		return s, cmd
+		original := submit.editOrigin
+		return s, s.applyRuleEdit("rules.edit_toast", profile.RuleEdit{
+			Match: originalRuleLine(original.ruleType, original.payload, original.proxy, original.noResolve),
+			Rule:  buildRuleLine(submit.currentType(), submit.fields[addFieldPayload].Value(), submit.currentProxy(), submit.noResolve),
+			Index: submit.resolveIndex(),
+		})
 
 	case msg.String() == "tab":
 		form.cycleField(1)
@@ -253,57 +242,17 @@ func (s State) openEditFormForIndex(origIdx int) (State, tea.Cmd) {
 	if origIdx < 0 || origIdx >= len(s.rules) {
 		return s, nil
 	}
-	form := newEditForm(s.configPath, s.rules[origIdx], origIdx)
-	return State{
-		rules:               s.rules,
-		filteredRuleIndices: s.filteredRuleIndices,
-		ruleFilter:          s.ruleFilter,
-		ruleFilterMode:      s.ruleFilterMode,
-		FilterEngine:        s.FilterEngine,
-		selectedRule:        s.selectedRule,
-		ruleScrollTop:       s.ruleScrollTop,
-		showTypeFilter:      s.showTypeFilter,
-		selectedTypes:       s.selectedTypes,
-		availableTypes:      s.availableTypes,
-		typeFilterCursor:    s.typeFilterCursor,
-		showAddForm:         false,
-		addForm:             form,
-		configPath:          s.configPath,
-		showDeleteConfirm:   false,
-		deleteTarget:        model.Rule{},
-		deleteTargetIndex:   0,
-		showEditForm:        true,
-		editOriginIndex:     origIdx,
-		ColorAdjustLight:    s.ColorAdjustLight,
-		ColorAdjustDark:     s.ColorAdjustDark,
-	}, nil
+	s.addForm = newEditForm(s.configPath, s.rules[origIdx], origIdx)
+	s.showAddForm, s.showDeleteConfirm = false, false
+	s.deleteTarget, s.deleteTargetIndex = model.Rule{}, 0
+	s.showEditForm, s.editOriginIndex = true, origIdx
+	return s, nil
 }
 
 // applyEditFormUpdate 将更新后的 addForm 应用到 State，保留其他字段不变。
 func (s State) applyEditFormUpdate(form addForm) (State, tea.Cmd) {
-	return State{
-		rules:               s.rules,
-		filteredRuleIndices: s.filteredRuleIndices,
-		ruleFilter:          s.ruleFilter,
-		ruleFilterMode:      s.ruleFilterMode,
-		FilterEngine:        s.FilterEngine,
-		selectedRule:        s.selectedRule,
-		ruleScrollTop:       s.ruleScrollTop,
-		showTypeFilter:      s.showTypeFilter,
-		selectedTypes:       s.selectedTypes,
-		availableTypes:      s.availableTypes,
-		typeFilterCursor:    s.typeFilterCursor,
-		showAddForm:         s.showAddForm,
-		addForm:             form,
-		configPath:          s.configPath,
-		showDeleteConfirm:   s.showDeleteConfirm,
-		deleteTarget:        s.deleteTarget,
-		deleteTargetIndex:   s.deleteTargetIndex,
-		showEditForm:        s.showEditForm,
-		editOriginIndex:     s.editOriginIndex,
-		ColorAdjustLight:    s.ColorAdjustLight,
-		ColorAdjustDark:     s.ColorAdjustDark,
-	}, nil
+	s.addForm = form
+	return s, nil
 }
 
 // handleProxyPickerMode 处理策略选择二级弹窗按键（吞掉所有键）。

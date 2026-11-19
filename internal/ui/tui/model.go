@@ -26,8 +26,8 @@ import (
 
 // newRulesState 构造规则页面初始状态，并注入当前 Mihomo 配置文件路径。
 // 路径解析失败时静默留空（用户尝试添加规则时会得到明确错误）。
-func newRulesState() rules.State {
-	s := rules.State{}
+func newRulesState(client *api.Client, configSvc *service.ConfigService, coreSvc *service.CoreService) rules.State {
+	s := rules.NewState(client, configSvc, coreSvc)
 	if path, err := config.GetMihomoConfigPathForWrite(); err == nil {
 		s = s.SetConfigPath(path)
 	}
@@ -150,7 +150,7 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 		nodesState:           nodes.NewState(client, testURL, timeout),
 		connsState:           connections.NewState(config.MixedPortToProxyURL(endpoint.MixedPort), model.DefaultSiteTests(), client, timeout, chartData),
 		logsState:            logs.NewState(ipResolver),
-		rulesState:           newRulesState(),
+		rulesState:           newRulesState(client, configSvc, coreSvc),
 		subState:             sub.NewState(profileSvc),
 		settingsState:        settings.NewState(configSvc, client),
 		autoRefreshRemaining: cfg.AutoRefreshInterval,
