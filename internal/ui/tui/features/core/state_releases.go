@@ -132,15 +132,12 @@ func (s State) loadReleasePage(page int) (State, tea.Cmd) {
 
 func (s State) openTab(tab int) (State, tea.Cmd) {
 	s = s.selectTab(tab)
-	if s.tab == 1 {
+	if s.isDownloadsPage() {
 		if !s.catalog.loaded {
 			s.catalog.forceRefresh = false
 			next, cmd := s.loadReleasePage(1)
 			return next, tea.Batch(cmd, next.Refresh())
 		}
-	}
-	if s.tab == 3 {
-		return s, s.refreshGeoData()
 	}
 	if s.tab == 4 {
 		return s, s.editor.Refresh()

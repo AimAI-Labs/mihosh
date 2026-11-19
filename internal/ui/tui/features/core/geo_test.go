@@ -10,6 +10,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -33,11 +34,21 @@ func TestGeoManagementLoadsFilesAndQueuesSelectedUpdate(t *testing.T) {
 	defer svc.Close()
 	s := NewState(svc, nil, nil)
 	s.Status.Mode = "managed"
+	initial, initialCmd := s.Update(coreKey("4"))
+	defer initial.Close()
+	if !initial.Busy || initial.task != "releases" || initialCmd == nil {
+		t.Fatal("opening Downloads with GEO focus did not request the version catalogue")
+	}
+	s.catalog.loaded = true
 	s, cmd := s.Update(coreKey("4"))
 	if s.tab != 3 || cmd == nil || s.Busy {
 		t.Fatal("GEO tab did not load without starting a download")
 	}
-	s, _ = s.Update(cmd())
+	for _, child := range cmd().(tea.BatchMsg) {
+		if msg, ok := child().(messages.CoreGeoDataMsg); ok {
+			s, _ = s.Update(msg)
+		}
+	}
 	if len(s.geoFiles) != 4 || !s.geoFiles[0].Exists || s.geoFiles[0].Size != 8 || s.geoFiles[1].Exists || s.geoErr != nil {
 		t.Fatalf("incorrect file status: %+v, %v", s.geoFiles, s.geoErr)
 	}
