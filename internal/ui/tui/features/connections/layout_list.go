@@ -24,7 +24,7 @@ type connectionListLayout struct {
 }
 
 func layoutConnectionList(state PageState) connectionListLayout {
-	parts := []string{RenderConnModeSwitchComponent(state.ViewMode, state.Width, state.InlineMode), ""}
+	parts := []string{RenderConnModeSwitchComponent(state.ViewMode, state.Width, state.InlineMode, state.Paused, state.PausedUpdates), ""}
 	filterLine := ""
 	if state.FilterMode {
 		filterLine = state.FilterInput

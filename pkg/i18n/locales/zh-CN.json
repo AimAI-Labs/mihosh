@@ -371,6 +371,12 @@
   "conns.topn_modal_more_down": "↓ 还有 %d 项",
 
   "logs.stats": "共 %d 条日志 (级别: %s)",
+  "logs.paused_badge": "已暂停",
+  "logs.paused_badge_new": "已暂停 (+%d)",
+  "logs.pause_btn": "暂停",
+  "conns.paused_badge": "已暂停",
+  "conns.paused_badge_new": "已暂停 (+%d)",
+  "conns.pause_btn": "暂停",
   "logs.search": "搜索: ",
   "logs.empty": "暂无日志",
   "logs.detail.title": "日志详情",
@@ -558,6 +564,9 @@
   "help.conns.hint_close": "关闭",
   "help.conns.hint_close_all": "全关",
   "help.conns.hint_search": "搜索",
+  "help.conns.hint_pause": "暂停",
+  "help.conns.hint_resume": "恢复",
+  "help.conns.pause": "暂停 / 恢复实时刷新",
 
   "help.section.conns_detail": "连接详情",
   "help.conns_detail.scroll": "滚动",
@@ -620,6 +629,9 @@
   "help.logs.hint_scroll": "横滚",
   "help.logs.hint_search": "搜索",
   "help.logs.hint_clear": "清空",
+  "help.logs.hint_pause": "暂停",
+  "help.logs.hint_resume": "恢复",
+  "help.logs.pause": "暂停 / 恢复实时刷新",
 
   "help.section.rules_type_filter": "类型筛选",
   "help.rules_filter.select": "选择",

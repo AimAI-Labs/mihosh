@@ -24,6 +24,9 @@ type State struct {
 	logCount int // 已写入总数（上限 LogsCap）
 
 	cachedLogs     []model.LogEntry // 缓存的日志列表，避免每帧分配
+	paused         bool
+	frozenLogs     []model.LogEntry // 暂停期间冻结的可见快照（独立拷贝）
+	pausedNewCount int
 	coreLogCursor  uint64
 	coreLogPending string
 
@@ -73,8 +76,35 @@ func (s State) DetailMode() bool { return s.detailMode }
 // FilterMode 返回是否处于过滤模式
 func (s State) FilterMode() bool { return s.logFilterMode }
 
-// Logs 返回日志列表（最新在前，用于渲染）
+// Paused 返回是否处于暂停实时刷新状态
+func (s State) Paused() bool { return s.paused }
+
+// TogglePause 切换日志页实时刷新暂停状态（暂停时复制快照，后台继续写入 Ring Buffer）
+func (s State) TogglePause() State {
+	if !s.paused {
+		s.paused = true
+		s.pausedNewCount = 0
+		s.frozenLogs = append([]model.LogEntry(nil), s.cachedLogs...)
+		return s
+	}
+	s.paused = false
+	s.frozenLogs = nil
+	s.pausedNewCount = 0
+	s.updateFilteredLogs()
+	if s.selectedLog >= len(s.filteredLogIndices) {
+		s.selectedLog = max(0, len(s.filteredLogIndices)-1)
+	}
+	if s.logScrollTop > s.selectedLog {
+		s.logScrollTop = s.selectedLog
+	}
+	return s
+}
+
+// Logs 返回日志列表（最新在前，暂停时返回冻结快照）
 func (s State) Logs() []model.LogEntry {
+	if s.paused {
+		return s.frozenLogs
+	}
 	return s.cachedLogs
 }
 
@@ -109,7 +139,11 @@ func (s State) AppendLog(logType, payload string) State {
 		s.logCount++
 	}
 	s.rebuildCachedLogs()
-	s.updateFilteredLogs()
+	if s.paused {
+		s.pausedNewCount++
+	} else {
+		s.updateFilteredLogs()
+	}
 	return s
 }
 
@@ -117,6 +151,8 @@ func (s State) ClearLogs() State {
 	s.coreLogPending = ""
 	s.logHead = 0
 	s.logCount = 0
+	s.frozenLogs = nil
+	s.pausedNewCount = 0
 	s.filteredLogIndices = s.filteredLogIndices[:0] // 保留底层数组，避免重新分配
 	s.selectedLog = 0
 	s.logScrollTop = 0
@@ -127,7 +163,7 @@ func (s State) ClearLogs() State {
 // GetSysLogs 返回用于系统状态展示的最近日志（过滤掉 debug 等级，限制最多 50 条）
 func (s State) GetSysLogs() []model.LogEntry {
 	var infoLogs []model.LogEntry
-	allLogs := s.Logs()
+	allLogs := s.cachedLogs
 	for _, l := range allLogs {
 		if l.Type != "debug" {
 			infoLogs = append(infoLogs, l)
@@ -158,6 +194,8 @@ func (s State) ToPageState(width, height int) PageState {
 		DetailResolved:      s.detailResolved,
 		DetailSourcePrivate: s.detailSourcePrivate,
 		DetailScroll:        s.detailScroll,
+		Paused:              s.paused,
+		PausedNewCount:      s.pausedNewCount,
 	}
 }
 
@@ -240,6 +278,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 
 		case msg.String() == "/":
 			s.logFilterMode = true
+
+		case msg.String() == "p", msg.String() == " ":
+			s = s.TogglePause()
 
 		case key.Matches(msg, common.Keys.Clear):
 			s = s.ClearLogs()
@@ -341,10 +382,14 @@ func (s State) HandleMouseLeft(pageY int, pageX int, pageWidth int) (State, tea.
 	if s.logFilterMode {
 		return s, nil
 	}
-	// 点击级别栏（带边框，占据 Y=0 到 Y=2）切换日志级别
+	// 点击级别栏（带边框，占据 Y=0 到 Y=2）切换日志级别或暂停/恢复
 	if pageY >= 0 && pageY < logsModeSwitchHeight {
 		// 只检测中间行（Y=1）的按钮点击
 		if pageY == 1 {
+			if ClickedPause(pageX, pageWidth, s.logLevel, s.paused, s.pausedNewCount) {
+				s = s.TogglePause()
+				return s, nil
+			}
 			clickedLevel := ClickedLevel(pageX, pageWidth, s.logLevel)
 			if clickedLevel >= 0 && clickedLevel != s.logLevel {
 				s.logLevel = clickedLevel

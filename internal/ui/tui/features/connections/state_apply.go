@@ -49,6 +49,9 @@ func (s State) ApplyWSConnections(data api.ConnectionsData) State {
 	}
 	s.PrevConnIDs = currentIDs
 	s.Connections = ConvertToConnectionsResponse(data)
+	if s.paused {
+		s.pausedUpdates++
+	}
 	return s
 }
 
@@ -56,6 +59,9 @@ func (s State) ApplyWSConnections(data api.ConnectionsData) State {
 func (s State) ApplyConnections(resp *model.ConnectionsResponse) State {
 	s.connGen++
 	s.Connections = resp
+	if s.paused {
+		s.pausedUpdates++
+	}
 	return s
 }
 

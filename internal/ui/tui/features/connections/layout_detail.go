@@ -12,7 +12,7 @@ type connectionDetailLayout struct {
 }
 
 func layoutConnectionDetail(state PageState) connectionDetailLayout {
-	modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width, state.InlineMode)
+	modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width, state.InlineMode, state.Paused, state.PausedUpdates)
 	layout := connectionDetailLayout{detailY: lipgloss.Height(modeSwitch) + 1}
 	// Leave a row beneath the panels for the inline help.
 	height := max(5, state.Height-layout.detailY-1)

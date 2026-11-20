@@ -371,6 +371,12 @@
   "conns.topn_modal_more_down": "↓ %d more items",
 
   "logs.stats": "Total %d logs (level: %s)",
+  "logs.paused_badge": "PAUSED",
+  "logs.paused_badge_new": "PAUSED (+%d)",
+  "logs.pause_btn": "Pause",
+  "conns.paused_badge": "PAUSED",
+  "conns.paused_badge_new": "PAUSED (+%d)",
+  "conns.pause_btn": "Pause",
   "logs.search": "Search: ",
   "logs.empty": "No logs",
   "logs.detail.title": "Log Details",
@@ -558,6 +564,9 @@
   "help.conns.hint_close": "Close",
   "help.conns.hint_close_all": "Close All",
   "help.conns.hint_search": "Search",
+  "help.conns.hint_pause": "Pause",
+  "help.conns.hint_resume": "Resume",
+  "help.conns.pause": "Pause / Resume live updates",
 
   "help.section.conns_detail": "Connection Details",
   "help.conns_detail.scroll": "Scroll",
@@ -620,6 +629,9 @@
   "help.logs.hint_scroll": "Scroll",
   "help.logs.hint_search": "Search",
   "help.logs.hint_clear": "Clear",
+  "help.logs.hint_pause": "Pause",
+  "help.logs.hint_resume": "Resume",
+  "help.logs.pause": "Pause / Resume live updates",
 
   "help.section.rules_type_filter": "Type Filter",
   "help.rules_filter.select": "Select",

@@ -105,6 +105,12 @@ func (s State) HandleMouseLeft(
 		s.setConnViewMode(ConnViewHistory)
 		return s, nil
 
+	case MouseTargetPauseToggle:
+		if s.connViewMode == ConnViewActive || s.connViewMode == ConnViewHistory {
+			s = s.TogglePause()
+		}
+		return s, nil
+
 	case MouseTargetInlineToggle:
 		if s.connViewMode == ConnViewActive || s.connViewMode == ConnViewHistory {
 			s.inlineDetailMode = !s.inlineDetailMode

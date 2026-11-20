@@ -42,6 +42,8 @@ type PageState struct {
 	InlineMode      bool // 是否开启内联详情模式
 	InlineFocused   bool // 内联详情是否获取焦点
 	InlineScroll    int  // 内联详情滚动偏移
+	Paused          bool // 是否暂停实时刷新
+	PausedUpdates   int  // 暂停期间收到的后台更新次数
 	Unlock          unlockView
 }
 
@@ -59,7 +61,7 @@ func RenderConnectionsPage(state PageState) string {
 
 	var page string
 	if state.ViewMode == ConnViewTraffic {
-		modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width, state.InlineMode)
+		modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width, state.InlineMode, state.Paused, state.PausedUpdates)
 		page = renderTrafficTab(state, []string{modeSwitch, ""})
 	} else {
 		page = renderConnectionListTab(state)

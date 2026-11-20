@@ -13,12 +13,13 @@ func (s State) filteredConnCount() int {
 	}
 	var conns []model.Connection
 	if s.connViewMode == ConnViewActive {
-		if s.Connections == nil {
+		visible := s.visibleConnections()
+		if visible == nil {
 			return 0
 		}
-		conns = s.Connections.Connections
+		conns = visible.Connections
 	} else {
-		conns = s.ClosedConnections()
+		conns = s.visibleClosedConnections()
 	}
 	if s.filterList.FilterValue() == "" {
 		return len(conns)

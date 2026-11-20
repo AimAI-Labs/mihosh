@@ -35,6 +35,12 @@ type State struct {
 	closedCount       int                // 已写入的总条数（上限 ClosedConnCap）
 	cachedClosedConns []model.Connection // 缓存的已关闭连接列表
 
+	// 暂停实时刷新：冻结可见快照（独立拷贝），后台 WS 继续更新实时状态
+	paused            bool
+	frozenConnections *model.ConnectionsResponse
+	frozenClosedConns []model.Connection
+	pausedUpdates     int
+
 	filterList              common.FilterList
 	connDetailMode          bool
 	connDetailSnapshot      *model.Connection
@@ -100,6 +106,62 @@ func (s State) ClosedConnections() []model.Connection {
 	return s.cachedClosedConns
 }
 
+// Paused 返回是否处于暂停实时刷新状态
+func (s State) Paused() bool { return s.paused }
+
+func cloneConnectionsResponse(resp *model.ConnectionsResponse) *model.ConnectionsResponse {
+	if resp == nil {
+		return nil
+	}
+	cp := *resp
+	cp.Connections = append([]model.Connection(nil), resp.Connections...)
+	return &cp
+}
+
+func (s State) visibleConnections() *model.ConnectionsResponse {
+	if s.paused {
+		return s.frozenConnections
+	}
+	return s.Connections
+}
+
+func (s State) visibleClosedConnections() []model.Connection {
+	if s.paused {
+		return s.frozenClosedConns
+	}
+	return s.cachedClosedConns
+}
+
+// TogglePause 切换连接列表实时刷新暂停状态（冻结时复制快照，后台继续接收 WS）
+func (s State) TogglePause() State {
+	if !s.paused {
+		s.paused = true
+		s.pausedUpdates = 0
+		s.frozenConnections = cloneConnectionsResponse(s.Connections)
+		s.frozenClosedConns = append([]model.Connection(nil), s.cachedClosedConns...)
+		return s
+	}
+	s.paused = false
+	s.frozenConnections = nil
+	s.frozenClosedConns = nil
+	s.pausedUpdates = 0
+	s.filterList.SetItemCount(s.filteredConnCount())
+	return s
+}
+
+func (s *State) removeFrozenConnection(id string) {
+	if !s.paused || s.frozenConnections == nil || id == "" {
+		return
+	}
+	conns := s.frozenConnections.Connections
+	for i := range conns {
+		if conns[i].ID == id {
+			s.frozenConnections.Connections = append(conns[:i], conns[i+1:]...)
+			return
+		}
+	}
+}
+
 // rebuildCachedClosedConns 重建历史连接列表缓存
 func (s *State) rebuildCachedClosedConns() {
 	if s.closedCount == 0 {
@@ -156,7 +218,7 @@ func (s State) ToPageState(chartData *model.ChartData, width, height int) PageSt
 	}
 
 	return PageState{
-		Connections:        s.Connections,
+		Connections:        s.visibleConnections(),
 		Width:              width,
 		Height:             height,
 		SelectedIndex:      s.filterList.Cursor,
@@ -172,7 +234,7 @@ func (s State) ToPageState(chartData *model.ChartData, width, height int) PageSt
 		DetailFocusPanel:   s.connDetailFocusPanel,
 		ChartData:          chartData,
 		ViewMode:           s.connViewMode,
-		ClosedConnections:  s.ClosedConnections(),
+		ClosedConnections:  s.visibleClosedConnections(),
 		SiteTests:          s.siteTests,
 		SelectedSiteTest:   s.selectedSiteTest,
 		TopNItems:          topNItems,
@@ -182,6 +244,8 @@ func (s State) ToPageState(chartData *model.ChartData, width, height int) PageSt
 		InlineMode:         s.inlineDetailMode,
 		InlineFocused:      s.inlineDetailFocused,
 		InlineScroll:       s.inlineDetailPanel.ScrollTop,
+		Paused:             s.paused,
+		PausedUpdates:      s.pausedUpdates,
 		Unlock:             s.unlock.unlockView,
 	}
 }
@@ -300,6 +364,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 
 		// 活跃/历史连接 tab：连接列表操作
 		switch {
+		case msg.String() == "p", msg.String() == " ":
+			s = s.TogglePause()
+
 		case msg.String() == "i":
 			if s.connViewMode == ConnViewActive || s.connViewMode == ConnViewHistory {
 				s.inlineDetailMode = !s.inlineDetailMode
@@ -330,8 +397,10 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			if s.connViewMode == ConnViewActive {
 				conn := s.selectedConnection()
 				if conn != nil {
+					id := conn.ID
+					s.removeFrozenConnection(id)
 					return s, tea.Batch(
-						CloseConnection(s.client, conn.ID),
+						CloseConnection(s.client, id),
 						FetchConnections(s.client),
 					)
 				}
@@ -390,12 +459,13 @@ func (s State) selectedConnection() *model.Connection {
 	}
 	var conns []model.Connection
 	if s.connViewMode == ConnViewActive {
-		if s.Connections == nil || len(s.Connections.Connections) == 0 {
+		visible := s.visibleConnections()
+		if visible == nil || len(visible.Connections) == 0 {
 			return nil
 		}
-		conns = s.Connections.Connections
+		conns = visible.Connections
 	} else {
-		closed := s.ClosedConnections()
+		closed := s.visibleClosedConnections()
 		if len(closed) == 0 {
 			return nil
 		}

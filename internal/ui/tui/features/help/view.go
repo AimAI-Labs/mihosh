@@ -264,6 +264,7 @@ func buildConnectionsSections(ctx HelpContext) []section {
 			bindings: []keybinding{
 				{"↑/↓  k/j", i18n.T("help.conns_active.select")},
 				{"↵", i18n.T("help.conns_active.detail")},
+				{"p / Space", i18n.T("help.conns.pause")},
 				{"x", i18n.T("help.conns_active.close_conn")},
 				{"X", i18n.T("help.conns_active.close_all")},
 				{"/", i18n.T("help.conns_active.search")},
@@ -279,6 +280,7 @@ func buildConnectionsSections(ctx HelpContext) []section {
 			bindings: []keybinding{
 				{"↑/↓  k/j", i18n.T("help.conns_history.select")},
 				{"↵", i18n.T("help.conns_history.detail")},
+				{"p / Space", i18n.T("help.conns.pause")},
 				{"/", i18n.T("help.conns_history.search")},
 				{"h", i18n.T("help.conns_history.switch")},
 				{"Esc", i18n.T("help.conns_history.clear")},
@@ -321,6 +323,7 @@ func buildLogsSections(ctx HelpContext) []section {
 			{"↵", i18n.T("help.logs.detail")},
 			{"[ / ]", i18n.T("help.logs.level_down")},
 			{"←/→  h/l", i18n.T("help.logs.scroll")},
+			{"p / Space", i18n.T("help.logs.pause")},
 			{"/", i18n.T("help.logs.search")},
 			{"c", i18n.T("help.logs.clear")},
 			{"Esc", i18n.T("help.logs.clear_search")},

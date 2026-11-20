@@ -63,13 +63,15 @@ type PageState struct {
 	DetailResolved      *model.ResolvedIP
 	DetailSourcePrivate bool
 	DetailScroll        int
+	Paused              bool
+	PausedNewCount      int
 }
 
 func RenderLogsPage(state PageState) string {
 	var sections []string
 
 	// 渲染日志级别标签栏
-	levelBar := renderLevelBar(state.LogLevel, state.Width)
+	levelBar := renderLevelBar(state.LogLevel, state.Width, state.Paused, state.PausedNewCount)
 	sections = append(sections, levelBar)
 	sections = append(sections, "")
 
@@ -87,8 +89,20 @@ func RenderLogsPage(state PageState) string {
 	}
 
 	// 渲染统计信息
-	stats := i18n.Tf("logs.stats", len(filteredLogs), logLevels[state.LogLevel])
-	sections = append(sections, common.MutedStyle().Render(stats))
+	stats := common.MutedStyle().Render(i18n.Tf("logs.stats", len(filteredLogs), logLevels[state.LogLevel]))
+	if state.Paused {
+		badgeText := i18n.T("logs.paused_badge")
+		if state.PausedNewCount > 0 {
+			badgeText = i18n.Tf("logs.paused_badge_new", state.PausedNewCount)
+		}
+		badge := lipgloss.NewStyle().
+			Foreground(theme.Resolve(theme.Current().Background)).
+			Background(theme.Resolve(theme.Current().Warning)).
+			Bold(true).
+			Render(" ⏸ " + badgeText + " ")
+		stats += "  " + badge
+	}
+	sections = append(sections, stats)
 	sections = append(sections, "")
 
 	// 计算可显示的日志行数 (级别栏 + 搜索框 + 统计 + 间隔)
@@ -149,11 +163,16 @@ func buildLogsInlineHelpHints(state PageState) []common.InlineHelpHint {
 	}
 
 	// 普通模式：核心操作
+	pauseHint := common.InlineHelpHint{Key: "p", Desc: i18n.T("help.logs.hint_pause")}
+	if state.Paused {
+		pauseHint = common.InlineHelpHint{Key: "p", Desc: i18n.T("help.logs.hint_resume"), Tone: common.InlineHelpToneWarning}
+	}
 	return []common.InlineHelpHint{
 		{Key: "↑↓", Desc: i18n.T("help.logs.hint_select")},
 		{Key: "↵", Desc: i18n.T("help.logs.hint_detail")},
 		{Key: "[/]", Desc: i18n.T("help.logs.hint_level")},
 		{Key: "←→", Desc: i18n.T("help.logs.hint_scroll")},
+		pauseHint,
 		{Key: "/", Desc: i18n.T("help.logs.hint_search")},
 		{Key: "c", Desc: i18n.T("help.logs.hint_clear"), Tone: common.InlineHelpToneDanger},
 		{Key: "?", Desc: i18n.T("core.inline.help")},
@@ -176,8 +195,32 @@ func renderLogsInlineHelp(page string, state PageState) string {
 	return common.OverlayHelpAtBottomRight(page, body, state.Width, state.Height)
 }
 
-// renderLevelBar 渲染日志级别标签栏（带边框）
-func renderLevelBar(selectedLevel int, width int) string {
+func logPauseLabel(paused bool, pausedNewCount int) string {
+	if paused {
+		if pausedNewCount > 0 {
+			return " ⏸ " + i18n.Tf("logs.paused_badge_new", pausedNewCount) + " "
+		}
+		return " ⏸ " + i18n.T("logs.paused_badge") + " "
+	}
+	return " ⏸ " + i18n.T("logs.pause_btn") + " "
+}
+
+func renderLogPausePill(paused bool, pausedNewCount int) string {
+	label := logPauseLabel(paused, pausedNewCount)
+	if paused {
+		return lipgloss.NewStyle().
+			Background(theme.Resolve(theme.Current().Warning)).
+			Foreground(theme.Resolve(theme.Current().Background)).
+			Bold(true).
+			Render(label)
+	}
+	return lipgloss.NewStyle().
+		Foreground(common.TokyoMuted()).
+		Render(label)
+}
+
+// renderLevelBar 渲染日志级别标签栏（带边框，右侧含暂停/恢复状态按钮）
+func renderLevelBar(selectedLevel int, width int, paused bool, pausedNewCount int) string {
 	// 渲染原始的级别标签
 	var tabs []string
 	for i, level := range logLevels {
@@ -191,9 +234,14 @@ func renderLevelBar(selectedLevel int, width int) string {
 		innerWidth = 1
 	}
 
-	// 填充内容到指定宽度
+	pausePill := renderLogPausePill(paused, pausedNewCount)
+	pauseWidth := lipgloss.Width(pausePill)
+
+	// 填充内容到指定宽度（空间足够时右侧展示暂停/恢复按钮）
 	contentWidth := lipgloss.Width(content)
-	if contentWidth < innerWidth {
+	if contentWidth+1+pauseWidth <= innerWidth {
+		content += strings.Repeat(" ", innerWidth-contentWidth-pauseWidth) + pausePill
+	} else if contentWidth < innerWidth {
 		content += strings.Repeat(" ", innerWidth-contentWidth)
 	} else {
 		content = ansi.Truncate(content, innerWidth, "")
@@ -234,6 +282,24 @@ func resolveLogLevelTabStyle(level string, active bool) logLevelTabStyle {
 		}
 	}
 	return style
+}
+
+// ClickedPause 判断是否点击了级别栏右侧的暂停/恢复按钮
+func ClickedPause(pageX, pageWidth, selectedLevel int, paused bool, pausedNewCount int) bool {
+	innerWidth := pageWidth - 2
+	if innerWidth < 1 || pageX < 1 || pageX >= pageWidth-1 {
+		return false
+	}
+	leftWidth := 0
+	for i, level := range logLevels {
+		leftWidth += lipgloss.Width(renderLogLevelTab(level, i == selectedLevel))
+	}
+	pauseWidth := lipgloss.Width(logPauseLabel(paused, pausedNewCount))
+	if leftWidth+1+pauseWidth > innerWidth {
+		return false
+	}
+	startX := 1 + innerWidth - pauseWidth
+	return pageX >= startX && pageX < startX+pauseWidth
 }
 
 // ClickedLevel 根据点击的 X 坐标返回对应的级别索引，未点击级别栏返回 -1

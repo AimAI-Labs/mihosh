@@ -35,6 +35,7 @@ const (
 	MouseTargetTopNModalItem
 	MouseTargetInlineToggle
 	MouseTargetInlineDetail
+	MouseTargetPauseToggle
 )
 
 // MouseHit 是 connections 页面鼠标命中结果
@@ -165,9 +166,19 @@ func resolveViewModeHit(state PageState, pageX, pageY int) (MouseHit, bool) {
 				if innerWidth < 1 {
 					innerWidth = 1
 				}
+				leftWidth := x - 1
 				toggleStartX := 1 + innerWidth - toggleWidth
-				if pageX >= toggleStartX && pageX < toggleStartX+toggleWidth {
-					return MouseHit{Target: MouseTargetInlineToggle, Index: -1}, true
+				if leftWidth+toggleWidth <= innerWidth {
+					if pageX >= toggleStartX && pageX < toggleStartX+toggleWidth {
+						return MouseHit{Target: MouseTargetInlineToggle, Index: -1}, true
+					}
+					pauseWidth := lipgloss.Width(connPauseLabel(state.Paused, state.PausedUpdates))
+					if leftWidth+pauseWidth+1+toggleWidth <= innerWidth {
+						pauseStartX := toggleStartX - 1 - pauseWidth
+						if pageX >= pauseStartX && pageX < pauseStartX+pauseWidth {
+							return MouseHit{Target: MouseTargetPauseToggle, Index: -1}, true
+						}
+					}
 				}
 			}
 		}
@@ -177,8 +188,30 @@ func resolveViewModeHit(state PageState, pageX, pageY int) (MouseHit, bool) {
 	return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}, false
 }
 
+func connPauseLabel(paused bool, pausedUpdates int) string {
+	if paused {
+		if pausedUpdates > 0 {
+			return " ⏸ " + i18n.Tf("conns.paused_badge_new", pausedUpdates) + " "
+		}
+		return " ⏸ " + i18n.T("conns.paused_badge") + " "
+	}
+	return " ⏸ " + i18n.T("conns.pause_btn") + " "
+}
+
 // RenderConnModeSwitchComponent 渲染连接页面模式切换按钮（带边框，与节点模式切换风格一致）
-func RenderConnModeSwitchComponent(viewMode int, width int, inlineMode bool) string {
+func RenderConnModeSwitchComponent(viewMode int, width int, inlineMode bool, pauseArgs ...any) string {
+	paused := false
+	pausedUpdates := 0
+	if len(pauseArgs) > 0 {
+		if v, ok := pauseArgs[0].(bool); ok {
+			paused = v
+		}
+	}
+	if len(pauseArgs) > 1 {
+		if v, ok := pauseArgs[1].(int); ok {
+			pausedUpdates = v
+		}
+	}
 	modes := []struct {
 		Label string
 		Value int
@@ -210,12 +243,25 @@ func RenderConnModeSwitchComponent(viewMode int, width int, inlineMode bool) str
 	}
 
 	var toggleStr string
+	var pauseStr string
 	if viewMode == ConnViewActive || viewMode == ConnViewHistory {
 		label := " Inline ◫ "
 		if inlineMode {
 			toggleStr = activeStyle.Render(label)
 		} else {
 			toggleStr = inactiveStyle.Render(label)
+		}
+		pauseLabel := connPauseLabel(paused, pausedUpdates)
+		if paused {
+			pauseStr = lipgloss.NewStyle().
+				Background(theme.Resolve(theme.Current().Warning)).
+				Foreground(theme.Resolve(theme.Current().Background)).
+				Bold(true).
+				Render(pauseLabel)
+		} else {
+			pauseStr = lipgloss.NewStyle().
+				Foreground(common.TokyoMuted()).
+				Render(pauseLabel)
 		}
 	}
 
@@ -227,10 +273,13 @@ func RenderConnModeSwitchComponent(viewMode int, width int, inlineMode bool) str
 		innerWidth = 1
 	}
 
-	// 填充内容到指定宽度，并将 toggleStr 放在最右侧
+	// 填充内容到指定宽度，并将 pauseStr + toggleStr 放在最右侧
 	contentWidth := lipgloss.Width(content)
 	toggleWidth := lipgloss.Width(toggleStr)
-	if contentWidth+toggleWidth <= innerWidth {
+	pauseWidth := lipgloss.Width(pauseStr)
+	if pauseWidth > 0 && contentWidth+pauseWidth+1+toggleWidth <= innerWidth {
+		content += strings.Repeat(" ", innerWidth-contentWidth-pauseWidth-1-toggleWidth) + pauseStr + " " + toggleStr
+	} else if contentWidth+toggleWidth <= innerWidth {
 		content += strings.Repeat(" ", innerWidth-contentWidth-toggleWidth) + toggleStr
 	}
 
@@ -380,9 +429,14 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		)
 
 	case ConnViewActive:
+		pauseHint := common.InlineHelpHint{Key: "p", Desc: i18n.T("help.conns.hint_pause")}
+		if state.Paused {
+			pauseHint = common.InlineHelpHint{Key: "p", Desc: i18n.T("help.conns.hint_resume"), Tone: common.InlineHelpToneWarning}
+		}
 		hints := []common.InlineHelpHint{
 			{Key: "↑↓", Desc: i18n.T("help.conns.hint_select")},
 			{Key: "↵", Desc: i18n.T("help.conns.hint_detail")},
+			pauseHint,
 			{Key: "i", Desc: i18n.T("help.conns.hint_inline")},
 			{Key: "x/X", Desc: i18n.T("help.conns.hint_close")},
 			{Key: "/", Desc: i18n.T("help.conns.hint_search")},
@@ -397,9 +451,14 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		return append(hints, unlock)
 
 	case ConnViewHistory:
+		pauseHint := common.InlineHelpHint{Key: "p", Desc: i18n.T("help.conns.hint_pause")}
+		if state.Paused {
+			pauseHint = common.InlineHelpHint{Key: "p", Desc: i18n.T("help.conns.hint_resume"), Tone: common.InlineHelpToneWarning}
+		}
 		hints := []common.InlineHelpHint{
 			{Key: "↑↓", Desc: i18n.T("help.conns.hint_select")},
 			{Key: "↵", Desc: i18n.T("help.conns.hint_detail")},
+			pauseHint,
 			{Key: "i", Desc: i18n.T("help.conns.hint_inline")},
 			{Key: "/", Desc: i18n.T("help.conns.hint_search")},
 			{Key: "h", Desc: i18n.T("help.conns.hint_switch")},
