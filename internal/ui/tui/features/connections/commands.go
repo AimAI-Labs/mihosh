@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
@@ -41,6 +42,52 @@ func CloseAllConnections(client *api.Client) tea.Cmd {
 			return messages.ErrMsg{Err: err}
 		}
 		return messages.AllConnectionsClosedMsg{}
+	}
+}
+
+// CloseConnectionsByIDs 按活跃连接 ID 批量关闭筛选命中的连接（限制并发为 model.TestConcurrency）
+func CloseConnectionsByIDs(client *api.Client, ids []string) tea.Cmd {
+	unique := make([]string, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		if id == "" {
+			continue
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	return func() tea.Msg {
+		if client == nil || len(unique) == 0 {
+			return messages.FilteredConnectionsClosedMsg{}
+		}
+		sem := make(chan struct{}, model.TestConcurrency)
+		var (
+			wg     sync.WaitGroup
+			mu     sync.Mutex
+			closed int
+			failed int
+		)
+		for _, id := range unique {
+			wg.Add(1)
+			go func(connID string) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				err := client.CloseConnection(connID)
+				mu.Lock()
+				if err != nil {
+					failed++
+				} else {
+					closed++
+				}
+				mu.Unlock()
+			}(id)
+		}
+		wg.Wait()
+		return messages.FilteredConnectionsClosedMsg{Closed: closed, Failed: failed}
 	}
 }
 

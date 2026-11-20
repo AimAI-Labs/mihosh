@@ -46,6 +46,11 @@ func (q ConnQuery) HasActiveFilter() bool {
 	return strings.TrimSpace(q.Text) != "" || q.Protocol != "" || q.Field != ConnFilterAll
 }
 
+// HasEffectiveFilter reports whether the query actually narrows the connection list.
+func (q ConnQuery) HasEffectiveFilter() bool {
+	return strings.TrimSpace(q.Text) != "" || q.Protocol != ""
+}
+
 func (q ConnQuery) HasActiveCriteria() bool {
 	return q.HasActiveFilter() || q.SortBy != ConnSortDefault
 }

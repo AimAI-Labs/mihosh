@@ -433,6 +433,10 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		if state.Paused {
 			pauseHint = common.InlineHelpHint{Key: "p", Desc: i18n.T("help.conns.hint_resume"), Tone: common.InlineHelpToneWarning}
 		}
+		closeHint := common.InlineHelpHint{Key: "x/X", Desc: i18n.T("help.conns.hint_close")}
+		if resolvePageQuery(state).HasEffectiveFilter() {
+			closeHint = common.InlineHelpHint{Key: "X", Desc: i18n.T("help.conns.hint_close_matched"), Tone: common.InlineHelpToneDanger}
+		}
 		hints := []common.InlineHelpHint{
 			{Key: "↑↓", Desc: i18n.T("help.conns.hint_select")},
 			{Key: "↵", Desc: i18n.T("help.conns.hint_detail")},
@@ -441,7 +445,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 			{Key: "t", Desc: i18n.T("help.conns.hint_proto"), Tone: common.InlineHelpToneInfo},
 			{Key: "f", Desc: i18n.T("help.conns.hint_field"), Tone: common.InlineHelpToneInfo},
 			{Key: "i", Desc: i18n.T("help.conns.hint_inline")},
-			{Key: "x/X", Desc: i18n.T("help.conns.hint_close")},
+			closeHint,
 			{Key: "/", Desc: i18n.T("help.conns.hint_search")},
 			{Key: "h", Desc: i18n.T("help.conns.hint_switch")},
 		}

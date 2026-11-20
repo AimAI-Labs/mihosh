@@ -10,6 +10,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -160,13 +161,24 @@ func (s *State) removeFrozenConnection(id string) {
 	if !s.paused || s.frozenConnections == nil || id == "" {
 		return
 	}
-	conns := s.frozenConnections.Connections
-	for i := range conns {
-		if conns[i].ID == id {
-			s.frozenConnections.Connections = append(conns[:i], conns[i+1:]...)
-			return
+	s.removeFrozenConnections([]string{id})
+}
+
+func (s *State) removeFrozenConnections(ids []string) {
+	if !s.paused || s.frozenConnections == nil || len(ids) == 0 {
+		return
+	}
+	drop := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		drop[id] = struct{}{}
+	}
+	kept := s.frozenConnections.Connections[:0]
+	for _, c := range s.frozenConnections.Connections {
+		if _, remove := drop[c.ID]; !remove {
+			kept = append(kept, c)
 		}
 	}
+	s.frozenConnections.Connections = kept
 }
 
 // rebuildCachedClosedConns 重建历史连接列表缓存
@@ -459,6 +471,30 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 
 		case msg.String() == "X":
 			if s.connViewMode == ConnViewActive {
+				if s.currentQuery().HasEffectiveFilter() {
+					matched := s.filteredConnections()
+					if len(matched) == 0 {
+						return s, func() tea.Msg {
+							return messages.NoticeMsg{Text: i18n.T("conns.close_matched_empty"), Level: messages.NoticeInfo}
+						}
+					}
+					ids := make([]string, 0, len(matched))
+					for _, conn := range matched {
+						if conn.ID != "" {
+							ids = append(ids, conn.ID)
+						}
+					}
+					s.removeFrozenConnections(ids)
+					s.filterList.SetItemCount(s.filteredConnCount())
+					return s, tea.Batch(
+						CloseConnectionsByIDs(s.client, ids),
+						FetchConnections(s.client),
+					)
+				}
+				if s.paused && s.frozenConnections != nil {
+					s.frozenConnections.Connections = nil
+					s.filterList.SetItemCount(0)
+				}
 				return s, tea.Batch(
 					CloseAllConnections(s.client),
 					FetchConnections(s.client),

@@ -91,6 +91,11 @@ type ConnectionClosedMsg struct {
 
 type AllConnectionsClosedMsg struct{}
 
+type FilteredConnectionsClosedMsg struct {
+	Closed int
+	Failed int
+}
+
 type IPInfoMsg struct {
 	Info *model.IPInfo
 	Err  error

@@ -309,6 +309,14 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 	case messages.AllConnectionsClosedMsg:
 		m.connsState = m.connsState.ApplyAllConnectionsClosed()
 
+	case messages.FilteredConnectionsClosedMsg:
+		m.connsState = m.connsState.ApplyAllConnectionsClosed()
+		if msg.Failed > 0 {
+			m.publishNotice(i18n.Tf("conns.close_matched_partial", msg.Closed, msg.Failed), messages.NoticeWarning)
+		} else if msg.Closed > 0 {
+			m.publishNotice(i18n.Tf("conns.close_matched_done", msg.Closed), messages.NoticeSuccess)
+		}
+
 	case messages.ConnTickMsg:
 		if m.currentPage == layout.PageConnections {
 			return m, connTick()
