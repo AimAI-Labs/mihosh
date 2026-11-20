@@ -43,6 +43,8 @@ func TestProxyProbeKeepsResultsAcrossSourceFailures(t *testing.T) {
 		jsonProxyProbe{name: "invalid", endpoint: "https://invalid.example"},
 		jsonProxyProbe{name: "large", endpoint: "https://large.example"},
 		jsonProxyProbe{name: "valid", endpoint: "https://valid.example"},
+		jsonProxyProbe{name: "ip-only", endpoint: "https://ip-only.example"},
+		jsonProxyProbe{name: "controls", endpoint: "https://controls.example"},
 	}
 	var requested []string
 	client := &http.Client{Transport: probeRoundTripper(func(request *http.Request) (*http.Response, error) {
@@ -52,7 +54,7 @@ func TestProxyProbeKeepsResultsAcrossSourceFailures(t *testing.T) {
 		host := request.URL.Hostname()
 		requested = append(requested, host)
 		status := http.StatusOK
-		body := `{"ip":"2001:db8::1","country":"Example"}`
+		body := `{"ip":"2001:db8::1","country":"Example","city":"東京","asn":64496,"organization":"Example Network","asn_organization":"Example ASN Holder"}`
 		switch host {
 		case "blocked.example":
 			status = http.StatusTooManyRequests
@@ -60,11 +62,15 @@ func TestProxyProbeKeepsResultsAcrossSourceFailures(t *testing.T) {
 			body = `{"ip":"not an IP"}`
 		case "large.example":
 			body += strings.Repeat(" ", maxProxyProbeBody)
+		case "ip-only.example":
+			body = `{"ip":"192.0.2.1"}`
+		case "controls.example":
+			body = `{"ip":"192.0.2.1","city":"Bad\nCity","organization":"\u001b[2J","asn_organization":"Example ASN Holder"}`
 		}
 		return &http.Response{StatusCode: status, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}, nil
 	})}
 	results := probeProxySources(context.Background(), client, time.Second, sources)
-	require.Equal(t, []string{"blocked.example", "invalid.example", "large.example", "valid.example"}, requested)
+	require.Equal(t, []string{"blocked.example", "invalid.example", "large.example", "valid.example", "ip-only.example", "controls.example"}, requested)
 	require.Len(t, results, len(sources))
 	require.Equal(t, "blocked", results[0].Source)
 	require.Contains(t, results[0].Error, "429")
@@ -73,5 +79,12 @@ func TestProxyProbeKeepsResultsAcrossSourceFailures(t *testing.T) {
 	require.Equal(t, "valid", results[3].Source)
 	require.Equal(t, "2001:db8::1", results[3].IP)
 	require.Equal(t, "Example", results[3].Country)
+	require.Equal(t, "東京", results[3].City)
+	require.Equal(t, uint32(64496), results[3].ASN)
+	require.Equal(t, "Example Network", results[3].Org)
 	require.Empty(t, results[3].Error)
+	require.Equal(t, ProxyProbeResult{Source: "ip-only", IP: "192.0.2.1", LatencyMS: results[4].LatencyMS}, results[4])
+	require.Empty(t, results[5].Error)
+	require.Empty(t, results[5].City)
+	require.Equal(t, "Example ASN Holder", results[5].Org)
 }

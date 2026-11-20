@@ -21,6 +21,9 @@ type ProxyProbeResult struct {
 	Source    string `json:"source"`
 	IP        string `json:"ip,omitempty"`
 	Country   string `json:"country,omitempty"`
+	City      string `json:"city,omitempty"`
+	ASN       uint32 `json:"asn,omitempty"`
+	Org       string `json:"org,omitempty"`
 	LatencyMS int64  `json:"latency_ms"`
 	Error     string `json:"error,omitempty"`
 }
@@ -57,8 +60,12 @@ func (source jsonProxyProbe) lookup(ctx context.Context, client *http.Client) (P
 		return result, errors.New("IP response exceeds size limit")
 	}
 	var info struct {
-		IP      string `json:"ip"`
-		Country string `json:"country"`
+		IP              string `json:"ip"`
+		Country         string `json:"country"`
+		City            string `json:"city"`
+		ASN             uint32 `json:"asn"`
+		Organization    string `json:"organization"`
+		ASNOrganization string `json:"asn_organization"`
 	}
 	if err := json.Unmarshal(data, &info); err != nil {
 		return result, fmt.Errorf("invalid IP response: %w", err)
@@ -68,10 +75,21 @@ func (source jsonProxyProbe) lookup(ctx context.Context, client *http.Client) (P
 		return result, errors.New("IP response contains no valid address")
 	}
 	result.IP = ip.String()
-	if strings.IndexFunc(info.Country, unicode.IsControl) < 0 {
-		result.Country = info.Country
+	result.Country = cleanProbeField(info.Country)
+	result.City = cleanProbeField(info.City)
+	result.ASN = info.ASN
+	result.Org = cleanProbeField(info.Organization)
+	if result.Org == "" {
+		result.Org = cleanProbeField(info.ASNOrganization)
 	}
 	return result, nil
+}
+
+func cleanProbeField(value string) string {
+	if strings.IndexFunc(value, unicode.IsControl) >= 0 {
+		return ""
+	}
+	return strings.TrimSpace(value)
 }
 
 // TestProxySources probes each exit-IP source through proxyURL. Source failures

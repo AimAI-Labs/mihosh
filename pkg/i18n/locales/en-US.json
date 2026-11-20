@@ -230,6 +230,8 @@
   "cli.proxy.address": "Proxy address",
   "cli.proxy.source": "Source",
   "cli.proxy.country": "Country",
+  "cli.proxy.city": "City",
+  "cli.proxy.org": "Organization",
   "cli.proxy.latency": "Latency",
   "cli.proxy.error": "Error",
   "cli.proxy.test_failed": "All proxy sources failed",

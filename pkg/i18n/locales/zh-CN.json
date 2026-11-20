@@ -230,6 +230,8 @@
   "cli.proxy.address": "代理地址",
   "cli.proxy.source": "数据源",
   "cli.proxy.country": "国家或地区",
+  "cli.proxy.city": "城市",
+  "cli.proxy.org": "组织",
   "cli.proxy.latency": "延迟",
   "cli.proxy.error": "错误",
   "cli.proxy.test_failed": "所有代理数据源均检测失败",
