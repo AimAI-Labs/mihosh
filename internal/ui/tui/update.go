@@ -113,6 +113,8 @@ func (m *Model) onPageChange() tea.Cmd {
 	cmd := m.refreshMenu()
 	switch m.currentPage {
 	case layout.PageConnections:
+		width, height := m.getPageSize()
+		m.connsState, _ = m.connsState.Update(messages.PageResizeMsg{Width: width, Height: height})
 		if cmd != nil {
 			m.connsState = m.connsState.ResetPrevConnIDs()
 			return tea.Batch(cmd, connTick())

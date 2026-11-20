@@ -152,9 +152,10 @@ func (s State) HandleMouseLeft(
 // HandleMouseScroll 鼠标滚轮处理
 func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight int) (State, tea.Cmd) {
 	if s.unlock.open {
-		delta := 1
+		s.unlock.width = mainWidth
+		delta := unlockColumns(mainWidth)
 		if up {
-			delta = -1
+			delta = -delta
 		}
 		s.unlock.move(delta)
 		return s, nil

@@ -326,8 +326,12 @@ func connectionsByViewMode(state PageState) []model.Connection {
 // buildConnectionsInlineHelpHints 根据连接页上下文构建内联帮助条目
 func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 	if state.Unlock.open {
+		arrows := "↑↓"
+		if unlockColumns(state.Width) > 1 {
+			arrows = "↑↓←→"
+		}
 		return []common.InlineHelpHint{
-			{Key: "S", Desc: i18n.T("conns.unlock.run_all"), Tone: common.InlineHelpToneSuccess},
+			{Key: arrows, Desc: i18n.T("help.conns.hint_select")},
 			{Key: "↵", Desc: i18n.T("conns.unlock.run_one")},
 			{Key: "Esc", Desc: i18n.T("conns.unlock.close")},
 		}

@@ -9,30 +9,15 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 )
-
-type UnlockStatus string
-
-const (
-	UnlockAvailable    UnlockStatus = "available"
-	UnlockRestricted   UnlockStatus = "restricted"
-	UnlockOriginals    UnlockStatus = "originals"
-	UnlockComingSoon   UnlockStatus = "coming_soon"
-	UnlockInconclusive UnlockStatus = "inconclusive"
-	UnlockFailed       UnlockStatus = "failed"
-)
-
-type UnlockResult struct {
-	Status    UnlockStatus
-	Region    string
-	CheckedAt time.Time
-}
 
 const unlockTimeout = 15 * time.Second
 
 type unlockCheck struct {
 	name string
-	run  func(unlockClient) UnlockResult
+	run  func(unlockClient) model.UnlockResult
 }
 
 var unlockChecks = [...]unlockCheck{
@@ -60,13 +45,13 @@ func UnlockServiceNames() []string {
 }
 
 // CheckUnlock tests the effective egress for one service through Mihomo's proxy.
-func CheckUnlock(ctx context.Context, proxyURL string, index int) UnlockResult {
+func CheckUnlock(ctx context.Context, proxyURL string, index int) model.UnlockResult {
 	if index < 0 || index >= len(unlockChecks) {
-		return UnlockResult{Status: UnlockFailed, CheckedAt: time.Now()}
+		return model.UnlockResult{Status: model.UnlockFailed, CheckedAt: time.Now()}
 	}
 	client, err := newProxyProbeClient(proxyURL)
 	if err != nil {
-		return UnlockResult{Status: UnlockFailed, CheckedAt: time.Now()}
+		return model.UnlockResult{Status: model.UnlockFailed, CheckedAt: time.Now()}
 	}
 	defer client.CloseIdleConnections()
 	client.Jar, _ = cookiejar.New(nil)
@@ -118,26 +103,26 @@ func (c unlockClient) get(endpoint string) unlockResponse {
 		challenge: resp.Header.Get("Cf-Mitigated") == "challenge"}
 }
 
-func (r unlockResponse) status() UnlockStatus {
+func (r unlockResponse) status() model.UnlockStatus {
 	switch {
 	case r.challenge || r.code == http.StatusTooManyRequests || (r.code >= 300 && r.code < 400):
-		return UnlockInconclusive
+		return model.UnlockInconclusive
 	case r.code == http.StatusForbidden || r.code == http.StatusUnavailableForLegalReasons:
-		return UnlockRestricted
+		return model.UnlockRestricted
 	case r.code >= 200 && r.code < 300:
-		return UnlockAvailable
+		return model.UnlockAvailable
 	default:
-		return UnlockFailed
+		return model.UnlockFailed
 	}
 }
 
-func unlockResult(status UnlockStatus, candidates ...string) UnlockResult {
+func unlockResult(status model.UnlockStatus, candidates ...string) model.UnlockResult {
 	for _, candidate := range candidates {
 		if code := regionCode(candidate); code != "" {
-			return UnlockResult{Status: status, Region: code}
+			return model.UnlockResult{Status: status, Region: code}
 		}
 	}
-	return UnlockResult{Status: status}
+	return model.UnlockResult{Status: status}
 }
 
 func regionCode(value string) string {

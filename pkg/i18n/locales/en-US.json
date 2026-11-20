@@ -326,6 +326,7 @@
   "conns.unlock.run_one": "Test",
   "conns.unlock.close": "Close",
   "conns.unlock.no_proxy": "Configure the Mihomo mixed port to run unlock tests",
+  "conns.unlock.cache_failed": "Could not save unlock test history",
   "conns.unlock.pending": "Untested",
   "conns.unlock.checking": "Testing…",
   "conns.unlock.available": "Available",

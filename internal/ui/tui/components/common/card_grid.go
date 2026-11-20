@@ -97,13 +97,18 @@ func CardHeading(width int, title, action string) string {
 
 func RenderCard(width int, border, background lipgloss.Color, rows []string) string {
 	inner := max(1, width-4)
+	bodyStyle := lipgloss.NewStyle().
+		Background(theme.Resolve(background)).
+		Foreground(theme.Resolve(theme.Current().Foreground))
+	reset := ansi.SGR(0)
+	base := strings.TrimSuffix(bodyStyle.Inline(true).Render(""), reset)
+	// Resume the card's colors after a colored label returns the terminal to defaults.
+	restore := strings.NewReplacer(reset, reset+base, ansi.ResetStyle, ansi.ResetStyle+base)
 	for i, row := range rows {
-		rows[i] = ansi.Truncate(row, inner, "…")
+		rows[i] = restore.Replace(ansi.Truncate(row, inner, "…"))
 	}
-	return lipgloss.NewStyle().Border(theme.Frame()).
+	return bodyStyle.Border(theme.Frame()).
 		BorderForeground(theme.Resolve(border)).
 		BorderBackground(theme.Resolve(background)).
-		Background(theme.Resolve(background)).
-		Foreground(theme.Resolve(theme.Current().Foreground)).
 		Padding(0, 1).Width(width - 2).Render(strings.Join(rows, "\n"))
 }

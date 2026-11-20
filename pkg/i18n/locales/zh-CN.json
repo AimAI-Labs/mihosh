@@ -326,6 +326,7 @@
   "conns.unlock.run_one": "测试",
   "conns.unlock.close": "关闭",
   "conns.unlock.no_proxy": "请配置 Mihomo 混合端口后再进行解锁测试",
+  "conns.unlock.cache_failed": "无法保存解锁测试记录",
   "conns.unlock.pending": "未测试",
   "conns.unlock.checking": "测试中…",
   "conns.unlock.available": "可用",

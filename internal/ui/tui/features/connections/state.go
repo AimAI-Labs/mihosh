@@ -192,18 +192,23 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	case messages.CoreTargetChangedMsg:
 		if msg.Reset {
 			s.CancelTest()
-			return NewState(msg.ProxyURL, model.DefaultSiteTests(), s.client, s.timeout, s.chartData), nil
+			next := NewState(msg.ProxyURL, model.DefaultSiteTests(), s.client, s.timeout, s.chartData)
+			next.unlock.width = s.unlock.width
+			return next, nil
 		}
 		if msg.Invalidate || msg.ProxyURL != s.proxyAddr {
 			s.CancelTest()
 			for i := range s.unlock.items {
-				s.unlock.items[i].result = service.UnlockResult{}
+				s.unlock.items[i].result = model.UnlockResult{}
 			}
 		}
 		return s.UpdateProxyAddr(msg.ProxyURL), nil
 
 	case messages.UnlockTestMsg:
 		return s.completeUnlock(msg)
+	case messages.PageResizeMsg:
+		s.unlock.width = msg.Width
+		return s, nil
 	case messages.PageMouseScrollMsg:
 		return s.HandleMouseScroll(msg.Up, msg.X, msg.Y, msg.Width, msg.Height)
 	case messages.PageMouseClickMsg:
