@@ -48,6 +48,7 @@ type State struct {
 	showDeleteConf bool
 	deleteUID      string // 待删除订阅 UID
 	file           fileView
+	history        historyView
 
 	// 鼠标双击
 	doubleClickDetector common.DoubleClickDetector[struct{}]
@@ -103,6 +104,7 @@ func (s State) ToPageState(width, height int) PageState {
 		DeleteUID:      s.deleteUID,
 		UpdatingUID:    s.updatingUID,
 		File:           s.file,
+		History:        s.history,
 	}
 }
 
@@ -125,7 +127,7 @@ func (s State) Mode() int {
 
 // Querying 是否处于输入捕获模式（供主 Model 的 isInputCapturing 判断）。
 func (s State) Querying() bool {
-	return s.filterMode || s.showAddForm || s.showEditForm || s.showDeleteConf || s.file.mode != fileClosed
+	return s.filterMode || s.showAddForm || s.showEditForm || s.showDeleteConf || s.file.mode != fileClosed || s.history.mode != historyClosed
 }
 
 // ApplySubs 应用加载的订阅列表与激活 UID，并重建过滤缓存。
@@ -153,6 +155,23 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			s.file.err = msg.Err
 		}
 		return s, nil
+	case messages.SubHistoryLoadedMsg:
+		if s.history.mode != historyClosed && s.history.request == msg.Request {
+			s.history.loading = false
+			s.history.snapshots = msg.Snapshots
+			s.history.err = msg.Err
+			if s.history.selected >= len(s.history.snapshots) {
+				s.history.selected = max(0, len(s.history.snapshots)-1)
+			}
+		}
+		return s, nil
+	case messages.SubHistoryDiffMsg:
+		if s.history.mode == historyDiff && s.history.request == msg.Request {
+			s.history.loading = false
+			s.history.diff = msg.Rows
+			s.history.err = msg.Err
+		}
+		return s, nil
 	case messages.PageResizeMsg:
 		s.pageWidth = msg.Width
 		s.pageHeight = msg.Height
@@ -170,6 +189,20 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		return s, nil
 	case messages.PageMouseScrollMsg:
 		s.pageWidth, s.pageHeight = msg.Width, msg.Height
+		if s.history.mode != historyClosed {
+			if s.history.mode == historyList {
+				if msg.Up && s.history.selected > 0 {
+					s.history.selected--
+				} else if !msg.Up && s.history.selected < len(s.history.snapshots)-1 {
+					s.history.selected++
+				}
+			} else if msg.Up && s.history.top > 0 {
+				s.history.top--
+			} else if !msg.Up {
+				s.history.top++
+			}
+			return s, nil
+		}
 		if s.file.mode != fileClosed {
 			delta := 1
 			if msg.Up {
@@ -183,12 +216,18 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		}
 		return s.HandleMouseScroll(msg.Up), nil
 	case messages.PageMouseClickMsg:
+		if s.history.mode != historyClosed {
+			return s.clickHistory(msg)
+		}
 		if s.file.mode != fileClosed {
 			return s.clickFile(msg)
 		}
 		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
 	case tea.KeyMsg:
 		// 弹窗优先拦截
+		if s.history.mode != historyClosed {
+			return s.handleHistoryKey(msg)
+		}
 		if s.file.mode != fileClosed {
 			return s.handleFileKey(msg)
 		}
@@ -231,6 +270,8 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			return s.openMergeExternalEditor()
 		case msg.String() == "c":
 			return s.openFileMenu(), nil
+		case msg.String() == "H":
+			return s.openHistoryModal()
 		case msg.String() == "e":
 			return s.openEditForm()
 		case msg.String() == "n":

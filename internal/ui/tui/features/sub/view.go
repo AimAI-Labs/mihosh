@@ -48,6 +48,7 @@ type PageState struct {
 	DeleteUID      string
 	UpdatingUID    string
 	File           fileView
+	History        historyView
 }
 
 // RenderSubPage 渲染订阅页。
@@ -79,6 +80,9 @@ func RenderSubPage(state PageState) string {
 	}
 
 	result = renderInlineHelp(result, state)
+	if state.History.mode != historyClosed {
+		return state.History.dialog(state.Width, state.Height).Overlay(result, true)
+	}
 	if state.File.mode != fileClosed {
 		return state.File.dialog(state.Width, state.Height).Overlay(result, true)
 	}
@@ -163,7 +167,7 @@ func relativeTime(ts int64) string {
 // ============================================================
 
 func visibleInlineHints(state PageState) []common.InlineHelpHint {
-	if state.File.mode != fileClosed {
+	if state.File.mode != fileClosed || state.History.mode != historyClosed {
 		return nil
 	}
 	hints := buildHints(state)
@@ -220,6 +224,7 @@ func buildHints(state PageState) []common.InlineHelpHint {
 		{Key: "U", Desc: i18n.T("help.sub.update_all"), Tone: common.InlineHelpToneSuccess},
 		{Key: "m", Desc: i18n.T("help.sub.edit_merge")},
 		{Key: "c", Desc: i18n.T("help.sub.view_raw")},
+		{Key: "H", Desc: i18n.T("help.sub.history"), Tone: common.InlineHelpToneInfo},
 		{Key: "e", Desc: i18n.T("help.sub.edit_profile")},
 		{Key: "n", Desc: i18n.T("help.sub.add")},
 		{Key: "d", Desc: i18n.T("help.sub.delete")},

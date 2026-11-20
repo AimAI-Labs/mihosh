@@ -1,0 +1,86 @@
+package service
+
+import (
+	"fmt"
+
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
+)
+
+// ListRawSnapshots returns saved historical snapshots of a subscription's raw.yaml (newest first).
+func (s *ProfileService) ListRawSnapshots(uid string) ([]profile.Snapshot, error) {
+	return profile.ListSnapshots(profile.SnapshotRaw, uid)
+}
+
+// ListMergeSnapshots returns saved historical snapshots of global merge.yaml (newest first).
+func (s *ProfileService) ListMergeSnapshots() ([]profile.Snapshot, error) {
+	return profile.ListSnapshots(profile.SnapshotMerge, "")
+}
+
+// DiffSnapshotWithCurrent computes a line-level diff between a historical snapshot and the current file.
+func (s *ProfileService) DiffSnapshotWithCurrent(kind profile.SnapshotKind, uid, snapshotID string, opts profile.FileDiffOptions) ([]profile.FileDiffRow, error) {
+	before, err := profile.ReadSnapshot(kind, uid, snapshotID)
+	if err != nil {
+		return nil, err
+	}
+	var after []byte
+	switch kind {
+	case profile.SnapshotRaw:
+		after, err = profile.ReadRawFile(uid)
+		if err != nil {
+			return nil, err
+		}
+	case profile.SnapshotMerge:
+		after, err = profile.ReadMerge()
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unsupported snapshot kind: %q", kind)
+	}
+	return profile.DiffFiles(string(before), string(after), opts), nil
+}
+
+// RollbackSnapshot restores a historical raw.yaml or merge.yaml snapshot and re-applies
+// the active subscription configuration when affected.
+func (s *ProfileService) RollbackSnapshot(kind profile.SnapshotKind, uid, snapshotID string) (*ActivateResult, error) {
+	data, err := profile.ReadSnapshot(kind, uid, snapshotID)
+	if err != nil {
+		return nil, err
+	}
+	_, activeUID, err := s.ListProfiles()
+	if err != nil {
+		return nil, err
+	}
+	switch kind {
+	case profile.SnapshotRaw:
+		if err := profile.WriteRaw(uid, data); err != nil {
+			return nil, err
+		}
+		if activeUID != "" && activeUID == uid {
+			res, actErr := s.Activate(uid)
+			if actErr != nil {
+				return &res, actErr
+			}
+			return &res, nil
+		}
+		return &ActivateResult{}, nil
+	case profile.SnapshotMerge:
+		before, _ := profile.ReadMerge()
+		beforeOverrides, _ := profile.ReadMihomoOverridesFrom(before)
+		afterOverrides, _ := profile.ReadMihomoOverridesFrom(data)
+		cleared := profile.ClearedOverrideKeys(beforeOverrides, afterOverrides)
+		if err := profile.WriteMerge(data); err != nil {
+			return nil, err
+		}
+		if activeUID != "" {
+			res, applyErr := s.ApplyActiveMerge(activeUID, cleared)
+			if applyErr != nil {
+				return &res, applyErr
+			}
+			return &res, nil
+		}
+		return &ActivateResult{}, nil
+	default:
+		return nil, fmt.Errorf("unsupported snapshot kind: %q", kind)
+	}
+}

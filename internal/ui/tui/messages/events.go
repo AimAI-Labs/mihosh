@@ -259,6 +259,34 @@ type SubBatchFetchDoneMsg struct {
 // SubAutoUpdateTickMsg 触发一次远程订阅定时过期检查。
 type SubAutoUpdateTickMsg time.Time
 
+// SubHistoryLoadedMsg 订阅或覆写历史快照列表加载完成。
+type SubHistoryLoadedMsg struct {
+	Request   uint64
+	Kind      profile.SnapshotKind
+	UID       string
+	Snapshots []profile.Snapshot
+	Err       error
+}
+
+// SubHistoryDiffMsg 历史快照与当前文件的差异结果。
+type SubHistoryDiffMsg struct {
+	Request uint64
+	Rows    []profile.FileDiffRow
+	Err     error
+}
+
+// SubRollbackDoneMsg 历史快照回滚结果。
+type SubRollbackDoneMsg struct {
+	Kind         profile.SnapshotKind
+	UID          string
+	SnapshotID   string
+	MergeErr     error
+	Restarted    bool
+	NeedsRestart bool
+	Remote       bool
+	Err          error
+}
+
 // SubActivatedMsg 激活订阅流程结束。
 // Err != nil 表示生成/备份/写入/重载中某步失败（配置可能已写入，见 ProfileService.Activate）。
 // MergeErr != nil 表示 merge.yaml 语法错误（已降级忽略覆写，非致命）。

@@ -100,11 +100,14 @@ func ReadRawFile(uid string) ([]byte, error) {
 	return data, nil
 }
 
-// WriteRaw 原子写入 raw.yaml（覆盖）。
+// WriteRaw 原子写入 raw.yaml（覆盖前自动保留历史快照）。
 func WriteRaw(uid string, data []byte) error {
 	p, err := RawPath(uid)
 	if err != nil {
 		return err
+	}
+	if prev, rErr := os.ReadFile(p); rErr == nil && len(trimSpaceBytes(prev)) > 0 && !bytes.Equal(prev, data) {
+		_, _ = SaveRawSnapshot(uid, prev, DefaultSnapshotRetention)
 	}
 	return atomicWrite(p, data, 0600)
 }
@@ -248,10 +251,13 @@ func WriteMerge(data []byte) error {
 	if err := PreserveLegacyRuleEdits(previous); err != nil {
 		return err
 	}
+	if len(trimSpaceBytes(previous)) > 0 && !bytes.Equal(previous, data) {
+		_, _ = SaveMergeSnapshot(previous, DefaultSnapshotRetention)
+	}
 	return atomicWrite(p, data, 0600)
 }
 
-// DeleteProfileDir 删除某订阅的整个目录（raw + merge）。
+// DeleteProfileDir 删除某订阅的整个目录（raw + 历史快照）。
 // 目录不存在不报错。
 func DeleteProfileDir(uid string) error {
 	path, err := rawStoragePath(uid)
@@ -261,6 +267,7 @@ func DeleteProfileDir(uid string) error {
 	if err := os.RemoveAll(filepath.Dir(path)); err != nil {
 		return fmt.Errorf("删除订阅目录失败: %w", err)
 	}
+	_ = DeleteRawSnapshots(uid)
 	return nil
 }
 

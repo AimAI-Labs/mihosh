@@ -497,6 +497,7 @@ func buildSubSections(ctx HelpContext) []section {
 				{"u", i18n.T("help.sub.update")},
 				{"U", i18n.T("help.sub.update_all")},
 				{"m", i18n.T("help.sub.edit_merge")},
+				{"H", i18n.T("help.sub.history")},
 				{"e", i18n.T("help.sub.edit_profile")},
 				{"n", i18n.T("help.sub.add")},
 				{"d", i18n.T("help.sub.delete")},

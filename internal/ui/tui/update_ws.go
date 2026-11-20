@@ -574,6 +574,28 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 		m.subState, _ = m.subState.Update(msg)
 		return m, func() tea.Msg { return tea.EnableMouseCellMotion() }
 
+	case messages.SubHistoryLoadedMsg, messages.SubHistoryDiffMsg:
+		m.subState, _ = m.subState.Update(msg)
+
+	case messages.SubRollbackDoneMsg:
+		if msg.Err != nil {
+			m.publishError(msg.Err)
+			return m, nil
+		}
+		if msg.MergeErr != nil {
+			m.publishNotice(i18n.Tf("sub.history.rollback_warn", msg.SnapshotID), messages.NoticeWarning)
+		} else {
+			m.publishNotice(i18n.Tf("sub.history.rollback_done", msg.SnapshotID), messages.NoticeSuccess)
+		}
+		cmds := []tea.Cmd{sub.FetchSubs(m.profileSvc), preferences.FetchMihomoOverrides(m.configSvc)}
+		if msg.Restarted {
+			m.reloadStoredConfig()
+			cmds = append(cmds, m.updateCoreTarget(config.ResolveMihomoEndpoint(), coreTargetReconnect))
+		} else if m.connectionReady {
+			cmds = append(cmds, m.refreshOnConnect())
+		}
+		return m, tea.Batch(cmds...)
+
 	case messages.MergeEditFinishedMsg:
 		// 外部编辑器结束：tea.ExecProcess 期间会 ReleaseTerminal（禁用鼠标），
 		// 但 RestoreTerminal 不恢复鼠标模式（Bubble Tea v1.3.10 缺陷），需显式重新启用。
