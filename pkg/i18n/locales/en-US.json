@@ -903,7 +903,7 @@
   "core.geo.description": "View managed core GEO files. Select a file and press Enter or click to download or update it.",
   "core.geo.managed_only": "File management requires a Mihosh managed core. Update an external core's GEO data in Core > Mihomo config.",
   "core.geo.restart_hint": "After updating, press z to restart the core and load the new data.",
-  "core.geo.files": "Data files",
+  "core.geo.files": "GEO data files",
   "core.geo.missing": "Not downloaded",
   "core.geo.custom": "Custom source; manage through the core",
   "core.geo.no_files": "No managed data files",

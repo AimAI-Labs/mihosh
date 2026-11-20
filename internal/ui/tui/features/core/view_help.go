@@ -33,12 +33,20 @@ func (s State) inlineHelp(width int) string {
 		{Key: "↑↓", Desc: i18n.T("core.inline.select")},
 		{Key: "Enter", Desc: i18n.T("core.inline.run")},
 	}
-	if s.tab == 1 {
-		hints = append([]common.InlineHelpHint{{Key: "Enter", Desc: i18n.T("core.inline.download")}}, hints[:2]...)
-		hints = append(hints, common.InlineHelpHint{Key: "a", Desc: i18n.T("core.inline.activate")}, common.InlineHelpHint{Key: "4", Desc: i18n.T("core.tab.geo")})
-	} else if s.tab == 3 {
-		hints[2].Desc = i18n.T("core.geo.update")
-		hints = append(hints, common.InlineHelpHint{Key: "2", Desc: i18n.T("core.tab.versions")}, common.InlineHelpHint{Key: "z", Desc: i18n.T("core.action.restart")})
+	if s.isDownloadsPage() {
+		primary := i18n.T("core.inline.download")
+		if s.tab == 3 {
+			primary = i18n.T("core.geo.update")
+		}
+		hints = append([]common.InlineHelpHint{
+			{Key: "Enter", Desc: primary},
+			{Key: "z", Desc: i18n.T("core.action.restart")},
+		}, hints[:2]...)
+		if s.tab == 1 {
+			hints = append(hints, common.InlineHelpHint{Key: "a", Desc: i18n.T("core.inline.activate")}, common.InlineHelpHint{Key: "4", Desc: i18n.T("core.tab.geo")})
+		} else {
+			hints = append(hints, common.InlineHelpHint{Key: "2", Desc: i18n.T("core.tab.versions")})
+		}
 	}
 	if s.Editing {
 		hints = []common.InlineHelpHint{

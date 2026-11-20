@@ -92,7 +92,10 @@ func (s *CoreService) Status() (CoreStatus, error) {
 	state.ShellProxy = cfg.ShellProxy
 	_, journalErr := os.Stat(filepath.Join(root, "runtime", "network-recovery.json"))
 	state.RecoveryPending = journalErr == nil
-	if state.Runtime == "service" {
+	if state.Mode == "managed" && runtime.GOOS == "linux" {
+		state.ServiceUnit = host.ServiceName(root) + ".service"
+	}
+	if state.ServiceUnit != "" || state.Runtime == "service" {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		service, serviceErr := s.serviceManager(root).Status(ctx)
 		cancel()
@@ -100,7 +103,10 @@ func (s *CoreService) Status() (CoreStatus, error) {
 		state.ServiceRunning = service.Running
 		state.AutoStart = service.Enabled
 		if serviceErr != nil {
-			return state, serviceErr
+			state.ServiceError = serviceErr.Error()
+			if state.Runtime == "service" {
+				return state, serviceErr
+			}
 		}
 	}
 	if state.Mode == "" {

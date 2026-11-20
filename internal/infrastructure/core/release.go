@@ -104,9 +104,10 @@ const ReleasePageSize = 10
 // HasNext follows the unfiltered GitHub page, so filtered entries do not
 // prematurely terminate browsing.
 type ReleasePage struct {
-	Page     int       `json:"page"`
-	HasNext  bool      `json:"has_next"`
-	Releases []Release `json:"releases"`
+	Page      int       `json:"page"`
+	HasNext   bool      `json:"has_next"`
+	Releases  []Release `json:"releases"`
+	FetchedAt time.Time `json:"-"`
 }
 
 func (f *Fetcher) Releases(ctx context.Context, page int, goos, arch string) (ReleasePage, error) {
@@ -258,6 +259,8 @@ type Status struct {
 	MixedPort        int      `json:"mixed_port"`
 	Runtime          string   `json:"runtime"`
 	ServiceInstalled bool     `json:"service_installed"`
+	ServiceUnit      string   `json:"service_unit,omitempty"`
+	ServiceError     string   `json:"service_error,omitempty"`
 	ServiceRunning   bool     `json:"service_running"`
 	AutoStart        bool     `json:"auto_start"`
 	SystemProxy      bool     `json:"system_proxy"`

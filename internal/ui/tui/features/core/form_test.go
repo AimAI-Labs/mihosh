@@ -28,9 +28,14 @@ func TestDownloadAllowsNetworkPreferencesWithoutReplacingActiveTask(t *testing.T
 	id := s.generation
 	s.Progress = coreinfra.Progress{Downloaded: 1, Total: 2}
 	s, _ = s.Update(coreKey("3"))
-	s = selectTestAction(t, s, "network")
-	s, _ = s.Update(coreKey("enter"))
-	if s.tab != 2 || !s.Editing || s.form != "network" || !s.Busy || s.task != "install" || s.generation != id {
+	if next, _ := s.Update(coreKey("e")); next.Editing {
+		t.Fatal("download settings remained in Advanced")
+	}
+	s, _ = s.Update(coreKey("2"))
+	page := s.layout(120, 30-footerHeight)
+	hit := page.controls[0].actionHit
+	s, _ = s.Update(messages.PageMouseClickMsg{X: hit.x, Y: hit.y, Width: 120, Height: 30})
+	if s.tab != 1 || !s.Editing || s.form != "network" || !s.Busy || s.task != "install" || s.generation != id {
 		t.Fatal("download blocked settings or lost its active task")
 	}
 	s.fields[1].SetValue("https://mirror.example")

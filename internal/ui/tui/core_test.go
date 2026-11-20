@@ -28,7 +28,7 @@ func TestOfflineStartupRoutesToCoreWithoutStartingStreams(t *testing.T) {
 	if m.currentPage != layout.PageCore || m.wsStarted || cmd != nil {
 		t.Fatal("offline startup started online tasks")
 	}
-	if !strings.Contains(m.View(), "Mihomo Core") {
+	if !strings.Contains(m.View(), i18n.T("core.tab.downloads")) {
 		t.Fatal("Core page not rendered")
 	}
 }
@@ -153,7 +153,14 @@ func TestCoreSettingsDialogsBlockGlobalNavigationAndMouse(t *testing.T) {
 	defer svc.Close()
 	for _, shortcut := range []string{"e", "h", "m", "c"} {
 		s := corepage.NewState(svc, nil, nil)
-		s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
+		tab := "3"
+		if shortcut == "e" {
+			tab = "2"
+		}
+		s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(tab)})
+		if s.Busy {
+			s, _ = s.Update(messages.CoreOperationMsg{ID: s.OperationID(), Action: "releases", Releases: &coreinfra.ReleasePage{Page: 1}})
+		}
 		s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(shortcut)})
 		m := Model{currentPage: layout.PageCore, coreState: s, width: 120, height: 30}
 		for _, key := range []string{"r", "?", "q"} {

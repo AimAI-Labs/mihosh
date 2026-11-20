@@ -62,7 +62,7 @@ func (s State) actions() []actionItem {
 			items = append(items, item)
 		}
 	}
-	items = append(items, actionItem{"h", "service"}, actionItem{"e", "network"}, actionItem{"y", "system-proxy"}, actionItem{"w", "shell-proxy"})
+	items = append(items, actionItem{"h", "service"}, actionItem{"y", "system-proxy"}, actionItem{"w", "shell-proxy"})
 	if s.Status.Mode == "managed" || s.Status.RecoveryPending {
 		items = append(items, actionItem{"c", "recover"})
 	}

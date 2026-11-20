@@ -206,8 +206,12 @@ func TestCoreVisibleMouseTargetsMatchAfterViewportScrolling(t *testing.T) {
 		for _, width := range []int{64, 80, 100, 120} {
 			for _, height := range []int{12, 28} {
 				for _, action := range []string{"network", "configure"} {
-					s := NewState(svc, nil, nil).selectTab(2)
-					s = selectTestAction(t, s, action)
+					s := NewState(svc, nil, nil)
+					if action == "network" {
+						s = s.selectTab(1)
+					} else {
+						s = selectTestAction(t, s.selectTab(2), action)
+					}
 					label := i18n.T("core.action." + action)
 					view := ansi.Strip(s.Render(width, height))
 					found := false
@@ -317,5 +321,31 @@ func TestDailyOverviewShowsCoreDetailsWithoutGuidance(t *testing.T) {
 	s.Status.BinaryPath = ""
 	if !strings.Contains(ansi.Strip(s.overview(70)), i18n.T("core.path_unavailable")) {
 		t.Fatal("unavailable executable path is not explained")
+	}
+}
+
+func TestCoreMihomoPageShowsManagedUnitBelowOverrides(t *testing.T) {
+	i18n.Init()
+	s := State{tab: 4, Status: service.CoreStatus{
+		Mode: "managed", ServiceUnit: "mihosh-example.service", ServiceInstalled: true, ServiceRunning: true, AutoStart: true,
+	}}
+	page := ansi.Strip(s.layout(100, 40).content)
+	firstLine, _, _ := strings.Cut(page, "\n")
+	if strings.Contains(firstLine, i18n.T("core.heading")) {
+		t.Fatal("Core navigation has a panel title")
+	}
+	settings := strings.Index(page, i18n.T("settings.panel_title"))
+	card := strings.Index(page, i18n.T("settings.sys_status.panel_title"))
+	unit := strings.Index(page, "mihosh-example.service")
+	if settings < 0 || card <= settings || unit <= card || !strings.Contains(page, i18n.T("core.service.status_running")) ||
+		!strings.Contains(page, i18n.T("core.autostart")+" "+i18n.T("core.enabled")) {
+		t.Fatal("managed service card does not show its unit, status and startup state")
+	}
+	wheel := messages.PageMouseScrollMsg{X: 30, Y: 6, Width: 80, Height: 13}
+	for range 20 {
+		s, _ = s.Update(wheel)
+	}
+	if !strings.Contains(ansi.Strip(s.Render(80, 13)), "mihosh-example.service") {
+		t.Fatal("managed service card is unreachable in a short terminal")
 	}
 }

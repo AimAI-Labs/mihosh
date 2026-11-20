@@ -93,7 +93,10 @@ func RenderTokyoPanel(title, body string, width int) string {
 	}
 
 	// 逐字符填充顶部边框，确保总宽度精确等于 innerWidth+2（含 ╭ 和 ╮）
-	topBorder := theme.Frame().TopLeft + "─ " + title + " "
+	topBorder := theme.Frame().TopLeft
+	if title != "" {
+		topBorder += "─ " + title + " "
+	}
 	for lipgloss.Width(topBorder) < innerWidth+1 {
 		topBorder += "─"
 	}

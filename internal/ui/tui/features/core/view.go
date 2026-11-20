@@ -292,13 +292,16 @@ func (s State) layout(width, height int) pageLayout {
 	}
 	tabText, hits := renderCoreTabRow(width, 1, selectedTab, []coreTabItem{{0, "advanced"}, {1, "downloads"}, {4, "mihomo"}})
 	result.tabs = hits
-	parts := []string{panel(i18n.T("core.heading"), tabText, width), ""}
+	parts := []string{panel("", tabText, width), ""}
 	if s.isDownloadsPage() {
 		return s.downloadsLayout(width, height, parts, result)
 	}
 	top := lipgloss.Height(strings.Join(parts, "\n"))
 	if s.tab == 4 {
-		parts = append(parts, preferences.RenderEmbedded(s.editor.ToPageState(s.editor.Config, nil), width, max(1, height-top)))
+		parts = append(parts, preferences.RenderEmbedded(s.editor.ToPageState(s.editor.Config, nil), width))
+		if s.Status.ServiceUnit != "" {
+			parts = append(parts, "", s.systemdPanel(width))
+		}
 		result.content, result.editorY = strings.Join(parts, "\n"), top
 		return result
 	}
@@ -355,8 +358,11 @@ func (s State) downloadsLayout(width, height int, parts []string, result pageLay
 	for i := range result.releases {
 		result.releases[i].y += top
 	}
+	for i := range releases.controls {
+		releases.controls[i].y += top
+	}
+	result.controls = releases.controls
 	geo, hits := s.geoPanel(geoWidth)
-	geo += "\n" + s.geoOverview(geoWidth)
 	geoX, geoY := releaseWidth, top
 	if width >= 100 {
 		parts = append(parts, lipgloss.JoinHorizontal(lipgloss.Top, releases.content, geo))
@@ -371,6 +377,27 @@ func (s State) downloadsLayout(width, height int, parts []string, result pageLay
 	result.geoBounds = actionHit{x: geoX, y: geoY, width: geoWidth, height: lipgloss.Height(geo)}
 	result.actions, result.content = hits, strings.Join(parts, "\n")
 	return result
+}
+
+func (s State) systemdPanel(width int) string {
+	status := "core.service.status_not_installed"
+	if s.Status.ServiceInstalled {
+		status = "core.service.status_stopped"
+		if s.Status.ServiceRunning {
+			status = "core.service.status_running"
+		}
+	}
+	rows := []string{wrap(s.Status.ServiceUnit, width-4)}
+	if s.Status.ServiceError != "" {
+		rows = append(rows, wrap(s.Status.ServiceError, width-4))
+	} else {
+		auto := "core.disabled"
+		if s.Status.AutoStart {
+			auto = "core.enabled"
+		}
+		rows = append(rows, i18n.T(status), i18n.T("core.autostart")+" "+i18n.T(auto))
+	}
+	return panel(i18n.T("settings.sys_status.panel_title"), strings.Join(rows, "\n"), width)
 }
 
 type coreTabItem struct {
@@ -443,9 +470,14 @@ func (s State) viewportOffset(page pageLayout, height int) int {
 	if s.Editing && s.form != "service" {
 		offset = max(0, page.focusY-height+2)
 	} else if s.followSelection && len(page.actions) > 0 {
-		hit := page.actions[min(s.selected, len(page.actions)-1)]
-		if hit.y+hit.height > offset+height {
-			offset = hit.y + hit.height - height
+		index := min(s.selected, len(page.actions)-1)
+		hit := page.actions[index]
+		bottom := hit.y + hit.height
+		if s.tab == 3 && index == len(page.actions)-1 {
+			bottom = page.geoBounds.y + page.geoBounds.height
+		}
+		if bottom > offset+height {
+			offset = bottom - height
 		}
 		if hit.y < offset {
 			offset = hit.y

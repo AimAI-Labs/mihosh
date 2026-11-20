@@ -88,3 +88,18 @@ func TestClientCloseLeavesExistingBackgroundOwnerAlone(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "existing owner", string(data))
 }
+
+func TestManagedStatusIdentifiesSystemdUnitInSessionMode(t *testing.T) {
+	s, _, root := networkService(t)
+	s.services = &fakeCoreServices{state: host.ServiceState{Installed: true, Enabled: true}}
+	require.NoError(t, config.Update(func(cfg *config.Config) error {
+		cfg.Core.Mode, cfg.Core.Runtime = "managed", "session"
+		return nil
+	}))
+	status, err := s.Status()
+	require.NoError(t, err)
+	require.Equal(t, host.ServiceName(root)+".service", status.ServiceUnit)
+	require.True(t, status.ServiceInstalled)
+	require.True(t, status.AutoStart)
+	require.False(t, status.ServiceRunning)
+}

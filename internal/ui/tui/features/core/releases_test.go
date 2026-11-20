@@ -660,37 +660,38 @@ func TestOpenReleasesTabUsesDiskCacheWhileRefreshBypassesIt(t *testing.T) {
 	s := NewState(svc, nil, nil)
 	defer s.Close()
 
-	s, cmd := s.openTab(1)
-	if cmd == nil || s.catalog.forceRefresh {
-		t.Fatalf("openTab(1) should load normally without forceRefresh: cmd=%v forceRefresh=%v", cmd != nil, s.catalog.forceRefresh)
+	s, _ = s.openTab(1)
+	if s.Busy || s.catalog.forceRefresh || !s.catalog.loaded || s.releaseCount() != 1 || s.Release.Tag != pinned.Tag {
+		t.Fatalf("fresh cache was not displayed immediately: loaded=%v count=%d busy=%v", s.catalog.loaded, s.releaseCount(), s.Busy)
 	}
-	batch, ok := cmd().(tea.BatchMsg)
-	if !ok {
-		t.Fatalf("expected BatchMsg from openTab(1), got %T", cmd())
+
+	// A stale cache still renders immediately while the refresh is in progress.
+	payload.FetchedAt = payload.FetchedAt.Add(-25 * time.Hour)
+	raw, err = json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
 	}
-	var opMsg *messages.CoreOperationMsg
-	for i := 0; i < len(batch); i++ {
-		sub := batch[i]
-		if sub == nil {
-			continue
-		}
-		switch msg := sub().(type) {
-		case tea.BatchMsg:
-			batch = append(batch, msg...)
-		case messages.CoreOperationMsg:
-			opMsg = &msg
-		}
-		if opMsg != nil {
-			break
-		}
+	if err := os.WriteFile(cacheFile, raw, 0600); err != nil {
+		t.Fatal(err)
 	}
-	if opMsg == nil || opMsg.Err != nil || opMsg.Releases == nil || len(opMsg.Releases.Releases) != 1 || opMsg.Releases.Releases[0].Tag != pinned.Tag {
-		t.Fatalf("openTab(1) did not load releases from disk cache without network: %+v", opMsg)
+	stale := NewState(svc, nil, nil)
+	defer stale.Close()
+	stale, cmd := stale.openTab(1)
+	if cmd == nil || !stale.Busy || !stale.catalog.loaded || stale.releaseCount() != 1 {
+		t.Fatal("stale cache must remain visible during refresh")
 	}
-	s, _ = s.Update(*opMsg)
-	if !s.catalog.loaded || s.releaseCount() != 1 {
-		t.Fatalf("cached release catalog was not applied: loaded=%v count=%d", s.catalog.loaded, s.releaseCount())
+	stale, _ = stale.Update(messages.CoreOperationMsg{ID: stale.generation, Action: "releases", Err: errors.New("offline")})
+	if stale.Busy || stale.releaseCount() != 1 || !stale.catalog.failed {
+		t.Fatal("failed refresh discarded the cached list")
 	}
+
+	// Re-entering after the in-memory catalogue expires refreshes it as well.
+	s.catalog.firstPageFetched = payload.FetchedAt
+	expired, cmd := s.openTab(1)
+	if cmd == nil || !expired.Busy || expired.releaseCount() != 1 {
+		t.Fatal("expired catalogue was not refreshed on re-entry")
+	}
+	expired.Close()
 
 	// Triggering refresh via 'r' sets forceRefresh so upstream is queried.
 	s, refreshCmd := s.releaseAction("refresh")

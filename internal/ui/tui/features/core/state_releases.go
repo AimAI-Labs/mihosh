@@ -2,23 +2,26 @@ package core
 
 import (
 	"errors"
+	"time"
 
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 type releaseCatalog struct {
-	page         coreinfra.ReleasePage
-	requested    int
-	loaded       bool
-	lookup       *coreinfra.Release
-	scroll       int
-	store        *releaseStore
-	failed       bool
-	resume       bool
-	forceRefresh bool
-	cleanup      *releaseCleanup
+	page             coreinfra.ReleasePage
+	requested        int
+	loaded           bool
+	lookup           *coreinfra.Release
+	scroll           int
+	store            *releaseStore
+	failed           bool
+	resume           bool
+	forceRefresh     bool
+	firstPageFetched time.Time
+	cleanup          *releaseCleanup
 }
 
 // The initial Bubble Tea model is also closed on terminal errors. Share only
@@ -133,13 +136,18 @@ func (s State) loadReleasePage(page int) (State, tea.Cmd) {
 func (s State) openTab(tab int) (State, tea.Cmd) {
 	s = s.selectTab(tab)
 	if s.isDownloadsPage() {
-		if !s.catalog.loaded {
+		if !s.catalog.loaded && s.svc != nil {
+			if page, ok := service.CachedReleasePage(1); ok {
+				s = s.applyReleasePage(page)
+			}
+		}
+		if !s.Busy && (!s.catalog.loaded || (!s.catalog.firstPageFetched.IsZero() && !service.ReleasePageIsFresh(s.catalog.firstPageFetched))) {
 			s.catalog.forceRefresh = false
 			next, cmd := s.loadReleasePage(1)
 			return next, tea.Batch(cmd, next.Refresh())
 		}
 	}
-	if s.tab == 4 {
+	if s.tab == 4 && s.svc == nil {
 		return s, s.editor.Refresh()
 	}
 	return s, s.Refresh()
@@ -183,6 +191,7 @@ func (s State) applyReleasePage(page coreinfra.ReleasePage) State {
 	s.catalog.page, s.catalog.loaded, s.catalog.failed = page, true, false
 	if page.Page == 1 {
 		s.catalog.scroll = 0
+		s.catalog.firstPageFetched = page.FetchedAt
 	}
 	if s.tab == 1 {
 		index, found := s.releaseIndex(previous)

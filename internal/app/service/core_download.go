@@ -87,13 +87,23 @@ func (s *CoreService) RefreshReleases(ctx context.Context, page int, notify func
 	return s.releases(ctx, page, notify, true)
 }
 
+// CachedReleasePage returns the last stored catalogue page even when due for refresh.
+func CachedReleasePage(page int) (coreinfra.ReleasePage, bool) {
+	return loadCachedReleasePage(page, runtime.GOOS, runtime.GOARCH)
+}
+
+func ReleasePageIsFresh(fetchedAt time.Time) bool {
+	age := time.Since(fetchedAt)
+	return !fetchedAt.IsZero() && age >= -time.Minute && age < releasePageCacheTTL
+}
+
 func (s *CoreService) releases(ctx context.Context, page int, notify func(coreinfra.Progress), force bool) (coreinfra.ReleasePage, error) {
 	if page < 1 {
 		return coreinfra.ReleasePage{}, errors.New("invalid release page")
 	}
 	goos, goarch := runtime.GOOS, runtime.GOARCH
 	if !force {
-		if cached, ok := loadCachedReleasePage(page, goos, goarch); ok {
+		if cached, ok := loadCachedReleasePage(page, goos, goarch); ok && ReleasePageIsFresh(cached.FetchedAt) {
 			return cached, nil
 		}
 	}
@@ -109,10 +119,10 @@ func (s *CoreService) releases(ctx context.Context, page int, notify func(corein
 	if err != nil {
 		return coreinfra.ReleasePage{}, err
 	}
-	if force && page == 1 {
-		clearCachedReleasePages(goos, goarch)
+	result.FetchedAt = time.Now().UTC()
+	if saveCachedReleasePage(result, goos, goarch) && page == 1 {
+		clearLaterCachedReleasePages(goos, goarch)
 	}
-	saveCachedReleasePage(result, goos, goarch)
 	return result, nil
 }
 
@@ -153,11 +163,7 @@ func loadCachedReleasePage(page int, goos, goarch string) (coreinfra.ReleasePage
 	if json.Unmarshal(data, &entry) != nil || entry.GOOS != goos || entry.GOARCH != goarch || entry.Page.Page != page {
 		return coreinfra.ReleasePage{}, false
 	}
-	if entry.FetchedAt.IsZero() {
-		return coreinfra.ReleasePage{}, false
-	}
-	age := time.Since(entry.FetchedAt)
-	if age < -time.Minute || age >= releasePageCacheTTL {
+	if entry.FetchedAt.IsZero() || time.Until(entry.FetchedAt) > time.Minute {
 		return coreinfra.ReleasePage{}, false
 	}
 	for _, r := range entry.Page.Releases {
@@ -171,31 +177,32 @@ func loadCachedReleasePage(page int, goos, goarch string) (coreinfra.ReleasePage
 	if entry.Page.Releases == nil {
 		entry.Page.Releases = []coreinfra.Release{}
 	}
+	entry.Page.FetchedAt = entry.FetchedAt
 	return entry.Page, true
 }
 
-func saveCachedReleasePage(page coreinfra.ReleasePage, goos, goarch string) {
+func saveCachedReleasePage(page coreinfra.ReleasePage, goos, goarch string) bool {
 	if page.Page < 1 {
-		return
+		return false
 	}
 	dir, err := releasePageCacheDir()
 	if err != nil || os.MkdirAll(dir, 0700) != nil {
-		return
+		return false
 	}
 	entry := cachedReleasePage{
-		FetchedAt: time.Now().UTC(),
+		FetchedAt: page.FetchedAt,
 		GOOS:      goos,
 		GOARCH:    goarch,
 		Page:      page,
 	}
 	data, err := json.Marshal(entry)
 	if err != nil {
-		return
+		return false
 	}
-	_ = privateWrite(releasePageCachePath(dir, goos, goarch, page.Page), data)
+	return privateWrite(releasePageCachePath(dir, goos, goarch, page.Page), data) == nil
 }
 
-func clearCachedReleasePages(goos, goarch string) {
+func clearLaterCachedReleasePages(goos, goarch string) {
 	dir, err := releasePageCacheDir()
 	if err != nil {
 		return
@@ -205,8 +212,9 @@ func clearCachedReleasePages(goos, goarch string) {
 		return
 	}
 	prefix := fmt.Sprintf("%s-%s-page-", goos, goarch)
+	first := filepath.Base(releasePageCachePath(dir, goos, goarch, 1))
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasPrefix(entry.Name(), prefix) {
+		if !entry.IsDir() && entry.Name() != first && strings.HasPrefix(entry.Name(), prefix) {
 			_ = os.Remove(filepath.Join(dir, entry.Name()))
 		}
 	}

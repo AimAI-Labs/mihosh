@@ -219,8 +219,8 @@ func RenderSettingsPage(state PageState, width, height int) string {
 	return renderSettingsPage(state, width, height, true)
 }
 
-func RenderEmbedded(state PageState, width, height int) string {
-	return renderSettingsPage(state, width, height, false)
+func RenderEmbedded(state PageState, width int) string {
+	return renderSettingsPage(state, width, 0, false)
 }
 
 func renderSettingsPage(state PageState, width, height int, standalone bool) string {
@@ -244,11 +244,15 @@ func renderSettingsPage(state PageState, width, height int, standalone bool) str
 		parts = append(parts, statusView)
 	}
 
-	parts = append(parts, descRow)
+	if standalone || strings.TrimSpace(ansi.Strip(descRow)) != "" {
+		parts = append(parts, descRow)
+	}
 	mainContent := lipgloss.JoinVertical(lipgloss.Left, parts...)
 
 	// 填充至页面高度，使右下角帮助提示浮层能正确定位到底部
-	mainContent = lipgloss.PlaceVertical(height, lipgloss.Top, mainContent)
+	if standalone {
+		mainContent = lipgloss.PlaceVertical(height, lipgloss.Top, mainContent)
+	}
 
 	// 将版本信息叠加在左下角（状态栏上方）
 	if standalone {

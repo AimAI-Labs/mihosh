@@ -167,3 +167,32 @@ func TestGeoEmptyAndCustomSourceDoNotStartDownloads(t *testing.T) {
 		t.Fatal("background GEO response changed the selection in the service dialog")
 	}
 }
+
+func TestGeoFilesPanelKeepsDirectoryAndRestartHintReachable(t *testing.T) {
+	i18n.Init()
+	root, err := os.MkdirTemp("", "mihosh-geo-view-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(root) })
+	t.Setenv("MIHOSH_CONFIG_DIR", root)
+	s := releaseFixture(t)
+	s.Status.Mode = "managed"
+	s.geoFiles = []service.GeoDataFile{
+		{Key: "mmdb", Name: "Country.mmdb", Updatable: true},
+		{Key: "geoip", Name: "GeoIP.dat", Updatable: true},
+		{Key: "geosite", Name: "GeoSite.dat", Updatable: true},
+		{Key: "asn", Name: "ASN.mmdb", Updatable: true},
+	}
+	s = s.selectTab(3)
+	page := s.layout(120, 26)
+	if !strings.Contains(ansi.Strip(page.content), i18n.T("core.geo.files")) {
+		t.Fatal("GEO files card is missing")
+	}
+	s.selected = len(s.geoFiles) - 1
+	view := strings.Split(ansi.Strip(s.Render(80, 22)), "\n")
+	if !strings.Contains(strings.Join(view, "\n"), filepath.Join(root, "runtime")) ||
+		!strings.Contains(view[len(view)-1], "z "+i18n.T("core.action.restart")) {
+		t.Fatalf("GEO directory or restart help is unreachable: %q", view)
+	}
+}

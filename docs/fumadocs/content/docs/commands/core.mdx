@@ -25,7 +25,7 @@ The baseline configuration provides direct connections, not proxy nodes. System 
 | `g` / `b` | Upgrade to the latest stable release / restore the previous version |
 | `s` / `x` / `z` | Start / stop / restart |
 | `l` | Import a local executable using its independently verified SHA-256 |
-| `e` | Edit download proxy and accelerator settings |
+| `e` (Downloads) | Edit download proxy and accelerator settings |
 | `w` | Shell proxy preference, automatic startup setup and refresh prompt |
 | `h` | Install, control and configure automatic startup of the background service |
 | `y` / `n` | Toggle system proxy / TUN |
@@ -36,17 +36,17 @@ The baseline configuration provides direct connections, not proxy nodes. System 
 | Mouse wheel | Move selection in Advanced and GEO, or scroll dialog contents |
 | `Esc` | Cancel the task or leave the form; downloads also have a clickable Cancel download control |
 
-**Advanced** shows core details, service state and lifecycle controls. Stopping or restarting the core requires confirmation. **Downloads** shows versions and GEO files on the same page. **Mihomo configuration** contains the override form. Switches show saved preferences, whose effects depend on the running core. Wide terminals use 43% / 57% panels. Narrow terminals stack the content. Use `Tab` and `Enter` inside forms. Exiting Mihosh stops the child owned by a session. A background service continues after the TUI exits. Existing external cores remain under their original owner.
+**Advanced** shows core details, service state and lifecycle controls. Stopping or restarting the core requires confirmation. **Downloads** shows versions and GEO files on the same page. **Mihomo configuration** contains the override form and, on managed Linux setups, the systemd user service status beneath it. Switches show saved preferences, whose effects depend on the running core. Wide terminals use 43% / 57% panels. Narrow terminals stack the content. Use `Tab` and `Enter` inside forms. Exiting Mihosh stops the child owned by a session. A background service continues after the TUI exits. Existing external cores remain under their original owner.
 
 ## GEO management
 
-Press `4` in Core to inspect the managed core's `Country.mmdb`, `GeoIP.dat`, `GeoSite.dat` and `ASN.mmdb`. The list shows actual filenames, sizes and modification times, or Not downloaded for missing files. Select a file and press `Enter` or click to download or update it through the configured proxy/accelerator chain with SHA-256 verification. Press `z` after updating to restart the core and load the new data.
+Press `4` in Core to inspect the managed core's `Country.mmdb`, `GeoIP.dat`, `GeoSite.dat` and `ASN.mmdb`. The GEO data files panel shows the storage directory, actual filenames, sizes, and modification times. Missing files are marked Not downloaded. Select a file and press `Enter` or click to download or update it through the configured proxy/accelerator chain with SHA-256 verification. Press `z` after updating to restart the core and load the new data.
 
 Existing filename aliases and configured official lite datasets are preserved. Custom sources are marked for management through the core. External cores retain GEO updates in Core > Mihomo config.
 
 ## Visual release browser
 
-Press `2` in Core to browse official stable releases. The list matches assets to the current OS and architecture, showing version, publication date, size, and Current / Installed badges. Each on-demand request reads up to 10 upstream releases. Compatible stable entries are appended to one continuous list and deduplicated by tag. Arrow-key and wheel navigation near the bottom automatically load older releases until upstream history ends, skipping fully filtered batches. Loaded records live in a session temporary directory, with a fixed 64-record memory cache and rendering limited to visible rows. All loaded history remains browsable; exiting the app cleans up the temporary directory.
+Press `2` in Core to browse official stable releases. Downloads opens with the cached list from `core/releases-cache/` under the Mihosh configuration directory. If the cache is 24 hours old or missing, the app fetches the latest list in the background. The list matches assets to the current OS and architecture, showing version, publication date, size, and Current / Installed badges. Each on-demand request reads up to 10 upstream releases. Compatible stable entries are appended to one continuous list and deduplicated by tag. Arrow-key and wheel navigation near the bottom automatically load older releases until upstream history ends, skipping fully filtered batches. Loaded records live in a session temporary directory, with a fixed 64-record memory cache and rendering limited to visible rows. All loaded history remains browsable; exiting the app cleans up the temporary directory.
 
 Select with the arrow keys or mouse wheel or mouse to inspect the matching asset. **Selecting or downloading a release does not switch or restart the running core.** Press `Enter` / `i` to download, then explicitly press `a` to activate an installed version, which may restart a managed core. The current version is not activated again.
 
@@ -139,7 +139,7 @@ Regular `go test ./...` never mutates real system services or desktop proxies. `
 
 Release queries and asset downloads independently try **official direct access → available HTTP(S) proxies → GitHub accelerators**. The proxy stage is skipped when none is available. Direct and accelerator requests explicitly bypass environment proxies. The proxy stage considers configured, applicable environment and node-capable managed proxies in that order; environment proxies honor `NO_PROXY`.
 
-Built-in endpoints are `https://gh-proxy.org/` and its same-service compatibility endpoint `https://gh-proxy.com/`. Use `e` in Core to reorder or add endpoints, or leave the list empty to disable them. Advanced capability settings are available in application configuration:
+Built-in endpoints are `https://gh-proxy.org/` and its same-service compatibility endpoint `https://gh-proxy.com/`. Use `e` in Core → Downloads to reorder or add endpoints, or leave the list empty to disable them. Advanced capability settings are available in application configuration:
 
 ```yaml
 core:

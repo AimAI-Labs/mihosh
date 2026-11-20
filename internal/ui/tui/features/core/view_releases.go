@@ -150,7 +150,7 @@ func (s State) releaseLayout(width, height int) pageLayout {
 	var result pageLayout
 	t := theme.Current()
 	selected := lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true)
-	visible := max(1, height-2)
+	visible := max(1, height-3)
 	result.listRows = visible
 	start := s.releaseStart(visible)
 	var rows []string
@@ -159,9 +159,12 @@ func (s State) releaseLayout(width, height int) pageLayout {
 		rows = append(rows, strings.Split(wrap(i18n.T("core.catalog.empty"), width-4), "\n")...)
 	}
 	rowWidth := width - 4
-	scrollbar := common.BuildVerticalScrollbar(visible, count, start, true)
-	if scrollbar != "" {
-		rowWidth -= 2
+	var scrollbar string
+	if rowWidth >= 22 {
+		scrollbar = common.BuildVerticalScrollbar(visible, count, start, true)
+		if scrollbar != "" {
+			rowWidth -= 2
+		}
 	}
 	columns := s.releaseColumns(start, min(count, start+visible), rowWidth)
 	for i := start; i < min(count, start+visible); i++ {
@@ -184,10 +187,16 @@ func (s State) releaseLayout(width, height int) pageLayout {
 	}
 	if scrollbar != "" {
 		tracks := strings.Split(scrollbar, "\n")
-		for i := range rows {
+		for i := range min(len(rows), len(tracks)) {
 			rows[i] = common.PadString(rows[i], rowWidth) + " " + tracks[i]
 		}
 	}
+	network := ansi.Truncate("  "+i18n.T("core.action.network")+" [e]", width-4, "…")
+	result.controls = append(result.controls, releaseControl{
+		actionHit: actionHit{x: 2, y: len(rows) + 1, width: lipgloss.Width(network), height: 1},
+		action:    "network",
+	})
+	rows = append(rows, common.HighlightStyle().Render(network))
 	result.content = panel(i18n.T("core.catalog.title"), strings.Join(rows, "\n"), width)
 	return result
 }

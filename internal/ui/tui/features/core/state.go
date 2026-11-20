@@ -16,6 +16,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type State struct {
@@ -361,6 +362,12 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			}
 		}
 		if s.isDownloadsPage() {
+			for _, control := range page.controls {
+				hit := control.actionHit
+				if msg.X >= hit.x && msg.X < hit.x+hit.width && y == hit.y {
+					return s.editForm(control.action)
+				}
+			}
 			for _, hit := range page.actions {
 				if msg.X >= hit.x && msg.X < hit.x+hit.width && y >= hit.y && y < hit.y+hit.height {
 					if s.tab != 3 {
@@ -373,6 +380,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			return s.clickReleasePage(page, msg.X, y)
 		}
 		if s.tab == 4 {
+			msg.Y = y
 			return s.updateEditorMouse(msg, page.editorY)
 		}
 		for _, control := range page.controls {
@@ -418,7 +426,20 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			}
 		}
 		if s.tab == 4 {
-			return s.updateEditorMouse(msg, 4)
+			height := max(1, msg.Height-footerHeight)
+			page := s.layout(msg.Width, height)
+			overflow := lipgloss.Height(page.content) - height
+			if overflow <= 0 {
+				return s.updateEditorMouse(msg, page.editorY)
+			}
+			if !s.editor.IsEditing() {
+				delta := 1
+				if msg.Up {
+					delta = -1
+				}
+				s.scroll = max(0, min(s.scroll+delta, overflow))
+			}
+			return s, nil
 		}
 		if msg.Up {
 			s.selected = max(0, s.selected-1)
@@ -518,7 +539,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case "x":
 			return s.choose("stop")
 		case "e":
-			return s.editForm("network")
+			if s.isDownloadsPage() {
+				return s.editForm("network")
+			}
 		case "w":
 			return s.choose("shell-proxy")
 		}

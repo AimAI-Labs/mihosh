@@ -25,22 +25,6 @@ func (s State) refreshGeoData() tea.Cmd {
 	}
 }
 
-func (s State) geoOverview(width int) string {
-	rows := []string{wrap(i18n.T("core.geo.description"), width-4)}
-	if s.Status.Mode != "managed" {
-		rows = append(rows, "", wrap(i18n.T("core.geo.managed_only"), width-4))
-	} else {
-		if path, err := config.ManagedMihomoConfigPath(); err == nil {
-			rows = append(rows, "", wrap(filepath.Dir(path), width-4))
-		}
-		rows = append(rows, "", wrap(i18n.T("core.geo.restart_hint"), width-4))
-		if s.geoErr != nil {
-			rows = append(rows, "", lipgloss.NewStyle().Foreground(theme.Resolve(theme.Current().Danger)).Render(wrap(s.geoErr.Error(), width-4)))
-		}
-	}
-	return panel(i18n.T("core.tab.geo"), strings.Join(rows, "\n"), width)
-}
-
 func (s State) geoPanel(width int) (string, []actionHit) {
 	t := theme.Current()
 	muted := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted))
@@ -69,7 +53,19 @@ func (s State) geoPanel(width int) (string, []actionHit) {
 		rows = append(rows, strings.Split(muted.Render(detail), "\n")...)
 	}
 	if len(rows) == 0 {
-		rows = append(rows, wrap(i18n.T("core.geo.no_files"), width-4))
+		key := "core.geo.no_files"
+		if s.Status.Mode != "managed" {
+			key = "core.geo.managed_only"
+		}
+		rows = append(rows, wrap(i18n.T(key), width-4))
+	}
+	if s.Status.Mode == "managed" {
+		if path, err := config.ManagedMihomoConfigPath(); err == nil {
+			rows = append(rows, muted.Render(wrap(filepath.Dir(path), width-4)))
+		}
+		if s.geoErr != nil {
+			rows = append(rows, common.ErrorStyle().Render(wrap(s.geoErr.Error(), width-4)))
+		}
 	}
 	return panel(i18n.T("core.geo.files"), strings.Join(rows, "\n"), width), hits
 }
