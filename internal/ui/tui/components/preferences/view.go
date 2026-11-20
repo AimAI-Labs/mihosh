@@ -62,10 +62,7 @@ type PageState struct {
 	EditMode        bool
 	EditValue       string
 	EditCursor      int
-	// Toast 状态
-	Toast *common.ToastManager
-
-	MihomoVersion string
+	MihomoVersion   string
 
 	ActiveTab       int
 	MihomoConfig    *model.MihomoConfig
@@ -224,12 +221,6 @@ func RenderEmbedded(state PageState, width int) string {
 }
 
 func renderSettingsPage(state PageState, width, height int, standalone bool) string {
-	// Toast 管理器
-	if state.Toast == nil {
-		state.Toast = common.NewToastManager()
-	}
-	state.Toast.CleanExpired()
-
 	parts, descRow, versionText := buildSettingsLayoutBase(state, width)
 	if !standalone {
 		parts = parts[2:] // Core already supplies the section header.
@@ -259,21 +250,10 @@ func renderSettingsPage(state PageState, width, height int, standalone bool) str
 		mainContent = overlayVersionAtBottomLeft(mainContent, versionText, width, height)
 	}
 
-	// 渲染 Toast（如果有）
-	toastStr := state.Toast.Render(width)
-
-	// 组装最终结果
-	result := mainContent
-
-	// 如果有 Toast，叠加在右上角
-	if toastStr != "" {
-		result = overlayToast(result, toastStr, width)
-	}
-
 	if standalone {
-		return renderSettingsInlineHelp(result, state, width, height)
+		return renderSettingsInlineHelp(mainContent, state, width, height)
 	}
-	return result
+	return mainContent
 }
 
 func (s State) InlineHelpHints(width int) []common.InlineHelpHint {
@@ -755,25 +735,4 @@ func renderEnumTabs(current string, modes []string, editMode bool) string {
 		}
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Left, parts...)
-}
-
-// overlayToast 在页面右上角叠加 Toast。
-func overlayToast(page, toast string, width int) string {
-	if toast == "" {
-		return page
-	}
-
-	pageLines := strings.Split(page, "\n")
-	toastLines := strings.Split(toast, "\n")
-
-	toastHeight := len(toastLines)
-	if toastHeight > len(pageLines) {
-		toastHeight = len(pageLines)
-	}
-
-	for i := 0; i < toastHeight; i++ {
-		pageLines[i] = toastLines[i]
-	}
-
-	return strings.Join(pageLines, "\n")
 }

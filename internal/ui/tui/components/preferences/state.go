@@ -47,9 +47,6 @@ type State struct {
 
 	doubleClickDetector common.DoubleClickDetector[struct{}]
 
-	// Toast 管理器
-	toastManager *common.ToastManager
-
 	// Mihomo 内核版本
 	mihomoVersion string
 	versionLoaded bool
@@ -79,10 +76,9 @@ type State struct {
 // NewState 创建新的设置页面状态
 func NewState(configSvc *service.ConfigService, client *api.Client) State {
 	return State{
-		SysStatus:    NewSysStatusState(),
-		toastManager: common.NewToastManager(),
-		configSvc:    configSvc,
-		client:       client,
+		SysStatus: NewSysStatusState(),
+		configSvc: configSvc,
+		client:    client,
 	}
 }
 
@@ -174,16 +170,12 @@ func (s State) ApplyMihomoVersion(version string) State {
 
 // ToPageState 转换为渲染层所需的 PageState
 func (s State) ToPageState(cfg *config.Config, sysLogs []model.LogEntry) PageState {
-	if s.toastManager == nil {
-		s.toastManager = common.NewToastManager()
-	}
 	return PageState{
 		Config:          cfg,
 		SelectedSetting: s.selectedSetting,
 		EditMode:        s.editMode,
 		EditValue:       s.editValue,
 		EditCursor:      s.editCursor,
-		Toast:           s.toastManager,
 		MihomoVersion:   s.mihomoVersion,
 		ActiveTab:       s.activeTab,
 		MihomoConfig:    s.mihomoConfig,
@@ -220,9 +212,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 				return s, nil
 			}
 			if msg.String() == "ctrl+s" {
-				next, ok := s.commitCurrentEditDraft()
-				if !ok {
-					return next, nil
+				next, err := s.commitCurrentEditDraft()
+				if err != nil {
+					return next, saveErrorNotice(err)
 				}
 				return next.submitMihomoOverrides()
 			}
@@ -295,6 +287,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		return s.handleMihomoMouseLeft(pageX, pageY, pageWidth)
 	}
 	settingIdx := resolveMouseSettingIndex(s, pageY, pageWidth)
+	var feedback tea.Cmd
 
 	if s.editMode {
 		if s.activeTab == 0 && s.selectedSetting == LanguageSettingIndex() {
@@ -305,10 +298,9 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 					s.editMode = false
 					s.editValue = ""
 					s.editCursor = 0
-					return s, noticeCmd(i18n.T("settings.toast.save_success_lang"))
+					return s, noticeCmd(i18n.T("settings.toast.save_success_lang"), messages.NoticeSuccess)
 				}
-				s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
-				return s, nil
+				return s, noticeCmd(i18n.T("settings.toast.save_failed"), messages.NoticeError)
 			}
 		}
 		if s.selectedSetting == ThemeSettingIndex() && settingIdx == s.selectedSetting {
@@ -320,10 +312,9 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 					s.editMode = false
 					s.editValue = ""
 					s.editCursor = 0
-					return s, noticeCmd(i18n.T("settings.toast.save_success_theme"))
+					return s, noticeCmd(i18n.T("settings.toast.save_success_theme"), messages.NoticeSuccess)
 				}
-				s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
-				return s, nil
+				return s, noticeCmd(i18n.T("settings.toast.save_failed"), messages.NoticeError)
 			}
 		}
 
@@ -356,9 +347,9 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 			if err := s.configSvc.SetConfigValue(s.activeKeys()[settingIdx], lang); err == nil {
 				newCfg, _ := s.configSvc.LoadConfig()
 				s.Config = newCfg
-				return s, noticeCmd(i18n.T("settings.toast.save_success_lang"))
+				return s, noticeCmd(i18n.T("settings.toast.save_success_lang"), messages.NoticeSuccess)
 			}
-			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
+			feedback = noticeCmd(i18n.T("settings.toast.save_failed"), messages.NoticeError)
 		}
 	}
 	if s.activeTab == 0 && settingIdx == ThemeSettingIndex() {
@@ -367,9 +358,9 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 				newCfg, _ := s.configSvc.LoadConfig()
 				s.Config = newCfg
 				theme.SetTheme(t)
-				return s, noticeCmd(i18n.T("settings.toast.save_success_theme"))
+				return s, noticeCmd(i18n.T("settings.toast.save_success_theme"), messages.NoticeSuccess)
 			}
-			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
+			feedback = noticeCmd(i18n.T("settings.toast.save_failed"), messages.NoticeError)
 		}
 	}
 
@@ -380,7 +371,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		s.editCursor = len([]rune(s.editValue))
 	}
 
-	return s, nil
+	return s, feedback
 }
 
 func (s State) handleMihomoMouseLeft(pageX, pageY, pageWidth int) (State, tea.Cmd) {
@@ -390,9 +381,9 @@ func (s State) handleMihomoMouseLeft(pageX, pageY, pageWidth int) (State, tea.Cm
 	if pageY == mihomoApplyButtonRowY {
 		if s.editMode {
 			if resolveMihomoApplyButtonClick(pageX, s.overridesSaving) {
-				next, ok := s.commitCurrentEditDraft()
-				if !ok {
-					return next, nil
+				next, err := s.commitCurrentEditDraft()
+				if err != nil {
+					return next, saveErrorNotice(err)
 				}
 				next.selectedSetting = mihomoApplyIndex
 				return next.submitMihomoOverrides()
@@ -470,8 +461,7 @@ func (s State) saveBorderStyle(style string) (State, tea.Cmd) {
 		return s, nil
 	}
 	if err := s.configSvc.SetConfigValue("border-style", style); err != nil {
-		s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
-		return s, nil
+		return s, noticeCmd(i18n.T("settings.toast.save_failed"), messages.NoticeError)
 	}
 	s.Config, _ = s.configSvc.LoadConfig()
 	theme.SetBorderStyle(style)
@@ -528,9 +518,9 @@ func (s State) handleEditMode(msg tea.KeyMsg) (State, tea.Cmd) {
 				s.Config = newCfg
 				s.editMode = false
 				s.editValue = ""
-				return s, noticeCmd(i18n.T("settings.toast.save_success_lang"))
+				return s, noticeCmd(i18n.T("settings.toast.save_success_lang"), messages.NoticeSuccess)
 			}
-			s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
+			return s, noticeCmd(i18n.T("settings.toast.save_failed"), messages.NoticeError)
 		case msg.String() == "left":
 			s.editValue = prevLanguage(s.editValue)
 		case msg.String() == "right", msg.String() == "tab":
@@ -547,15 +537,14 @@ func (s State) handleEditMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		case key.Matches(msg, common.Keys.Enter):
 			newTheme := s.editValue
 			if err := s.configSvc.SetConfigValue("theme", newTheme); err != nil {
-				s.showToast(i18n.T("settings.toast.save_failed"), common.ToastError)
-				return s, nil
+				return s, noticeCmd(i18n.T("settings.toast.save_failed"), messages.NoticeError)
 			}
 			newCfg, _ := s.configSvc.LoadConfig()
 			s.Config = newCfg
 			theme.SetTheme(newTheme)
 			s.editMode = false
 			s.editValue = ""
-			return s, tea.Batch(func() tea.Msg { return messages.ThemeChangedMsg{} }, noticeCmd(i18n.T("settings.toast.save_success_theme")))
+			return s, tea.Batch(func() tea.Msg { return messages.ThemeChangedMsg{} }, noticeCmd(i18n.T("settings.toast.save_success_theme"), messages.NoticeSuccess))
 		case msg.String() == "left":
 			s.editValue = prevTheme(s.editValue)
 		case msg.String() == "right", msg.String() == "tab":
@@ -573,22 +562,23 @@ func (s State) handleEditMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	case key.Matches(msg, common.Keys.Enter):
 		settingKey := s.activeKeys()[s.selectedSetting]
 		if s.activeTab == 1 {
-			next, _ := s.commitCurrentEditDraft()
+			next, err := s.commitCurrentEditDraft()
+			if err != nil {
+				return next, saveErrorNotice(err)
+			}
 			return next, nil
 		}
 
 		if err := s.configSvc.SetConfigValue(settingKey, s.editValue); err != nil {
 			// 保存失败：保持编辑模式，显示错误提示
-			s.showToast(i18n.Tf("settings.toast.save_failed_with_err", err.Error()), common.ToastError)
-			return s, nil
+			return s, saveErrorNotice(err)
 		}
 		newCfg, _ := s.configSvc.LoadConfig()
 		s.Config = newCfg
 		s.editMode = false
 		s.editValue = ""
 		s.editCursor = 0
-		s.showToast(i18n.T("settings.toast.save_success"), common.ToastSuccess)
-		return s, nil
+		return s, noticeCmd(i18n.T("settings.toast.save_success"), messages.NoticeSuccess)
 
 	case msg.String() == "left":
 		if s.editCursor > 0 {
@@ -644,19 +634,14 @@ func (s State) handleEditMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	return s, nil
 }
 
-// showToast 显示 Toast 提示
-func (s *State) showToast(msg string, toastType common.ToastType) {
-	if s.toastManager == nil {
-		s.toastManager = common.NewToastManager()
+func noticeCmd(text string, level messages.NoticeLevel) tea.Cmd {
+	return func() tea.Msg {
+		return messages.NoticeMsg{Text: text, Level: level}
 	}
-	s.toastManager.Add(msg, toastType, 2*time.Second)
 }
 
-// noticeCmd 返回一个 tea.Cmd，向底栏发送通知消息。
-func noticeCmd(text string) tea.Cmd {
-	return func() tea.Msg {
-		return messages.NoticeMsg{Text: text}
-	}
+func saveErrorNotice(err error) tea.Cmd {
+	return noticeCmd(i18n.Tf("settings.toast.save_failed_with_err", err.Error()), messages.NoticeError)
 }
 
 func resolveMouseSettingIndex(s State, pageY, width int) int {
@@ -878,9 +863,9 @@ func (s *State) setDraftOverride(key, value string) {
 	s.draftOverrides[key] = value
 }
 
-func (s State) commitCurrentEditDraft() (State, bool) {
+func (s State) commitCurrentEditDraft() (State, error) {
 	if !s.editMode || s.selectedSetting < 0 || s.selectedSetting >= len(MihomoSettingKeys) {
-		return s.CancelEdit(), true
+		return s.CancelEdit(), nil
 	}
 	settingKey := MihomoSettingKeys[s.selectedSetting]
 	val := s.editValue
@@ -888,11 +873,10 @@ func (s State) commitCurrentEditDraft() (State, bool) {
 		val = strings.TrimSpace(val)
 	}
 	if err := profile.ValidateMihomoOverride(settingKey, val); err != nil {
-		s.showToast(i18n.Tf("settings.toast.save_failed_with_err", err.Error()), common.ToastError)
-		return s, false
+		return s, err
 	}
 	s.setDraftOverride(settingKey, val)
-	return s.CancelEdit(), true
+	return s.CancelEdit(), nil
 }
 
 func (s State) submitMihomoOverrides() (State, tea.Cmd) {
@@ -901,8 +885,7 @@ func (s State) submitMihomoOverrides() (State, tea.Cmd) {
 	}
 	for _, k := range MihomoSettingKeys {
 		if err := profile.ValidateMihomoOverride(k, s.getDraftOverride(k)); err != nil {
-			s.showToast(i18n.Tf("settings.toast.save_failed_with_err", err.Error()), common.ToastError)
-			return s, nil
+			return s, saveErrorNotice(err)
 		}
 	}
 	s.overridesSaving = true

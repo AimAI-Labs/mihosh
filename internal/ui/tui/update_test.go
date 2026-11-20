@@ -52,15 +52,15 @@ func TestUpdate_GlobalMessages(t *testing.T) {
 	errMsg := messages.ErrMsg{Err: context.DeadlineExceeded}
 	newM, _ = newModel.Update(errMsg)
 	newModel = newM.(Model)
-	if newModel.err == nil {
+	if newModel.notice.Message.Level != messages.NoticeError {
 		t.Errorf("Expected error to be set")
 	}
 
 	// Test ConfigModeMsg
 	newM, _ = newModel.Update(messages.ConfigModeMsg{Mode: "rule"})
 	newModel = newM.(Model)
-	if newModel.noticeTicks != 0 {
-		t.Errorf("Notice ticks should be 0 or maintained based on logic")
+	if newModel.notice.Message.Level != messages.NoticeError {
+		t.Errorf("a background mode update should not dismiss an error")
 	}
 }
 
@@ -82,10 +82,10 @@ func TestUpdate_MouseMessages(t *testing.T) {
 	}
 
 	// Error popup intercepts
-	newModel.showErrorPopup = true
+	newModel.notice.DetailsOpen = true
 	newM, _ = newModel.Update(msg)
 	newModel = newM.(Model)
-	if newModel.showErrorPopup {
+	if newModel.notice.DetailsOpen {
 		t.Errorf("Expected left click to dismiss error popup")
 	}
 
@@ -173,21 +173,21 @@ func TestUpdate_DataMessages(t *testing.T) {
 	// A successful rule edit reports the persisted and applied result.
 	newM, _ = m.Update(messages.RuleEditAppliedMsg{NoticeKey: "rules.added_toast", Applied: true})
 	m = newM.(Model)
-	if m.notice == "" {
+	if m.notice.Message.Text == "" {
 		t.Errorf("Expected notice to be set for rule added")
 	}
 
 	// Test SubAddDoneMsg
 	newM, _ = m.Update(messages.SubAddDoneMsg{UID: "sub1"})
 	m = newM.(Model)
-	if m.notice == "" {
+	if m.notice.Message.Text == "" {
 		t.Errorf("Expected notice to be set for sub add done")
 	}
 
 	// Test NoticeMsg
-	newM, _ = m.Update(messages.NoticeMsg{Text: "test notice"})
+	newM, _ = m.Update(messages.NoticeMsg{Text: "test notice", Level: messages.NoticeSuccess})
 	m = newM.(Model)
-	if m.notice != "test notice" {
+	if m.notice.Message.Text != "test notice" {
 		t.Errorf("Expected notice to be updated")
 	}
 
@@ -260,7 +260,8 @@ func TestUpdate_InlineHelpMenuClick(t *testing.T) {
 	findLabelX := func(view, label string) (int, int) {
 		t.Helper()
 		lines := strings.Split(ansi.Strip(view), "\n")
-		y := layout.TopNavHeight + (m.height - layout.TopNavHeight - common.StatusBarHeight) - 1
+		_, pageHeight := m.getPageSize()
+		y := pageTop + pageHeight - 1
 		if y < 0 || y >= len(lines) {
 			t.Fatalf("invalid bottom hint row %d", y)
 		}

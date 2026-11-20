@@ -111,10 +111,10 @@ func TestOverrideResultsKeepLiveTargetUntilManualRefresh(t *testing.T) {
 			require.Equal(t, "old", next.client.EndpointSnapshot().Secret)
 			require.True(t, next.connectionReady)
 			if entry.notice == "" {
-				require.Empty(t, next.notice)
-				require.ErrorContains(t, next.err, i18n.T("settings.toast.mihomo_override_restored"))
+				require.Equal(t, messages.NoticeError, next.notice.Message.Level)
+				require.Contains(t, next.notice.Message.Detail, i18n.T("settings.toast.mihomo_override_restored"))
 			} else {
-				require.Equal(t, i18n.T(entry.notice), next.notice)
+				require.Equal(t, i18n.T(entry.notice), next.notice.Message.Text)
 			}
 			if entry.pending {
 				next.currentPage = layout.PageCore
@@ -137,7 +137,7 @@ func TestMergeEditorRefreshReachesMihomoForm(t *testing.T) {
 	updated, cmd := m.Update(messages.MergeEditFinishedMsg{})
 	require.NotNil(t, cmd)
 	var read messages.MihomoOverridesMsg
-	for _, child := range cmd().(tea.BatchMsg) {
+	for _, child := range mergeEditSideEffects(t, cmd) {
 		if msg, ok := child().(messages.MihomoOverridesMsg); ok {
 			read = msg
 		}
@@ -185,7 +185,7 @@ func TestMergeEditorAppliesActiveSubscriptionToRemoteCore(t *testing.T) {
 
 	updated, cmd := m.Update(messages.MergeEditFinishedMsg{ClearedOverrides: []string{"log-level"}})
 	var applied messages.SubMergeAppliedMsg
-	for _, child := range cmd().(tea.BatchMsg) {
+	for _, child := range mergeEditSideEffects(t, cmd) {
 		if msg, ok := child().(messages.SubMergeAppliedMsg); ok {
 			applied = msg
 		}
@@ -203,9 +203,21 @@ func TestMergeEditorAppliesActiveSubscriptionToRemoteCore(t *testing.T) {
 	}
 
 	updated, cmd = updated.Update(applied)
-	require.Equal(t, i18n.T("settings.toast.mihomo_override_remote_applied"), updated.(Model).notice)
+	require.Equal(t, i18n.T("settings.toast.mihomo_override_remote_applied"), updated.(Model).notice.Message.Text)
 	require.NotNil(t, cmd)
 	require.Equal(t, m.connectionEpoch, updated.(Model).connectionEpoch)
+}
+
+func mergeEditSideEffects(t *testing.T, cmd tea.Cmd) tea.BatchMsg {
+	t.Helper()
+	require.NotNil(t, cmd)
+	batch, ok := cmd().(tea.BatchMsg)
+	require.True(t, ok)
+	require.Len(t, batch, 2)
+	// The first command keeps the editor's work together, alongside the notice expiry.
+	sideEffects, ok := batch[0]().(tea.BatchMsg)
+	require.True(t, ok)
+	return sideEffects
 }
 
 func TestUnchangedSettingsDoNotInvalidateTarget(t *testing.T) {

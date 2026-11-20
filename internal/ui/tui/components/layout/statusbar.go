@@ -8,7 +8,6 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/styles"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
-	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-runewidth"
@@ -69,8 +68,8 @@ func renderNodeInfo(mode, groupName, nodeName string, delay, width int) string {
 }
 
 // RenderStatusBar 渲染底部状态栏（含实时指标和累计流量）
-func RenderStatusBar(width int, err error, testing bool, testingTarget string, notice string, chartData *model.ChartData, uploadTotal int64, downloadTotal int64, mode string, groupName string, nodeName string, delay int, hasUpdate bool) string {
-	// ── 左侧：节点信息 + 运行状态 / 错误 ──
+func RenderStatusBar(width int, chartData *model.ChartData, uploadTotal int64, downloadTotal int64, mode string, groupName string, nodeName string, delay int, hasUpdate bool) string {
+	// ── 左侧：节点信息 ──
 	nodeInfo := renderNodeInfo(mode, groupName, nodeName, delay, width)
 
 	// ── 右侧：实时指标 ──
@@ -111,53 +110,6 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, n
 		}
 	}
 
-	var status string
-	metricsWidth := lipgloss.Width(metricsStr)
-	nodeInfoWidth := lipgloss.Width(nodeInfo)
-
-	if err != nil {
-		errText := err.Error()
-		friendlyErr := errText
-		if strings.Contains(errText, "context dead") {
-			friendlyErr = i18n.T("status.err.timeout_node")
-		} else if strings.Contains(errText, "connection refused") {
-			friendlyErr = i18n.T("status.err.refused")
-		} else if strings.Contains(errText, "timeout") {
-			friendlyErr = i18n.T("status.err.timeout")
-		}
-
-		// 截断长度需减去节点信息宽度和右侧指标宽度，以及图标等占用的边距
-		maxErrLen := width - nodeInfoWidth - metricsWidth - 6
-		if maxErrLen < 5 {
-			maxErrLen = 5
-		}
-		status = styles.ErrorStyle().Render(fmt.Sprintf("✗ %s", truncateRunes(friendlyErr, maxErrLen)))
-	} else if strings.TrimSpace(notice) != "" {
-		maxNoticeLen := width - nodeInfoWidth - metricsWidth - 6
-		if maxNoticeLen < 5 {
-			maxNoticeLen = 5
-		}
-		status = styles.StatusStyle().Render("✔ " + truncateRunes(notice, maxNoticeLen))
-	} else if testing {
-		statusText := i18n.T("status.testing")
-		if target := strings.TrimSpace(testingTarget); target != "" {
-			statusText = fmt.Sprintf("%s: %s", i18n.T("status.testing"), target)
-		}
-		maxTestingLen := width - nodeInfoWidth - metricsWidth - 6
-		if maxTestingLen < 5 {
-			maxTestingLen = 5
-		}
-		status = styles.TestingStyle().Render(truncateRunes(statusText, maxTestingLen))
-	} else {
-		status = ""
-	}
-
-	// 组合左侧内容（节点信息始终显示）
-	leftPart := nodeInfo
-	if status != "" {
-		leftPart = nodeInfo + " " + status
-	}
-
 	// ── 分隔线 ──
 	divider := styles.DividerStyle().
 		Render(strings.Repeat("─", width))
@@ -169,11 +121,11 @@ func RenderStatusBar(width int, err error, testing bool, testingTarget string, n
 
 	// ── 组装状态行 ──
 	// 计算右侧空间并右对齐
-	gap := width - lipgloss.Width(leftPart) - lipgloss.Width(metricsStr) - lipgloss.Width(rightIcon) - 2
+	gap := width - lipgloss.Width(nodeInfo) - lipgloss.Width(metricsStr) - lipgloss.Width(rightIcon) - 2
 	if gap < 0 {
 		gap = 0
 	}
-	statusLine := leftPart + strings.Repeat(" ", gap) + metricsStr + rightIcon
+	statusLine := nodeInfo + strings.Repeat(" ", gap) + metricsStr + rightIcon
 
 	return lipgloss.JoinVertical(lipgloss.Left, divider, statusLine)
 }

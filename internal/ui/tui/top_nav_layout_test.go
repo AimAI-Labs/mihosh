@@ -18,7 +18,7 @@ func TestResolveMainPageMouseHitUsesTopNavOffset(t *testing.T) {
 	}
 
 	// 移除外边框后，内容直接从顶部导航下方开始
-	pageX, pageY, pageWidth, _, ok := m.resolveMainPageMouseHit(2, layout.TopNavHeight)
+	pageX, pageY, pageWidth, _, ok := m.resolveMainPageMouseHit(2, pageTop)
 	if !ok {
 		t.Fatal("expected point inside main page content to resolve")
 	}

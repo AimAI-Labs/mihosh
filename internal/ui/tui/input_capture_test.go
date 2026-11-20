@@ -42,7 +42,7 @@ func capturedPage(t *testing.T, name string) Model {
 	case "connection TopN":
 		m.currentPage = layout.PageConnections
 		for i := 0; i < 2; i++ {
-			next, _ := m.Update(tea.MouseMsg{X: 1, Y: layout.TopNavHeight + 4, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+			next, _ := m.Update(tea.MouseMsg{X: 1, Y: pageTop + 4, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
 			m = next.(Model)
 		}
 		if !m.connsState.ToPageState(chart, 120, 32).TopNModalMode {

@@ -5,23 +5,18 @@ import (
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
 
-func TestRenderSettingsPageToastUsesReservedTopLine(t *testing.T) {
+func TestRenderSettingsPagePreservesLayout(t *testing.T) {
 	i18n.Init()
 	i18n.SetLanguageOverride("zh-CN")
-
-	toast := common.NewToastManager()
-	toast.Success(i18n.T("settings.toast.save_success_theme"))
 
 	rendered := stripANSISettings(RenderSettingsPage(PageState{
 		Config: &config.Config{
 			TestURL: "http://example.com",
 			Theme:   "tokyo-night",
 		},
-		Toast: toast,
 	}, 80, 20))
 
 	lines := strings.Split(rendered, "\n")

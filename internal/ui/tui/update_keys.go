@@ -82,10 +82,10 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// 报错弹窗拦截
-	if m.showErrorPopup {
+	if m.notice.DetailsOpen {
 		switch msg.String() {
 		case "esc", "enter", "q":
-			m.showErrorPopup = false
+			m.notice.Clear()
 			return m, nil
 		}
 		if key.Matches(msg, common.Keys.Quit) {
@@ -202,8 +202,6 @@ func (m Model) dispatchToPage(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.autoRefreshRemaining = newCfg.AutoRefreshInterval
 			m.autoRefreshSynced = false
 			m.autoRefreshSyncedTTL = 0
-			m.notice = ""
-			m.noticeTicks = 0
 		}
 	}
 	return m, cmd

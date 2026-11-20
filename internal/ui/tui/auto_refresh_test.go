@@ -111,24 +111,22 @@ func TestAutoRefreshMessageShowsSyncedCheckmarkAfterSuccessfulRefresh(t *testing
 	}
 }
 
-func TestAutoRefreshNoticeExpiresOnTicks(t *testing.T) {
-	model := Model{
-		config: &config.Config{AutoRefreshInterval: 5},
-	}
-
-	next, _ := model.Update(messages.AutoRefreshMsg{Changed: true})
+func TestAutoRefreshNoticeUsesIndependentExpiry(t *testing.T) {
+	model := Model{config: &config.Config{AutoRefreshInterval: 5}}
+	next, cmd := model.Update(messages.AutoRefreshMsg{Changed: true})
 	got := next.(Model)
-	if got.notice == "" {
-		t.Fatalf("expected changed refresh to set notice")
+	if got.notice.Message.Level != messages.NoticeInfo || got.notice.Message.Text == "" || cmd == nil {
+		t.Fatal("changed refresh must publish an expiring info notification")
 	}
 
-	for i := 0; i < autoRefreshNoticeTicks; i++ {
-		next, _ = got.Update(messages.AutoRefreshTickMsg(time.Now()))
-		got = next.(Model)
+	next, _ = got.Update(messages.AutoRefreshTickMsg(time.Now()))
+	got = next.(Model)
+	if got.notice.Message.Text == "" {
+		t.Fatal("the refresh timer expired a notification")
 	}
-
-	if got.notice != "" {
-		t.Fatalf("expected auto refresh notice to expire, got %q", got.notice)
+	next, _ = got.Update(messages.NoticeExpiredMsg{ID: got.notice.ID})
+	if next.(Model).notice.Message.Text != "" {
+		t.Fatal("the notification timer did not clear the message")
 	}
 }
 

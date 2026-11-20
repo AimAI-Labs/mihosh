@@ -25,10 +25,7 @@ import (
 // connRefreshInterval 连接刷新间隔
 const connRefreshInterval = 1 * time.Second
 
-const (
-	autoRefreshNoticeTicks = 3
-	autoRefreshSyncedTicks = 1
-)
+const autoRefreshSyncedTicks = 1
 
 // connTick 创建连接页面定时器
 func connTick() tea.Cmd {
@@ -68,12 +65,20 @@ func reloadConfigCmd(client interface {
 }
 
 func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.applyWSMessage(msg)
+	if next.notice.ID != m.notice.ID {
+		cmd = tea.Batch(cmd, next.notice.ExpiryCmd())
+	}
+	return next, cmd
+}
+
+func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.CoreHTTPMsg:
 		if m.client == nil || msg.Generation != m.client.Generation() {
 			return m, nil
 		}
-		return m.handleWSMessages(msg.Payload)
+		return m.applyWSMessage(msg.Payload)
 	case messages.CoreOwnerChangedMsg:
 		m.reloadStoredConfig()
 		update := coreTargetReconnect
@@ -86,7 +91,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.wsClient == nil || msg.Generation != m.wsClient.Generation() {
 			return m, listenWSMessages(m.wsCtx, m.wsMsgChan)
 		}
-		return m.handleWSMessages(msg.Payload)
+		return m.applyWSMessage(msg.Payload)
 
 	case messages.ManagedCoreStartedMsg:
 		if msg.Epoch != m.connectionEpoch {
@@ -147,8 +152,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case messages.HideGuideModalMsg:
 		if m.guideState.Active {
-			m.notice = i18n.T("status.normal")
-			m.noticeTicks = autoRefreshNoticeTicks
+			m.publishNotice(i18n.T("status.normal"), messages.NoticeInfo)
 		}
 		m.guideState = m.guideState.Dismiss()
 		return m, nil
@@ -165,29 +169,20 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.isUpdating = false
 			return m, nil
 		}
-		m.notice = i18n.T("status.update_applied")
-		if m.notice == "status.update_applied" {
-			m.notice = "Update applied, please restart."
+		text := i18n.T("status.update_applied")
+		if text == "status.update_applied" {
+			text = "Update applied, please restart."
 		}
-		m.noticeTicks = autoRefreshNoticeTicks
+		m.publishNotice(text, messages.NoticeSuccess)
 		return m, tea.Quit
 
 	case messages.GroupsMsg:
-		if m.noticeTicks <= 0 {
-			m.notice = ""
-		}
 		m.nodesState = m.nodesState.ApplyGroups(msg.Groups, msg.OrderedNames)
 
 	case messages.ProxiesMsg:
-		if m.noticeTicks <= 0 {
-			m.notice = ""
-		}
 		m.nodesState = m.nodesState.ApplyProxies(msg)
 
 	case messages.ConfigModeMsg:
-		if m.noticeTicks <= 0 {
-			m.notice = ""
-		}
 		m.nodesState = m.nodesState.ApplyConfigMode(msg.Mode)
 
 	case messages.ConnectionsMsg:
@@ -241,11 +236,10 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case messages.RuleEditAppliedMsg:
 		if msg.Err != nil {
-			m.err = messages.ErrMsg{Err: msg.Err}
-			m.notice, m.noticeTicks = "", 0
+			m.publishError(msg.Err)
 			return m, nil
 		}
-		m.err = nil
+		m.clearErrorNotice()
 		notice := msg.NoticeKey
 		if msg.Remote || msg.NeedsRestart || msg.Restarted {
 			notice = mihomoOverrideNotice(messages.MihomoOverridesSavedMsg{
@@ -254,8 +248,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else if !msg.Applied {
 			notice = "rules.write.saved"
 		}
-		m.notice = i18n.T(notice)
-		m.noticeTicks = autoRefreshNoticeTicks
+		m.publishNotice(i18n.T(notice), overrideNoticeLevel(msg.Applied, msg.NeedsRestart))
 		if !msg.Remote && (msg.Restarted || msg.EndpointChanged) {
 			if cmd := m.syncAppliedCore(msg.Restarted, msg.NeedsRestart && msg.Applied); cmd != nil {
 				return m, cmd
@@ -268,7 +261,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case messages.ConfigReloadedMsg:
 		if msg.Err != nil {
-			m.err = messages.ErrMsg(msg)
+			m.publishError(msg.Err)
 			return m, nil
 		}
 		if m.currentPage == layout.PageRules {
@@ -281,13 +274,10 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// 不恢复鼠标模式（Bubble Tea v1.3.10 缺陷），需显式重新启用，否则退出编辑器后鼠标失效。
 		reenableMouse := func() tea.Msg { return tea.EnableMouseCellMotion() }
 		if msg.Err != nil {
-			m.err = messages.ErrMsg(msg)
-			m.notice = ""
-			m.noticeTicks = 0
+			m.publishError(msg.Err)
 			return m, reenableMouse
 		}
-		m.notice = i18n.T("rules.edited_toast")
-		m.noticeTicks = autoRefreshNoticeTicks
+		m.publishNotice(i18n.T("rules.edited_toast"), messages.NoticeSuccess)
 		return m, tea.Batch(reenableMouse, reloadConfigCmd(m.client))
 
 	case messages.SiteTestMsg:
@@ -329,8 +319,6 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.autoRefreshRemaining = 0
 			m.autoRefreshSynced = false
 			m.autoRefreshSyncedTTL = 0
-			m.notice = ""
-			m.noticeTicks = 0
 			return m, autoRefreshTick()
 		}
 		if m.autoRefreshRemaining <= 0 || m.autoRefreshRemaining > interval {
@@ -347,28 +335,22 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, autoRefreshTick()
 
 	case messages.AutoRefreshMsg:
-		m.err = nil
 		m.nodesState = m.nodesState.ApplyGroups(msg.Result.Groups, msg.Result.OrderedNames)
 		m.nodesState = m.nodesState.ApplyProxies(msg.Result.Proxies)
 		m.nodesState = m.nodesState.ApplyConfigMode(msg.Result.Mode)
 		m.autoRefreshSynced = true
 		m.autoRefreshSyncedTTL = autoRefreshSyncedTicks
 		if msg.Changed {
-			m.notice = i18n.T("status.auto_refreshed")
-			m.noticeTicks = autoRefreshNoticeTicks
+			m.publishNotice(i18n.T("status.auto_refreshed"), messages.NoticeInfo)
 		}
 
 	case messages.ErrMsg:
-		m.err = msg
-		m.showErrorPopup = false // 收到新错误时不要自动弹出，除非用户主动点击，如果当前开着弹窗则关掉。或者也可以保持不管。保险起见设为 false。
-		m.notice = ""
-		m.noticeTicks = 0
+		m.publishError(msg.Err)
 		m.nodesState = m.nodesState.ResetTesting()
 
 	case messages.CoreActionDoneMsg:
 		m.coreState, _ = m.coreState.Update(msg)
-		m.notice = msg.Action + " " + i18n.T("settings.action.success")
-		m.noticeTicks = autoRefreshNoticeTicks
+		m.publishNotice(msg.Action+" "+i18n.T("settings.action.success"), messages.NoticeSuccess)
 		if msg.NeedReloadAll {
 			cmds := []tea.Cmd{
 				nodes.FetchGroups(m.client),
@@ -389,9 +371,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case messages.CoreActionErrorMsg:
 		m.coreState, _ = m.coreState.Update(msg)
-		m.err = messages.ErrMsg{Err: msg.Err}
-		m.notice = ""
-		m.noticeTicks = 0
+		m.publishError(msg.Err)
 
 	case messages.MihomoVersionMsg:
 		m.settingsState = m.settingsState.ApplyMihomoVersion(msg.Version)
@@ -408,14 +388,12 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if msg.Restored {
 					err = fmt.Errorf("%s (%w)", i18n.T("settings.toast.mihomo_override_restored"), err)
 				}
-				m.err = messages.ErrMsg{Err: err}
+				m.publishError(err)
 			}
-			m.notice, m.noticeTicks = "", 0
 			return m, nil
 		}
-		m.err = nil
-		m.notice = i18n.T(mihomoOverrideNotice(msg))
-		m.noticeTicks = autoRefreshNoticeTicks
+		m.clearErrorNotice()
+		m.publishNotice(i18n.T(mihomoOverrideNotice(msg)), overrideNoticeLevel(msg.Applied, msg.NeedsRestart))
 		var targetCmd tea.Cmd
 		if !msg.Remote && (msg.Restarted || msg.EndpointChanged || msg.NeedsRestart && !msg.Applied) {
 			targetCmd = m.syncAppliedCore(msg.Restarted, msg.NeedsRestart && msg.Applied)
@@ -432,7 +410,6 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.coreState, _ = m.coreState.Update(msg)
 		if msg.Config != nil {
 			cmd := m.updateCoreTarget(config.MihomoEndpoint{ExternalController: msg.Config.ExternalController, Secret: msg.Config.Secret, MixedPort: msg.Config.MixedPort}, coreTargetSync)
-			m.err = nil
 			return m, cmd
 		}
 
@@ -442,19 +419,17 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// external-controller/secret/mixed-port 变更后重新解析 endpoint 热刷新 client/wsClient。
 		if msg.Err != nil && !msg.WriteOK {
 			// YAML 写入就失败了（如路径不存在），显示硬错误
-			m.err = messages.ErrMsg{Err: msg.Err}
+			m.publishError(msg.Err)
 		} else {
 			// YAML 写入成功：即使 reload 失败也刷新端点（修改 external-controller 后旧端口不可达是预期行为）
 			endpoint := config.ResolveMihomoEndpoint()
 			targetCmd = m.updateCoreTarget(endpoint, coreTargetSync)
+			m.clearErrorNotice()
 			if msg.Err != nil {
-				// reload 失败但 YAML 已保存，提示用户配置已保存但需重启内核生效
-				m.notice = i18n.T("settings.toast.mihomo_save_reload_warn")
+				m.publishNotice(i18n.T("settings.toast.mihomo_save_reload_warn"), messages.NoticeWarning)
 			} else {
-				m.notice = i18n.T("settings.toast.mihomo_save_success")
+				m.publishNotice(i18n.T("settings.toast.mihomo_save_success"), messages.NoticeSuccess)
 			}
-			m.noticeTicks = autoRefreshNoticeTicks
-			m.err = nil
 		}
 		return m, tea.Batch(targetCmd, m.fetchNodes(), preferences.FetchMihomoConfig(m.configSvc, m.client))
 
@@ -463,10 +438,10 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.ClearScreen
 
 	case messages.NoticeMsg:
-		// 页面通过 tea.Cmd 推送的底栏通知
-		m.notice = msg.Text
-		m.noticeTicks = autoRefreshNoticeTicks
-		return m, nil
+		m.notice.Publish(msg)
+
+	case messages.NoticeExpiredMsg:
+		m.notice.Expire(msg.ID)
 
 	// ── 订阅管理 (Sub) 消息 ──
 	case messages.SubsLoadedMsg:
@@ -474,8 +449,7 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case messages.SubAddDoneMsg:
 		// 新增成功：刷新列表 + 提示，并自动触发首次更新
-		m.notice = i18n.T("sub.added_toast")
-		m.noticeTicks = autoRefreshNoticeTicks
+		m.publishNotice(i18n.T("sub.added_toast"), messages.NoticeSuccess)
 		m.subState = m.subState.SetUpdating(msg.UID)
 		return m, tea.Sequence(
 			sub.FetchSubs(m.profileSvc),
@@ -483,37 +457,27 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 
 	case messages.SubAddErrorMsg:
-		m.err = msg
-		m.notice = ""
-		m.noticeTicks = 0
+		m.publishError(msg.Err)
 
 	case messages.SubDeletedMsg:
-		m.notice = i18n.T("sub.deleted_toast")
-		m.noticeTicks = autoRefreshNoticeTicks
+		m.publishNotice(i18n.T("sub.deleted_toast"), messages.NoticeSuccess)
 		return m, sub.FetchSubs(m.profileSvc)
 
 	case messages.SubDeleteErrorMsg:
-		m.err = msg
-		m.notice = ""
-		m.noticeTicks = 0
+		m.publishError(msg.Err)
 
 	case messages.SubFetchDoneMsg:
 		m.subState = m.subState.ClearUpdating()
-		m.notice = i18n.T("sub.updated_toast")
-		m.noticeTicks = autoRefreshNoticeTicks
+		m.publishNotice(i18n.T("sub.updated_toast"), messages.NoticeSuccess)
 		return m, sub.FetchSubs(m.profileSvc)
 
 	case messages.SubFetchErrorMsg:
-		m.err = msg
-		m.notice = ""
-		m.noticeTicks = 0
+		m.publishError(msg.Err)
 		m.subState = m.subState.ClearUpdating()
 
 	case messages.SubActivatedMsg:
 		if msg.Err != nil {
-			m.err = messages.ErrMsg{Err: msg.Err}
-			m.notice = ""
-			m.noticeTicks = 0
+			m.publishError(msg.Err)
 			return m, nil
 		}
 		cmd := m.finishSubConfigApply(msg.MergeErr, msg.Restarted, msg.NeedsRestart, msg.Remote,
@@ -521,30 +485,24 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case messages.SubMergeSavedMsg:
-		m.notice = i18n.T("sub.merge_saved_toast")
-		m.noticeTicks = autoRefreshNoticeTicks
+		m.publishNotice(i18n.T("sub.merge_saved_toast"), messages.NoticeSuccess)
 
 	case messages.SubMergeSaveErrorMsg:
-		m.err = msg
-		m.notice = ""
-		m.noticeTicks = 0
+		m.publishError(msg.Err)
 
 	case messages.SubEditDoneMsg:
-		m.notice = i18n.T("sub.edited_toast")
-		m.noticeTicks = autoRefreshNoticeTicks
+		m.publishNotice(i18n.T("sub.edited_toast"), messages.NoticeSuccess)
 		return m, sub.FetchSubs(m.profileSvc)
 
 	case messages.SubEditErrorMsg:
-		m.err = msg
-		m.notice = ""
-		m.noticeTicks = 0
+		m.publishError(msg.Err)
 
 	case messages.SubSourceCopiedMsg:
-		m.notice = i18n.T("sub.copy_source_error")
 		if msg.Success {
-			m.notice = i18n.T("sub.copy_source_done")
+			m.publishNotice(i18n.T("sub.copy_source_done"), messages.NoticeSuccess)
+		} else {
+			m.publishNotice(i18n.T("sub.copy_source_error"), messages.NoticeError)
 		}
-		m.noticeTicks = autoRefreshNoticeTicks
 
 	case messages.SubFileLoadedMsg:
 		m.subState, _ = m.subState.Update(msg)
@@ -558,28 +516,22 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// 但 RestoreTerminal 不恢复鼠标模式（Bubble Tea v1.3.10 缺陷），需显式重新启用。
 		reenableMouse := func() tea.Msg { return tea.EnableMouseCellMotion() }
 		if msg.Err != nil {
-			m.err = messages.ErrMsg{Err: msg.Err}
-			m.notice = ""
-			m.noticeTicks = 0
+			m.publishError(msg.Err)
 			return m, tea.Batch(reenableMouse, preferences.FetchMihomoOverrides(m.configSvc))
 		}
-		m.err = nil
+		m.clearErrorNotice()
 		// 如果有激活的订阅，则立即应用这份全局覆写并热重载
 		if m.subState.ActiveUID() != "" {
-			m.notice = i18n.T("settings.toast.mihomo_override_applying")
-			m.noticeTicks = autoRefreshNoticeTicks
+			m.publishNotice(i18n.T("settings.toast.mihomo_override_applying"), messages.NoticeInfo)
 			return m, tea.Batch(reenableMouse, sub.ApplyActiveMergeCmd(m.profileSvc, m.subState.ActiveUID(), msg.ClearedOverrides))
 		}
-		m.notice = i18n.T("sub.merge_saved_toast")
-		m.noticeTicks = autoRefreshNoticeTicks
+		m.publishNotice(i18n.T("sub.merge_saved_toast"), messages.NoticeSuccess)
 		return m, tea.Batch(reenableMouse, preferences.FetchMihomoOverrides(m.configSvc))
 
 	case messages.SubMergeAppliedMsg:
 		// 覆写编辑后触发的重载流程结束（仅激活订阅会走到此分支）。
 		if msg.Err != nil {
-			m.err = messages.ErrMsg{Err: msg.Err}
-			m.notice = ""
-			m.noticeTicks = 0
+			m.publishError(msg.Err)
 			return m, preferences.FetchMihomoOverrides(m.configSvc)
 		}
 		cmd := m.finishSubConfigApply(msg.MergeErr, msg.Restarted, msg.NeedsRestart, msg.Remote,
@@ -595,6 +547,13 @@ func (m Model) handleWSMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, nil
+}
+
+func overrideNoticeLevel(applied, needsRestart bool) messages.NoticeLevel {
+	if needsRestart || !applied {
+		return messages.NoticeWarning
+	}
+	return messages.NoticeSuccess
 }
 
 func mihomoOverrideNotice(msg messages.MihomoOverridesSavedMsg) string {
@@ -619,16 +578,16 @@ func mihomoOverrideNotice(msg messages.MihomoOverridesSavedMsg) string {
 }
 
 func (m *Model) finishSubConfigApply(mergeErr error, restarted, needsRestart, remote bool, successKey, warningKey string) tea.Cmd {
-	m.err = nil
-	m.noticeTicks = autoRefreshNoticeTicks
+	m.clearErrorNotice()
 	if mergeErr != nil {
-		m.notice = i18n.T(warningKey)
+		m.publishNotice(i18n.T(warningKey), messages.NoticeWarning)
 	} else if restarted || needsRestart || remote {
-		m.notice = i18n.T(mihomoOverrideNotice(messages.MihomoOverridesSavedMsg{
+		result := messages.MihomoOverridesSavedMsg{
 			Applied: true, Restarted: restarted, NeedsRestart: needsRestart, Remote: remote,
-		}))
+		}
+		m.publishNotice(i18n.T(mihomoOverrideNotice(result)), overrideNoticeLevel(result.Applied, result.NeedsRestart))
 	} else {
-		m.notice = i18n.T(successKey)
+		m.publishNotice(i18n.T(successKey), messages.NoticeSuccess)
 	}
 	if !remote {
 		if cmd := m.syncAppliedCore(restarted, needsRestart); cmd != nil {
@@ -643,12 +602,6 @@ func (m *Model) advanceAutoRefreshTransientState() {
 		m.autoRefreshSyncedTTL--
 		if m.autoRefreshSyncedTTL == 0 {
 			m.autoRefreshSynced = false
-		}
-	}
-	if m.noticeTicks > 0 {
-		m.noticeTicks--
-		if m.noticeTicks == 0 {
-			m.notice = ""
 		}
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/notice"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/help"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
@@ -20,11 +21,7 @@ func (m Model) View() string {
 	}
 
 	// ── 布局参数 ──
-	statusBarHeight := common.StatusBarHeight // 分隔线 + 信息行
-	contentHeight := m.height - statusBarHeight - layout.TopNavHeight
-	if contentHeight < common.MinContentHeight {
-		contentHeight = common.MinContentHeight
-	}
+	_, contentHeight := m.getPageSize()
 
 	// ── 顶部导航 ──
 	topNav := layout.RenderTopNav(m.currentPage, m.width, layout.TopNavRefreshStatus{
@@ -75,10 +72,6 @@ func (m Model) View() string {
 
 	statusBar := layout.RenderStatusBar(
 		m.width,
-		m.err,
-		m.nodesState.Testing,
-		m.nodesState.TestingTarget,
-		m.notice,
 		m.chartData,
 		uploadTotal,
 		downloadTotal,
@@ -89,11 +82,11 @@ func (m Model) View() string {
 		m.hasUpdate,
 	)
 
-	fullPage := lipgloss.JoinVertical(lipgloss.Left, topNav, pageContent, statusBar)
+	fullPage := lipgloss.JoinVertical(lipgloss.Left, topNav, notice.Render(m.visibleNotice(), m.width), pageContent, statusBar)
 
 	// ── 报错弹窗叠加 ──
-	if m.showErrorPopup && m.err != nil {
-		fullPage = overlayErrorPopup(fullPage, m.width, m.height, m.err.Error())
+	if m.notice.DetailsOpen {
+		fullPage = overlayErrorPopup(fullPage, m.width, m.height, m.notice.Message.Detail)
 	}
 
 	// ── 更新弹窗叠加 ──

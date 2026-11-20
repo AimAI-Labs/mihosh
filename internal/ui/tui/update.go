@@ -124,7 +124,6 @@ func (m *Model) onPageChange() tea.Cmd {
 }
 
 func (m *Model) refreshMenu() tea.Cmd {
-	m.err = nil
 	if m.connectionChecked && !m.connectionReady && m.currentPage != layout.PageCore && m.currentPage != layout.PageSub && m.currentPage != layout.PageSettings && m.currentPage != layout.PageLogs {
 		return nil
 	}

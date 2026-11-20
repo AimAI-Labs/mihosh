@@ -108,9 +108,6 @@ func TestToPageState(t *testing.T) {
 	if pageState.EditCursor != 4 {
 		t.Errorf("expected EditCursor to be 4, got %d", pageState.EditCursor)
 	}
-	if pageState.Toast == nil {
-		t.Errorf("expected Toast manager to be lazy-initialized")
-	}
 }
 
 func TestUpdate_NonEditMode_UpDown(t *testing.T) {
@@ -255,11 +252,8 @@ func TestUpdate_LanguageEditMode(t *testing.T) {
 	}
 	sInvalid.Config = cfg
 	sInvalid.configSvc = configSvc
-	nextInvalid, _ := sInvalid.Update(enterMsg)
-	// 虽然语言设置键盘模式通常不会有非法值，但以防万一检查它的处理逻辑，保存失败会调用 s.showToast
-	if nextInvalid.toastManager == nil || nextInvalid.toastManager.Render(80) == "" {
-		t.Errorf("expected toast error message when saving invalid language")
-	}
+	_, cmd := sInvalid.Update(enterMsg)
+	assertNotice(t, cmd, messages.NoticeError)
 }
 
 func TestUpdate_NormalEditMode_CursorAndInput(t *testing.T) {
@@ -431,7 +425,7 @@ func TestUpdate_NormalEditMode_Enter_Success(t *testing.T) {
 	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
 	s.Config = cfg
 	s.configSvc = configSvc
-	next, _ := s.Update(enterMsg)
+	next, cmd := s.Update(enterMsg)
 
 	if next.editMode {
 		t.Errorf("expected editMode to be false after save")
@@ -446,14 +440,7 @@ func TestUpdate_NormalEditMode_Enter_Success(t *testing.T) {
 		t.Errorf("expected saved timeout to be 9999, got %d", next.Config.Timeout)
 	}
 
-	// 验证 Toast 显示成功
-	if next.toastManager == nil {
-		t.Fatalf("expected toastManager to be initialized")
-	}
-	toastMsg := next.toastManager.Render(80)
-	if len(toastMsg) == 0 {
-		t.Errorf("expected toast message to be visible")
-	}
+	assertNotice(t, cmd, messages.NoticeSuccess)
 }
 
 func TestUpdate_NormalEditMode_Enter_Fail(t *testing.T) {
@@ -468,7 +455,7 @@ func TestUpdate_NormalEditMode_Enter_Fail(t *testing.T) {
 	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
 	s.Config = cfg
 	s.configSvc = configSvc
-	next, _ := s.Update(enterMsg)
+	next, cmd := s.Update(enterMsg)
 
 	// 应仍保留在编辑模式
 	if !next.editMode {
@@ -481,13 +468,16 @@ func TestUpdate_NormalEditMode_Enter_Fail(t *testing.T) {
 		t.Errorf("expected editCursor to be retained")
 	}
 
-	// 验证 Toast 提示失败
-	if next.toastManager == nil {
-		t.Fatalf("expected toastManager to be initialized")
+	assertNotice(t, cmd, messages.NoticeError)
+}
+
+func assertNotice(t *testing.T, cmd tea.Cmd, level messages.NoticeLevel) {
+	t.Helper()
+	if cmd == nil {
+		t.Fatal("expected a notification command")
 	}
-	toastMsg := next.toastManager.Render(80)
-	if len(toastMsg) == 0 {
-		t.Errorf("expected toast error message on failure")
+	if msg, ok := cmd().(messages.NoticeMsg); !ok || msg.Level != level || msg.Text == "" {
+		t.Fatalf("expected notification of level %v, got %+v", level, msg)
 	}
 }
 

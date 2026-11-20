@@ -16,6 +16,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/notice"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
@@ -60,11 +61,7 @@ type Model struct {
 	// 共享图表数据（Connections 页面和 StatusBar 共用）
 	chartData *model.ChartData
 
-	// 全局错误（状态栏显示）
-	err            error
-	showErrorPopup bool
-	notice         string
-	noticeTicks    int
+	notice notice.State
 
 	// WebSocket
 	connectionEpoch   uint64

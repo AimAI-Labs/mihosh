@@ -30,9 +30,9 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	// 报错弹窗打开时吞掉所有鼠标事件
-	if m.showErrorPopup {
+	if m.notice.DetailsOpen {
 		if isMouseLeftPress(msg) {
-			m.showErrorPopup = false
+			m.notice.Clear()
 		}
 		return m, nil
 	}
@@ -43,6 +43,12 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.updateError = nil
 		}
 		return m, nil
+	}
+	if isMouseLeftPress(msg) && msg.Y == layout.TopNavHeight {
+		m.notice.OpenDetails(msg.X, m.width)
+		if m.notice.DetailsOpen {
+			return m, nil
+		}
 	}
 	if m.pageInputCapture().Active {
 		pageX, pageY, pageWidth, pageHeight, ok := m.resolveMainPageMouseHit(msg.X, msg.Y)
@@ -66,22 +72,13 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 	switch {
 	case isMouseLeftPress(msg):
-		statusBarHeight := common.StatusBarHeight
-		contentHeight := m.height - statusBarHeight
-		if contentHeight < common.MinContentHeight {
-			contentHeight = common.MinContentHeight
+		if msg.Y == layout.TopNavHeight {
+			return m, nil
 		}
 
 		// 检查是否点击了底栏 (Status Bar)
-		if msg.Y >= contentHeight {
-			if m.err != nil {
-				// 粗略判断点击区域：假设状态栏左侧显示错误信息
-				if msg.X >= 0 && msg.X < m.width/2 {
-					m.showErrorPopup = true
-					return m, nil
-				}
-			}
-
+		_, pageHeight := m.getPageSize()
+		if msg.Y >= pageTop+pageHeight {
 			if m.hasUpdate && msg.X >= m.width-5 {
 				m.showUpdateDialog = true
 				return m, nil
@@ -136,6 +133,9 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 // handleMouseScroll 处理鼠标滚轮滚动
 func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
+	if y == layout.TopNavHeight {
+		return m, nil
+	}
 	if y >= 0 && y < layout.TopNavHeight {
 		m.onPageLeave()
 		if up {
@@ -163,37 +163,13 @@ func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) resolveMainPageMouseHit(x, y int) (pageX, pageY, pageWidth, pageHeight int, ok bool) {
-	statusBarHeight := common.StatusBarHeight
-	contentHeight := m.height - statusBarHeight - layout.TopNavHeight
-	if contentHeight < common.MinContentHeight {
-		contentHeight = common.MinContentHeight
-	}
-	contentYAbs := y - layout.TopNavHeight
-	if contentYAbs < 0 || contentYAbs >= contentHeight {
+	pageWidth, pageHeight = m.getPageSize()
+	pageY = y - pageTop
+	if pageY < 0 || pageY >= pageHeight || x < 0 || x >= pageWidth {
 		return 0, 0, 0, 0, false
 	}
 
-	mainWidth := m.width
-	if mainWidth < common.MinMainWidth {
-		mainWidth = common.MinMainWidth
-	}
-
-	// 移除外边框检查，内容直接从顶部开始
-	pageY = contentYAbs
-	pageHeight = m.height - layout.TopNavHeight - common.StatusBarHeight
-	if pageHeight < common.MinContentHeight {
-		pageHeight = common.MinContentHeight
-	}
-	pageWidth = mainWidth
-	if pageWidth < common.MinMainWidth {
-		pageWidth = common.MinMainWidth
-	}
-	pageX = x
-	if pageX < 0 || pageX >= pageWidth {
-		return 0, 0, 0, 0, false
-	}
-
-	return pageX, pageY, pageWidth, pageHeight, true
+	return x, pageY, pageWidth, pageHeight, true
 }
 
 func (m Model) resolveInlineHelpClick(pageX, pageY, pageWidth, pageHeight int) (tea.KeyMsg, bool) {

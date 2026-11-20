@@ -3,6 +3,7 @@ package tui
 import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/notice"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/logs"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
@@ -11,21 +12,11 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/sub"
 )
 
+const pageTop = layout.TopNavHeight + notice.Height
+
 // getPageSize 计算页面内容的可用宽度和高度
 func (m *Model) getPageSize() (pageWidth, pageHeight int) {
-	mainWidth := m.width
-	if mainWidth < common.MinMainWidth {
-		mainWidth = common.MinMainWidth
-	}
-	pageWidth = mainWidth
-	if pageWidth < common.MinMainWidth {
-		pageWidth = common.MinMainWidth
-	}
-	pageHeight = m.height - layout.TopNavHeight - common.StatusBarHeight
-	if pageHeight < common.MinContentHeight {
-		pageHeight = common.MinContentHeight
-	}
-	return pageWidth, pageHeight
+	return max(m.width, common.MinMainWidth), max(m.height-pageTop-common.StatusBarHeight, common.MinContentHeight)
 }
 
 // renderNodesPage 渲染节点管理页面

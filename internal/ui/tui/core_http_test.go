@@ -46,7 +46,7 @@ func TestLateHTTPCompletionsCannotAffectCurrentTarget(t *testing.T) {
 				updated, follow := m.Update(cmd())
 				next := updated.(Model)
 				require.Nil(t, follow)
-				require.Nil(t, next.err)
+				require.Empty(t, next.notice.Message.Text)
 				require.Equal(t, generation, next.client.Generation())
 				require.NotContains(t, next.nodesState.Groups, "late")
 				require.NotContains(t, next.nodesState.Proxies, "late")
