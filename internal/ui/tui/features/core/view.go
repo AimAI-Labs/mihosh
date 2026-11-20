@@ -364,8 +364,6 @@ func (s State) downloadsLayout(width, height int, parts []string, result pageLay
 	return result
 }
 
-var serviceQuickActions = []string{"start", "stop", "restart", "enable", "boot", "disable", "install", "uninstall"}
-
 func (s State) serviceQuickStyle(action string) lipgloss.Style {
 	t := theme.Current()
 	base := lipgloss.NewStyle().Background(theme.Resolve(t.Selected))
@@ -373,18 +371,10 @@ func (s State) serviceQuickStyle(action string) lipgloss.Style {
 		return base.Foreground(theme.Resolve(t.Muted))
 	}
 	switch action {
-	case "start":
-		return base.Foreground(theme.Resolve(t.Success)).Bold(s.Status.ServiceRunning)
+	case "start", "restart", "install":
+		return base.Foreground(theme.Resolve(t.Primary))
 	case "stop":
 		return base.Foreground(theme.Resolve(t.Warning))
-	case "restart":
-		return base.Foreground(theme.Resolve(t.Primary)).Bold(true)
-	case "enable", "boot":
-		return base.Foreground(theme.Resolve(t.Info)).Bold(s.Status.AutoStart)
-	case "disable":
-		return base.Foreground(theme.Resolve(t.Muted))
-	case "install":
-		return base.Foreground(theme.Resolve(t.Primary)).Bold(s.Status.ServiceInstalled)
 	case "uninstall":
 		return base.Foreground(theme.Resolve(t.Danger))
 	default:
@@ -392,34 +382,83 @@ func (s State) serviceQuickStyle(action string) lipgloss.Style {
 	}
 }
 
-func (s State) systemdPanel(width, availHeight int) (string, []releaseControl, int) {
-	innerW := max(1, width-4)
-	var menuRows []string
+func (s State) serviceQuickMenu(width int) ([]string, []releaseControl) {
+	type group struct {
+		label   string
+		actions []string
+	}
+	var groups []group
+	installation := []string{"install"}
+	if s.Status.ServiceInstalled {
+		lifecycle := []string{"start"}
+		if s.Status.ServiceRunning {
+			lifecycle = []string{"stop", "restart"}
+		}
+		groups = append(groups,
+			group{"runtime", lifecycle},
+			group{"autostart", []string{"enable", "boot", "disable"}},
+		)
+		installation = append(installation, "uninstall")
+	}
+	groups = append(groups, group{"manage", installation})
+
+	muted := common.DimStyle()
+	var rows []string
 	var controls []releaseControl
 	var line string
 	x := 0
-	for _, action := range serviceQuickActions {
-		label := ansi.Truncate(" "+i18n.T("core.service.quick."+action)+" ", innerW, "…")
-		btnW := lipgloss.Width(label)
-		if x > 0 && x+1+btnW > innerW {
-			menuRows = append(menuRows, line)
+	for _, section := range groups {
+		title := i18n.T("core.service.group." + section.label)
+		titleWidth := lipgloss.Width(title)
+		groupWidth := titleWidth
+		labels := make([]string, len(section.actions))
+		for i, action := range section.actions {
+			labelKey := action
+			if action == "install" && s.Status.ServiceInstalled {
+				labelKey = "reinstall"
+			}
+			labels[i] = " " + i18n.T("core.service.quick."+labelKey) + " "
+			groupWidth += 1 + lipgloss.Width(labels[i])
+		}
+		const gap = "   "
+		if x > 0 && x+len(gap)+groupWidth > width {
+			rows = append(rows, line)
 			line, x = "", 0
 		}
 		if x > 0 {
-			line += " "
-			x++
+			line += gap
+			x += len(gap)
 		}
-		controls = append(controls, releaseControl{
-			actionHit: actionHit{x: 2 + x, y: len(menuRows) + 1, width: btnW, height: 1},
-			action:    "service:" + action,
-		})
-		line += s.serviceQuickStyle(action).Render(label)
-		x += btnW
+		line += muted.Render(title)
+		x += titleWidth
+		for i, action := range section.actions {
+			label := labels[i]
+			btnW := lipgloss.Width(label)
+			if x+1+btnW > width {
+				rows = append(rows, line)
+				line, x = "", 0
+			}
+			if x > 0 {
+				line += " "
+				x++
+			}
+			if !s.Busy {
+				controls = append(controls, releaseControl{
+					actionHit: actionHit{x: 2 + x, y: len(rows) + 1, width: btnW, height: 1},
+					action:    "service:" + action,
+				})
+			}
+			line += s.serviceQuickStyle(action).Render(label)
+			x += btnW
+		}
 	}
-	if line != "" {
-		menuRows = append(menuRows, line)
-	}
+	return append(rows, line), controls
+}
 
+func (s State) systemdPanel(width, availHeight int) (string, []releaseControl, int) {
+	innerW := max(1, width-4)
+	menuRows, controls := s.serviceQuickMenu(innerW)
+	menuRows = append(menuRows, "")
 	logHeight := max(3, availHeight-2-len(menuRows))
 	body := s.Status.ServiceUnit + "\n" + i18n.T("core.service.status_loading")
 	if s.serviceLog.Unit == s.Status.ServiceUnit {

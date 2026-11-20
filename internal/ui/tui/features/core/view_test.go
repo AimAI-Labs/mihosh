@@ -461,3 +461,50 @@ func TestCoreMihomoPageShowsManagedStatusLogsBelowOverrides(t *testing.T) {
 		t.Fatal("managed service card is unreachable in a short terminal")
 	}
 }
+
+func TestCoreServiceQuickMenuMatchesServiceStateAndWraps(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	for _, language := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(language)
+		for _, width := range []int{24, 40, 120} {
+			for _, status := range []struct {
+				installed, running bool
+				actions            string
+			}{
+				{false, false, "install"},
+				{true, false, "start,enable,boot,disable,install,uninstall"},
+				{true, true, "stop,restart,enable,boot,disable,install,uninstall"},
+			} {
+				s := State{Status: service.CoreStatus{ServiceUnit: "example.service", ServiceInstalled: status.installed, ServiceRunning: status.running}}
+				card, controls, _ := s.systemdPanel(width, 20)
+				rows := strings.Split(ansi.Strip(card), "\n")
+				var actions []string
+				for _, control := range controls {
+					action := strings.TrimPrefix(control.action, "service:")
+					actions = append(actions, action)
+					label := action
+					if action == "install" && status.installed {
+						label = "reinstall"
+					}
+					cell := ansi.Cut(rows[control.y], control.x, control.x+control.width)
+					if got, want := strings.TrimSpace(cell), i18n.T("core.service.quick."+label); got != want {
+						t.Fatalf("%s width %d: hitbox for %s found %q, want %q", language, width, action, got, want)
+					}
+				}
+				if strings.Join(actions, ",") != status.actions {
+					t.Fatalf("controls for installed=%t running=%t: %v", status.installed, status.running, actions)
+				}
+				for _, row := range rows {
+					if lipgloss.Width(row) > width {
+						t.Fatalf("%s width %d: service card overflowed: %q", language, width, row)
+					}
+				}
+				s.Busy = true
+				if _, hits, _ := s.systemdPanel(width, 20); len(hits) != 0 {
+					t.Fatal("service buttons are still clickable during a task")
+				}
+			}
+		}
+	}
+}
