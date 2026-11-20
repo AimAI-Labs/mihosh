@@ -1,11 +1,15 @@
 package nodes
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestNodesState_TestAllStartsWithFirstProxyTarget(t *testing.T) {
@@ -132,5 +136,86 @@ func TestNodeSearchKeepsWholeSubstringAndClearsOnEscape(t *testing.T) {
 	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	if s.NodeFilterMode || s.NodeFilter != "" || len(s.displayProxies()) != 3 {
 		t.Fatal("node Escape must leave search and clear the query")
+	}
+}
+
+func TestNodesLocateActiveProxyModesLayoutsAndFilters(t *testing.T) {
+	i18n.Init()
+	manyNodes := make([]string, 0, 30)
+	for i := 0; i < 30; i++ {
+		manyNodes = append(manyNodes, fmt.Sprintf("HK-%02d", i))
+	}
+	groups := map[string]model.Group{
+		"GLOBAL": {Name: "GLOBAL", Type: "Selector", Now: "US-01", All: []string{"HK-00", "US-01", "Proxy"}},
+		"Auto":   {Name: "Auto", Type: "URLTest", Now: "HK-25", All: manyNodes},
+		"Proxy":  {Name: "Proxy", Type: "Selector", Now: "Auto", All: append([]string{"Auto"}, manyNodes...)},
+		"Media":  {Name: "Media", Type: "Selector", Now: "US-01", All: []string{"US-01", "JP-01"}},
+	}
+	ordered := []string{"GLOBAL", "Auto", "Proxy", "Media"}
+
+	// Rule mode: jumps to priority group "Proxy" -> "Auto", second press drills down to "Auto" -> "HK-25".
+	s := State{Mode: "rule"}.ApplyGroups(groups, ordered)
+	s.applyGroupSelection(3) // Start on Media
+	s, cmd := s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	if s.GroupNames[s.SelectedGroup] != "Proxy" || s.displayProxies()[s.SelectedProxy] != "Auto" {
+		t.Fatalf("rule mode first locate expected Proxy -> Auto, got %s -> %s", s.GroupNames[s.SelectedGroup], s.displayProxies()[s.SelectedProxy])
+	}
+	if cmd == nil {
+		t.Fatal("expected info notice command on locate")
+	}
+	if notice, ok := cmd().(messages.NoticeMsg); !ok || !strings.Contains(notice.Text, "Auto") {
+		t.Fatalf("unexpected locate notice: %#v", notice)
+	}
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	if s.GroupNames[s.SelectedGroup] != "Auto" || s.displayProxies()[s.SelectedProxy] != "HK-25" {
+		t.Fatalf("rule mode second locate expected drill-down Auto -> HK-25, got %s -> %s", s.GroupNames[s.SelectedGroup], s.displayProxies()[s.SelectedProxy])
+	}
+
+	// Both layouts render the located deep node visibly.
+	for _, layout := range []NodesLayout{LayoutCards, LayoutColumns} {
+		s.Layout = layout
+		rendered := ansi.Strip(RenderNodesPage(s.ToPageState(120, 26)))
+		if !strings.Contains(rendered, "HK-25") {
+			t.Fatalf("layout %v did not render located active node HK-25", layout)
+		}
+	}
+
+	// Global mode jumps to GLOBAL -> US-01.
+	gs := State{Mode: "global"}.ApplyGroups(groups, ordered)
+	gs.applyGroupSelection(3)
+	gs, _ = gs.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	if gs.GroupNames[gs.SelectedGroup] != "GLOBAL" || gs.displayProxies()[gs.SelectedProxy] != "US-01" {
+		t.Fatalf("global mode expected GLOBAL -> US-01, got %s -> %s", gs.GroupNames[gs.SelectedGroup], gs.displayProxies()[gs.SelectedProxy])
+	}
+
+	// Direct mode keeps selection unchanged and returns an info notice.
+	ds := State{Mode: "direct"}.ApplyGroups(groups, ordered)
+	ds.applyGroupSelection(3)
+	ds, cmd = ds.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	if ds.SelectedGroup != 3 || cmd == nil {
+		t.Fatalf("direct mode should not jump and should notify")
+	}
+	if notice, ok := cmd().(messages.NoticeMsg); !ok || notice.Level != messages.NoticeInfo {
+		t.Fatalf("expected direct mode info notice, got %#v", notice)
+	}
+
+	// Search filter: preserves matching filter, clears non-matching filter.
+	fs := State{Mode: "global", NodeFilter: "us-01"}.ApplyGroups(groups, ordered)
+	fs, _ = fs.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	if fs.NodeFilter != "us-01" || fs.displayProxies()[fs.SelectedProxy] != "US-01" {
+		t.Fatalf("matching search filter should be preserved, got filter=%q", fs.NodeFilter)
+	}
+	fs.NodeFilter = "nomatch"
+	fs.updateFilteredProxies()
+	fs, _ = fs.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	if fs.NodeFilter != "" || fs.displayProxies()[fs.SelectedProxy] != "US-01" {
+		t.Fatalf("non-matching filter should clear to locate active node, got filter=%q", fs.NodeFilter)
+	}
+
+	// SortOrderAvailable hiding untested active node resets sort to locate it.
+	as := State{Mode: "global", ProxySortOrder: SortOrderAvailable}.ApplyGroups(groups, ordered)
+	as, _ = as.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	if as.ProxySortOrder != SortOrderOriginal || as.displayProxies()[as.SelectedProxy] != "US-01" {
+		t.Fatalf("available-only sort should reset to locate untested active node")
 	}
 }

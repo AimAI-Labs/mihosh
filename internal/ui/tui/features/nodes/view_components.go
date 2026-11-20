@@ -204,6 +204,7 @@ func buildNodesInlineHelpHints(state PageState) []common.InlineHelpHint {
 		{Key: "a", Desc: i18n.T("help.nodes.hint_test_all")},
 		{Key: "m", Desc: i18n.T("help.nodes.hint_mode")},
 		{Key: "v", Desc: i18n.T("help.nodes.hint_layout"), Tone: common.InlineHelpToneInfo},
+		{Key: "g", Desc: i18n.T("help.nodes.hint_locate"), Tone: common.InlineHelpToneInfo},
 		{Key: "s", Desc: i18n.T("help.nodes.hint_sort"), Tone: common.InlineHelpToneInfo},
 		{Key: "/", Desc: i18n.T("help.nodes.hint_search")},
 		{Key: "f", Desc: i18n.T("help.nodes.hint_result")},

@@ -2,6 +2,7 @@ package nodes
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -345,6 +346,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			} else {
 				s.selectLayout(LayoutColumns)
 			}
+
+		case msg.String() == "g":
+			return s.LocateActiveProxy()
 
 		case msg.String() == "s":
 			s.ProxySortOrder = (s.ProxySortOrder + 1) % ProxySortOrder(len(sortOrderLabels))
@@ -791,6 +795,85 @@ func (s *State) ResolveActiveGroupName() string {
 		}
 	}
 	return ""
+}
+
+func nodesNoticeCmd(text string, level messages.NoticeLevel) tea.Cmd {
+	return func() tea.Msg {
+		return messages.NoticeMsg{Text: text, Level: level}
+	}
+}
+
+// LocateActiveProxy jumps to the currently effective proxy group and node.
+// Reuses ResolveActiveGroupName / GetActiveProxyAndDelay and drills down one hop
+// when already focused on a nested proxy group.
+func (s State) LocateActiveProxy() (State, tea.Cmd) {
+	if strings.EqualFold(s.Mode, "direct") {
+		return s, nodesNoticeCmd(i18n.T("nodes.locate_direct"), messages.NoticeInfo)
+	}
+
+	groupName := s.ResolveActiveGroupName()
+	proxyName, _, ok := s.GetActiveProxyAndDelay()
+	if !ok || groupName == "" || proxyName == "" {
+		for _, gName := range s.GroupNames {
+			if group, exists := s.Groups[gName]; exists && group.Now != "" {
+				groupName = gName
+				proxyName = group.Now
+				ok = true
+				break
+			}
+		}
+	}
+	if !ok || groupName == "" || proxyName == "" {
+		return s, nodesNoticeCmd(i18n.T("nodes.locate_unavailable"), messages.NoticeWarning)
+	}
+
+	// If already positioned on (groupName, proxyName) and proxyName is itself a group, drill down to its active node.
+	if s.SelectedGroup >= 0 && s.SelectedGroup < len(s.GroupNames) && s.GroupNames[s.SelectedGroup] == groupName {
+		display := s.displayProxies()
+		if s.SelectedProxy >= 0 && s.SelectedProxy < len(display) && display[s.SelectedProxy] == proxyName {
+			if subGroup, exists := s.Groups[proxyName]; exists && subGroup.Now != "" && slices.Index(s.GroupNames, proxyName) >= 0 {
+				groupName = proxyName
+				proxyName = subGroup.Now
+			}
+		}
+	}
+
+	groupIdx := slices.Index(s.GroupNames, groupName)
+	if groupIdx < 0 {
+		return s, nodesNoticeCmd(i18n.T("nodes.locate_unavailable"), messages.NoticeWarning)
+	}
+	if groupIdx != s.SelectedGroup {
+		s.applyGroupSelection(groupIdx)
+	}
+	s.GroupScrollTop = max(0, groupIdx-2)
+
+	proxyIdx := slices.Index(s.displayProxies(), proxyName)
+	if proxyIdx < 0 && s.NodeFilter != "" && slices.Index(s.CurrentProxies, proxyName) >= 0 {
+		s.NodeFilter = ""
+		s.NodeFilterMode = false
+		s.updateFilteredProxies()
+		proxyIdx = slices.Index(s.displayProxies(), proxyName)
+	}
+	if proxyIdx < 0 && s.ProxySortOrder != SortOrderOriginal {
+		s.ProxySortOrder = SortOrderOriginal
+		s.applySortOrder()
+		s.updateFilteredProxies()
+		proxyIdx = slices.Index(s.displayProxies(), proxyName)
+		if proxyIdx < 0 && s.NodeFilter != "" {
+			s.NodeFilter = ""
+			s.NodeFilterMode = false
+			s.updateFilteredProxies()
+			proxyIdx = slices.Index(s.displayProxies(), proxyName)
+		}
+	}
+	if proxyIdx < 0 {
+		return s, nodesNoticeCmd(i18n.T("nodes.locate_unavailable"), messages.NoticeWarning)
+	}
+
+	s.SelectedProxy = proxyIdx
+	s.ProxyScrollTop = max(0, proxyIdx-2)
+	s.MouseFocus = nodesMouseFocusProxy
+	return s, nodesNoticeCmd(i18n.Tf("nodes.locate_success", groupName, proxyName), messages.NoticeInfo)
 }
 
 // InputCapture declares which input belongs to the current page mode.
