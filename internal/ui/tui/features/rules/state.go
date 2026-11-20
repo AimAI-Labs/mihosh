@@ -29,13 +29,11 @@ type State struct {
 	selectedRule        int
 	ruleScrollTop       int
 
-	// 规则类型筛选弹窗状态
-	showTypeFilter   bool     // 是否显示类型筛选弹窗
+	// 规则类型筛选栏状态
+	showTypeFilter   bool     // 是否显示类型筛选栏
 	selectedTypes    []string // 已选择的规则类型
 	availableTypes   []string // 可用规则类型列表（从规则中提取）
 	typeFilterCursor int      // 光标位置（在availableTypes中的索引）
-
-	typeFilterDC common.DoubleClickDetector[struct{}]
 
 	// 鼠标双击检测（用于策略选择二级弹窗内双击选中）
 	proxyPickerDC common.DoubleClickDetector[struct{}]
@@ -83,7 +81,7 @@ func (s State) ToPageState(width, height int) PageState {
 		Height:              height,
 		ColorAdjustLight:    s.ColorAdjustLight,
 		ColorAdjustDark:     s.ColorAdjustDark,
-		// 类型筛选弹窗状态
+		// 类型筛选栏状态
 		ShowTypeFilter:   s.showTypeFilter,
 		SelectedTypes:    s.selectedTypes,
 		AvailableTypes:   s.availableTypes,
@@ -133,11 +131,6 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			return s.handleDeleteConfirmMode(msg)
 		}
 
-		// 类型筛选弹窗模式优先处理
-		if s.showTypeFilter {
-			return s.handleTypeFilterMode(msg)
-		}
-
 		if s.ruleFilterMode {
 			return s.handleRuleFilterMode(msg)
 		}
@@ -160,10 +153,17 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			s.ruleFilterMode = true
 
 		case msg.String() == "t":
-			// 打开类型筛选弹窗，保留已选类型以便增量调整
-			s.showTypeFilter = true
+			s.showTypeFilter = !s.showTypeFilter
 			s.typeFilterCursor = 0
-			s.extractAvailableTypes()
+
+		case s.showTypeFilter && msg.String() == "left":
+			s.typeFilterCursor = max(0, s.typeFilterCursor-1)
+		case s.showTypeFilter && msg.String() == "right":
+			s.typeFilterCursor = min(len(ruleFilterTypes(s.availableTypes))-1, s.typeFilterCursor+1)
+		case s.showTypeFilter && msg.String() == " ":
+			types := ruleFilterTypes(s.availableTypes)
+			s.typeFilterCursor = min(s.typeFilterCursor, len(types)-1)
+			s.toggleType(types[s.typeFilterCursor])
 
 		case msg.String() == "n":
 			// 打开添加自定义规则弹窗（每次打开重置为干净表单）
@@ -186,6 +186,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			return s, FetchRules(s.client)
 
 		case key.Matches(msg, common.Keys.Escape):
+			s.showTypeFilter = false
 			if s.ruleFilter != "" || len(s.selectedTypes) > 0 {
 				s.ruleFilter = ""
 				s.selectedTypes = nil
@@ -202,6 +203,8 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 // ApplyRules 应用新规则列表并重建过滤缓存
 func (s State) ApplyRules(rules []model.Rule) State {
 	s.rules = rules
+	s.extractAvailableTypes()
+	s.typeFilterCursor = min(s.typeFilterCursor, len(ruleFilterTypes(s.availableTypes))-1)
 	// 预分配容量与规则数相同，避免动态扩容
 	if cap(s.filteredRuleIndices) < len(rules) {
 		s.filteredRuleIndices = make([]int, 0, len(rules))
@@ -210,7 +213,7 @@ func (s State) ApplyRules(rules []model.Rule) State {
 	return s
 }
 
-// ShowTypeFilter 返回是否显示类型筛选弹窗
+// ShowTypeFilter 返回是否显示类型筛选栏
 func (s State) ShowTypeFilter() bool { return s.showTypeFilter }
 
 // ShowAddForm 返回是否显示添加规则弹窗
@@ -227,6 +230,6 @@ func (s State) FilterMode() bool { return s.ruleFilterMode }
 
 // InputCapture declares which input belongs to the current page mode.
 func (s State) InputCapture() common.InputCapture {
-	active := s.ruleFilterMode || s.showTypeFilter || s.showAddForm || s.showDeleteConfirm
+	active := s.ruleFilterMode || s.showAddForm || s.showDeleteConfirm
 	return common.InputCapture{Active: active || s.showEditForm, Interrupt: active}
 }

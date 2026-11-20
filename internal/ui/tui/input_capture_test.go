@@ -60,14 +60,12 @@ func capturedPage(t *testing.T, name string) Model {
 		if name == "node filter" {
 			keys[0] = keyMsg("/")
 		}
-	case "rule add", "rule edit", "rule types", "rule delete", "rule picker", "rule filter":
+	case "rule add", "rule edit", "rule delete", "rule picker", "rule filter":
 		m.currentPage = layout.PageRules
 		keys = []tea.KeyMsg{keyMsg("n")}
 		switch name {
 		case "rule edit":
 			keys[0] = tea.KeyMsg{Type: tea.KeyEnter}
-		case "rule types":
-			keys[0] = keyMsg("t")
 		case "rule delete":
 			keys[0] = keyMsg("d")
 		case "rule filter":
@@ -105,7 +103,7 @@ func capturedPage(t *testing.T, name string) Model {
 func TestPageInputCaptureBlocksGlobalNavigation(t *testing.T) {
 	modes := []string{
 		"connection detail", "connection TopN", "connection filter", "log detail", "log filter",
-		"node results", "node filter", "rule add", "rule edit", "rule types", "rule picker", "rule delete", "rule filter",
+		"node results", "node filter", "rule add", "rule edit", "rule picker", "rule delete", "rule filter",
 		"subscription add", "subscription edit", "subscription delete", "subscription filter", "Core edit", "settings edit",
 	}
 	for _, mode := range modes {
@@ -159,7 +157,7 @@ func TestPageInputCapturePreservesInterruptPolicy(t *testing.T) {
 		quit bool
 	}{
 		{"connection detail", true}, {"connection TopN", true}, {"log detail", true}, {"node results", true}, {"rule edit", true}, {"Core edit", true},
-		{"connection filter", false}, {"log filter", false}, {"node filter", false}, {"rule add", false}, {"rule types", false}, {"rule filter", false},
+		{"connection filter", false}, {"log filter", false}, {"node filter", false}, {"rule add", false}, {"rule filter", false},
 		{"subscription edit", false}, {"subscription filter", false}, {"settings edit", false},
 	} {
 		t.Run(tc.mode, func(t *testing.T) {
@@ -177,7 +175,7 @@ func TestPageInputCapturePreservesInterruptPolicy(t *testing.T) {
 }
 
 func TestPageModalWheelDoesNotMoveUnderlyingSelection(t *testing.T) {
-	for _, mode := range []string{"rule types", "rule delete", "subscription add", "subscription edit", "subscription delete", "subscription filter", "connection filter", "node filter", "rule filter"} {
+	for _, mode := range []string{"rule delete", "subscription add", "subscription edit", "subscription delete", "subscription filter", "connection filter", "node filter", "rule filter"} {
 		t.Run(mode, func(t *testing.T) {
 			m := capturedPage(t, mode)
 			next, _ := m.Update(tea.MouseMsg{X: 2, Y: 10, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
@@ -186,15 +184,12 @@ func TestPageModalWheelDoesNotMoveUnderlyingSelection(t *testing.T) {
 				got.connsState.ToPageState(nil, 120, 32).SelectedIndex != 0 || got.nodesState.SelectedGroup != 0 {
 				t.Fatal("modal wheel moved the underlying list")
 			}
-			if mode == "rule types" && got.rulesState.ToPageState(120, 32).TypeFilterCursor != 1 {
-				t.Fatal("modal wheel did not move the type selector")
-			}
 		})
 	}
 }
 
 func TestPageModeEscapeReleasesInput(t *testing.T) {
-	for _, mode := range []string{"connection detail", "connection TopN", "log detail", "node results", "rule add", "rule edit", "rule types", "rule delete", "subscription add", "subscription edit", "subscription delete", "Core edit", "settings edit"} {
+	for _, mode := range []string{"connection detail", "connection TopN", "log detail", "node results", "rule add", "rule edit", "rule delete", "subscription add", "subscription edit", "subscription delete", "Core edit", "settings edit"} {
 		t.Run(mode, func(t *testing.T) {
 			m := capturedPage(t, mode)
 			scrolled, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})

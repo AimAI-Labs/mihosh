@@ -1,8 +1,8 @@
 package rules
 
 import (
+	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 
@@ -31,40 +31,17 @@ func (s State) handleRuleFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	return s, nil
 }
 
-// handleTypeFilterMode 处理类型筛选弹窗的按键
-func (s State) handleTypeFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
-	switch {
-	case key.Matches(msg, common.Keys.Escape):
-		// Esc 取消筛选：关闭弹窗、清空选择并恢复未筛选状态
-		s.cancelAndClose()
-
-	case key.Matches(msg, common.Keys.Enter):
-		// Enter 确认：关闭弹窗并应用当前选择
-		s.confirmAndClose()
-
-	case msg.String() == " ":
-		// 空格切换选择
-		if s.typeFilterCursor < len(s.availableTypes) {
-			typeName := s.availableTypes[s.typeFilterCursor]
-			if s.isTypeSelected(typeName) {
-				s.selectedTypes = removeString(s.selectedTypes, typeName)
-			} else {
-				s.selectedTypes = append(s.selectedTypes, typeName)
-			}
-			s.updateFilteredRules()
-		}
-
-	case key.Matches(msg, common.Keys.Up):
-		if s.typeFilterCursor > 0 {
-			s.typeFilterCursor--
-		}
-
-	case key.Matches(msg, common.Keys.Down):
-		if s.typeFilterCursor < len(s.availableTypes)-1 {
-			s.typeFilterCursor++
-		}
+func (s *State) toggleType(name string) {
+	if !slices.Contains(s.availableTypes, name) {
+		return
 	}
-	return s, nil
+	if s.isTypeSelected(name) {
+		s.selectedTypes = removeString(s.selectedTypes, name)
+	} else {
+		s.selectedTypes = append(slices.Clone(s.selectedTypes), name)
+	}
+	s.selectedRule, s.ruleScrollTop = 0, 0
+	s.updateFilteredRules()
 }
 
 func (s *State) updateFilteredRules() {
@@ -92,9 +69,9 @@ func (s *State) updateFilteredRules() {
 		// 类型过滤检查
 		if hasTypeFilter {
 			matched := false
-			ruleType := strings.ToUpper(rule.Type)
+			ruleType := filterTypeName(rule.Type)
 			for _, selectedType := range s.selectedTypes {
-				if ruleType == strings.ToUpper(selectedType) {
+				if ruleType == selectedType {
 					matched = true
 					break
 				}
@@ -127,13 +104,18 @@ func (s *State) extractAvailableTypes() {
 	typeSet := make(map[string]struct{})
 	for _, rule := range s.rules {
 		if rule.Type != "" {
-			typeSet[rule.Type] = struct{}{}
+			typeSet[filterTypeName(rule.Type)] = struct{}{}
 		}
 	}
 	s.availableTypes = make([]string, 0, len(typeSet))
 	for t := range typeSet {
 		s.availableTypes = append(s.availableTypes, t)
 	}
+	slices.Sort(s.availableTypes)
+	s.selectedTypes = slices.DeleteFunc(slices.Clone(s.selectedTypes), func(name string) bool {
+		_, present := typeSet[name]
+		return !present
+	})
 }
 
 // isTypeSelected 检查类型是否已被选中

@@ -3,8 +3,6 @@ package rules
 import (
 	"time"
 
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
-
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -12,14 +10,6 @@ import (
 // HandleMouseScroll 鼠标滚轮处理
 func (s State) HandleMouseScroll(up bool) State {
 	if s.showDeleteConfirm || s.ruleFilterMode {
-		return s
-	}
-	if s.showTypeFilter {
-		keyType := tea.KeyDown
-		if up {
-			keyType = tea.KeyUp
-		}
-		s, _ = s.handleTypeFilterMode(tea.KeyMsg{Type: keyType})
 		return s
 	}
 	// 如果显示添加表单或编辑表单，滚动切换字段焦点
@@ -218,51 +208,17 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		return s, nil
 	}
 
-	// 类型筛选弹窗打开时处理鼠标点击
 	if s.showTypeFilter {
-		pageState := PageState{
-			ShowTypeFilter:   s.showTypeFilter,
-			SelectedTypes:    s.selectedTypes,
-			AvailableTypes:   s.availableTypes,
-			TypeFilterCursor: s.typeFilterCursor,
-			Width:            pageWidth,
-			Height:           pageHeight,
-		}
-
-		// 点击在弹窗内？
-		left, top, right, bottom := ResolveTypeFilterModalBounds(pageState, pageWidth, pageHeight)
-		insideModal := pageX >= left && pageX < right && pageY >= top && pageY < bottom
-		if !insideModal {
-			// 点击边框外：确认并关闭（保留已勾选的过滤）
-			s.confirmAndClose()
-			// 重置双击状态，避免下次打开误触发
-			s.typeFilterDC = common.DoubleClickDetector[struct{}]{}
-			return s, nil
-		}
-
-		// 点击在弹窗内：尝试映射到类型列表项
-		idx := ResolveTypeFilterListItemAt(pageState, pageX, pageY, pageWidth, pageHeight)
-		if idx < 0 {
-			return s, nil
-		}
-
-		now := time.Now()
-		isDouble := s.typeFilterDC.IsDoubleClick(struct{}{}, idx, now)
-
-		// 单击：移动光标到该项
-		s.typeFilterCursor = idx
-
-		// 双击：切换该项选中状态
-		if isDouble {
-			typeName := s.availableTypes[idx]
-			if s.isTypeSelected(typeName) {
-				s.selectedTypes = removeString(s.selectedTypes, typeName)
-			} else {
-				s.selectedTypes = append(s.selectedTypes, typeName)
+		_, hits := typeFilterLayout(s.ToPageState(pageWidth, pageHeight))
+		for _, h := range hits {
+			if pageY == h.y && pageX >= h.x && pageX < h.x+h.width {
+				if h.enabled {
+					s.typeFilterCursor = h.index
+					s.toggleType(h.name)
+				}
+				return s, nil
 			}
-			s.updateFilteredRules()
 		}
-		return s, nil
 	}
 
 	// 处理规则列表的单击和双击
@@ -284,10 +240,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 	if s.selectedRule < s.ruleScrollTop {
 		s.ruleScrollTop = s.selectedRule
 	}
-	availableHeight := pageHeight - rulesFixedLines
-	if availableHeight < rulesMinHeight {
-		availableHeight = rulesMinHeight
-	}
+	availableHeight := ruleListHeight(pageState)
 	if s.selectedRule >= s.ruleScrollTop+availableHeight {
 		s.ruleScrollTop = s.selectedRule - availableHeight + 1
 	}

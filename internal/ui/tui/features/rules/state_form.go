@@ -303,24 +303,3 @@ func (s State) handleProxyPickerMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	s.addForm = form
 	return s, nil
 }
-
-// confirmAndClose 关闭类型筛选弹窗并应用当前选择（行为同 Enter / 点击弹窗外）。
-func (s *State) confirmAndClose() {
-	s.showTypeFilter = false
-	s.typeFilterCursor = 0
-	s.selectedRule = 0
-	s.ruleScrollTop = 0
-	s.updateFilteredRules()
-}
-
-// cancelAndClose 取消类型筛选：关闭弹窗、清空选择并恢复未筛选状态（行为同 Esc）。
-func (s *State) cancelAndClose() {
-	s.showTypeFilter = false
-	s.typeFilterCursor = 0
-	if len(s.selectedTypes) > 0 {
-		s.selectedTypes = nil
-		s.selectedRule = 0
-		s.ruleScrollTop = 0
-		s.updateFilteredRules()
-	}
-}

@@ -43,8 +43,8 @@ type PageState struct {
 	ColorAdjustLight    float64      // 较浅色调明度增加比例
 	ColorAdjustDark     float64      // 较深色调明度降低比例
 
-	// 类型筛选弹窗状态
-	ShowTypeFilter   bool     // 是否显示类型筛选弹窗
+	// 类型筛选栏状态
+	ShowTypeFilter   bool     // 是否显示类型筛选栏
 	SelectedTypes    []string // 已选择的规则类型
 	AvailableTypes   []string // 可用规则类型列表
 	TypeFilterCursor int      // 光标位置
@@ -85,13 +85,12 @@ func RenderRulesPage(state PageState) string {
 	searchBox := renderRuleSearchBox(state.FilterText, state.FilterMode, state.FilterEngine, state.SelectedTypes)
 	header := RenderRulesHeaderComponent(stats, searchBox, state.Width)
 	sections = append(sections, header)
+	typeRows, _ := typeFilterLayout(state)
+	sections = append(sections, typeRows...)
 	sections = append(sections, "")
 
 	// 计算可显示的规则行数
-	availableHeight := state.Height - rulesFixedLines
-	if availableHeight < rulesMinHeight {
-		availableHeight = rulesMinHeight
-	}
+	availableHeight := ruleListHeight(state)
 
 	// 渲染规则列表（传入颜色调整参数）
 	ruleList := renderRuleList(filteredRules, state.SelectedRule, state.ScrollTop, availableHeight, state.Width, state.ColorAdjustLight, state.ColorAdjustDark)
@@ -100,12 +99,7 @@ func RenderRulesPage(state PageState) string {
 	mainContent := strings.Join(sections, "\n")
 	result := mainContent
 
-	// 如果显示类型筛选弹窗，叠加在页面之上
-	if state.ShowTypeFilter {
-		result = renderTypeFilterOverlay(result, state, state.Width, state.Height)
-	}
-
-	// 如果显示添加规则弹窗，叠加在页面之上（优先级高于类型筛选）
+	// 如果显示添加规则弹窗，叠加在页面之上
 	if state.ShowAddForm {
 		result = renderAddRuleOverlay(result, state, state.Width, state.Height)
 	}
@@ -190,13 +184,12 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 		}
 	}
 
-	// 类型筛选弹窗：移动 + 切换 + 确认 + 取消
-	if state.ShowTypeFilter {
+	if state.ShowTypeFilter && !state.FilterMode {
 		return []common.InlineHelpHint{
-			{Key: "↑/↓", Desc: i18n.T("help.rules_filter.select")},
+			{Key: "←/→", Desc: i18n.T("help.rules_filter.select")},
 			{Key: "Space", Desc: i18n.T("help.rules_filter.toggle")},
-			{Key: "↵", Desc: i18n.T("help.rules_filter.confirm")},
-			{Key: "Esc", Desc: i18n.T("help.rules_filter.cancel")},
+			{Key: "t", Desc: i18n.T("help.rules.hint_type")},
+			{Key: "/", Desc: i18n.T("help.rules.hint_search")},
 		}
 	}
 
@@ -278,7 +271,8 @@ func ResolveMouseHit(state PageState, pageY int) int {
 	// 计算规则列表起始行：
 	// - 头部组件占 rulesHeaderHeight (3) 行（包括边框）
 	// - 然后有一个空行
-	listStartY := rulesHeaderHeight + 1
+	typeRows, _ := typeFilterLayout(state)
+	listStartY := rulesHeaderHeight + 1 + len(typeRows)
 
 	if pageY < listStartY {
 		return -1
@@ -291,10 +285,7 @@ func ResolveMouseHit(state PageState, pageY int) int {
 	}
 
 	// 计算可用的规则行数
-	availableHeight := state.Height - rulesFixedLines
-	if availableHeight < rulesMinHeight {
-		availableHeight = rulesMinHeight
-	}
+	availableHeight := ruleListHeight(state)
 
 	// 检查是否在规则可见范围内
 	numFiltered := len(state.FilteredRuleIndices)
@@ -305,4 +296,9 @@ func ResolveMouseHit(state PageState, pageY int) int {
 	}
 
 	return visibleRuleIdx
+}
+
+func ruleListHeight(state PageState) int {
+	typeRows, _ := typeFilterLayout(state)
+	return max(rulesMinHeight, state.Height-rulesFixedLines-len(typeRows))
 }

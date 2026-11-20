@@ -53,7 +53,7 @@ type HelpContext struct {
 	LogsFilter bool // 过滤输入
 
 	// 规则页子状态
-	RulesTypeFilter    bool // 类型筛选弹窗
+	RulesTypeFilter    bool // 类型筛选栏
 	RulesFilter        bool // 过滤输入
 	RulesDeleteConfirm bool // 删除确认弹窗
 	RulesEditForm      bool // 编辑规则弹窗
@@ -349,16 +349,14 @@ func buildRulesSections(ctx HelpContext) []section {
 		}
 	}
 
-	if ctx.RulesTypeFilter {
+	if ctx.RulesTypeFilter && !ctx.RulesFilter {
 		return []section{{
 			title: i18n.T("help.section.rules_type_filter"),
 			bindings: []keybinding{
-				{"↑/↓  k/j", i18n.T("help.rules_filter.select")},
+				{"← / →", i18n.T("help.rules_filter.select")},
 				{"Space", i18n.T("help.rules_filter.toggle")},
-				{"输入字符", i18n.T("help.rules_filter.search")},
-				{"Backspace", i18n.T("help.rules_filter.backspace")},
-				{"↵", i18n.T("help.rules_filter.confirm")},
-				{"Esc", i18n.T("help.rules_filter.cancel")},
+				{"t", i18n.T("help.rules.hint_type")},
+				{"/", i18n.T("help.rules.hint_search")},
 			},
 		}}
 	}
