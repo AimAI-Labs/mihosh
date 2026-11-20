@@ -32,15 +32,13 @@ func renderList(state PageState, grid common.CardGrid) string {
 func renderSubCard(p profile.Profile, active, updating, selected bool, width, height int) string {
 	palette := theme.Current()
 	border, titleColor := palette.Border, palette.Bright
-	title := strings.Join(strings.Fields(ansi.Strip(p.Name)), " ")
-	if active {
-		title = common.SymbolCheck + title
-		titleColor = palette.Primary
-	}
 	if selected {
-		title = common.SymbolSelectActive + title
 		border, titleColor = palette.Primary, palette.Primary
 	}
+	if active {
+		border = palette.Success
+	}
+	title := strings.Join(strings.Fields(ansi.Strip(p.Name)), " ")
 	title = lipgloss.NewStyle().Foreground(theme.Resolve(titleColor)).Bold(true).Render(title)
 	if height < 3 {
 		line := lipgloss.NewStyle().Width(width).Render(ansi.Truncate(title, width, "…"))

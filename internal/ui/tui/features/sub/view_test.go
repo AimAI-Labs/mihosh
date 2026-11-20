@@ -94,7 +94,8 @@ func TestRenderSubCardUsageFitsViewport(t *testing.T) {
 		for _, row := range rows {
 			require.Equal(t, width, common.DisplayWidth(row))
 		}
-		assert.Contains(t, card, "✓")
+		assert.NotContains(t, card, common.SymbolCheck)
+		assert.NotContains(t, card, common.SymbolSelectActive)
 		assert.Contains(t, card, "example.com")
 		assert.NotContains(t, card, "token")
 		assert.Contains(t, card, utils.FormatBytes(4096)+" / "+utils.FormatBytes(8192))
@@ -104,6 +105,23 @@ func TestRenderSubCardUsageFitsViewport(t *testing.T) {
 		assert.Contains(t, card, "↓"+utils.FormatBytes(down))
 		half := (width - 4) / 2
 		assert.Contains(t, card, strings.Repeat("━", half)+strings.Repeat("─", width-4-half))
+	}
+}
+
+func TestSubscriptionActiveBorderSurvivesSelection(t *testing.T) {
+	colorProfile := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	t.Cleanup(func() { lipgloss.SetColorProfile(colorProfile) })
+	palette := theme.Current()
+	profile := sampleSubs()[0]
+	for _, tc := range []struct {
+		active   bool
+		selected bool
+		color    lipgloss.Color
+	}{{false, false, palette.Border}, {false, true, palette.Primary}, {true, false, palette.Success}, {true, true, palette.Success}} {
+		card := renderSubCard(profile, tc.active, false, tc.selected, 48, subCardHeight)
+		corner := lipgloss.NewStyle().Foreground(theme.Resolve(tc.color)).Render(theme.Frame().TopLeft)
+		require.True(t, strings.HasPrefix(card, strings.TrimSuffix(corner, ansi.SGR(0))), card)
 	}
 }
 
