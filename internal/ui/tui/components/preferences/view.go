@@ -276,9 +276,13 @@ func renderSettingsPage(state PageState, width, height int, standalone bool) str
 	return result
 }
 
-func (s State) InlineHelp(width int) string {
+func (s State) InlineHelpHints(width int) []common.InlineHelpHint {
 	hints := buildSettingsInlineHelpHints(s.ToPageState(s.Config, nil))
-	return ansi.Truncate(common.FormatInlineHintRow(hints), max(1, width-1), "")
+	return common.FitInlineHints(hints, max(1, width-1))
+}
+
+func (s State) InlineHelp(width int) string {
+	return ansi.Truncate(common.FormatInlineHintRow(s.InlineHelpHints(width)), max(1, width-1), "")
 }
 
 // overlayVersionAtBottomLeft 将版本信息叠加在页面左下角（状态栏上方一行）。
@@ -358,8 +362,9 @@ func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		if state.SelectedSetting == mihomoApplyIndex {
 			return []common.InlineHelpHint{
 				{Key: "↑↓", Desc: i18n.T("help.settings.hint_select")},
-				{Key: "↵", Desc: i18n.T("settings.mihomo.apply_button")},
+				{Key: "↵", Desc: i18n.T("settings.mihomo.apply_button"), Tone: common.InlineHelpToneSuccess},
 				{Key: "r", Desc: i18n.T("help.settings.hint_refresh")},
+				{Key: "?", Desc: i18n.T("core.inline.help")},
 			}
 		}
 		return []common.InlineHelpHint{
@@ -367,20 +372,22 @@ func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
 			{Key: "↵", Desc: i18n.T("help.settings.hint_edit")},
 			{Key: "Ctrl+S", Desc: i18n.T("settings.mihomo.apply_button")},
 			{Key: "r", Desc: i18n.T("help.settings.hint_refresh")},
+			{Key: "?", Desc: i18n.T("core.inline.help")},
 		}
 	}
 
-	// 普通模式：切换标签 + 选择 + 编辑 + 刷新
+	// 普通模式：切换标签 + 选择 + 编辑 + 刷新 + 帮助
 	return []common.InlineHelpHint{
 		{Key: "↑↓", Desc: i18n.T("help.settings.hint_select")},
 		{Key: "↵", Desc: i18n.T("help.settings.hint_edit")},
 		{Key: "r", Desc: i18n.T("help.settings.hint_refresh")},
+		{Key: "?", Desc: i18n.T("core.inline.help")},
 	}
 }
 
 // renderSettingsInlineHelp 渲染右下角内联帮助面板并叠加到页面上
 func renderSettingsInlineHelp(page string, state PageState, width, height int) string {
-	hints := buildSettingsInlineHelpHints(state)
+	hints := common.FitInlineHints(buildSettingsInlineHelpHints(state), max(1, width-1))
 	if len(hints) == 0 {
 		return page
 	}

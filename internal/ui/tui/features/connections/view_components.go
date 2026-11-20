@@ -358,6 +358,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 			{Key: "h", Desc: i18n.T("help.conns.hint_switch")},
 			{Key: "s/S", Desc: i18n.T("help.conns.hint_test")},
 			{Key: "←→", Desc: i18n.T("help.conns.hint_site")},
+			{Key: "?", Desc: i18n.T("core.inline.help")},
 		}
 
 	case ConnViewActive:
@@ -372,6 +373,8 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		if state.InlineFocused {
 			hints[0] = common.InlineHelpHint{Key: "↑↓", Desc: i18n.T("help.conns_detail.scroll")}
 			hints = append(hints, common.InlineHelpHint{Key: "Esc", Desc: i18n.T("help.conns_search.cancel")})
+		} else {
+			hints = append(hints, common.InlineHelpHint{Key: "?", Desc: i18n.T("core.inline.help")})
 		}
 		return hints
 
@@ -386,6 +389,8 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		if state.InlineFocused {
 			hints[0] = common.InlineHelpHint{Key: "↑↓", Desc: i18n.T("help.conns_detail.scroll")}
 			hints = append(hints, common.InlineHelpHint{Key: "Esc", Desc: i18n.T("help.conns_search.cancel")})
+		} else {
+			hints = append(hints, common.InlineHelpHint{Key: "?", Desc: i18n.T("core.inline.help")})
 		}
 		return hints
 	}
@@ -393,9 +398,14 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 	return nil
 }
 
+// InlineHelpHints 返回连接页当前可见的右下角交互菜单条目。
+func (s State) InlineHelpHints(chartData *model.ChartData, width, height int) []common.InlineHelpHint {
+	return common.FitInlineHints(buildConnectionsInlineHelpHints(s.ToPageState(chartData, width, height)), max(1, width-1))
+}
+
 // renderConnectionsInlineHelp 渲染右下角内联帮助面板并叠加到页面上
 func renderConnectionsInlineHelp(page string, state PageState) string {
-	hints := buildConnectionsInlineHelpHints(state)
+	hints := common.FitInlineHints(buildConnectionsInlineHelpHints(state), max(1, state.Width-1))
 	if len(hints) == 0 {
 		return page
 	}

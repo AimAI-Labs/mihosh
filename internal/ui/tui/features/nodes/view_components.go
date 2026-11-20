@@ -122,16 +122,21 @@ func buildNodesInlineHelpHints(state PageState) []common.InlineHelpHint {
 		{Key: "t", Desc: i18n.T("help.nodes.hint_test")},
 		{Key: "a", Desc: i18n.T("help.nodes.hint_test_all")},
 		{Key: "m", Desc: i18n.T("help.nodes.hint_mode")},
-		{Key: "s", Desc: i18n.T("help.nodes.hint_sort")},
+		{Key: "s", Desc: i18n.T("help.nodes.hint_sort"), Tone: common.InlineHelpToneInfo},
 		{Key: "/", Desc: i18n.T("help.nodes.hint_search")},
 		{Key: "f", Desc: i18n.T("help.nodes.hint_result")},
 		{Key: "?", Desc: i18n.T("help.nodes.hint_more")},
 	}
 }
 
+// InlineHelpHints 返回节点页当前可见的右下角交互菜单条目。
+func (s State) InlineHelpHints(width, height int) []common.InlineHelpHint {
+	return common.FitInlineHints(buildNodesInlineHelpHints(s.ToPageState(width, height)), max(1, width-1))
+}
+
 // renderNodesInlineHelp 渲染右下角内联帮助面板并叠加到页面上
 func renderNodesInlineHelp(page string, state PageState) string {
-	hints := buildNodesInlineHelpHints(state)
+	hints := common.FitInlineHints(buildNodesInlineHelpHints(state), max(1, state.Width-1))
 	if len(hints) == 0 {
 		return page
 	}

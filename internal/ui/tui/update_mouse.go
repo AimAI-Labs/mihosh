@@ -55,6 +55,9 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 		switch {
 		case isMouseLeftPress(msg):
+			if keyMsg, hit := m.resolveInlineHelpClick(pageX, pageY, pageWidth, pageHeight); hit {
+				return m.handleGlobalKeys(keyMsg)
+			}
 			return m.dispatchToPage(messages.PageMouseClickMsg{X: pageX, Y: pageY, Width: pageWidth, Height: pageHeight})
 		case isMouseWheelUp(msg), isMouseWheelDown(msg):
 			return m.dispatchToPage(messages.PageMouseScrollMsg{Up: isMouseWheelUp(msg), X: pageX, Y: pageY, Width: pageWidth, Height: pageHeight})
@@ -112,6 +115,9 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		pageX, pageY, pageWidth, pageHeight, ok := m.resolveMainPageMouseHit(msg.X, msg.Y)
 		if !ok {
 			return m, nil
+		}
+		if keyMsg, hit := m.resolveInlineHelpClick(pageX, pageY, pageWidth, pageHeight); hit {
+			return m.handleGlobalKeys(keyMsg)
 		}
 		clickMsg := messages.PageMouseClickMsg{
 			X:      pageX,
@@ -188,6 +194,31 @@ func (m *Model) resolveMainPageMouseHit(x, y int) (pageX, pageY, pageWidth, page
 	}
 
 	return pageX, pageY, pageWidth, pageHeight, true
+}
+
+func (m Model) resolveInlineHelpClick(pageX, pageY, pageWidth, pageHeight int) (tea.KeyMsg, bool) {
+	var hints []common.InlineHelpHint
+	switch m.currentPage {
+	case layout.PageNodes:
+		hints = m.nodesState.InlineHelpHints(pageWidth, pageHeight)
+	case layout.PageConnections:
+		hints = m.connsState.InlineHelpHints(m.chartData, pageWidth, pageHeight)
+	case layout.PageLogs:
+		hints = m.logsState.InlineHelpHints(pageWidth, pageHeight)
+	case layout.PageRules:
+		hints = m.rulesState.InlineHelpHints(pageWidth, pageHeight)
+	case layout.PageSub:
+		hints = m.subState.InlineHelpHints(pageWidth, pageHeight)
+	case layout.PageSettings:
+		hints = m.settingsState.InlineHelpHints(pageWidth)
+	case layout.PageCore:
+		hints = m.coreState.InlineHelpHints(pageWidth, pageHeight)
+	}
+	hint, ok := common.ResolveInlineHelpHit(hints, pageX, pageY, pageWidth, pageHeight)
+	if !ok {
+		return tea.KeyMsg{}, false
+	}
+	return hint.KeyMsg()
 }
 
 func isMouseLeftPress(msg tea.MouseMsg) bool {

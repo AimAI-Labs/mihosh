@@ -3,17 +3,32 @@ package common
 import (
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
 
 // ============================================================
-//  内联帮助提示面板（右下角浮层）—— 通用渲染辅助
+//  内联帮助提示面板（右下角交互菜单）—— 通用渲染与命中辅助
 // ============================================================
 //
 // 各页面共享此实现：页面只需构造 []InlineHelpHint（按键 + 描述），
-// 调用 OverlayHelpAtBottomRight 将其叠加到页面右下角即可。
-// 与页面无关的纯渲染逻辑集中于此，避免重复造轮子。
+// 调用 OverlayHelpAtBottomRight 将其叠加到页面右下角，并通过
+// ResolveInlineHelpHit 将点击位置映射回对应的快捷键动作。
+
+// InlineHelpTone 定义右下角快捷菜单项的语义色彩类别。
+type InlineHelpTone uint8
+
+const (
+	InlineHelpToneAuto InlineHelpTone = iota
+	InlineHelpToneNav                 // 纯导航提示（不可点击，弱化展示）
+	InlineHelpTonePrimary             // 主操作（确认/切换/运行/刷新）
+	InlineHelpToneSuccess             // 正向操作（新增/测速/应用/更新）
+	InlineHelpToneInfo                // 浏览与筛选（搜索/模式/排序/视图/标签）
+	InlineHelpToneWarning             // 取消/返回/重启/退格
+	InlineHelpToneDanger              // 危险操作（删除/关闭/清空）
+	InlineHelpToneHelp                // 帮助入口（?）
+)
 
 // InlineHelp 样式函数（支持主题热切换）
 
@@ -30,20 +45,206 @@ func InlineHelpDimStyle() lipgloss.Style {
 // InlineHelpDescStyle 描述文本样式（柔和蓝）
 func InlineHelpDescStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(resolve(Dim())) }
 
-// InlineHelpHint 内联帮助条目（按键 + 描述）
+// InlineHelpHint 内联帮助条目（按键 + 描述 + 可选动作与语义色）
 type InlineHelpHint struct {
-	Key  string
-	Desc string
+	Key    string
+	Desc   string
+	Action string
+	Tone   InlineHelpTone
 }
 
-// FormatInlineHintRow 将一组帮助条目格式化为 "key desc · key desc" 单行
+// Clickable 返回该条目是否支持点击触发对应操作。
+func (h InlineHelpHint) Clickable() bool {
+	_, ok := h.KeyMsg()
+	return ok
+}
+
+// KeyMsg 返回点击该条目时应派发的按键消息。
+func (h InlineHelpHint) KeyMsg() (tea.KeyMsg, bool) {
+	action := h.Action
+	if action == "" {
+		action = defaultHintAction(h.Key)
+	}
+	if action == "" {
+		return tea.KeyMsg{}, false
+	}
+	switch action {
+	case "enter":
+		return tea.KeyMsg{Type: tea.KeyEnter}, true
+	case "esc":
+		return tea.KeyMsg{Type: tea.KeyEsc}, true
+	case "tab":
+		return tea.KeyMsg{Type: tea.KeyTab}, true
+	case "space", " ":
+		return tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}}, true
+	case "backspace":
+		return tea.KeyMsg{Type: tea.KeyBackspace}, true
+	case "ctrl+s":
+		return tea.KeyMsg{Type: tea.KeyCtrlS}, true
+	case "ctrl+r":
+		return tea.KeyMsg{Type: tea.KeyCtrlR}, true
+	case "ctrl+f":
+		return tea.KeyMsg{Type: tea.KeyCtrlF}, true
+	default:
+		runes := []rune(action)
+		if len(runes) == 1 {
+			return tea.KeyMsg{Type: tea.KeyRunes, Runes: runes}, true
+		}
+		return tea.KeyMsg{}, false
+	}
+}
+
+// ResolveTone 返回条目的最终语义色彩类别。
+func (h InlineHelpHint) ResolveTone() InlineHelpTone {
+	if h.Tone != InlineHelpToneAuto {
+		return h.Tone
+	}
+	if !h.Clickable() {
+		return InlineHelpToneNav
+	}
+	switch h.Key {
+	case "?":
+		return InlineHelpToneHelp
+	case "d", "x/X":
+		return InlineHelpToneDanger
+	case "Esc", "Esc/q", "Esc/n", "f/Esc", "Enter/Esc", "z", "⌫":
+		return InlineHelpToneWarning
+	case "n", "t", "a", "s/S", "Ctrl+S", "Enter/y":
+		return InlineHelpToneSuccess
+	case "↵", "Enter", "r", "u", "Space":
+		return InlineHelpTonePrimary
+	default:
+		return InlineHelpToneInfo
+	}
+}
+
+func defaultHintAction(key string) string {
+	switch key {
+	case "", "↑↓", "↑/↓", "←→", "←/→", "Home/End", "…":
+		return ""
+	case "↵", "Enter", "Enter/y":
+		return "enter"
+	case "Esc", "Esc/q", "Esc/n", "f/Esc", "Enter/Esc":
+		return "esc"
+	case "Tab", "←→/Tab":
+		return "tab"
+	case "Space":
+		return "space"
+	case "⌫":
+		return "backspace"
+	case "Ctrl+S":
+		return "ctrl+s"
+	case "Ctrl+R/F":
+		return "ctrl+r"
+	case "[/]":
+		return "]"
+	}
+	if len([]rune(key)) == 1 {
+		return key
+	}
+	if first, _, ok := strings.Cut(key, "/"); ok && len([]rune(first)) == 1 {
+		return first
+	}
+	return ""
+}
+
+func inlineHelpToneColor(tone InlineHelpTone) lipgloss.Color {
+	switch tone {
+	case InlineHelpTonePrimary:
+		return Primary()
+	case InlineHelpToneSuccess:
+		return Success()
+	case InlineHelpToneInfo:
+		return Info()
+	case InlineHelpToneWarning:
+		return Warning()
+	case InlineHelpToneDanger:
+		return Danger()
+	case InlineHelpToneHelp:
+		return Secondary()
+	default:
+		return Muted()
+	}
+}
+
+func formatInlineHintItem(h InlineHelpHint) string {
+	tone := h.ResolveTone()
+	if tone == InlineHelpToneNav || !h.Clickable() {
+		return InlineHelpDimStyle().Render(h.Key) + " " + InlineHelpDescStyle().Render(h.Desc)
+	}
+	bg := resolve(Selected())
+	keyStyle := lipgloss.NewStyle().Foreground(resolve(inlineHelpToneColor(tone))).Background(bg).Bold(true)
+	spaceStyle := lipgloss.NewStyle().Background(bg)
+	descStyle := lipgloss.NewStyle().Foreground(resolve(TokyoForeground())).Background(bg)
+	return keyStyle.Render(h.Key) + spaceStyle.Render(" ") + descStyle.Render(h.Desc)
+}
+
+// FormatInlineHintRow 将一组帮助条目格式化为 "key desc · key desc" 单行交互菜单
 func FormatInlineHintRow(hints []InlineHelpHint) string {
 	sep := InlineHelpDimStyle().Render(" · ")
 	parts := make([]string, 0, len(hints))
 	for _, h := range hints {
-		parts = append(parts, InlineHelpKeyStyle().Render(h.Key)+" "+InlineHelpDescStyle().Render(h.Desc))
+		parts = append(parts, formatInlineHintItem(h))
 	}
 	return strings.Join(parts, sep)
+}
+
+// FitInlineHints 将条目裁切到 maxWidth 内，优先保留可点击菜单项和末尾的帮助/取消项。
+func FitInlineHints(hints []InlineHelpHint, maxWidth int) []InlineHelpHint {
+	if len(hints) == 0 || maxWidth <= 0 || lipgloss.Width(FormatInlineHintRow(hints)) <= maxWidth {
+		return hints
+	}
+	fitted := make([]InlineHelpHint, 0, len(hints))
+	for _, h := range hints {
+		if h.Clickable() {
+			fitted = append(fitted, h)
+		}
+	}
+	if len(fitted) == 0 {
+		fitted = append(fitted, hints...)
+	}
+	if lipgloss.Width(FormatInlineHintRow(fitted)) <= maxWidth || len(fitted) == 1 {
+		return fitted
+	}
+	last := fitted[len(fitted)-1]
+	prefix := append([]InlineHelpHint(nil), fitted[:len(fitted)-1]...)
+	for len(prefix) > 0 && lipgloss.Width(FormatInlineHintRow(append(append([]InlineHelpHint(nil), prefix...), last))) > maxWidth {
+		prefix = prefix[:len(prefix)-1]
+	}
+	return append(prefix, last)
+}
+
+// ResolveInlineHelpHit 检测 (x, y) 是否命中右下角内联菜单中的某个可点击条目。
+func ResolveInlineHelpHit(hints []InlineHelpHint, x, y, width, height int) (InlineHelpHint, bool) {
+	if len(hints) == 0 || width <= 0 || height <= 0 || y != height-1 || x < 0 || x >= width {
+		return InlineHelpHint{}, false
+	}
+	panelW := lipgloss.Width(FormatInlineHintRow(hints))
+	startCol := width - panelW - 1
+	if startCol < 0 {
+		startCol = 0
+	}
+	curX := startCol
+	sepW := lipgloss.Width(" · ")
+	maxVisible := max(1, width-1)
+	for i, h := range hints {
+		itemW := lipgloss.Width(h.Key + " " + h.Desc)
+		endX := min(maxVisible, curX+itemW)
+		if x >= curX && x < endX {
+			if h.Clickable() {
+				return h, true
+			}
+			return InlineHelpHint{}, false
+		}
+		curX += itemW
+		if i < len(hints)-1 {
+			curX += sepW
+		}
+		if curX >= maxVisible {
+			break
+		}
+	}
+	return InlineHelpHint{}, false
 }
 
 // OverlayHelpAtBottomRight 将帮助面板叠加在页面右下角（紧贴底栏上方，距右 1 字符）。

@@ -24,9 +24,9 @@ func (s State) ReleaseHelpNotes() []string {
 	return append(notes, s.releaseCaption())
 }
 
-func (s State) inlineHelp(width int) string {
-	if s.tab == 4 && !s.Editing && !s.Busy {
-		return s.editor.InlineHelp(width)
+func (s State) inlineHelpHints(width int) []common.InlineHelpHint {
+	if s.tab == 4 && !s.Editing && !s.Busy && s.task == "" && s.Err == nil {
+		return s.editor.InlineHelpHints(width)
 	}
 	hints := []common.InlineHelpHint{
 		{Key: "←→", Desc: i18n.T("core.inline.sections")},
@@ -82,5 +82,9 @@ func (s State) inlineHelp(width int) string {
 	for len(hints) > 0 && lipgloss.Width(common.FormatInlineHintRow(append(hints, help))) > width-1 {
 		hints = hints[:len(hints)-1]
 	}
-	return ansi.Truncate(common.FormatInlineHintRow(append(hints, help)), max(1, width-1), "")
+	return append(hints, help)
+}
+
+func (s State) inlineHelp(width int) string {
+	return ansi.Truncate(common.FormatInlineHintRow(s.inlineHelpHints(width)), max(1, width-1), "")
 }

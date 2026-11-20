@@ -171,7 +171,7 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 	// 删除确认弹窗：确认删除 + 取消
 	if state.ShowDeleteConfirm {
 		return []common.InlineHelpHint{
-			{Key: "Enter/y", Desc: i18n.T("help.rules_delete.confirm")},
+			{Key: "Enter/y", Desc: i18n.T("help.rules_delete.confirm"), Tone: common.InlineHelpToneDanger},
 			{Key: "Esc/n", Desc: i18n.T("help.rules_delete.cancel")},
 		}
 	}
@@ -182,7 +182,7 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 			{Key: "←/→", Desc: i18n.T("help.rules_add.type")},
 			{Key: "Space", Desc: i18n.T("help.rules_add.type_input")},
 			{Key: "↑/↓", Desc: i18n.T("help.rules_add.field")},
-			{Key: "↵", Desc: i18n.T("help.rules_add.confirm")},
+			{Key: "↵", Desc: i18n.T("help.rules_add.confirm"), Tone: common.InlineHelpToneSuccess},
 			{Key: "Esc", Desc: i18n.T("help.rules_add.cancel")},
 		}
 	}
@@ -193,7 +193,7 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 			{Key: "←/→", Desc: i18n.T("help.rules_add.type")},
 			{Key: "Space", Desc: i18n.T("help.rules_add.type_input")},
 			{Key: "↑/↓", Desc: i18n.T("help.rules_add.field")},
-			{Key: "↵", Desc: i18n.T("help.rules_add.confirm")},
+			{Key: "↵", Desc: i18n.T("help.rules_add.confirm"), Tone: common.InlineHelpToneSuccess},
 			{Key: "Esc", Desc: i18n.T("help.rules_add.cancel")},
 		}
 	}
@@ -204,6 +204,7 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 			{Key: "Space", Desc: i18n.T("help.rules_filter.toggle")},
 			{Key: "t", Desc: i18n.T("help.rules.hint_type")},
 			{Key: "/", Desc: i18n.T("help.rules.hint_search")},
+			{Key: "?", Desc: i18n.T("core.inline.help")},
 		}
 	}
 
@@ -222,17 +223,23 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 		{Key: "↑↓", Desc: i18n.T("help.rules.hint_select")},
 		{Key: "↵", Desc: i18n.T("help.rules.hint_modify")},
 		{Key: "/", Desc: i18n.T("help.rules.hint_search")},
-		{Key: "t", Desc: i18n.T("help.rules.hint_type")},
+		{Key: "t", Desc: i18n.T("help.rules.hint_type"), Tone: common.InlineHelpToneInfo},
 		{Key: "n", Desc: i18n.T("help.rules.hint_add")},
 		{Key: "d", Desc: i18n.T("help.rules.hint_delete")},
 		{Key: "e", Desc: i18n.T("help.rules.hint_edit")},
 		{Key: "r", Desc: i18n.T("help.rules.hint_refresh")},
+		{Key: "?", Desc: i18n.T("core.inline.help")},
 	}
+}
+
+// InlineHelpHints 返回规则页当前可见的右下角交互菜单条目。
+func (s State) InlineHelpHints(width, height int) []common.InlineHelpHint {
+	return common.FitInlineHints(buildRulesInlineHelpHints(s.ToPageState(width, height)), max(1, width-1))
 }
 
 // renderRulesInlineHelp 渲染右下角内联帮助面板并叠加到页面上
 func renderRulesInlineHelp(page string, state PageState) string {
-	hints := buildRulesInlineHelpHints(state)
+	hints := common.FitInlineHints(buildRulesInlineHelpHints(state), max(1, state.Width-1))
 	if len(hints) == 0 {
 		return page
 	}

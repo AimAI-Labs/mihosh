@@ -155,13 +155,19 @@ func buildLogsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		{Key: "[/]", Desc: i18n.T("help.logs.hint_level")},
 		{Key: "←→", Desc: i18n.T("help.logs.hint_scroll")},
 		{Key: "/", Desc: i18n.T("help.logs.hint_search")},
-		{Key: "c", Desc: i18n.T("help.logs.hint_clear")},
+		{Key: "c", Desc: i18n.T("help.logs.hint_clear"), Tone: common.InlineHelpToneDanger},
+		{Key: "?", Desc: i18n.T("core.inline.help")},
 	}
+}
+
+// InlineHelpHints 返回日志页当前可见的右下角交互菜单条目。
+func (s State) InlineHelpHints(width, height int) []common.InlineHelpHint {
+	return common.FitInlineHints(buildLogsInlineHelpHints(s.ToPageState(width, height)), max(1, width-1))
 }
 
 // renderLogsInlineHelp 渲染右下角内联帮助面板并叠加到页面上
 func renderLogsInlineHelp(page string, state PageState) string {
-	hints := buildLogsInlineHelpHints(state)
+	hints := common.FitInlineHints(buildLogsInlineHelpHints(state), max(1, state.Width-1))
 	if len(hints) == 0 {
 		return page
 	}

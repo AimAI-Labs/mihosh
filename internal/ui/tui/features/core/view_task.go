@@ -69,7 +69,20 @@ func (s State) progressText(width int) string {
 	return progress
 }
 
+func (s State) InlineHelpHints(width, height int) []common.InlineHelpHint {
+	if s.Editing || width <= 0 || height <= 0 {
+		return nil
+	}
+	_, helpWidth := s.footerRender(width, height)
+	return s.inlineHelpHints(helpWidth + 1)
+}
+
 func (s State) footer(width, height int) string {
+	rendered, _ := s.footerRender(width, height)
+	return rendered
+}
+
+func (s State) footerRender(width, height int) (string, int) {
 	t := theme.Current()
 	width = max(1, width-1)
 	body := ""
@@ -126,5 +139,5 @@ func (s State) footer(width, height int) string {
 	leftWidth := max(0, width-lipgloss.Width(help)-2)
 	left := lipgloss.NewStyle().Foreground(theme.Resolve(color)).Render(ansi.Truncate(notice, leftWidth, "…"))
 	row := common.PadString(left, max(0, width-lipgloss.Width(help))) + help
-	return strings.Join(append(lines, row), "\n")
+	return strings.Join(append(lines, row), "\n"), helpWidth
 }

@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 	"unsafe"
@@ -13,7 +14,10 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestUpdate_GlobalMessages(t *testing.T) {
@@ -234,5 +238,58 @@ func TestModelCompactFootprintAndBoundedRingBuffers(t *testing.T) {
 	m = next.(Model)
 	if closed := m.connsState.ClosedConnections(); len(closed) != common.ClosedConnCap {
 		t.Fatalf("len(ClosedConnections()) = %d, want %d", len(closed), common.ClosedConnCap)
+	}
+}
+
+func TestUpdate_InlineHelpMenuClick(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	i18n.Init()
+	i18n.SetLanguageOverride("zh-CN")
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+
+	client := api.NewClient(config.MihomoEndpoint{}, 2000)
+	m := NewModel(client, "", 2000)
+	defer m.Close()
+	m.width = 120
+	m.height = 30
+	m.currentPage = layout.PageRules
+
+	findLabelX := func(view, label string) (int, int) {
+		t.Helper()
+		lines := strings.Split(ansi.Strip(view), "\n")
+		y := layout.TopNavHeight + (m.height - layout.TopNavHeight - common.StatusBarHeight) - 1
+		if y < 0 || y >= len(lines) {
+			t.Fatalf("invalid bottom hint row %d", y)
+		}
+		at := strings.Index(lines[y], label)
+		if at < 0 {
+			t.Fatalf("label %q not found in bottom hint row %q", label, lines[y])
+		}
+		return lipgloss.Width(lines[y][:at]) + 1, y
+	}
+
+	// Click "/ 搜索" on Rules page -> enters filter mode.
+	x, y := findLabelX(m.View(), "/ "+i18n.T("help.rules.hint_search"))
+	next, _ := m.Update(tea.MouseMsg{X: x, Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	m = next.(Model)
+	if !m.rulesState.FilterMode() {
+		t.Fatal("clicking bottom-right search menu item did not enter filter mode")
+	}
+
+	// While in filter mode (InputCapture active), click "Esc 取消" -> exits filter mode.
+	x, y = findLabelX(m.View(), "Esc "+i18n.T("help.rules_search.cancel"))
+	next, _ = m.Update(tea.MouseMsg{X: x, Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	m = next.(Model)
+	if m.rulesState.FilterMode() {
+		t.Fatal("clicking bottom-right Esc menu item did not exit filter mode")
+	}
+
+	// Click "? 帮助" on Settings page -> opens help popup.
+	m.currentPage = layout.PageSettings
+	x, y = findLabelX(m.View(), "? "+i18n.T("core.inline.help"))
+	next, _ = m.Update(tea.MouseMsg{X: x, Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	m = next.(Model)
+	if !m.showHelp {
+		t.Fatal("clicking bottom-right help menu item did not open help popup")
 	}
 }

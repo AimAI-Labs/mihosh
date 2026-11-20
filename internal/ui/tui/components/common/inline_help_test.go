@@ -123,3 +123,83 @@ func TestOverlayHelpAtBottomRight_NoOverlapChangesHeight(t *testing.T) {
 		t.Fatalf("result height = %d, want %d", got, height)
 	}
 }
+
+func TestResolveInlineHelpHit_AndKeyMsg(t *testing.T) {
+	hints := []InlineHelpHint{
+		{Key: "↑↓", Desc: "Select"},
+		{Key: "/", Desc: "Search"},
+		{Key: "d", Desc: "Delete"},
+		{Key: "?", Desc: "Help"},
+	}
+	const width, height = 60, 10
+	panelW := lipgloss.Width(FormatInlineHintRow(hints))
+	startCol := width - panelW - 1
+
+	// Clicking passive navigation hint must not trigger.
+	if _, ok := ResolveInlineHelpHit(hints, startCol+1, height-1, width, height); ok {
+		t.Fatal("passive navigation hint should not be clickable")
+	}
+
+	// Clicking "/" search hint hits "/" and maps to rune '/'.
+	searchX := startCol + lipgloss.Width("↑↓ Select · ") + 1
+	hit, ok := ResolveInlineHelpHit(hints, searchX, height-1, width, height)
+	if !ok || hit.Key != "/" {
+		t.Fatalf("expected '/' hit, got (%+v, %v)", hit, ok)
+	}
+	if keyMsg, ok := hit.KeyMsg(); !ok || keyMsg.String() != "/" {
+		t.Fatalf("expected '/' key msg, got (%v, %v)", keyMsg, ok)
+	}
+
+	// Clicking "?" at the right edge hits "?".
+	helpX := width - 2
+	hit, ok = ResolveInlineHelpHit(hints, helpX, height-1, width, height)
+	if !ok || hit.Key != "?" || hit.ResolveTone() != InlineHelpToneHelp {
+		t.Fatalf("expected '?' help hit, got (%+v, %v)", hit, ok)
+	}
+
+	// Clicking above the bottom row must not hit.
+	if _, ok := ResolveInlineHelpHit(hints, helpX, height-2, width, height); ok {
+		t.Fatal("click above bottom row should not hit inline help")
+	}
+}
+
+func TestFitInlineHints_DropsNavFirstAndKeepsHelp(t *testing.T) {
+	hints := []InlineHelpHint{
+		{Key: "↑↓", Desc: "Select"},
+		{Key: "←→", Desc: "Group"},
+		{Key: "t", Desc: "Test"},
+		{Key: "d", Desc: "Delete"},
+		{Key: "?", Desc: "Help"},
+	}
+	fitted := FitInlineHints(hints, 24)
+	if len(fitted) == 0 || fitted[len(fitted)-1].Key != "?" {
+		t.Fatalf("expected trailing '?' preserved, got %+v", fitted)
+	}
+	for _, h := range fitted {
+		if h.Key == "↑↓" || h.Key == "←→" {
+			t.Fatalf("expected passive nav hints dropped when constrained, got %+v", fitted)
+		}
+	}
+	if w := lipgloss.Width(FormatInlineHintRow(fitted)); w > 24 {
+		t.Fatalf("fitted row width %d exceeds budget 24", w)
+	}
+}
+
+func TestInlineHelpHint_DistinctTonesByCategory(t *testing.T) {
+	cases := map[string]InlineHelpTone{
+		"↑↓":     InlineHelpToneNav,
+		"↵":      InlineHelpTonePrimary,
+		"t":      InlineHelpToneSuccess,
+		"/":      InlineHelpToneInfo,
+		"Esc":    InlineHelpToneWarning,
+		"d":      InlineHelpToneDanger,
+		"?":      InlineHelpToneHelp,
+		"Ctrl+S": InlineHelpToneSuccess,
+	}
+	for k, want := range cases {
+		h := InlineHelpHint{Key: k, Desc: "X"}
+		if got := h.ResolveTone(); got != want {
+			t.Errorf("hint %q tone = %v, want %v", k, got, want)
+		}
+	}
+}

@@ -325,15 +325,26 @@ func resolveListItemAt(state PageState, pageY, pageHeight int) int {
 // 内联帮助（右下角浮层）
 // ============================================================
 
-func renderInlineHelp(page string, state PageState) string {
+func visibleInlineHints(state PageState) []common.InlineHelpHint {
+	if state.File.mode != fileClosed {
+		return nil
+	}
 	hints := buildHints(state)
 	if len(hints) == 0 {
-		return page
+		return nil
 	}
-	if state.ShowAddForm || state.ShowEditForm {
-		for len(hints) > 1 && lipgloss.Width(common.FormatInlineHintRow(hints)) > state.Width-1 {
-			hints = hints[:len(hints)-1]
-		}
+	return common.FitInlineHints(hints, max(1, state.Width-1))
+}
+
+// InlineHelpHints 返回订阅页当前可见的右下角交互菜单条目。
+func (s State) InlineHelpHints(width, height int) []common.InlineHelpHint {
+	return visibleInlineHints(s.ToPageState(width, height))
+}
+
+func renderInlineHelp(page string, state PageState) string {
+	hints := visibleInlineHints(state)
+	if len(hints) == 0 {
+		return page
 	}
 	body := common.FormatInlineHintRow(hints)
 	return common.OverlayHelpAtBottomRight(page, body, state.Width, state.Height)
@@ -342,13 +353,13 @@ func renderInlineHelp(page string, state PageState) string {
 func buildHints(state PageState) []common.InlineHelpHint {
 	if state.ShowDeleteConf {
 		return []common.InlineHelpHint{
-			{Key: "Enter/y", Desc: i18n.T("help.sub_delete.confirm")},
+			{Key: "Enter/y", Desc: i18n.T("help.sub_delete.confirm"), Tone: common.InlineHelpToneDanger},
 			{Key: "Esc/n", Desc: i18n.T("help.sub_delete.cancel")},
 		}
 	}
 	if state.ShowAddForm || state.ShowEditForm {
 		return []common.InlineHelpHint{
-			{Key: "↵", Desc: i18n.T("help.sub_add.confirm")},
+			{Key: "↵", Desc: i18n.T("help.sub_add.confirm"), Tone: common.InlineHelpToneSuccess},
 			{Key: "Esc", Desc: i18n.T("help.sub_add.cancel")},
 			{Key: "Tab", Desc: i18n.T("help.sub_add.field")},
 		}
@@ -364,13 +375,14 @@ func buildHints(state PageState) []common.InlineHelpHint {
 	return []common.InlineHelpHint{
 		{Key: "↑↓", Desc: i18n.T("help.sub.select")},
 		{Key: "↵", Desc: i18n.T("help.sub.activate")},
-		{Key: "u", Desc: i18n.T("help.sub.update")},
+		{Key: "u", Desc: i18n.T("help.sub.update"), Tone: common.InlineHelpToneSuccess},
 		{Key: "m", Desc: i18n.T("help.sub.edit_merge")},
 		{Key: "c", Desc: i18n.T("help.sub.view_raw")},
 		{Key: "e", Desc: i18n.T("help.sub.edit_profile")},
 		{Key: "n", Desc: i18n.T("help.sub.add")},
 		{Key: "d", Desc: i18n.T("help.sub.delete")},
 		{Key: "/", Desc: i18n.T("help.sub.search")},
+		{Key: "?", Desc: i18n.T("core.inline.help")},
 	}
 }
 
