@@ -11,11 +11,13 @@ package profile
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"maps"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"slices"
 	"strconv"
@@ -48,8 +50,19 @@ func FetchContext(ctx context.Context, p Profile) error {
 	return WriteRaw(p.UID, raw)
 }
 
+// DownloadOptions carries runtime transport context resolved by the caller
+// (e.g., Mihomo's active mixed-port proxy URL when SubSource.UseProxy is true).
+type DownloadOptions struct {
+	ProxyURL string
+}
+
 // Download validates subscription content and returns the usage reported by the same response.
 func Download(ctx context.Context, source SubSource) ([]byte, *SubscriptionUsage, error) {
+	return DownloadWithOptions(ctx, source, DownloadOptions{})
+}
+
+// DownloadWithOptions validates subscription content using source fetch options and caller options.
+func DownloadWithOptions(ctx context.Context, source SubSource, opts DownloadOptions) ([]byte, *SubscriptionUsage, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, nil, err
 	}
@@ -59,7 +72,7 @@ func Download(ctx context.Context, source SubSource) ([]byte, *SubscriptionUsage
 	if source.Kind == SourceLocal {
 		data, err = fetchLocal(source.Path)
 	} else {
-		data, usage, err = fetchRemoteContext(ctx, source.URL)
+		data, usage, err = fetchRemoteContext(ctx, source, opts)
 	}
 	if err != nil {
 		return nil, nil, err
@@ -91,8 +104,8 @@ func Download(ctx context.Context, source SubSource) ([]byte, *SubscriptionUsage
 	return nil, nil, fmt.Errorf("订阅内容顶层不是配置映射（可能是错误页或纯文本），已拒绝")
 }
 
-func fetchRemoteContext(ctx context.Context, url string) ([]byte, *SubscriptionUsage, error) {
-	subURL := strings.TrimSpace(url)
+func fetchRemoteContext(ctx context.Context, source SubSource, opts DownloadOptions) ([]byte, *SubscriptionUsage, error) {
+	subURL := strings.TrimSpace(source.URL)
 	if subURL == "" {
 		return nil, nil, fmt.Errorf("%s", i18n.T("profile.fetcher.err_empty_url"))
 	}
@@ -102,12 +115,39 @@ func fetchRemoteContext(ctx context.Context, url string) ([]byte, *SubscriptionU
 		return nil, nil, fmt.Errorf("%s", i18n.T("profile.fetcher.err_only_http"))
 	}
 
-	client := &http.Client{Timeout: fetchTimeout}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if source.UseProxy {
+		proxyRaw := strings.TrimSpace(opts.ProxyURL)
+		if proxyRaw != "" {
+			if !strings.Contains(proxyRaw, "://") {
+				proxyRaw = "http://" + proxyRaw
+			}
+			parsedProxy, err := url.Parse(proxyRaw)
+			if err != nil {
+				return nil, nil, fmt.Errorf(i18n.T("profile.fetcher.err_build_req"), err)
+			}
+			transport.Proxy = http.ProxyURL(parsedProxy)
+		} else {
+			transport.Proxy = http.ProxyFromEnvironment
+		}
+	}
+	if source.InsecureSkipVerify {
+		if transport.TLSClientConfig == nil {
+			transport.TLSClientConfig = &tls.Config{}
+		}
+		transport.TLSClientConfig.InsecureSkipVerify = true
+	}
+
+	client := &http.Client{Timeout: fetchTimeout, Transport: transport}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, subURL, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf(i18n.T("profile.fetcher.err_build_req"), err)
 	}
-	req.Header.Set("User-Agent", fetchUserAgent)
+	ua := strings.TrimSpace(source.UserAgent)
+	if ua == "" {
+		ua = fetchUserAgent
+	}
+	req.Header.Set("User-Agent", ua)
 
 	resp, err := client.Do(req)
 	if err != nil {

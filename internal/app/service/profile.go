@@ -79,7 +79,13 @@ func (s *ProfileService) AddProfile(name string, src profile.SubSource) (profile
 	// 规范化来源字段：去除首尾空白，并按内容推断 Kind（统一用户输入）。
 	src.URL = trimSpace(src.URL)
 	src.Path = trimSpace(src.Path)
+	src.UserAgent = trimSpace(src.UserAgent)
 	src.Kind = profile.ParseSourceKind(src.Display())
+	if src.Kind != profile.SourceRemote {
+		src.UseProxy = false
+		src.UserAgent = ""
+		src.InsecureSkipVerify = false
+	}
 
 	uid, err := newUID()
 	if err != nil {
@@ -165,10 +171,16 @@ func (s *ProfileService) EditProfile(uid, name string, src profile.SubSource) er
 	// 规范化来源字段：去除首尾空白，并按内容推断 Kind（与 AddProfile 一致）。
 	src.URL = trimSpace(src.URL)
 	src.Path = trimSpace(src.Path)
+	src.UserAgent = trimSpace(src.UserAgent)
 	src.Kind = profile.ParseSourceKind(src.Display())
+	if src.Kind != profile.SourceRemote {
+		src.UseProxy = false
+		src.UserAgent = ""
+		src.InsecureSkipVerify = false
+	}
 	return s.mutateProfile(uid, func(p *profile.Profile) {
 		p.Name = name
-		if p.Source != src {
+		if !p.Source.SameOrigin(src) {
 			p.Usage = nil
 		}
 		p.Source = src
@@ -202,7 +214,11 @@ func (s *ProfileService) FetchProfileContext(ctx context.Context, uid string) er
 	if err != nil {
 		return err
 	}
-	raw, usage, err := profile.Download(ctx, p.Source)
+	var opts profile.DownloadOptions
+	if p.Source.UseProxy {
+		opts.ProxyURL = config.MixedPortToProxyURL(config.ResolveMihomoEndpoint().MixedPort)
+	}
+	raw, usage, err := profile.DownloadWithOptions(ctx, p.Source, opts)
 	if err != nil {
 		return err
 	}
@@ -212,7 +228,7 @@ func (s *ProfileService) FetchProfileContext(ctx context.Context, uid string) er
 			if current.UID != uid {
 				continue
 			}
-			if current.Source != p.Source {
+			if !current.Source.SameOrigin(p.Source) {
 				return errors.New(i18n.T("sub.err.source_changed"))
 			}
 			if err := ctx.Err(); err != nil {

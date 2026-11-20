@@ -31,16 +31,35 @@ func (s State) clickForm(x, y, width, height int) (State, tea.Cmd) {
 	f := s.activeForm()
 	f.resize(width, height)
 	_, fieldWidth, _ := formDimensions(width, height)
-	if button := f.copyButton(fieldWidth); y == 2 && button != "" {
-		left := formLabelWidth() + 1 + f.srcField.Width() + 1
-		if x >= left && x < left+lipgloss.Width(button) {
-			return s, copySourceCmd(f.srcField.Value())
+	bodyLines, spans, offset := formBodyLayout(*f, width, height)
+	if y < 0 || y >= len(bodyLines) {
+		return s, nil
+	}
+	absY := y + offset
+
+	// Copy button sits on the first row of the source field.
+	if button := f.copyButton(fieldWidth); button != "" {
+		for _, sp := range spans {
+			if sp.field == addFieldSrc && absY == sp.start {
+				left := formLabelWidth() + 1 + f.srcField.Width() + 1
+				if x >= left && x < left+lipgloss.Width(button) {
+					return s, copySourceCmd(f.srcField.Value())
+				}
+			}
 		}
 	}
-	switch {
-	case y == 0:
+
+	clickedField := -1
+	for _, sp := range spans {
+		if absY >= sp.start && absY < sp.end {
+			clickedField = sp.field
+			break
+		}
+	}
+	switch clickedField {
+	case addFieldName:
 		f.fieldCursor = addFieldName
-	case y == 1:
+	case addFieldKind:
 		f.fieldCursor = addFieldKind
 		if x >= formLabelWidth()+1 {
 			remote := x < formLabelWidth()+1+len("remote")+3
@@ -49,8 +68,20 @@ func (s State) clickForm(x, y, width, height int) (State, tea.Cmd) {
 			}
 			f.kindExplicit = true
 		}
-	case y >= 2 && y < 2+f.srcField.Height():
+	case addFieldSrc:
 		f.fieldCursor = addFieldSrc
+	case addFieldProxy:
+		f.fieldCursor = addFieldProxy
+		if x >= formLabelWidth()+1 {
+			f.useProxy = !f.useProxy
+		}
+	case addFieldUA:
+		f.fieldCursor = addFieldUA
+	case addFieldSkipTLS:
+		f.fieldCursor = addFieldSkipTLS
+		if x >= formLabelWidth()+1 {
+			f.skipTLS = !f.skipTLS
+		}
 	default:
 		return s, nil
 	}

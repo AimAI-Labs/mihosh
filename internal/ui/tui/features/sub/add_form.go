@@ -23,19 +23,26 @@ import (
 )
 
 const (
-	addFieldName = 0
-	addFieldKind = 1
-	addFieldSrc  = 2
-	addFieldCnt  = 3
+	addFieldName    = 0
+	addFieldKind    = 1
+	addFieldSrc     = 2
+	addFieldProxy   = 3
+	addFieldUA      = 4
+	addFieldSkipTLS = 5
+	addFieldLocalN  = 3
+	addFieldRemoteN = 6
 )
 
-// addForm 添加订阅表单。
+// addForm 添加/编辑订阅表单。
 type addForm struct {
 	nameField    textinput.Model
 	srcField     textarea.Model
+	uaField      textinput.Model
 	fieldCursor  int
 	kindRemote   bool // true=remote, false=local
 	kindExplicit bool
+	useProxy     bool
+	skipTLS      bool
 	copySource   bool
 	errMsg       string
 }
@@ -55,21 +62,37 @@ func newAddForm() addForm {
 	src.SetHeight(3)
 	src.SetWidth(42)
 
+	ua := textinput.New()
+	ua.Prompt = ""
+	ua.Placeholder = i18n.T("sub.add_placeholder_ua")
+	ua.CharLimit = 256
+
 	return addForm{
 		nameField:   name,
 		srcField:    src,
+		uaField:     ua,
 		fieldCursor: addFieldName,
 		kindRemote:  true,
 	}
 }
 
-func (f addForm) isNameField() bool { return f.fieldCursor == addFieldName }
-func (f addForm) isKindField() bool { return f.fieldCursor == addFieldKind }
-func (f addForm) isSrcField() bool  { return f.fieldCursor == addFieldSrc }
+func (f addForm) fieldCount() int {
+	if f.kindRemote {
+		return addFieldRemoteN
+	}
+	return addFieldLocalN
+}
+
+func (f addForm) isNameField() bool    { return f.fieldCursor == addFieldName }
+func (f addForm) isKindField() bool    { return f.fieldCursor == addFieldKind }
+func (f addForm) isSrcField() bool     { return f.fieldCursor == addFieldSrc }
+func (f addForm) isProxyField() bool   { return f.kindRemote && f.fieldCursor == addFieldProxy }
+func (f addForm) isUAField() bool      { return f.kindRemote && f.fieldCursor == addFieldUA }
+func (f addForm) isSkipTLSField() bool { return f.kindRemote && f.fieldCursor == addFieldSkipTLS }
 
 // cycleField 按方向循环切换字段。
 func (f *addForm) cycleField(dir int) {
-	n := addFieldCnt
+	n := f.fieldCount()
 	f.fieldCursor = (f.fieldCursor + dir%n + n) % n
 	f.focusCurrent()
 }
@@ -78,6 +101,9 @@ func (f *addForm) cycleField(dir int) {
 func (f *addForm) toggleKind() {
 	f.kindRemote = !f.kindRemote
 	f.kindExplicit = true
+	if !f.kindRemote && f.fieldCursor >= addFieldLocalN {
+		f.fieldCursor = addFieldSrc
+	}
 	// 切换类型时更新占位符提示
 	if f.kindRemote {
 		f.srcField.Placeholder = i18n.T("sub.add_placeholder_src_remote")
@@ -87,16 +113,18 @@ func (f *addForm) toggleKind() {
 }
 
 func (f *addForm) focusCurrent() {
+	f.nameField.Blur()
+	f.srcField.Blur()
+	f.uaField.Blur()
 	switch f.fieldCursor {
 	case addFieldName:
 		f.nameField.Focus()
-		f.srcField.Blur()
 	case addFieldSrc:
-		f.nameField.Blur()
 		f.srcField.Focus()
-	default:
-		f.nameField.Blur()
-		f.srcField.Blur()
+	case addFieldUA:
+		if f.kindRemote {
+			f.uaField.Focus()
+		}
 	}
 }
 
@@ -121,6 +149,8 @@ func (f *addForm) resize(width, height int) {
 	_, fieldWidth, sourceHeight := formDimensions(width, height)
 	f.nameField.Width = fieldWidth
 	f.nameField.SetCursor(f.nameField.Position())
+	f.uaField.Width = fieldWidth
+	f.uaField.SetCursor(f.uaField.Position())
 	if button := f.copyButton(fieldWidth); button != "" {
 		fieldWidth -= lipgloss.Width(button) + 1
 	}
@@ -152,6 +182,9 @@ func (f addForm) buildSource() profile.SubSource {
 	src := profile.SubSource{Kind: kind}
 	if kind == profile.SourceRemote {
 		src.URL = val
+		src.UseProxy = f.useProxy
+		src.UserAgent = strings.TrimSpace(f.uaField.Value())
+		src.InsecureSkipVerify = f.skipTLS
 	} else {
 		src.Path = val
 	}
@@ -226,11 +259,21 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 			form.toggleKind()
 			return form, false, nil, false
 		}
+		if form.isProxyField() {
+			form.useProxy = !form.useProxy
+			return form, false, nil, false
+		}
+		if form.isSkipTLSField() {
+			form.skipTLS = !form.skipTLS
+			return form, false, nil, false
+		}
 		var c tea.Cmd
 		if form.isNameField() {
 			form.nameField, c = form.nameField.Update(msg)
 		} else if form.isSrcField() {
 			form.srcField, c = form.srcField.Update(msg)
+		} else if form.isUAField() {
+			form.uaField, c = form.uaField.Update(msg)
 		}
 		form.errMsg = ""
 		return form, false, c, false
@@ -240,18 +283,52 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 			form.toggleKind()
 			return form, false, nil, false
 		}
+		if form.isProxyField() {
+			form.useProxy = !form.useProxy
+			return form, false, nil, false
+		}
+		if form.isSkipTLSField() {
+			form.skipTLS = !form.skipTLS
+			return form, false, nil, false
+		}
 		var c tea.Cmd
 		if form.isNameField() {
 			form.nameField, c = form.nameField.Update(msg)
 		} else if form.isSrcField() {
 			form.srcField, c = form.srcField.Update(msg)
+		} else if form.isUAField() {
+			form.uaField, c = form.uaField.Update(msg)
+		}
+		form.errMsg = ""
+		return form, false, c, false
+
+	case msg.String() == " ":
+		if form.isKindField() {
+			form.toggleKind()
+			return form, false, nil, false
+		}
+		if form.isProxyField() {
+			form.useProxy = !form.useProxy
+			return form, false, nil, false
+		}
+		if form.isSkipTLSField() {
+			form.skipTLS = !form.skipTLS
+			return form, false, nil, false
+		}
+		var c tea.Cmd
+		if form.isNameField() {
+			form.nameField, c = form.nameField.Update(msg)
+		} else if form.isSrcField() {
+			form.srcField, c = form.srcField.Update(msg)
+		} else if form.isUAField() {
+			form.uaField, c = form.uaField.Update(msg)
 		}
 		form.errMsg = ""
 		return form, false, c, false
 
 	default:
-		// 仅名称与来源值字段接收文本输入
-		if form.isKindField() {
+		// 仅名称、来源值与 User-Agent 字段接收文本输入
+		if form.isKindField() || form.isProxyField() || form.isSkipTLSField() {
 			return form, false, nil, false
 		}
 		var c tea.Cmd
@@ -262,6 +339,8 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 			if !form.kindExplicit {
 				form.kindRemote = profile.ParseSourceKind(strings.TrimSpace(form.srcField.Value())) == profile.SourceRemote
 			}
+		} else if form.isUAField() {
+			form.uaField, c = form.uaField.Update(msg)
 		}
 		form.errMsg = ""
 		return form, false, c, false

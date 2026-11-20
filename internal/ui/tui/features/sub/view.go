@@ -236,7 +236,14 @@ const ()
 
 func formLabelWidth() int {
 	width := 0
-	for _, key := range []string{"sub.add_field_name", "sub.add_field_kind", "sub.add_field_src"} {
+	for _, key := range []string{
+		"sub.add_field_name",
+		"sub.add_field_kind",
+		"sub.add_field_src",
+		"sub.add_field_proxy",
+		"sub.add_field_ua",
+		"sub.add_field_skip_tls",
+	} {
 		width = max(width, common.DisplayWidth(i18n.T(key)))
 	}
 	return width
@@ -251,8 +258,108 @@ func formDimensions(width, height int) (modalWidth, fieldWidth, sourceHeight int
 	}
 	modalWidth = max(24, min(76, width-4))
 	fieldWidth = max(1, modalWidth-4-formLabelWidth()-1)
-	sourceHeight = max(1, min(6, height-7))
+	sourceHeight = max(1, min(6, height-10))
 	return
+}
+
+type formRowSpan struct {
+	field int
+	start int
+	end   int
+}
+
+func formBodyLayout(form addForm, width, height int) (lines []string, spans []formRowSpan, offset int) {
+	modalWidth, fieldWidth, _ := formDimensions(width, height)
+	form.resize(width, height)
+	innerWidth := modalWidth - 4
+
+	appendField := func(field int, rendered string) {
+		start := len(lines)
+		lines = append(lines, strings.Split(rendered, "\n")...)
+		spans = append(spans, formRowSpan{field: field, start: start, end: len(lines)})
+	}
+
+	renderBoolToggle := func(enabled bool) string {
+		offLabel := i18n.T("sub.opt_off")
+		onLabel := i18n.T("sub.opt_on")
+		offStyle := common.TokyoMutedStyle()
+		onStyle := common.TokyoMutedStyle()
+		if enabled {
+			onStyle = onStyle.Foreground(common.TokyoCyan()).Bold(true)
+		} else {
+			offStyle = offStyle.Foreground(common.TokyoCyan()).Bold(true)
+		}
+		if fieldWidth < common.DisplayWidth(offLabel+" │ "+onLabel) {
+			if enabled {
+				return "◀ " + onLabel + " ▶"
+			}
+			return "◀ " + offLabel + " ▶"
+		}
+		return offStyle.Render(offLabel) + " │ " + onStyle.Render(onLabel)
+	}
+
+	// 名称行
+	appendField(addFieldName, renderFieldRow(i18n.T("sub.add_field_name"), form.nameField.View(), form.isNameField(), innerWidth))
+
+	var options []string
+	for i, label := range []string{"remote", "local"} {
+		style := common.TokyoMutedStyle()
+		if (i == 0) == form.kindRemote {
+			style = style.Foreground(common.TokyoCyan()).Bold(true)
+		}
+		options = append(options, style.Render(label))
+	}
+	kindVal := strings.Join(options, " │ ")
+	if fieldWidth < common.DisplayWidth("remote │ local") {
+		label := "remote"
+		if !form.kindRemote {
+			label = "local"
+		}
+		kindVal = "◀ " + label + " ▶"
+	}
+	appendField(addFieldKind, renderFieldRow(i18n.T("sub.add_field_kind"), kindVal, form.isKindField(), innerWidth))
+
+	// 来源值行
+	srcLabel := i18n.T("sub.add_field_src")
+	srcValue := form.srcField.View()
+	if button := form.copyButton(fieldWidth); button != "" {
+		style := lipgloss.NewStyle().Background(common.TokyoCyan()).Foreground(common.Background()).Bold(true)
+		srcValue = lipgloss.JoinHorizontal(lipgloss.Top, srcValue, " ", style.Render(button))
+	}
+	appendField(addFieldSrc, renderFieldRow(srcLabel, srcValue, form.isSrcField(), innerWidth))
+
+	if form.kindRemote {
+		appendField(addFieldProxy, renderFieldRow(i18n.T("sub.add_field_proxy"), renderBoolToggle(form.useProxy), form.isProxyField(), innerWidth))
+		appendField(addFieldUA, renderFieldRow(i18n.T("sub.add_field_ua"), form.uaField.View(), form.isUAField(), innerWidth))
+		appendField(addFieldSkipTLS, renderFieldRow(i18n.T("sub.add_field_skip_tls"), renderBoolToggle(form.skipTLS), form.isSkipTLSField(), innerWidth))
+	}
+
+	// 高度预算：最大高度 height-1，减去边框(2)+分隔线(1)+底部提示(1) = height-5
+	budget := max(1, height-5)
+	if len(lines) > budget {
+		focusStart, focusEnd := 0, 1
+		for _, sp := range spans {
+			if sp.field == form.fieldCursor {
+				focusStart, focusEnd = sp.start, sp.end
+				break
+			}
+		}
+		if focusEnd > offset+budget {
+			offset = focusEnd - budget
+		}
+		if focusStart < offset {
+			offset = focusStart
+		}
+		maxOffset := len(lines) - budget
+		if offset > maxOffset {
+			offset = maxOffset
+		}
+		if offset < 0 {
+			offset = 0
+		}
+		lines = lines[offset:min(len(lines), offset+budget)]
+	}
+	return lines, spans, offset
 }
 
 // ===== 添加/编辑表单（共用渲染） =====
@@ -275,52 +382,32 @@ func buildEditFormModal(state PageState, width, height int) string {
 
 // buildFormModal 渲染订阅表单弹窗（添加/编辑共用，仅标题不同）。
 func buildFormModal(title string, form addForm, width, height int) string {
-	modalWidth, fieldWidth, _ := formDimensions(width, height)
-	form.resize(width, height)
+	modalWidth, _, _ := formDimensions(width, height)
 	innerWidth := modalWidth - 4
 
-	// 名称行
-	nameRow := renderFieldRow(i18n.T("sub.add_field_name"), form.nameField.View(), form.isNameField(), innerWidth)
-
-	var options []string
-	for i, label := range []string{"remote", "local"} {
-		style := common.TokyoMutedStyle()
-		if (i == 0) == form.kindRemote {
-			style = style.Foreground(common.TokyoCyan()).Bold(true)
-		}
-		options = append(options, style.Render(label))
-	}
-	kindVal := strings.Join(options, " │ ")
-	if fieldWidth < common.DisplayWidth("remote │ local") {
-		label := "remote"
-		if !form.kindRemote {
-			label = "local"
-		}
-		kindVal = "◀ " + label + " ▶"
-	}
-	kindRow := renderFieldRow(i18n.T("sub.add_field_kind"), kindVal, form.isKindField(), innerWidth)
-
-	// 来源值行
-	srcLabel := i18n.T("sub.add_field_src")
-	srcValue := form.srcField.View()
-	if button := form.copyButton(fieldWidth); button != "" {
-		style := lipgloss.NewStyle().Background(common.TokyoCyan()).Foreground(common.Background()).Bold(true)
-		srcValue = lipgloss.JoinHorizontal(lipgloss.Top, srcValue, " ", style.Render(button))
-	}
-	srcRow := renderFieldRow(srcLabel, srcValue, form.isSrcField(), innerWidth)
+	bodyLines, _, _ := formBodyLayout(form, width, height)
 
 	// 说明/错误行
 	var footer string
-	if form.errMsg != "" {
+	switch {
+	case form.errMsg != "":
 		footer = lipgloss.NewStyle().Foreground(common.Danger()).Render("✗ " + form.errMsg)
-	} else if form.isKindField() {
+	case form.isKindField():
 		footer = common.TokyoMutedStyle().Render(i18n.T("sub.add_kind_hint"))
-	} else {
+	case form.isProxyField():
+		footer = common.TokyoMutedStyle().Render(i18n.T("sub.add_proxy_hint"))
+	case form.isUAField():
+		footer = common.TokyoMutedStyle().Render(i18n.T("sub.add_ua_hint"))
+	case form.isSkipTLSField():
+		footer = common.TokyoMutedStyle().Render(i18n.T("sub.add_skip_tls_hint"))
+	default:
 		footer = common.TokyoMutedStyle().Render(i18n.T("sub.add_src_hint"))
 	}
+	footer = ansi.Truncate(footer, innerWidth, "…")
 
 	divider := lipgloss.NewStyle().Foreground(common.TokyoBlue()).Render(strings.Repeat("─", innerWidth))
-	content := strings.Join([]string{nameRow, kindRow, srcRow, divider, footer}, "\n")
+	allRows := append(append([]string(nil), bodyLines...), divider, footer)
+	content := strings.Join(allRows, "\n")
 
 	return common.RenderBorderedPanel(
 		title,

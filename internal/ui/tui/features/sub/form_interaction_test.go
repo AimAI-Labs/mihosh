@@ -146,3 +146,74 @@ func TestEditFormPersistsSelectedSourceWithoutLosingURLOrPath(t *testing.T) {
 		t.Fatal("selected source was lost during persistence", subs, err)
 	}
 }
+
+func TestEditFormFetchOptionsPersistAndPreserveUsageForSameURL(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	i18n.Init()
+	cfg := config.DefaultConfig
+	cfg.Subs = []profile.Profile{{
+		UID:  "u1",
+		Name: "RemoteSub",
+		Source: profile.SubSource{
+			Kind: profile.SourceRemote,
+			URL:  "https://example.org/sub.yaml",
+		},
+		Usage: &profile.SubscriptionUsage{
+			UsedBytes:  1024,
+			TotalBytes: 4096,
+			ExpiresAt:  1900000000,
+		},
+	}}
+	if err := config.Save(&cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	svc := service.NewProfileService(nil)
+	s := NewState(svc).ApplySubs(cfg.Subs, "")
+	s, _ = s.Update(messages.PageResizeMsg{Width: 100, Height: 24})
+	s, _ = s.openEditForm()
+
+	// Tab to Proxy (3) -> toggle On
+	for range 3 {
+		s, _ = s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeyTab})
+	}
+	if !s.editForm.isProxyField() {
+		t.Fatalf("expected focus on proxy field, got %d", s.editForm.fieldCursor)
+	}
+	s, _ = s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeySpace})
+
+	// Tab to UA (4) -> enter custom UA
+	s, _ = s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeyTab})
+	if !s.editForm.isUAField() {
+		t.Fatalf("expected focus on UA field, got %d", s.editForm.fieldCursor)
+	}
+	s.editForm.uaField.SetValue("MyCustomUA/2.0")
+
+	// Tab to SkipTLS (5) -> toggle On
+	s, _ = s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeyTab})
+	if !s.editForm.isSkipTLSField() {
+		t.Fatalf("expected focus on SkipTLS field, got %d", s.editForm.fieldCursor)
+	}
+	s, _ = s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeyRight})
+
+	// Submit via Enter
+	s, cmd := s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil || s.showEditForm {
+		t.Fatal("expected edit form to submit cleanly")
+	}
+	if _, ok := cmd().(messages.SubEditDoneMsg); !ok {
+		t.Fatal("expected SubEditDoneMsg")
+	}
+
+	subs, _, err := svc.ListProfiles()
+	if err != nil || len(subs) != 1 {
+		t.Fatalf("failed to reload subs: %v", err)
+	}
+	got := subs[0]
+	if !got.Source.UseProxy || got.Source.UserAgent != "MyCustomUA/2.0" || !got.Source.InsecureSkipVerify {
+		t.Fatalf("fetch options were not persisted: %+v", got.Source)
+	}
+	if got.Usage == nil || got.Usage.UsedBytes != 1024 || got.Usage.TotalBytes != 4096 || got.Usage.ExpiresAt != 1900000000 {
+		t.Fatalf("existing subscription usage was lost when editing fetch options: %+v", got.Usage)
+	}
+}

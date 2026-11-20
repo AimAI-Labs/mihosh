@@ -47,12 +47,23 @@ func ParseSourceKind(s string) SourceKind {
 	return SourceLocal
 }
 
-// SubSource 描述订阅的原始配置来源。
+// SubSource 描述订阅的原始配置来源与拉取选项。
 // Kind 决定使用 URL 还是 Path 字段。
 type SubSource struct {
-	Kind SourceKind `mapstructure:"kind" yaml:"kind"`
-	URL  string     `mapstructure:"url"  yaml:"url"`  // Kind==SourceRemote 时使用
-	Path string     `mapstructure:"path" yaml:"path"` // Kind==SourceLocal 时使用
+	Kind               SourceKind `mapstructure:"kind"                 yaml:"kind"`
+	URL                string     `mapstructure:"url"                  yaml:"url"`                            // Kind==SourceRemote 时使用
+	Path               string     `mapstructure:"path"                 yaml:"path"`                           // Kind==SourceLocal 时使用
+	UseProxy           bool       `mapstructure:"use_proxy"            yaml:"use_proxy,omitempty"`            // 通过当前 Mihomo 代理拉取远程订阅
+	UserAgent          string     `mapstructure:"user_agent"           yaml:"user_agent,omitempty"`           // 自定义 User-Agent（空则使用默认值）
+	InsecureSkipVerify bool       `mapstructure:"insecure_skip_verify" yaml:"insecure_skip_verify,omitempty"` // 跳过 TLS 证书校验
+}
+
+// SameOrigin reports whether two SubSources point to the exact same remote URL
+// or local file path, ignoring fetch transport options.
+func (s SubSource) SameOrigin(other SubSource) bool {
+	return s.Kind == other.Kind &&
+		strings.TrimSpace(s.URL) == strings.TrimSpace(other.URL) &&
+		strings.TrimSpace(s.Path) == strings.TrimSpace(other.Path)
 }
 
 // Display 返回来源的可显示字符串（remote 显示 URL，local 显示 Path）。
