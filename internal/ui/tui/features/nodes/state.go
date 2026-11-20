@@ -286,12 +286,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 
 		case key.Matches(msg, common.Keys.TestAll):
 			if len(s.CurrentProxies) > 0 {
-				s = s.ResetTesting()
-				s.clearTestResults()
-				s.ShowTestDetail = false
-				s.testBatch = service.NewTestBatch(s.CurrentProxies)
-				s.batchMode = true
-				return s.LaunchBatchTests()
+				return s.startBatchTest(s.CurrentProxies)
 			}
 
 		case msg.String() == "f":
@@ -419,6 +414,14 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		s.applyGroupSelection(hit.Index)
 		s.doubleClickDetector.IsDoubleClick(MouseTargetGroup, hit.Index, now)
 		return s, nil
+
+	case MouseTargetGroupTest:
+		if hit.Index < 0 || hit.Index >= len(s.GroupNames) {
+			return s, nil
+		}
+		s.MouseFocus = nodesMouseFocusGroup
+		group := s.Groups[s.GroupNames[hit.Index]]
+		return s.startBatchTest(group.All)
 
 	case MouseTargetProxy:
 		display := s.displayProxies()
@@ -676,6 +679,19 @@ func (s *State) getProxyDelayUnsafe(name string) int {
 func (s State) StartSingleTest(proxyName string) (State, tea.Cmd) {
 	s = s.ResetTesting()
 	s.testBatch = service.NewTestBatch([]string{proxyName})
+	return s.LaunchBatchTests()
+}
+
+// startBatchTest 封装策略组/批量节点测速逻辑
+func (s State) startBatchTest(targets []string) (State, tea.Cmd) {
+	if len(targets) == 0 {
+		return s, nil
+	}
+	s = s.ResetTesting()
+	s.clearTestResults()
+	s.ShowTestDetail = false
+	s.testBatch = service.NewTestBatch(targets)
+	s.batchMode = true
 	return s.LaunchBatchTests()
 }
 

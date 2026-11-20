@@ -26,6 +26,7 @@ type MouseTarget int
 const (
 	MouseTargetNone MouseTarget = iota
 	MouseTargetGroup
+	MouseTargetGroupTest
 	MouseTargetProxy
 	MouseTargetMode
 )

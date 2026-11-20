@@ -288,6 +288,16 @@ func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 		return none
 	}
 
+	if row == box.Y+1 && box.GroupIndex >= 0 && box.GroupIndex < len(state.GroupNames) {
+		group := state.Groups[state.GroupNames[box.GroupIndex]]
+		rightText, _ := cardHeaderDelayText(state, group)
+		hitW := maxInt(2, common.DisplayWidth(rightText))
+		innerRight := box.X + 2 + box.InnerWidth
+		if pageX >= innerRight-hitW && pageX < innerRight {
+			return MouseHit{Target: MouseTargetGroupTest, Index: box.GroupIndex}
+		}
+	}
+
 	if box.Expanded && row >= box.DataStartY &&
 		row < box.DataStartY+box.GridVisibleRows*2 {
 		cellRow := (row-box.DataStartY)/2 + box.GridScrollRow
@@ -391,6 +401,14 @@ func cardContentLine(leftEdge, rightEdge, content string, width int) string {
 	return leftEdge + inner + rightEdge
 }
 
+func cardHeaderDelayText(state PageState, group model.Group) (string, int) {
+	d := resolveNowDelay(state, group)
+	if d > 0 {
+		return fmt.Sprintf("%d", d), d
+	}
+	return "⚡", 0
+}
+
 func cardHeader(state PageState, name string, group model.Group, b cardBox) string {
 	alive := 0
 	for _, node := range group.All {
@@ -406,12 +424,12 @@ func cardHeader(state PageState, name string, group model.Group, b cardBox) stri
 	left := nameStyle.Render(name) +
 		common.MutedStyle().Render(fmt.Sprintf(" : %s (%d/%d)", group.Type, alive, len(group.All)))
 
-	d := resolveNowDelay(state, group)
+	rightText, d := cardHeaderDelayText(state, group)
 	var right string
 	if d > 0 {
-		right = lipgloss.NewStyle().Foreground(theme.Resolve(utils.GetDelayColor(d))).Bold(true).Render(fmt.Sprintf("%d", d))
+		right = lipgloss.NewStyle().Foreground(theme.Resolve(utils.GetDelayColor(d))).Bold(true).Render(rightText)
 	} else {
-		right = common.MutedStyle().Render("⚡")
+		right = lipgloss.NewStyle().Foreground(theme.Resolve(common.Warning())).Render(rightText)
 	}
 	return joinSides(left, right, b.InnerWidth)
 }

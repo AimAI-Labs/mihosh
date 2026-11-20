@@ -99,3 +99,49 @@ func TestHandleMouseScroll_GroupArea(t *testing.T) {
 		t.Fatalf("expected SelectedGroup to be 2 after scroll down, got %d", next.SelectedGroup)
 	}
 }
+
+func TestHandleMouseLeft_GroupHeaderDelayIconTriggersGroupBatchTest(t *testing.T) {
+	state := State{
+		Groups: map[string]model.Group{
+			"g1": {Type: "Selector", Now: "p1", All: []string{"p1", "p2"}},
+			"g2": {Type: "Selector", Now: "p3", All: []string{"p3", "p4"}},
+		},
+		Proxies: map[string]model.Proxy{
+			"p1": {History: []model.Delay{{Delay: 42}}},
+		},
+		GroupNames:    []string{"g1", "g2"},
+		SelectedGroup: 0,
+	}
+	state.updateCurrentProxies()
+
+	const w, h = 120, 24
+	ps := state.ToPageState(w, h)
+	l := calcCardLayout(ps, cardAreaHeight(ps))
+
+	// Click delay number "42" on expanded group g1.
+	b0 := l.Boxes[0]
+	x0 := b0.X + 2 + b0.InnerWidth - 1
+	y0 := l.AreaStartY + b0.Y + 1 - l.ScrollRows
+	next, cmd := state.HandleMouseLeft(x0, y0, w, h)
+	if cmd == nil || !next.Testing || !next.batchMode {
+		t.Fatalf("clicking delay badge on expanded group did not start batch test: testing=%v batch=%v cmd=%v", next.Testing, next.batchMode, cmd != nil)
+	}
+	if _, total := next.testBatch.Progress(); total != 2 {
+		t.Fatalf("expected g1 batch total=2, got %d", total)
+	}
+
+	// Click lightning icon "⚡" on collapsed group g2 without switching expanded group.
+	b1 := l.Boxes[1]
+	x1 := b1.X + 2 + b1.InnerWidth - 1
+	y1 := l.AreaStartY + b1.Y + 1 - l.ScrollRows
+	next, cmd = state.HandleMouseLeft(x1, y1, w, h)
+	if cmd == nil || !next.Testing || !next.batchMode {
+		t.Fatalf("clicking lightning icon on collapsed group did not start batch test: testing=%v batch=%v cmd=%v", next.Testing, next.batchMode, cmd != nil)
+	}
+	if next.SelectedGroup != 0 {
+		t.Fatalf("expected SelectedGroup to remain 0, got %d", next.SelectedGroup)
+	}
+	if _, total := next.testBatch.Progress(); total != 2 {
+		t.Fatalf("expected g2 batch total=2, got %d", total)
+	}
+}
