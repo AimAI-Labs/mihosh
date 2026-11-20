@@ -37,6 +37,21 @@ func TestRenderSettingsPagePreservesLayout(t *testing.T) {
 	}
 }
 
+func TestSettingsLogoUsesAvailableSpace(t *testing.T) {
+	state := PageState{Config: &config.Config{}}
+	full := stripANSISettings(RenderSettingsPage(state, 80, 32))
+	if !strings.Contains(full, strings.Split(mihoshLogo, "\n")[4]) {
+		t.Fatal("settings did not show the ASCII logo in the available space")
+	}
+	narrow := stripANSISettings(RenderSettingsPage(state, 36, 32))
+	if !strings.Contains(narrow, "\n               mihosh") {
+		t.Fatal("narrow settings did not center the short logo")
+	}
+	if strings.Contains(RenderEmbedded(state, 80), strings.Split(mihoshLogo, "\n")[4]) {
+		t.Fatal("the logo appeared in embedded preferences")
+	}
+}
+
 func stripANSISettings(s string) string {
 	var out strings.Builder
 	inEscape := false

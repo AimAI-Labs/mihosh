@@ -20,6 +20,12 @@ const (
 	settingsDescWidth   = 30
 )
 
+const mihoshLogo = ` __  __  ___  _   _   ___   ____  _   _
+|  \/  ||_ _|| | | | / _ \ / ___|| | | |
+| |\/| | | | | |_| || | | |\___ \| |_| |
+| |  | | | | |  _  || |_| | ___) |  _  |
+|_|  |_||___||_| |_| \___/ |____/|_| |_|`
+
 var MihoshSettingKeys = []string{"test-url", "timeout", "language", "auto-refresh-interval", "theme", "border-style"}
 var MihomoSettingKeys = []string{"external-controller", "secret", "mixed-port", "allow-lan", "log-level"}
 
@@ -242,6 +248,18 @@ func renderSettingsPage(state PageState, width, height int, standalone bool) str
 
 	// 填充至页面高度，使右下角帮助提示浮层能正确定位到底部
 	if standalone {
+		if state.ActiveTab == 0 {
+			space := height - lipgloss.Height(mainContent) - 1
+			if space >= 2 && width >= len("mihosh") {
+				logo := mihoshLogo
+				if lipgloss.Width(logo) > width || lipgloss.Height(logo) >= space {
+					logo = "mihosh"
+				}
+				styled := lipgloss.NewStyle().Bold(true).Foreground(theme.Resolve(common.Active())).Render(logo)
+				padding := max(1, (space-lipgloss.Height(logo))/2)
+				mainContent += "\n" + strings.Repeat("\n", padding) + lipgloss.PlaceHorizontal(width, lipgloss.Center, styled)
+			}
+		}
 		mainContent = lipgloss.PlaceVertical(height, lipgloss.Top, mainContent)
 	}
 
