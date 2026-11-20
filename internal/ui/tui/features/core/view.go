@@ -20,6 +20,8 @@ type actionHit struct {
 
 type pageLayout struct {
 	editorY                 int
+	systemdY                int
+	serviceMaxScroll        int
 	content                 string
 	actions                 []actionHit
 	tabs                    []actionHit
@@ -300,7 +302,15 @@ func (s State) layout(width, height int) pageLayout {
 	if s.tab == 4 {
 		parts = append(parts, preferences.RenderEmbedded(s.editor.ToPageState(s.editor.Config, nil), width))
 		if s.Status.ServiceUnit != "" {
-			parts = append(parts, "", s.systemdPanel(width))
+			systemdY := lipgloss.Height(strings.Join(parts, "\n")) + 1
+			panelView, controls, maxScroll := s.systemdPanel(width, height-systemdY)
+			for i := range controls {
+				controls[i].y += systemdY
+			}
+			parts = append(parts, "", panelView)
+			result.systemdY = systemdY
+			result.serviceMaxScroll = maxScroll
+			result.controls = controls
 		}
 		result.content, result.editorY = strings.Join(parts, "\n"), top
 		return result
@@ -379,7 +389,63 @@ func (s State) downloadsLayout(width, height int, parts []string, result pageLay
 	return result
 }
 
-func (s State) systemdPanel(width int) string {
+var serviceQuickActions = []string{"start", "stop", "restart", "enable", "boot", "disable", "install", "uninstall"}
+
+func (s State) serviceQuickStyle(action string) lipgloss.Style {
+	t := theme.Current()
+	base := lipgloss.NewStyle().Background(theme.Resolve(t.Selected))
+	if s.Busy {
+		return base.Foreground(theme.Resolve(t.Muted))
+	}
+	switch action {
+	case "start":
+		return base.Foreground(theme.Resolve(t.Success)).Bold(s.Status.ServiceRunning)
+	case "stop":
+		return base.Foreground(theme.Resolve(t.Warning))
+	case "restart":
+		return base.Foreground(theme.Resolve(t.Primary)).Bold(true)
+	case "enable", "boot":
+		return base.Foreground(theme.Resolve(t.Info)).Bold(s.Status.AutoStart)
+	case "disable":
+		return base.Foreground(theme.Resolve(t.Muted))
+	case "install":
+		return base.Foreground(theme.Resolve(t.Primary)).Bold(s.Status.ServiceInstalled)
+	case "uninstall":
+		return base.Foreground(theme.Resolve(t.Danger))
+	default:
+		return base.Foreground(theme.Resolve(t.Foreground))
+	}
+}
+
+func (s State) systemdPanel(width, availHeight int) (string, []releaseControl, int) {
+	innerW := max(1, width-4)
+	var menuRows []string
+	var controls []releaseControl
+	var line string
+	x := 0
+	for _, action := range serviceQuickActions {
+		label := ansi.Truncate(" "+i18n.T("core.service.quick."+action)+" ", innerW, "…")
+		btnW := lipgloss.Width(label)
+		if x > 0 && x+1+btnW > innerW {
+			menuRows = append(menuRows, line)
+			line, x = "", 0
+		}
+		if x > 0 {
+			line += " "
+			x++
+		}
+		controls = append(controls, releaseControl{
+			actionHit: actionHit{x: 2 + x, y: len(menuRows) + 1, width: btnW, height: 1},
+			action:    "service:" + action,
+		})
+		line += s.serviceQuickStyle(action).Render(label)
+		x += btnW
+	}
+	if line != "" {
+		menuRows = append(menuRows, line)
+	}
+
+	logHeight := max(3, availHeight-2-len(menuRows))
 	body := s.Status.ServiceUnit + "\n" + i18n.T("core.service.status_loading")
 	if s.serviceLog.Unit == s.Status.ServiceUnit {
 		body = strings.TrimRight(ansi.Strip(s.serviceLog.Output), "\r\n")
@@ -390,7 +456,30 @@ func (s State) systemdPanel(width int) string {
 			body = s.Status.ServiceUnit
 		}
 	}
-	return panel(i18n.T("settings.sys_status.panel_title"), wrap(body, width-4), width)
+	logWidth := innerW
+	logLines := strings.Split(wrap(body, logWidth), "\n")
+	if len(logLines) > logHeight && innerW >= 22 {
+		logWidth = innerW - 2
+		logLines = strings.Split(wrap(body, logWidth), "\n")
+	}
+	maxScroll := max(0, len(logLines)-logHeight)
+	start := max(0, min(s.serviceScroll, maxScroll))
+	var scrollbar string
+	if len(logLines) > logHeight && innerW >= 22 {
+		scrollbar = common.BuildVerticalScrollbar(logHeight, len(logLines), start, true)
+	}
+	visible := append([]string(nil), logLines[start:min(len(logLines), start+logHeight)]...)
+	for len(visible) < logHeight {
+		visible = append(visible, "")
+	}
+	if scrollbar != "" {
+		tracks := strings.Split(scrollbar, "\n")
+		for i := range min(len(visible), len(tracks)) {
+			visible[i] = common.PadString(visible[i], logWidth) + " " + tracks[i]
+		}
+	}
+	rows := append(menuRows, visible...)
+	return panel(i18n.T("settings.sys_status.panel_title"), strings.Join(rows, "\n"), width), controls, maxScroll
 }
 
 type coreTabItem struct {

@@ -21,6 +21,7 @@ import (
 
 type State struct {
 	serviceLog        messages.CoreServiceLogMsg
+	serviceScroll     int
 	svc               *service.CoreService
 	Status            service.CoreStatus
 	Release           coreinfra.Release
@@ -384,6 +385,16 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			return s.clickReleasePage(page, msg.X, y)
 		}
 		if s.tab == 4 {
+			for _, control := range page.controls {
+				hit := control.actionHit
+				if hit.height > 0 && msg.X >= hit.x && msg.X < hit.x+hit.width && y >= hit.y && y < hit.y+hit.height {
+					if action, ok := strings.CutPrefix(control.action, "service:"); ok {
+						s.editor = s.editor.CancelEdit()
+						s.args = []string{action}
+						return s.begin("service")
+					}
+				}
+			}
 			msg.Y = y
 			return s.updateEditorMouse(msg, page.editorY)
 		}
@@ -432,15 +443,29 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		if s.tab == 4 {
 			height := max(1, msg.Height-footerHeight)
 			page := s.layout(msg.Width, height)
-			overflow := lipgloss.Height(page.content) - height
+			overflow := max(0, lipgloss.Height(page.content)-height)
+			y := msg.Y + s.viewportOffset(page, height)
+			delta := 1
+			if msg.Up {
+				delta = -1
+			}
+			if !s.editor.IsEditing() && s.Status.ServiceUnit != "" && (y >= page.systemdY || overflow > 0) {
+				if !msg.Up && s.scroll < overflow {
+					s.scroll = min(overflow, s.scroll+1)
+					return s, nil
+				}
+				current := max(0, min(s.serviceScroll, page.serviceMaxScroll))
+				if msg.Up && current == 0 && s.scroll > 0 {
+					s.scroll = max(0, s.scroll-1)
+					return s, nil
+				}
+				s.serviceScroll = max(0, min(current+delta, page.serviceMaxScroll))
+				return s, nil
+			}
 			if overflow <= 0 {
 				return s.updateEditorMouse(msg, page.editorY)
 			}
 			if !s.editor.IsEditing() {
-				delta := 1
-				if msg.Up {
-					delta = -1
-				}
 				s.scroll = max(0, min(s.scroll+delta, overflow))
 			}
 			return s, nil
@@ -457,6 +482,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			if s.editor.IsEditing() || !isCoreTabKey(msg.String()) {
 				if s.Busy || s.editor.IsSaving() {
 					return s, nil
+				}
+				if !s.editor.IsEditing() && msg.String() == "r" {
+					return s, s.Refresh()
 				}
 				var cmd tea.Cmd
 				s.editor, cmd = s.editor.Update(msg)

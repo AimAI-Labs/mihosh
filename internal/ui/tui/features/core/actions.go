@@ -135,7 +135,7 @@ func (s State) choose(action string) (State, tea.Cmd) {
 func (s State) selectTab(tab int) State {
 	s.editor = s.editor.CancelEdit()
 	s.tab = (tab + len(tabs)) % len(tabs)
-	s.selected, s.scroll = 0, 0
+	s.selected, s.scroll, s.serviceScroll = 0, 0, 0
 	s.followSelection = true
 	if s.tab == 1 {
 		index, _ := s.releaseIndex(s.Release.Tag)

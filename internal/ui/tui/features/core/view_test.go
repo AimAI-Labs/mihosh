@@ -333,20 +333,54 @@ func TestCoreMihomoPageShowsManagedStatusLogsBelowOverrides(t *testing.T) {
 		Unit:   s.Status.ServiceUnit,
 		Output: "● mihosh-example.service\n   Active: active (running)\n\nNov 20 10:12:00 node mihosh[42]: Started managed core",
 	})
-	page := ansi.Strip(s.layout(100, 40).content)
+	layout40 := s.layout(100, 40)
+	if lipgloss.Height(layout40.content) != 40 {
+		t.Fatalf("expected systemctl card to fill remaining view height (40), got %d", lipgloss.Height(layout40.content))
+	}
+	page := ansi.Strip(layout40.content)
 	firstLine, _, _ := strings.Cut(page, "\n")
 	if strings.Contains(firstLine, i18n.T("core.heading")) {
 		t.Fatal("Core navigation has a panel title")
 	}
 	settings := strings.Index(page, i18n.T("settings.panel_title"))
 	card := strings.Index(page, i18n.T("settings.sys_status.panel_title"))
+	quickRestart := strings.Index(page, i18n.T("core.service.quick.restart"))
 	unit := strings.Index(page, "mihosh-example.service")
-	if settings < 0 || card <= settings || unit <= card ||
+	if settings < 0 || card <= settings || quickRestart <= card || unit <= quickRestart ||
 		!strings.Contains(page, "Active: active (running)") || !strings.Contains(page, "Started managed core") {
-		t.Fatal("managed service card does not show the command output and recent service logs")
+		t.Fatal("managed service card does not show quick actions above command output and recent service logs")
 	}
 	if strings.Contains(page, i18n.T("core.autostart")+" "+i18n.T("core.enabled")) {
 		t.Fatal("managed service card repeats the old startup summary")
+	}
+	// Scrolling inside the systemctl card in a normal terminal keeps top panels & quick menu fixed while scrolling logs.
+	longLogs := "● mihosh-example.service\n   Active: active (running)\n"
+	for i := range 15 {
+		longLogs += "\nlog-line-" + string(rune('A'+i))
+	}
+	longLogs += "\nStarted managed core tail"
+	sScroll, _ := s.Update(messages.CoreServiceLogMsg{Unit: s.Status.ServiceUnit, Output: longLogs})
+	for range 20 {
+		sScroll, _ = sScroll.Update(messages.PageMouseScrollMsg{X: 20, Y: 16, Width: 100, Height: 26})
+	}
+	renderedScroll := ansi.Strip(sScroll.Render(100, 26))
+	if !strings.Contains(renderedScroll, i18n.T("settings.panel_title")) ||
+		!strings.Contains(renderedScroll, i18n.T("core.service.quick.restart")) ||
+		!strings.Contains(renderedScroll, "Started managed core tail") {
+		t.Fatalf("internal systemctl card scroll did not preserve header/quick menu while reaching tail:\n%s", renderedScroll)
+	}
+	// Clicking a systemctl quick action button queues the service action.
+	for y, line := range strings.Split(renderedScroll, "\n") {
+		if at := strings.Index(line, i18n.T("core.service.quick.restart")); at >= 0 {
+			clicked, cmd := sScroll.Update(messages.PageMouseClickMsg{
+				X: lipgloss.Width(line[:at]), Y: y, Width: 100, Height: 26,
+			})
+			defer clicked.Close()
+			if !clicked.Busy || clicked.task != "service" || cmd == nil {
+				t.Fatal("clicking quick restart button did not start service action")
+			}
+			break
+		}
 	}
 	wheel := messages.PageMouseScrollMsg{X: 30, Y: 6, Width: 80, Height: 13}
 	for range 20 {
