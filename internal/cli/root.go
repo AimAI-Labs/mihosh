@@ -61,6 +61,7 @@ func init() {
 	rootCmd.AddCommand(proxyOffCmd)
 	rootCmd.AddCommand(newEnvCommand())
 	rootCmd.AddCommand(newActivateCommand(), newProxyCommand())
+	rootCmd.AddCommand(newDNSCommand())
 }
 
 // Execute 执行命令
@@ -122,6 +123,19 @@ func localizeCommands() {
 	}
 	if setup, _, err := rootCmd.Find([]string{"setup"}); err == nil {
 		setup.Short = i18n.T("cli.setup.short")
+	}
+	if dns, _, err := rootCmd.Find([]string{"dns"}); err == nil && dns != nil {
+		dns.Short = i18n.T("cli.dns.short")
+		if q, _, qErr := dns.Find([]string{"query"}); qErr == nil && q != nil {
+			q.Short = i18n.T("cli.dns.query.short")
+			q.Long = i18n.T("cli.dns.query.long")
+			if f := q.Flags().Lookup("type"); f != nil {
+				f.Usage = i18n.T("cli.dns.query.flag_type")
+			}
+			if f := q.Flags().Lookup("output"); f != nil {
+				f.Usage = i18n.T("cli.dns.query.flag_output")
+			}
+		}
 	}
 	rootCmd.Short = i18n.T("cli.root.short")
 	rootCmd.Long = i18n.T("cli.root.long")

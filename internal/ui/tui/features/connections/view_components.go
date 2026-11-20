@@ -374,6 +374,14 @@ func connectionsByViewMode(state PageState) []model.Connection {
 
 // buildConnectionsInlineHelpHints 根据连接页上下文构建内联帮助条目
 func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
+	if state.DNS.open {
+		return []common.InlineHelpHint{
+			{Key: "↵", Desc: i18n.T("conns.dns.hint_query")},
+			{Key: "Tab", Desc: i18n.T("conns.dns.hint_type")},
+			{Key: "↑↓", Desc: i18n.T("conns.dns.hint_scroll")},
+			{Key: "Esc", Desc: i18n.T("conns.dns.hint_close")},
+		}
+	}
 	if state.Unlock.open {
 		arrows := "↑↓"
 		if unlockColumns(state.Width) > 1 {
@@ -411,6 +419,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 	}
 
 	unlock := common.InlineHelpHint{Key: "U", Desc: i18n.T("conns.unlock.title")}
+	dnsHint := common.InlineHelpHint{Key: "D", Desc: i18n.T("conns.dns.title"), Tone: common.InlineHelpToneInfo}
 	// 按 tab 分流
 	switch state.ViewMode {
 	case ConnViewTraffic:
@@ -425,6 +434,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		return append(hints,
 			common.InlineHelpHint{Key: "h", Desc: i18n.T("help.conns.hint_switch")},
 			common.InlineHelpHint{Key: "?", Desc: i18n.T("core.inline.help")},
+			dnsHint,
 			unlock,
 		)
 
@@ -455,7 +465,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		} else {
 			hints = append(hints, common.InlineHelpHint{Key: "?", Desc: i18n.T("core.inline.help")})
 		}
-		return append(hints, unlock)
+		return append(hints, dnsHint, unlock)
 
 	case ConnViewHistory:
 		pauseHint := common.InlineHelpHint{Key: "p", Desc: i18n.T("help.conns.hint_pause")}
@@ -479,7 +489,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		} else {
 			hints = append(hints, common.InlineHelpHint{Key: "?", Desc: i18n.T("core.inline.help")})
 		}
-		return append(hints, unlock)
+		return append(hints, dnsHint, unlock)
 	}
 
 	return nil

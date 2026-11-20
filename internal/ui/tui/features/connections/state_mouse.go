@@ -11,6 +11,9 @@ import (
 func (s State) HandleMouseLeft(
 	pageX, pageY, pageWidth, pageHeight int,
 ) (State, tea.Cmd) {
+	if s.dns.open {
+		return s.clickDNS(pageX, pageY, pageWidth, pageHeight)
+	}
 	if s.unlock.open {
 		return s.clickUnlock(pageX, pageY, pageWidth, pageHeight)
 	}
@@ -157,6 +160,16 @@ func (s State) HandleMouseLeft(
 
 // HandleMouseScroll 鼠标滚轮处理
 func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight int) (State, tea.Cmd) {
+	if s.dns.open {
+		if up {
+			if s.dns.scroll > 0 {
+				s.dns.scroll--
+			}
+		} else {
+			s.dns.scroll++
+		}
+		return s, nil
+	}
 	if s.unlock.open {
 		s.unlock.width = mainWidth
 		delta := unlockColumns(mainWidth)

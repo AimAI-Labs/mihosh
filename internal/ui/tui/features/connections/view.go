@@ -46,6 +46,7 @@ type PageState struct {
 	PausedUpdates   int  // 暂停期间收到的后台更新次数
 	Query           ConnQuery
 	Unlock          unlockView
+	DNS             dnsQueryView
 }
 
 // RenderConnectionsPage 渲染连接监控页面
@@ -67,7 +68,10 @@ func RenderConnectionsPage(state PageState) string {
 	} else {
 		page = renderConnectionListTab(state)
 	}
-	if state.Unlock.open {
+	if state.DNS.open {
+		popup, _ := state.DNS.popup(state.Width, state.Height)
+		page = popup.Overlay(page, true)
+	} else if state.Unlock.open {
 		popup, _ := state.Unlock.popup(state.Width, state.Height)
 		page = popup.Overlay(page, true)
 	}

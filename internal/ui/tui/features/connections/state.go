@@ -81,6 +81,7 @@ type State struct {
 	testCtx         context.Context
 	testCancel      context.CancelFunc
 	unlock          unlockState
+	dns             dnsQueryView
 }
 
 // NewState 初始化连接状态
@@ -269,6 +270,7 @@ func (s State) ToPageState(chartData *model.ChartData, width, height int) PageSt
 		PausedUpdates:      s.pausedUpdates,
 		Query:              s.currentQuery(),
 		Unlock:             s.unlock.unlockView,
+		DNS:                s.dns,
 	}
 }
 
@@ -292,6 +294,8 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 
 	case messages.UnlockTestMsg:
 		return s.completeUnlock(msg)
+	case messages.DNSQueryResultMsg:
+		return s.applyDNSQueryResult(msg)
 	case messages.PageResizeMsg:
 		s.unlock.width = msg.Width
 		return s, nil
@@ -300,6 +304,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	case messages.PageMouseClickMsg:
 		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
 	case tea.KeyMsg:
+		if s.dns.open {
+			return s.handleDNSKey(msg)
+		}
 		if s.unlock.open {
 			return s.handleUnlockKey(msg)
 		}
@@ -352,6 +359,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		if msg.String() == "U" {
 			s.openUnlock()
 			return s, nil
+		}
+		if msg.String() == "D" {
+			return s, s.openDNSQuery()
 		}
 
 		// tab 切换键（所有 viewMode 通用）
@@ -583,5 +593,9 @@ func (s State) findConnectionByName(name string) *model.Connection {
 
 // InputCapture declares which input belongs to the current page mode.
 func (s State) InputCapture() common.InputCapture {
-	return common.InputCapture{Active: s.FilterMode() || s.connDetailMode || s.topNModalMode || s.unlock.open, Interrupt: s.FilterMode()}
+	return common.InputCapture{
+		Active:    s.FilterMode() || s.connDetailMode || s.topNModalMode || s.unlock.open || s.dns.open,
+		Help:      s.dns.open,
+		Interrupt: s.FilterMode() || s.dns.open,
+	}
 }

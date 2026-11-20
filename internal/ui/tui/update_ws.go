@@ -293,6 +293,11 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 		m.connsState, cmd = m.connsState.Update(msg)
 		return m, cmd
 
+	case messages.DNSQueryResultMsg:
+		var cmd tea.Cmd
+		m.connsState, cmd = m.connsState.Update(msg)
+		return m, cmd
+
 	case messages.TestDoneMsg:
 		var cmd tea.Cmd
 		m.nodesState, cmd = m.nodesState.CompleteTest(msg)

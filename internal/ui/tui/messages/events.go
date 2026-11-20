@@ -96,6 +96,13 @@ type FilteredConnectionsClosedMsg struct {
 	Failed int
 }
 
+type DNSQueryResultMsg struct {
+	Domain     string
+	RecordType string
+	Resp       *model.DNSQueryResponse
+	Err        error
+}
+
 type IPInfoMsg struct {
 	Info *model.IPInfo
 	Err  error

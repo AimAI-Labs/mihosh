@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 )
@@ -222,4 +223,26 @@ func (c *Client) FlushDNSCache() error {
 func (c *Client) FlushFakeIP() error {
 	_, err := c.DoRequest("POST", "/cache/fakeip/flush", nil)
 	return err
+}
+
+// QueryDNS 通过 Mihomo /dns/query 接口查询指定域名和记录类型
+func (c *Client) QueryDNS(name, recordType string) (*model.DNSQueryResponse, error) {
+	domain := strings.TrimSpace(name)
+	if domain == "" {
+		return nil, fmt.Errorf("domain name is required")
+	}
+	qtype := strings.ToUpper(strings.TrimSpace(recordType))
+	if qtype == "" {
+		qtype = "A"
+	}
+	path := fmt.Sprintf("/dns/query?name=%s&type=%s", url.QueryEscape(domain), url.QueryEscape(qtype))
+	data, err := c.DoRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp model.DNSQueryResponse
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
