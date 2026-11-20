@@ -53,9 +53,7 @@ func TestWriteProxyProbeResultsIncludesExitMetadata(t *testing.T) {
 		require.NoError(t, writeProxyProbeResults(cmd, results, format))
 		require.Regexp(t, `ip\.sb\s+2001:db8::1\s+Japan\s+Tokyo\s+AS64496\s+Example Network\s+20 ms`, out.String())
 		require.Regexp(t, `ipify\s+192\.0\.2\.1\s+40 ms`, out.String())
-		if format == outputFormatTable {
-			require.Regexp(t, `^Source\s+IP\s+Country\s+City\s+ASN\s+Organization\s+Latency\s+Error`, out.String())
-		}
+		require.Regexp(t, `^Source\s+IP\s+Country\s+City\s+ASN\s+Organization\s+Latency\s+Error\n`, out.String())
 	}
 
 	out.Reset()

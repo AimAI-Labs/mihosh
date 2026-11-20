@@ -162,11 +162,9 @@ func writeProxyProbeResults(cmd *cobra.Command, results []service.ProxyProbeResu
 		return writeJSON(cmd.OutOrStdout(), results)
 	}
 	w := newTabWriter(cmd.OutOrStdout())
-	if format == outputFormatTable {
-		fmt.Fprintf(w, "%s\tIP\t%s\t%s\tASN\t%s\t%s\t%s\n",
-			i18n.T("cli.proxy.source"), i18n.T("cli.proxy.country"), i18n.T("cli.proxy.city"),
-			i18n.T("cli.proxy.org"), i18n.T("cli.proxy.latency"), i18n.T("cli.proxy.error"))
-	}
+	fmt.Fprintf(w, "%s\tIP\t%s\t%s\tASN\t%s\t%s\t%s\n",
+		i18n.T("cli.proxy.source"), i18n.T("cli.proxy.country"), i18n.T("cli.proxy.city"),
+		i18n.T("cli.proxy.org"), i18n.T("cli.proxy.latency"), i18n.T("cli.proxy.error"))
 	for _, result := range results {
 		asn := ""
 		if result.ASN != 0 {
