@@ -69,7 +69,7 @@ func TestStore_MergeRoundTrip(t *testing.T) {
 	assert.Nil(t, node)
 
 	// 写入合法 merge
-	merge := []byte("prepend-rules:\n  - DOMAIN,a.com,DIRECT\n")
+	merge := []byte("rules:\n  - DOMAIN,a.com,DIRECT\n")
 	require.NoError(t, WriteMerge(merge))
 
 	data, err = ReadMerge()

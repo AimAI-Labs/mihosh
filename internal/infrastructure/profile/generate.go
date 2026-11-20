@@ -163,11 +163,9 @@ func GenerateOverrideConfigWithMerge(uid, path string, mergeBytes []byte, cleare
 	}
 	var merge *yaml.Node
 	if len(trimSpaceBytes(mergeBytes)) > 0 {
-		var mergeDoc yaml.Node
-		if err = yaml.Unmarshal(mergeBytes, &mergeDoc); err != nil {
+		if merge, err = parseReadableMerge(mergeBytes); err != nil {
 			return nil, fmt.Errorf("解析覆写配置失败: %w", err)
 		}
-		merge = &mergeDoc
 	}
 	// A runtime file already incorporates applied rule edits. Replay them only from a raw subscription.
 	final, err := applyMerge(&raw, merge, uid != "")

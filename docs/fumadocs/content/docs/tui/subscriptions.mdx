@@ -24,6 +24,12 @@ Press `c` to choose the source snapshot, the activated configuration generated w
 
 In a diff, press `o` or click **Diff options** in the footer to ignore indentation, other whitespace, invisible format characters such as a BOM, or punctuation and symbols. All four options start enabled and are saved across subscriptions and app restarts. The activated preview displays printable Unicode directly, and the diff treats an escaped character and its literal equivalent as equal.
 
+## Mihomo overrides
+
+Press `m` to edit `merge.yaml` with the same native Mihomo fields used by a subscription. A list such as `rules`, `proxies` or `proxy-groups` replaces its source list. Remove the field to use the subscription's list again.
+
+When Mihosh replaces a legacy file, it evaluates the old append, prepend and rule edit directives against the active subscription or the local config, writes the resulting native lists and keeps the original as `merge.yaml.legacy-*.bak`. If the source for automatic conversion is unavailable, you can enter native lists in the editor and save them manually.
+
 ## Interface Features
 
 - **Unified Management**: Manage both Proxy Providers and Rule Providers in one place.

@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,18 +10,20 @@ import (
 
 func TestRuleEditsReplayAfterStandardOverrides(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
-	merge := []byte("# keep these overrides\nprepend-rules:\n  - DOMAIN,first.example,DIRECT\nmode: rule\n")
-	for _, edit := range []RuleEdit{
-		{Rule: "DOMAIN,added.example,DIRECT", Index: 2},
-		{Match: "DOMAIN,original.example,DIRECT", Rule: "DOMAIN,changed.example,REJECT"},
-		{Match: "IP-CIDR,192.0.2.0/24,DIRECT,no-resolve"},
-	} {
-		var err error
-		merge, err = AppendRuleEdit(merge, edit)
-		require.NoError(t, err)
-	}
-	require.Contains(t, string(merge), "# keep these overrides")
-	require.NoError(t, WriteMerge(merge))
+	merge := []byte(`# keep these overrides
+prepend-rules:
+  - DOMAIN,first.example,DIRECT
+mode: rule
+rule-edits:
+  - rule: DOMAIN,added.example,DIRECT
+    index: 2
+  - match: DOMAIN,original.example,DIRECT
+    rule: DOMAIN,changed.example,REJECT
+  - match: IP-CIDR,192.0.2.0/24,DIRECT,no-resolve
+`)
+	path, err := MergePath()
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(path, merge, 0600))
 	preview, err := GenerateSourcePreview([]byte("rules:\n  - Domain, original.example,DIRECT\n  - IP-CIDR,192.0.2.0/24,DIRECT,NO-RESOLVE\n  - MATCH,DIRECT\n"))
 	require.NoError(t, err)
 	var cfg struct{ Rules []string }
@@ -36,4 +39,35 @@ func TestRuleEditsReplayAfterStandardOverrides(t *testing.T) {
 	require.NotContains(t, string(refreshed.Data), "DOMAIN,changed.example,REJECT")
 	_, err = ApplyRuleEditToYAML(refreshed.Data, RuleEdit{Match: "DOMAIN,missing.example,DIRECT"})
 	require.ErrorIs(t, err, ErrRuleEditTarget)
+}
+
+func TestNormalizeLegacyMergeUsesNativeRules(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	raw := []byte("rules: ['DOMAIN,old.test,DIRECT', 'MATCH,DIRECT']\n")
+	require.NoError(t, WriteRaw("active", raw))
+	legacy := []byte("# keep\nmode: rule\nprepend-rules: ['DOMAIN,first.test,DIRECT']\nrule-edits: [{match: 'DOMAIN,old.test,DIRECT', rule: 'MATCH,REJECT'}]\n")
+	normalized, err := NormalizeLegacyMerge(legacy, "active", nil)
+	require.NoError(t, err)
+	require.NoError(t, WriteMerge(normalized))
+	require.Contains(t, string(normalized), "# keep")
+	require.NotContains(t, string(normalized), "rule-edits:")
+	require.NotContains(t, string(normalized), "prepend-rules:")
+	var doc struct{ Rules []string }
+	require.NoError(t, yaml.Unmarshal(normalized, &doc))
+	require.Equal(t, []string{"DOMAIN,first.test,DIRECT", "MATCH,REJECT", "MATCH,DIRECT"}, doc.Rules)
+}
+
+func TestWriteMergeRejectsNonNativeFieldsAndInvalidLists(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	original := []byte("mode: rule\n")
+	require.NoError(t, WriteMerge(original))
+	for _, raw := range []string{
+		"prepend-rules: []", "rule-edits: []", "unknown: true", "rules: {}",
+		"proxies: [invalid]", "mode: rule\nmode: global", "mode: rule\n---\nmode: global",
+	} {
+		require.Error(t, WriteMerge([]byte(raw)), raw)
+		stored, err := ReadMerge()
+		require.NoError(t, err)
+		require.Equal(t, original, stored)
+	}
 }

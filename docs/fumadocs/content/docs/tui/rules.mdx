@@ -16,7 +16,7 @@ description: Browse and manage proxy rules
 
 Click a type to filter the list, or use `←` / `→` and `Space`. Types absent from the current configuration appear in gray. You can select several types and combine them with text search. Press `Esc` to clear the type filter when its row is visible.
 
-Mihosh records these changes under `rule-edits` in `merge.yaml` and applies them to the core. Additions use the selected position. Edits and deletions match the original rule by its content, so they continue to apply when that rule is still present after a subscription refresh. The subscription snapshot stays intact. Remote rule editing requires an active subscription and applies in memory on the remote core.
+Mihosh saves the edited list under Mihomo's native `rules` field in `merge.yaml` and applies it to the core. While the field is present, it replaces the subscription's rule list even after refreshing or switching sources. The source snapshot stays intact. Remote rule editing requires an active subscription and applies in memory on the remote core.
 
 ## Interface Features
 

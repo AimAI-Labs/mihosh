@@ -206,7 +206,7 @@ func TestProfileService_MergeRoundTrip(t *testing.T) {
 	assert.Nil(t, data)
 
 	// 写入合法 merge
-	merge := []byte("prepend-rules:\n  - DOMAIN,a.com,DIRECT\n")
+	merge := []byte("rules:\n  - DOMAIN,a.com,DIRECT\n")
 	require.NoError(t, s.SaveMerge(merge))
 
 	data, err = s.LoadMerge()
@@ -347,7 +347,7 @@ func TestProfileService_ActivatePreservesManagedFields(t *testing.T) {
 		"proxy-groups: []\n")))
 
 	// merge M 也不包含 5 个托管字段。
-	require.NoError(t, profile.WriteMerge([]byte("prepend-rules:\n  - MATCH,DIRECT\n")))
+	require.NoError(t, profile.WriteMerge([]byte("rules:\n  - MATCH,DIRECT\n")))
 
 	// 当前 O 已包含设置页托管字段，Activate 后应继续保留。
 	mihomoDir := filepath.Join(home, ".config", "mihomo")

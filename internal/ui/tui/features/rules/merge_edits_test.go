@@ -84,8 +84,10 @@ func TestRuleFormsPersistAndApplyMergeEdits(t *testing.T) {
 	merge, err := profile.ReadMerge()
 	require.NoError(t, err)
 	require.Contains(t, string(merge), "# keep")
-	require.Contains(t, string(merge), "rule-edits:")
-	require.Contains(t, string(merge), "match: DOMAIN,edited.example,DIRECT")
+	require.Contains(t, string(merge), "rules:")
+	require.NotContains(t, string(merge), "rule-edits:")
+	require.NotContains(t, string(merge), "edited.example")
+	require.Contains(t, string(merge), "MATCH,DIRECT")
 
 	reject.Store(true)
 	s, _ = s.Update(runeKey('n'))

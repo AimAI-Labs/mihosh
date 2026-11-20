@@ -32,7 +32,7 @@ secret: s3cr3t
 mixed-port: 7891
 allow-lan: false
 log-level: debug
-prepend-rules:
+rules:
   - DOMAIN,example.com,DIRECT
 `)))
 	got, err = ReadMihomoOverrides()

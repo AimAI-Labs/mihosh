@@ -16,65 +16,67 @@ type preparedMerge struct {
 	data      []byte
 	overrides map[string]string
 	cleared   []string
+	candidate []byte
 }
 
 func (change mergeMutation) prepare(old []byte, uid, path string, managed bool) (preparedMerge, error) {
 	var next preparedMerge
-	var err error
-	if change.rule != nil {
-		persisted := *change.rule
-		if uid != "" && path != "" && persisted.Match != "" && persisted.Rule != "" {
-			// Older versions only wrote custom rules to the runtime file. If the
-			// old rule isn't reproducible from the subscription, persist its edit as an addition.
-			base, genErr := profile.GenerateOverrideConfigWithMerge(uid, path, old, nil, managed)
-			if genErr != nil {
-				return next, genErr
-			}
-			if _, editErr := profile.ApplyRuleEditToYAML(base, persisted); errors.Is(editErr, profile.ErrRuleEditTarget) {
-				persisted.Match = ""
-			} else if editErr != nil {
-				return next, editErr
-			}
+	native, err := profile.NormalizeLegacyMerge(old, uid, func() (string, error) {
+		if path == "" {
+			return "", os.ErrNotExist
 		}
-		next.data, err = profile.AppendRuleEdit(old, persisted)
+		return path, nil
+	})
+	if err != nil {
+		return next, err
+	}
+	if change.rule != nil {
+		effective, err := readRuleEditBase(uid, path, old, managed)
+		if err != nil {
+			return next, err
+		}
+		next.candidate, err = profile.ApplyRuleEditToYAML(effective, *change.rule)
+		if err != nil {
+			return next, err
+		}
+		next.data, err = profile.ReplaceMergeRules(native, next.candidate)
+		if err != nil {
+			return next, err
+		}
 	} else {
-		before, err := profile.ReadMihomoOverridesFrom(old)
+		before, err := profile.ReadMihomoOverridesFrom(native)
 		if err != nil {
 			return next, err
 		}
 		next.cleared = profile.ClearedOverrideKeys(before, change.overrides)
-		next.data, err = profile.EncodeMihomoOverrides(old, change.overrides)
+		next.data, err = profile.EncodeMihomoOverrides(native, change.overrides)
 		if err != nil {
 			return next, err
 		}
-	}
-	if err != nil {
-		return next, err
 	}
 	next.overrides, err = profile.ReadMihomoOverridesFrom(next.data)
 	return next, err
 }
 
-func (change mergeMutation) candidate(uid, path string, old []byte, next preparedMerge, managed bool) ([]byte, error) {
-	if change.rule == nil {
-		return profile.GenerateOverrideConfigWithMerge(uid, path, next.data, next.cleared, managed)
+func (next preparedMerge) generate(uid, path string, managed bool) ([]byte, error) {
+	if next.candidate != nil {
+		return next.candidate, nil
 	}
+	return profile.GenerateOverrideConfigWithMerge(uid, path, next.data, next.cleared, managed)
+}
+
+func readRuleEditBase(uid, path string, old []byte, managed bool) ([]byte, error) {
 	if path != "" {
-		// Keep the rest of the live rule list intact when changing one rule,
-		// including legacy local rules and other runtime-only edits.
+		// Keep runtime-only rules when editing a rule displayed by the local core.
 		effective, err := os.ReadFile(path)
 		if err == nil {
-			return profile.ApplyRuleEditToYAML(effective, *change.rule)
+			return effective, nil
 		}
 		if !os.IsNotExist(err) || uid == "" {
 			return nil, err
 		}
 	}
-	effective, err := profile.GenerateOverrideConfigWithMerge(uid, path, old, nil, managed)
-	if err != nil {
-		return nil, err
-	}
-	return profile.ApplyRuleEditToYAML(effective, *change.rule)
+	return profile.GenerateOverrideConfigWithMerge(uid, path, old, nil, managed)
 }
 
 func (change mergeMutation) controlRequest() coreControlRequest {

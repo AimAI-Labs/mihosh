@@ -13,6 +13,7 @@ package profile
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
@@ -197,20 +198,29 @@ func ReadMergeNode() (*yaml.Node, error) {
 	if len(trimSpaceBytes(data)) == 0 {
 		return nil, nil
 	}
-	var doc yaml.Node
-	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return nil, fmt.Errorf("解析覆写配置失败: %w", err)
-	}
-	return &doc, nil
+	return parseReadableMerge(data)
 }
 
-// WriteMerge 原子写入全局 merge.yaml。
+func parseReadableMerge(data []byte) (*yaml.Node, error) {
+	doc, err := parseOverrideDocument(data)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateMergeDocument(doc, true); err != nil {
+		return nil, err
+	}
+	return doc, nil
+}
+
+// WriteMerge validates and atomically saves native Mihomo overrides, retaining
+// the original bytes when replacing a legacy override file.
 func WriteMerge(data []byte) error {
-	if len(trimSpaceBytes(data)) > 0 {
-		var probe yaml.Node
-		if err := yaml.Unmarshal(data, &probe); err != nil {
-			return fmt.Errorf("覆写 YAML 语法错误: %w", err)
-		}
+	doc, err := parseOverrideDocument(data)
+	if err != nil {
+		return fmt.Errorf("覆写 YAML 语法错误: %w", err)
+	}
+	if err := validateMergeDocument(doc, false); err != nil {
+		return err
 	}
 	p, err := MergePath()
 	if err != nil {
@@ -218,6 +228,22 @@ func WriteMerge(data []byte) error {
 	}
 	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
 		return fmt.Errorf("创建配置目录失败: %w", err)
+	}
+	previous, err := ReadMerge()
+	if err != nil {
+		return err
+	}
+	if old, err := parseOverrideDocument(previous); err == nil {
+		root := topLevelMapping(old)
+		for i := 0; i < len(root.Content); i += 2 {
+			if legacyMergeTarget(root.Content[i].Value) != "" {
+				backup := fmt.Sprintf("%s.legacy-%x.bak", p, sha256.Sum256(previous))
+				if err := atomicWrite(backup, previous, 0600); err != nil {
+					return fmt.Errorf("backup legacy merge.yaml: %w", err)
+				}
+				break
+			}
+		}
 	}
 	return atomicWrite(p, data, 0600)
 }

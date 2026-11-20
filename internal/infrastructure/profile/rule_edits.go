@@ -21,34 +21,6 @@ type RuleEdit struct {
 	Index int    `yaml:"index,omitempty" json:"index,omitempty"`
 }
 
-func AppendRuleEdit(merge []byte, edit RuleEdit) ([]byte, error) {
-	doc, err := parseOverrideDocument(merge)
-	if err != nil {
-		return nil, err
-	}
-	root := topLevelMapping(doc)
-	var list *yaml.Node
-	for i := 0; i+1 < len(root.Content); i += 2 {
-		if strings.EqualFold(strings.TrimSpace(root.Content[i].Value), ruleEditsKey) {
-			list = root.Content[i+1]
-			break
-		}
-	}
-	if list == nil {
-		list = &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
-		setMappingField(root, ruleEditsKey, list)
-	}
-	if list.Kind != yaml.SequenceNode {
-		return nil, fmt.Errorf("%s must be a YAML sequence", ruleEditsKey)
-	}
-	var item yaml.Node
-	if err = item.Encode(edit); err != nil {
-		return nil, err
-	}
-	list.Content = append(list.Content, &item)
-	return marshalYAML2Spaces(doc)
-}
-
 func ApplyRuleEditToYAML(data []byte, edit RuleEdit) ([]byte, error) {
 	doc, err := parseOverrideDocument(data)
 	if err != nil {

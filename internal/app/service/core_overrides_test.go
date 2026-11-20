@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -28,7 +29,10 @@ func TestManagedOverridesApplyClearAndPreserveInboundProtection(t *testing.T) {
 	rawBefore, err := profile.ReadRawFile(uid)
 	require.NoError(t, err)
 	require.NoError(t, config.Update(func(cfg *config.Config) error { cfg.ActiveSub = uid; return nil }))
-	require.NoError(t, profile.WriteMerge([]byte("prepend-rules:\n  - DOMAIN,keep.example,DIRECT\n")))
+	legacy := []byte("prepend-rules:\n  - DOMAIN,keep.example,DIRECT\n")
+	mergePath, err := profile.MergePath()
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(mergePath, legacy, 0600))
 
 	// 1. Apply explicit allow-lan: false, log-level: debug, mixed-port: 7895 while offline.
 	cfgSvc := NewConfigService()
@@ -49,6 +53,14 @@ func TestManagedOverridesApplyClearAndPreserveInboundProtection(t *testing.T) {
 	assert.Contains(t, string(mergeData), "allow-lan: false")
 	assert.Contains(t, string(mergeData), "log-level: debug")
 	assert.Contains(t, string(mergeData), "mixed-port: 7895")
+	assert.NotContains(t, string(mergeData), "prepend-rules:")
+	assert.Contains(t, string(mergeData), "rules:")
+	backups, err := filepath.Glob(mergePath + ".legacy-*.bak")
+	require.NoError(t, err)
+	require.Len(t, backups, 1)
+	saved, err := os.ReadFile(backups[0])
+	require.NoError(t, err)
+	require.Equal(t, legacy, saved)
 	assert.Contains(t, string(mergeData), "DOMAIN,keep.example,DIRECT")
 
 	path, err := config.ManagedMihomoConfigPath()
@@ -213,7 +225,8 @@ func TestManagedOverridesForwardedToBackgroundOwner(t *testing.T) {
 	require.True(t, outcome.WriteOK)
 	merge, err := profile.ReadMerge()
 	require.NoError(t, err)
-	require.Contains(t, string(merge), "rule-edits:")
+	require.Contains(t, string(merge), "rules:")
+	require.NotContains(t, string(merge), "rule-edits:")
 	require.Contains(t, string(merge), "DOMAIN,forwarded.example,DIRECT")
 }
 

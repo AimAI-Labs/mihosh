@@ -1,51 +1,92 @@
 package sub
 
-// merge_editor.go — 在外部编辑器（$EDITOR / notepad）中打开 merge.yaml。
-//
-// 与 rules 页编辑 mihomo 配置一致：通过 tea.ExecProcess 暂停 TUI，
-// 把终端交给编辑器，编辑器直接写盘 merge.yaml；退出后由主 Model 负责重载核心。
-// 删除了原 bubbles/textarea 弹窗与 Load/Save 来回，磁盘作为单一事实源。
-
 import (
+	"bytes"
 	"errors"
+	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
 
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// openMergeExternalEditor 在外部编辑器中打开全局 merge.yaml。
 func (s State) openMergeExternalEditor() (State, tea.Cmd) {
-	mergePath, err := profile.MergePath()
-	if err != nil {
-		return s, mergeEditError(err)
-	}
 	editor := utils.ResolveEditor()
 	if editor == "" {
-		return s, mergeEditError(errors.New("未找到可用的编辑器，请在 ~/.bashrc 或 ~/.zshrc 中设置 EDITOR 变量"))
-	}
-	beforeOverrides, _ := profile.ReadMihomoOverrides()
-	fields := utils.SplitEditorCommand(editor)
-	args := make([]string, 0, len(fields))
-	args = append(args, fields[1:]...)
-	args = append(args, mergePath)
-	c := exec.Command(fields[0], args...)
-	return s, tea.ExecProcess(c, func(err error) tea.Msg {
-		msg := messages.MergeEditFinishedMsg{Err: err}
-		if err == nil {
-			if afterOverrides, readErr := profile.ReadMihomoOverrides(); readErr == nil {
-				msg.ClearedOverrides = profile.ClearedOverrideKeys(beforeOverrides, afterOverrides)
-			}
+		return s, func() tea.Msg {
+			return messages.MergeEditFinishedMsg{Err: errors.New("未找到可用的编辑器，请设置 EDITOR 变量")}
 		}
-		return msg
+	}
+	cmd := &mergeEditor{command: utils.SplitEditorCommand(editor), activeUID: s.activeUID}
+	return s, tea.Exec(cmd, func(err error) tea.Msg {
+		return messages.MergeEditFinishedMsg{Err: err, ClearedOverrides: cmd.cleared}
 	})
 }
 
-// mergeEditError 构造一个返回 MergeEditFinishedMsg（携带错误）的命令。
-func mergeEditError(err error) tea.Cmd {
-	return func() tea.Msg {
-		return messages.MergeEditFinishedMsg{Err: err}
+type mergeEditor struct {
+	command        []string
+	activeUID      string
+	cleared        []string
+	stdin          io.Reader
+	stdout, stderr io.Writer
+}
+
+func (e *mergeEditor) SetStdin(r io.Reader)  { e.stdin = r }
+func (e *mergeEditor) SetStdout(w io.Writer) { e.stdout = w }
+func (e *mergeEditor) SetStderr(w io.Writer) { e.stderr = w }
+
+func (e *mergeEditor) Run() error {
+	original, err := profile.ReadMerge()
+	if err != nil {
+		return err
 	}
+	draft, draftErr := profile.NormalizeLegacyMerge(original, e.activeUID, config.GetMihomoConfigPath)
+	if draftErr != nil {
+		// Open the original so the user can repair invalid YAML or convert a legacy file manually.
+		draft = original
+	}
+	dir, err := os.MkdirTemp("", "mihosh-merge-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dir)
+	path := filepath.Join(dir, "merge.yaml")
+	if err := os.WriteFile(path, draft, 0600); err != nil {
+		return err
+	}
+	args := append(append([]string{}, e.command[1:]...), path)
+	cmd := exec.Command(e.command[0], args...)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = e.stdin, e.stdout, e.stderr
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	updated, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if bytes.Equal(original, updated) {
+		return nil
+	}
+	current, err := profile.ReadMerge()
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(current, original) {
+		return errors.New("merge.yaml changed while the editor was open")
+	}
+	before, _ := profile.ReadMihomoOverridesFrom(original)
+	after, err := profile.ReadMihomoOverridesFrom(updated)
+	if err != nil {
+		return err
+	}
+	if err := profile.WriteMerge(updated); err != nil {
+		return err
+	}
+	e.cleared = profile.ClearedOverrideKeys(before, after)
+	return nil
 }

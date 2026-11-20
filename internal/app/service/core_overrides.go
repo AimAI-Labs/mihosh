@@ -166,7 +166,7 @@ func (s *CoreService) applyMergeMutation(ctx context.Context, mutation mergeMuta
 		return MihomoOverridesSaveResult{Err: err}, err
 	}
 	newMerge, savedOverrides := next.data, next.overrides
-	generated, err := mutation.candidate(uid, path, oldMerge, next, true)
+	generated, err := next.generate(uid, path, true)
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}, err
 	}
@@ -338,7 +338,7 @@ func (s *ConfigService) applyLocalExternalOverrides(cfg *config.Config, client *
 	if uid == "" && !configExisted {
 		return MihomoOverridesSaveResult{Err: os.ErrNotExist}
 	}
-	data, err := mutation.candidate(uid, path, oldMerge, next, false)
+	data, err := next.generate(uid, path, false)
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
 	}
@@ -456,7 +456,7 @@ func (s *ConfigService) applyRemoteExternalOverrides(cfg *config.Config, client 
 	identityPending := identityRequestedForRemote(savedOverrides, cfg.Core.ExternalController, cfg.Core.ExternalSecret)
 
 	if uid != "" {
-		data, genErr := mutation.candidate(uid, "", oldMerge, next, false)
+		data, genErr := next.generate(uid, "", false)
 		if genErr != nil {
 			return MihomoOverridesSaveResult{Remote: true, Err: genErr}
 		}
