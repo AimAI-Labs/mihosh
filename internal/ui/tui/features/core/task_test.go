@@ -91,7 +91,7 @@ func TestTaskFooterAllowsBrowsingAndCancelsWithoutStartingAnotherTask(t *testing
 	if s.selected != hit.index {
 		t.Fatal("running task prevented selecting a version by mouse")
 	}
-	s, _ = s.Update(messages.PageMouseScrollMsg{Width: 80, Height: 12})
+	s, _ = s.Update(messages.PageMouseScrollMsg{X: 4, Y: 6, Width: 80, Height: 12})
 	if s.catalog.scroll == 0 || s.followSelection {
 		t.Fatal("running task prevented scrolling the version list")
 	}

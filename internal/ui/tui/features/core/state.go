@@ -450,16 +450,17 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		if s.isDownloadsPage() {
 			height := max(1, msg.Height-footerHeight)
 			page := s.layout(msg.Width, height)
+			if msg.X < 0 || msg.X >= msg.Width || msg.Y < page.pinnedRows || msg.Y >= height {
+				return s, nil
+			}
 			y := msg.Y + s.viewportOffset(page, height)
-			if msg.Y > 0 && msg.X >= 0 {
-				geo := page.geoBounds
-				if msg.X >= geo.x && y >= geo.y && y < geo.y+geo.height {
-					if s.tab != 3 {
-						s = s.selectTab(3)
-					}
-				} else if s.tab == 3 && (y < geo.y || msg.X < geo.x) {
-					s = s.selectTab(1)
+			geo := page.geoBounds
+			if msg.X >= geo.x && y >= geo.y && y < geo.y+geo.height {
+				if s.tab != 3 {
+					s = s.selectTab(3)
 				}
+			} else if s.tab == 3 && (y < geo.y || msg.X < geo.x) {
+				s = s.selectTab(1)
 			}
 			if s.tab == 1 {
 				return s.scrollReleasePage(msg)

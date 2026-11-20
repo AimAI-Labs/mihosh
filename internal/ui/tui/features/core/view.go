@@ -326,6 +326,16 @@ func (s State) layout(width, height int) pageLayout {
 
 func (s State) downloadsLayout(width, height int, parts []string, result pageLayout) pageLayout {
 	top := lipgloss.Height(strings.Join(parts, "\n"))
+	const networkKey = " [e]"
+	networkLabel := ansi.Truncate(i18n.T("core.action.network"), width-4-lipgloss.Width(networkKey), "…") + networkKey
+	labelWidth := lipgloss.Width(networkLabel)
+	networkX := width - 2 - labelWidth
+	parts[len(parts)-1] = strings.Repeat(" ", networkX) + common.HighlightStyle().Render(networkLabel)
+	result.pinnedRows = top
+	result.controls = []releaseControl{{
+		actionHit: actionHit{x: networkX, y: top - 1, width: labelWidth, height: 1},
+		action:    "network",
+	}}
 	releaseWidth, geoWidth := width, width
 	releaseHeight := max(3, height-top)
 	if width >= 100 {
@@ -343,10 +353,6 @@ func (s State) downloadsLayout(width, height int, parts []string, result pageLay
 	for i := range result.releases {
 		result.releases[i].y += top
 	}
-	for i := range releases.controls {
-		releases.controls[i].y += top
-	}
-	result.controls = releases.controls
 	geo, hits := s.geoPanel(geoWidth)
 	geoX, geoY := releaseWidth, top
 	if width >= 100 {

@@ -74,7 +74,11 @@ func TestGeoManagementLoadsFilesAndQueuesSelectedUpdate(t *testing.T) {
 			}
 		}
 	}
-	s, _ = s.Update(messages.PageMouseScrollMsg{Width: 120, Height: 30})
+	page := s.layout(120, 30-footerHeight)
+	first := page.actions[0]
+	s, _ = s.Update(messages.PageMouseScrollMsg{
+		X: first.x, Y: first.y - s.viewportOffset(page, 30-footerHeight), Width: 120, Height: 30,
+	})
 	if s.selected != 1 || !s.followSelection {
 		t.Fatal("wheel did not select the next GEO file")
 	}
@@ -91,9 +95,11 @@ func TestGeoManagementLoadsFilesAndQueuesSelectedUpdate(t *testing.T) {
 		t.Fatal("esc did not cancel GEO confirmation dialog")
 	}
 	// Clicking a GEO row also opens the confirmation dialog instead of starting a download immediately.
-	page := s.layout(120, 29)
+	page = s.layout(120, 30-footerHeight)
 	hit := page.actions[1]
-	s, cmd = s.Update(messages.PageMouseClickMsg{X: hit.x + 1, Y: hit.y, Width: 120, Height: 30})
+	s, cmd = s.Update(messages.PageMouseClickMsg{
+		X: hit.x + 1, Y: hit.y - s.viewportOffset(page, 30-footerHeight), Width: 120, Height: 30,
+	})
 	if !s.Editing || s.form != "geo-update" || s.Busy || cmd != nil {
 		t.Fatal("clicking GEO file must open a confirmation dialog before downloading")
 	}
@@ -194,5 +200,46 @@ func TestGeoFilesPanelKeepsDirectoryAndRestartHintReachable(t *testing.T) {
 	if !strings.Contains(strings.Join(view, "\n"), filepath.Join(root, "runtime")) ||
 		!strings.Contains(view[len(view)-1], "z "+i18n.T("core.action.restart")) {
 		t.Fatalf("GEO directory or restart help is unreachable: %q", view)
+	}
+}
+
+func TestDownloadConnectionSettingsStaysAboveBothPanels(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	for _, language := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(language)
+		for _, width := range []int{40, 80, 120} {
+			const height = 16
+			s := releaseFixture(t)
+			s.geoFiles = []service.GeoDataFile{
+				{Key: "mmdb", Name: "Country.mmdb"}, {Key: "geoip", Name: "GeoIP.dat"},
+				{Key: "geosite", Name: "GeoSite.dat"}, {Key: "asn", Name: "ASN.mmdb"},
+			}
+			before := s.layout(width, height-footerHeight)
+			hit := before.controls[0]
+			s = s.selectTab(3)
+			s.selected = len(s.geoFiles) - 1
+			after := s.layout(width, height-footerHeight)
+			if after.controls[0] != hit || hit.y >= min(after.releases[0].y, after.geoBounds.y) {
+				t.Fatal("the network settings position depends on list focus")
+			}
+			rendered := ansi.Strip(s.Render(width, height))
+			row := strings.Split(rendered, "\n")[hit.y]
+			if !strings.Contains(ansi.Cut(row, hit.x, hit.x+hit.width), i18n.T("core.action.network")+" [e]") {
+				t.Fatalf("%s width %d: network settings is missing at its fixed position: %q", language, width, row)
+			}
+			if strings.Count(rendered, i18n.T("core.action.network")) != 1 {
+				t.Fatal("the settings entrance is duplicated")
+			}
+			wheel := messages.PageMouseScrollMsg{X: hit.x, Y: hit.y, Width: width, Height: height}
+			same, cmd := s.Update(wheel)
+			if same.tab != s.tab || same.selected != s.selected || cmd != nil {
+				t.Fatal("scrolling over the settings entrance moved a list")
+			}
+			next, _ := s.Update(messages.PageMouseClickMsg{X: hit.x, Y: hit.y, Width: width, Height: height})
+			if next.tab != 3 || !next.Editing || next.form != "network" {
+				t.Fatal("the settings entrance did not open from the scrolled GEO list")
+			}
+		}
 	}
 }

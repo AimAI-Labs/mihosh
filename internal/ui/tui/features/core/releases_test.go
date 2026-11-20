@@ -324,7 +324,7 @@ func TestLazyCataloguePrefetchesAppendsAndDeduplicatesWithoutMovingSelection(t *
 func TestLazyCatalogueMouseScrollPreservesViewportAndStopsOnError(t *testing.T) {
 	s := releaseFixture(t)
 	var cmd tea.Cmd
-	wheel := messages.PageMouseScrollMsg{Width: 80, Height: 26}
+	wheel := messages.PageMouseScrollMsg{X: 4, Y: 6, Width: 80, Height: 26}
 	for i := 0; i < 15 && !s.Busy; i++ {
 		s, cmd = s.Update(wheel)
 	}
