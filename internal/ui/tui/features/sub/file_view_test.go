@@ -78,3 +78,26 @@ func TestDiffOptionsMenuRecomputesWithKeyboardAndMouse(t *testing.T) {
 	require.False(t, s.file.optionsOpen)
 	require.Contains(t, ansi.Strip(s.file.renderFile(60, width, height)), i18n.T("sub.file.same"))
 }
+
+func TestDiffOptionsPersistAcrossSubscriptionsAndAllCanBeDisabled(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	subs := []profile.Profile{{UID: "first"}, {UID: "second"}}
+	s := State{}.ApplySubs(subs, "").openFileMenu()
+	require.Equal(t, profile.DefaultFileDiffOptions, s.file.ignore)
+	s.file.mode, s.file.selected = fileDiff, 2
+	for _, width := range []int{80, 120} {
+		const height = 24
+		left, _, _, bottom := s.file.dialog(width, height).Bounds()
+		next, _ := s.clickFile(messages.PageMouseClickMsg{X: left + 2, Y: bottom - 2, Width: width, Height: height})
+		require.True(t, next.file.optionsOpen)
+	}
+	for option := range diffOptions {
+		s, _ = s.toggleDiffOption(option)
+		require.NoError(t, s.file.err)
+	}
+	reopened := State{}.ApplySubs(subs, "")
+	reopened.selected = 1
+	reopened = reopened.openFileMenu()
+	require.Equal(t, "second", reopened.file.uid)
+	require.Zero(t, reopened.file.ignore)
+}

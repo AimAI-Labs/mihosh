@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
@@ -53,7 +54,11 @@ func (s State) openFileMenu() State {
 		return s
 	}
 	uid := s.subs[s.filteredIdx[s.selected]].UID
-	s.file = fileView{mode: fileMenu, uid: uid, request: s.file.request + 1}
+	ignore := profile.DefaultFileDiffOptions
+	if cfg, err := config.Load(); err == nil && cfg.FileDiffOptions != nil {
+		ignore = *cfg.FileDiffOptions
+	}
+	s.file = fileView{mode: fileMenu, uid: uid, request: s.file.request + 1, ignore: ignore}
 	return s
 }
 
@@ -105,7 +110,7 @@ func terminalFileText(data []byte) string {
 }
 
 func (f fileView) rowBudget(width, height int) int {
-	rows := max(1, height-8)
+	rows := max(1, height-7)
 	if f.mode == fileDiff && width < 100 {
 		rows = max(1, (rows-3)/2)
 	}
@@ -145,7 +150,7 @@ func (s State) handleFileKey(msg tea.KeyMsg) (State, tea.Cmd) {
 		if s.file.mode == fileMenu {
 			mode = fileClosed
 		}
-		s.file = fileView{mode: mode, uid: s.file.uid, selected: s.file.selected, request: s.file.request + 1}
+		s.file = fileView{mode: mode, uid: s.file.uid, selected: s.file.selected, request: s.file.request + 1, ignore: s.file.ignore}
 	case "enter":
 		if s.file.mode == fileMenu {
 			return s.loadFileView()
@@ -186,7 +191,8 @@ func (s State) clickFile(msg messages.PageMouseClickMsg) (State, tea.Cmd) {
 		s.file.selected = idx
 		return s.loadFileView()
 	}
-	if s.file.mode == fileDiff && idx == 0 {
+	if s.file.mode == fileDiff && !s.file.optionsOpen && msg.Y == bottom-2 &&
+		msg.X >= left+2 && msg.X < left+2+lipgloss.Width(diffOptionHint()) {
 		s.file.optionsOpen = true
 	}
 	return s, nil
@@ -194,8 +200,20 @@ func (s State) clickFile(msg messages.PageMouseClickMsg) (State, tea.Cmd) {
 
 func (s State) toggleDiffOption(index int) (State, tea.Cmd) {
 	s.file.option = index
-	s.file.ignore ^= diffOptions[index].flag
+	ignore := s.file.ignore ^ diffOptions[index].flag
+	if err := config.Update(func(cfg *config.Config) error {
+		cfg.FileDiffOptions = &ignore
+		return nil
+	}); err != nil {
+		s.file.err = err
+		return s, nil
+	}
+	s.file.ignore, s.file.err = ignore, nil
 	return s.recomputeDiff()
+}
+
+func diffOptionHint() string {
+	return "o " + i18n.T("sub.file.diff_options")
 }
 
 func (f fileView) dialog(width, height int) dialog.Dialog {
@@ -220,6 +238,9 @@ func (f fileView) dialog(width, height int) dialog.Dialog {
 			rows = append(rows, row)
 		}
 		body = strings.Join(rows, "\n")
+		if f.err != nil && !f.loading {
+			body += "\n" + ansi.Wrap(terminalFileText([]byte(f.err.Error())), w-4, "")
+		}
 	} else if f.mode == fileMenu {
 		w = min(48, w)
 		items := make([]string, len(fileOptions))
@@ -239,7 +260,8 @@ func (f fileView) dialog(width, height int) dialog.Dialog {
 		}
 	} else {
 		title = i18n.T(fileOptions[f.selected])
-		body = common.SelectedStyle().Render("[ o "+i18n.T("sub.file.diff_options")+" ]") + "\n" + f.renderFile(w-4, width, height)
+		body = f.renderFile(w-4, width, height)
+		hint = diffOptionHint() + " · " + hint
 	}
 	body += "\n" + common.MutedStyle().Render(hint)
 	content := common.RenderBorderedPanel(title, body, w, common.Primary(), common.Bright())

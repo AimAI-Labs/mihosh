@@ -21,12 +21,17 @@ const (
 	DiffIgnoreWhitespace
 	DiffIgnoreFormatCharacters
 	DiffIgnorePunctuation
+	DefaultFileDiffOptions = DiffIgnoreIndent | DiffIgnoreWhitespace | DiffIgnoreFormatCharacters | DiffIgnorePunctuation
 )
 
 func DiffFiles(before, after string, options FileDiffOptions) []FileDiffRow {
-	a := strings.Split(strings.ReplaceAll(before, "\r\n", "\n"), "\n")
-	b := strings.Split(strings.ReplaceAll(after, "\r\n", "\n"), "\n")
-	matcher := difflib.NewMatcher(diffKeys(a, options), diffKeys(b, options))
+	before = strings.ReplaceAll(before, "\r\n", "\n")
+	after = strings.ReplaceAll(after, "\r\n", "\n")
+	a, b := strings.Split(before, "\n"), strings.Split(after, "\n")
+	matcher := difflib.NewMatcher(
+		diffKeys(strings.Split(string(readableYAMLUnicode([]byte(before))), "\n"), options),
+		diffKeys(strings.Split(string(readableYAMLUnicode([]byte(after))), "\n"), options),
+	)
 	var rows []FileDiffRow
 	for _, group := range matcher.GetGroupedOpCodes(3) {
 		first, last := group[0], group[len(group)-1]

@@ -277,7 +277,9 @@ func GenerateSourcePreview(source []byte) (GeneratedConfig, error) {
 	if err := yaml.Unmarshal(source, &raw); err != nil {
 		return GeneratedConfig{}, err
 	}
-	return generateFromRaw(&raw, "", nil, false)
+	generated, err := generateFromRaw(&raw, "", nil, false)
+	generated.Data = readableYAMLUnicode(generated.Data)
+	return generated, err
 }
 
 func generateFromRaw(raw *yaml.Node, managedPath string, cleared []string, managed bool) (GeneratedConfig, error) {

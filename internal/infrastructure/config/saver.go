@@ -47,6 +47,9 @@ func saveLocked(cfg *Config) error {
 	writer.Set("theme", cfg.Theme)
 	writer.Set("border_style", cfg.BorderStyle)
 	writer.Set("shell_proxy", cfg.ShellProxy)
+	if cfg.FileDiffOptions != nil {
+		writer.Set("file_diff_options", *cfg.FileDiffOptions)
+	}
 	// 订阅管理字段：subs 为订阅元数据列表，active_sub 为当前激活 UID
 	if cfg.Subs == nil {
 		writer.Set("subs", []interface{}{})
