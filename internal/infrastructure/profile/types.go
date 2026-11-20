@@ -70,10 +70,17 @@ func (s SubSource) Display() string {
 // raw.yaml（订阅原始配置快照）与 merge.yaml（用户覆写）按 UID 存为独立文件，
 // 不进入本结构（避免 config.yaml 膨胀）。
 type Profile struct {
-	UID       string    `mapstructure:"uid"        yaml:"uid"`        // 短 ID，用作 profiles/<uid>/ 目录名
-	Name      string    `mapstructure:"name"       yaml:"name"`       // 显示名
-	Source    SubSource `mapstructure:"source"     yaml:"source"`     // 原始配置来源
-	UpdatedAt int64     `mapstructure:"updated_at" yaml:"updated_at"` // 最近成功拉取的 unix 时间戳（秒），0=从未更新
+	UID       string             `mapstructure:"uid"        yaml:"uid"`        // 短 ID，用作 profiles/<uid>/ 目录名
+	Name      string             `mapstructure:"name"       yaml:"name"`       // 显示名
+	Source    SubSource          `mapstructure:"source"     yaml:"source"`     // 原始配置来源
+	UpdatedAt int64              `mapstructure:"updated_at" yaml:"updated_at"` // 最近成功拉取的 unix 时间戳（秒），0=从未更新
+	Usage     *SubscriptionUsage `mapstructure:"usage" yaml:"usage,omitempty"`
+}
+
+type SubscriptionUsage struct {
+	UsedBytes  int64 `mapstructure:"used_bytes" yaml:"used_bytes"`
+	TotalBytes int64 `mapstructure:"total_bytes" yaml:"total_bytes"`
+	ExpiresAt  int64 `mapstructure:"expires_at" yaml:"expires_at"`
 }
 
 // 错误哨兵。集中定义，便于调用方用 errors.Is 判别。

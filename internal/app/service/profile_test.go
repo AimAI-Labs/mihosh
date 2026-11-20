@@ -1,8 +1,11 @@
 package service
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
@@ -192,6 +195,44 @@ func TestProfileService_FetchLocal(t *testing.T) {
 	got, err := s.findProfile(p.UID)
 	require.NoError(t, err)
 	assert.NotZero(t, got.UpdatedAt)
+}
+
+func TestProfileServicePersistsUsageOnlyOnSuccessfulFetch(t *testing.T) {
+	s := newIsolatedService(t)
+	var mode atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch mode.Load() {
+		case 0:
+			w.Header().Add("Subscription-Userinfo", "upload=512; download=1024")
+			w.Header().Add("Subscription-Userinfo", "total=8192; expire=2000000000")
+		case 1:
+			w.Header().Set("Subscription-Userinfo", "upload=6000; total=8192")
+			_, _ = w.Write([]byte("invalid configuration"))
+			return
+		}
+		_, _ = w.Write([]byte("mode: rule\nproxies: []\n"))
+	}))
+	defer server.Close()
+
+	p, err := s.AddProfile("Remote", profile.SubSource{Kind: profile.SourceRemote, URL: server.URL})
+	require.NoError(t, err)
+	require.NoError(t, s.FetchProfile(p.UID))
+	loaded, err := s.findProfile(p.UID)
+	require.NoError(t, err)
+	require.Equal(t, &profile.SubscriptionUsage{UsedBytes: 1536, TotalBytes: 8192, ExpiresAt: 2000000000}, loaded.Usage)
+
+	mode.Store(1)
+	require.Error(t, s.FetchProfile(p.UID))
+	afterFailure, err := s.findProfile(p.UID)
+	require.NoError(t, err)
+	require.Equal(t, loaded.Usage, afterFailure.Usage)
+	require.Equal(t, loaded.UpdatedAt, afterFailure.UpdatedAt)
+
+	mode.Store(2)
+	require.NoError(t, s.FetchProfile(p.UID))
+	withoutHeader, err := s.findProfile(p.UID)
+	require.NoError(t, err)
+	require.Nil(t, withoutHeader.Usage)
 }
 
 func TestProfileService_MergeRoundTrip(t *testing.T) {

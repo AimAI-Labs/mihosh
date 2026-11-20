@@ -4,11 +4,10 @@ package sub
 //
 // 布局复用 rules 页的 header + 列表 + overlay 弹窗模式：
 //   1. header（搜索框 + 统计）
-//   2. 列表（序号 / 名称 / 类型 / 来源 / 更新时间）
+//   2. 订阅卡片
 //   3. 可选叠加：添加表单 / merge 编辑器 / 删除确认
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -23,7 +22,6 @@ import (
 
 const (
 	subFixedLines   = 4 // header(3) + 间距(1)
-	subMinHeight    = 5
 	subScrollWidth  = 1
 	subHeaderHeight = 3
 )
@@ -160,141 +158,6 @@ func renderSearchBox(filterText string, filterMode bool, engine FilterEngine) st
 		}
 	}
 	return label + input + hint + engineIndicator
-}
-
-func renderList(state PageState, layout subListLayout) string {
-	maxLines := layout.capacity
-	if len(state.FilteredIdx) == 0 {
-		return common.MutedStyle().Render(i18n.T("sub.empty"))
-	}
-
-	scrollTop, endIdx := layout.window.Start, layout.window.End
-
-	listWidth := state.Width - subScrollWidth
-	var lines []string
-	for i := scrollTop; i < endIdx; i++ {
-		subIdx := state.FilteredIdx[i]
-		if subIdx < 0 || subIdx >= len(state.Subs) {
-			continue
-		}
-		p := state.Subs[subIdx]
-		lines = append(lines, renderSubEntry(p, i+1, subIdx == 0, p.UID == state.ActiveUID, p.UID == state.UpdatingUID, i == layout.window.Selected, listWidth))
-	}
-	listStr := strings.Join(lines, "\n")
-
-	if len(state.FilteredIdx) <= maxLines {
-		return listStr
-	}
-
-	// 滚动条
-	thumbStart, thumbEnd := common.CalcThumbRange(maxLines, len(state.FilteredIdx), scrollTop)
-	barLines := make([]string, maxLines)
-	for i := range barLines {
-		barLines[i] = common.SymbolScrollbarTrack
-	}
-	for i := thumbStart; i < thumbEnd && i < maxLines; i++ {
-		barLines[i] = common.SymbolScrollbarThumb
-	}
-	barStr := strings.Join(barLines, "\n")
-	styledBar := ""
-	for i, ch := range strings.Split(barStr, "\n") {
-		if i >= thumbStart && i < thumbEnd {
-			styledBar += common.MutedStyle().Foreground(common.Gray()).Render(ch) + "\n"
-		} else {
-			styledBar += common.DimStyle().Render(ch) + "\n"
-		}
-	}
-	styledBar = strings.TrimRight(styledBar, "\n")
-
-	fixedList := lipgloss.NewStyle().Width(listWidth).Render(listStr)
-	return lipgloss.JoinHorizontal(lipgloss.Top, fixedList, styledBar)
-}
-
-func renderSubEntry(p profile.Profile, seq int, _, isActive, isUpdating, selected bool, width int) string {
-	// 列宽常量（固定列宽保证各列对齐）
-	const (
-		colIndexW  = 5  // 序号列
-		colUidW    = 8  // UID列
-		colKindW   = 6  // 类型列（remote/local 最长 6）
-		colTimeW   = 14 // 更新时间列
-		colNameMin = 8  // 名称列最小宽度
-		colSrcMin  = 16 // 来源列最小宽度
-	)
-	// 固定开销：选择符前缀(2) + 激活标记(2) + 列间分隔符(6) + 各固定列宽
-	const fixedOverhead = 2 + 2 + 6 + colIndexW + colUidW + colKindW + colTimeW // = 43
-
-	// 名称/来源列共享剩余宽度。URL 通常更长，来源列占 5/6、名称列占 1/8。
-	flex := width - fixedOverhead
-	if flex < colNameMin+colSrcMin {
-		flex = colNameMin + colSrcMin
-	}
-	nameMax := flex * 1 / 8
-	if nameMax < colNameMin {
-		nameMax = colNameMin
-	}
-	srcMax := flex - nameMax
-	if srcMax < colSrcMin {
-		srcMax = colSrcMin
-	}
-
-	// 激活标记：绿色圆点表示激活，灰色空位表示未激活（不再使用 [激活] 文字徽标）
-	var mark string
-	if isActive {
-		mark = lipgloss.NewStyle().Foreground(common.Success()).Render("● ")
-	} else {
-		mark = lipgloss.NewStyle().Foreground(common.Gray()).Render("  ")
-	}
-
-	// 序号
-	indexStr := lipgloss.NewStyle().Foreground(common.Success()).Width(colIndexW).Render(fmt.Sprintf("%d.", seq))
-
-	// 名称（截断）
-	name := p.Name
-	if common.DisplayWidth(name) > nameMax {
-		name = common.TruncateDisplay(name, nameMax)
-	}
-	nameStr := lipgloss.NewStyle().Foreground(common.Bright()).Width(nameMax).Render(name)
-
-	// UID
-	uid := p.UID
-	if common.DisplayWidth(uid) > colUidW {
-		uid = common.TruncateDisplay(uid, colUidW)
-	}
-	uidStr := lipgloss.NewStyle().Foreground(common.TokyoMuted()).Width(colUidW).Render(uid)
-
-	// 类型
-	kindColor := common.TokyoBlue()
-	if p.Source.Kind == profile.SourceLocal {
-		kindColor = common.TokyoPurple()
-	}
-	kindStr := lipgloss.NewStyle().Foreground(kindColor).Width(colKindW).Render(p.Source.Kind.String())
-
-	// 来源（截断）
-	src := p.Source.Display()
-	if common.DisplayWidth(src) > srcMax {
-		src = common.TruncateDisplay(src, srcMax)
-	}
-	srcStr := lipgloss.NewStyle().Foreground(common.Secondary()).Width(srcMax).Render(src)
-
-	// 更新时间（预截断，避免 lipgloss.Width 因内容超宽而自动换行破坏单行布局）
-	tm := relativeTime(p.UpdatedAt)
-	if common.DisplayWidth(tm) > colTimeW {
-		tm = common.TruncateDisplay(tm, colTimeW)
-	}
-	timeStr := lipgloss.NewStyle().Foreground(common.TokyoMuted()).Width(colTimeW).Render(tm)
-
-	var updatingBadge string
-	if isUpdating {
-		updatingBadge = " " + lipgloss.NewStyle().Foreground(common.TokyoCyan()).Render("["+i18n.T("sub.updating")+"]")
-	}
-
-	line := fmt.Sprintf("%s %s %s %s %s %s %s%s", mark, indexStr, nameStr, uidStr, kindStr, srcStr, timeStr, updatingBadge)
-	if selected {
-		line = lipgloss.NewStyle().Background(common.Highlight()).Render(common.SymbolSelectActive + line)
-	} else {
-		line = common.SymbolSelectInactive + line
-	}
-	return line
 }
 
 // relativeTime 把 unix 时间戳转为相对时间描述。

@@ -146,17 +146,17 @@ func TestClampScroll(t *testing.T) {
 
 func TestSubscriptionScrollUsesActualHeight(t *testing.T) {
 	s := State{}.ApplySubs(make([]profile.Profile, 40), "")
-	s, _ = s.Update(messages.PageResizeMsg{Width: 100, Height: 30})
+	s, _ = s.Update(messages.PageResizeMsg{Width: 100, Height: 126})
 	for i := 0; i < 16; i++ {
 		s, _ = s.Update(tea.KeyMsg{Type: tea.KeyDown})
 	}
 	assert.Equal(t, 16, s.selected)
-	assert.Zero(t, s.scrollTop, "a tall list must not start scrolling after ten items")
+	assert.Zero(t, s.scrollTop, "all seventeen cards fit in a tall viewport")
 	s, _ = s.Update(messages.PageResizeMsg{Width: 99, Height: 12})
-	assert.Equal(t, 9, s.scrollTop, "shrinking keeps the selected item visible")
+	assert.Equal(t, 16, s.scrollTop, "shrinking keeps the selected card visible")
 	s = s.HandleMouseScroll(false)
 	assert.Equal(t, 17, s.selected)
-	assert.Equal(t, 10, s.scrollTop)
+	assert.Equal(t, 17, s.scrollTop)
 }
 
 func TestActivateSelected_NoSelection(t *testing.T) {

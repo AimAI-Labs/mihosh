@@ -13,8 +13,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,82 +39,116 @@ const fetchUserAgent = "clash-verge/v2.4.5"
 func Fetch(p Profile) error { return FetchContext(context.Background(), p) }
 
 func FetchContext(ctx context.Context, p Profile) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	data, err := fetchBytesContext(ctx, p.Source)
+	raw, _, err := Download(ctx, p.Source)
 	if err != nil {
 		return err
 	}
+	return WriteRaw(p.UID, raw)
+}
+
+// Download validates subscription content and returns the usage reported by the same response.
+func Download(ctx context.Context, source SubSource) ([]byte, *SubscriptionUsage, error) {
 	if err := ctx.Err(); err != nil {
-		return err
+		return nil, nil, err
+	}
+	var data []byte
+	var usage *SubscriptionUsage
+	var err error
+	if source.Kind == SourceLocal {
+		data, err = fetchLocal(source.Path)
+	} else {
+		data, usage, err = fetchRemoteContext(ctx, source.URL)
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
 	}
 	// 校验 YAML 合法性 + 顶层必须为 mapping。
 	var probe yaml.Node
 	yamlErr := yaml.Unmarshal(data, &probe)
 	if yamlErr == nil && topLevelMapping(&probe) != nil {
 		// 合法 Mihomo YAML，直接写入
-		return WriteRaw(p.UID, data)
+		return data, usage, nil
 	}
 
 	// 非合法 Mihomo YAML，尝试作为 v2ray base64 订阅解析
 	converted, isV2Ray, convErr := TryConvertV2Ray(data)
 	if isV2Ray && convErr == nil {
-		return WriteRaw(p.UID, converted)
+		return converted, usage, nil
 	}
 	if isV2Ray {
-		return fmt.Errorf("v2ray 订阅解析失败: %w", convErr)
+		return nil, nil, fmt.Errorf("v2ray 订阅解析失败: %w", convErr)
 	}
 
 	// 两者皆非，返回原始 YAML 错误
 	if yamlErr != nil {
-		return fmt.Errorf("订阅内容非合法 YAML: %w", yamlErr)
+		return nil, nil, fmt.Errorf("订阅内容非合法 YAML: %w", yamlErr)
 	}
-	return fmt.Errorf("订阅内容顶层不是配置映射（可能是错误页或纯文本），已拒绝")
+	return nil, nil, fmt.Errorf("订阅内容顶层不是配置映射（可能是错误页或纯文本），已拒绝")
 }
 
-func fetchBytesContext(ctx context.Context, src SubSource) ([]byte, error) {
-	switch src.Kind {
-	case SourceLocal:
-		return fetchLocal(src.Path)
-	default:
-		return fetchRemoteContext(ctx, src.URL)
-	}
-}
-
-func fetchRemoteContext(ctx context.Context, url string) ([]byte, error) {
+func fetchRemoteContext(ctx context.Context, url string) ([]byte, *SubscriptionUsage, error) {
 	subURL := strings.TrimSpace(url)
 	if subURL == "" {
-		return nil, fmt.Errorf("%s", i18n.T("profile.fetcher.err_empty_url"))
+		return nil, nil, fmt.Errorf("%s", i18n.T("profile.fetcher.err_empty_url"))
 	}
 
 	if !strings.HasPrefix(subURL, "http://") && !strings.HasPrefix(subURL, "https://") {
 		// 禁止 file:// 等其它协议，防止与 local 混淆绕过。
-		return nil, fmt.Errorf("%s", i18n.T("profile.fetcher.err_only_http"))
+		return nil, nil, fmt.Errorf("%s", i18n.T("profile.fetcher.err_only_http"))
 	}
 
 	client := &http.Client{Timeout: fetchTimeout}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, subURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf(i18n.T("profile.fetcher.err_build_req"), err)
+		return nil, nil, fmt.Errorf(i18n.T("profile.fetcher.err_build_req"), err)
 	}
 	req.Header.Set("User-Agent", fetchUserAgent)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf(i18n.T("profile.fetcher.err_fetch"), err)
+		return nil, nil, fmt.Errorf(i18n.T("profile.fetcher.err_fetch"), err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf(i18n.T("profile.fetcher.err_status_code"), resp.StatusCode)
+		return nil, nil, fmt.Errorf(i18n.T("profile.fetcher.err_status_code"), resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf(i18n.T("profile.fetcher.err_read_resp"), err)
+		return nil, nil, fmt.Errorf(i18n.T("profile.fetcher.err_read_resp"), err)
 	}
-	return body, nil
+	return body, parseSubscriptionUsage(strings.Join(resp.Header.Values("Subscription-Userinfo"), ";")), nil
+}
+
+func parseSubscriptionUsage(header string) *SubscriptionUsage {
+	var upload, download int64
+	var usage SubscriptionUsage
+	for field := range strings.SplitSeq(header, ";") {
+		key, value, ok := strings.Cut(field, "=")
+		number, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+		if !ok || err != nil || number < 0 {
+			continue
+		}
+		switch strings.ToLower(strings.TrimSpace(key)) {
+		case "upload":
+			upload = number
+		case "download":
+			download = number
+		case "total":
+			usage.TotalBytes = number
+		case "expire":
+			usage.ExpiresAt = number
+		}
+	}
+	usage.UsedBytes = min(upload, math.MaxInt64-download) + download
+	if usage == (SubscriptionUsage{}) {
+		return nil
+	}
+	return &usage
 }
 
 // fetchLocal 读取本地文件。

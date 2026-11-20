@@ -8,6 +8,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
+	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -69,39 +70,25 @@ func TestRenderSubPage_WithSubs(t *testing.T) {
 	assert.Contains(t, out, "订阅B")
 }
 
-// TestRenderSubEntry_RowWidth 防止列宽计算回归：每行整行（含选择符前缀）的显示
-// 宽度必须严格等于列表区宽度（width - subScrollWidth），且只能渲染为单行，
-// 否则会溢出滚动条列或破坏列对齐。
-func TestRenderSubEntry_RowWidth(t *testing.T) {
-	listWidth := 80 - subScrollWidth
-
-	cases := []struct {
-		name string
-		prof profile.Profile
-	}{
-		{
-			name: "long url",
-			prof: profile.Profile{UID: "a1", Name: "订阅A", Source: profile.SubSource{Kind: profile.SourceRemote, URL: "https://example.com/long/path/sub.yaml"}},
-		},
-		{
-			name: "short url",
-			prof: profile.Profile{UID: "a1", Name: "订阅A", Source: profile.SubSource{Kind: profile.SourceRemote, URL: "https://example.com/sub"}},
-		},
-		{
-			name: "long name",
-			prof: profile.Profile{UID: "a1", Name: "这是一个非常非常长的订阅名称用来测试截断逻辑", Source: profile.SubSource{Kind: profile.SourceLocal, URL: "/local/path"}},
-		},
+func TestRenderSubCardUsageFitsViewport(t *testing.T) {
+	p := profile.Profile{
+		Name:   "订阅名称带有emoji 🌍 与很长的文本",
+		Source: profile.SubSource{Kind: profile.SourceRemote, URL: "https://example.com/sub?token=hidden"},
+		Usage:  &profile.SubscriptionUsage{UsedBytes: 4096, TotalBytes: 8192, ExpiresAt: 2000000000},
 	}
-
-	for _, tc := range cases {
-		for _, selected := range []bool{false, true} {
-			entry := renderSubEntry(tc.prof, 1, false, true, false, selected, listWidth)
-			// 1. 不允许换行：单行布局，换行会破坏列对齐
-			assert.NotContains(t, entry, "\n", "%s selected=%v: 行不应换行", tc.name, selected)
-			// 2. 整行宽度严格等于列表区宽度
-			assert.Equal(t, listWidth, common.DisplayWidth(entry),
-				"%s selected=%v: 整行宽度必须等于列表区宽度 %d", tc.name, selected, listWidth)
+	for _, width := range []int{40, 99, 100} {
+		card := renderSubCard(p, true, false, true, width, subCardHeight)
+		rows := strings.Split(card, "\n")
+		require.Len(t, rows, subCardHeight)
+		for _, row := range rows {
+			require.Equal(t, width, common.DisplayWidth(row))
 		}
+		assert.Contains(t, card, "✓")
+		assert.Contains(t, card, "example.com")
+		assert.NotContains(t, card, "token")
+		assert.Contains(t, card, utils.FormatBytes(4096)+" / "+utils.FormatBytes(8192))
+		assert.Contains(t, card, "2033")
+		assert.Contains(t, card, strings.Repeat("━", 12)+strings.Repeat("─", 12))
 	}
 }
 
@@ -144,7 +131,7 @@ func TestResolveListItemAt(t *testing.T) {
 	assert.Equal(t, -1, resolveListItemAt(state, 0, 30), "header 区域不应命中")
 	assert.Equal(t, -1, resolveListItemAt(state, 3, 30), "header 分隔行不应命中")
 	assert.Equal(t, 0, resolveListItemAt(state, 4, 30), "第一项应命中")
-	assert.Equal(t, 1, resolveListItemAt(state, 5, 30), "第二项应命中")
+	assert.Equal(t, 1, resolveListItemAt(state, 4+subCardHeight, 30), "第二项应命中")
 }
 
 func TestRelativeTime(t *testing.T) {

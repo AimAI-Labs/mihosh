@@ -26,6 +26,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
 
 // ErrSubNotFound 表示给定 UID 的订阅不存在。
@@ -167,6 +168,9 @@ func (s *ProfileService) EditProfile(uid, name string, src profile.SubSource) er
 	src.Kind = profile.ParseSourceKind(src.Display())
 	return s.mutateProfile(uid, func(p *profile.Profile) {
 		p.Name = name
+		if p.Source != src {
+			p.Usage = nil
+		}
 		p.Source = src
 	})
 }
@@ -198,12 +202,30 @@ func (s *ProfileService) FetchProfileContext(ctx context.Context, uid string) er
 	if err != nil {
 		return err
 	}
-	if err := profile.FetchContext(ctx, p); err != nil {
+	raw, usage, err := profile.Download(ctx, p.Source)
+	if err != nil {
 		return err
 	}
-	// 更新 UpdatedAt
-	return s.mutateProfile(uid, func(p *profile.Profile) {
-		p.UpdatedAt = time.Now().Unix()
+	return config.Update(func(cfg *config.Config) error {
+		for i := range cfg.Subs {
+			current := &cfg.Subs[i]
+			if current.UID != uid {
+				continue
+			}
+			if current.Source != p.Source {
+				return errors.New(i18n.T("sub.err.source_changed"))
+			}
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if err := profile.WriteRaw(uid, raw); err != nil {
+				return err
+			}
+			current.UpdatedAt = time.Now().Unix()
+			current.Usage = usage
+			return nil
+		}
+		return ErrSubNotFound
 	})
 }
 
