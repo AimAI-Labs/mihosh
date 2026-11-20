@@ -2,8 +2,10 @@ package connections
 
 import (
 	"strings"
+	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -23,23 +25,58 @@ type connectionListLayout struct {
 	detailHeight int
 }
 
-func layoutConnectionList(state PageState) connectionListLayout {
-	parts := []string{RenderConnModeSwitchComponent(state.ViewMode, state.Width, state.InlineMode, state.Paused, state.PausedUpdates), ""}
-	filterLine := ""
-	if state.FilterMode {
-		filterLine = state.FilterInput
-	} else if state.FilterText != "" {
-		filterLine = common.DimStyle().Render(i18n.Tf("conns.filter_inactive", state.FilterText))
+func resolvePageQuery(state PageState) ConnQuery {
+	q := state.Query
+	if q.Text == "" && state.FilterText != "" {
+		q.Text = state.FilterText
 	}
-	if filterLine != "" {
-		parts = append(parts, filterLine)
+	return q
+}
+
+func renderQuerySummary(state PageState, q ConnQuery) string {
+	var chips []string
+	accent := lipgloss.NewStyle().Foreground(theme.Resolve(theme.Current().Primary)).Bold(true)
+	info := lipgloss.NewStyle().Foreground(theme.Resolve(theme.Current().Info)).Bold(true)
+	muted := common.DimStyle()
+
+	if q.SortBy != ConnSortDefault {
+		dir := "↑"
+		if q.SortDesc {
+			dir = "↓"
+		}
+		chips = append(chips, accent.Render(i18n.T("conns.sort.label")+": "+q.SortBy.Label()+" "+dir))
+	}
+	if q.Protocol != "" {
+		chips = append(chips, info.Render(i18n.T("conns.filter.proto_label")+": "+strings.ToUpper(q.Protocol)))
+	}
+	if q.Field != ConnFilterAll {
+		chips = append(chips, info.Render(i18n.T("conns.filter.field_label")+": "+q.Field.Label()))
+	}
+
+	var filterPart string
+	if state.FilterMode {
+		filterPart = state.FilterInput
+	} else if q.Text != "" {
+		filterPart = muted.Render(i18n.Tf("conns.filter_inactive", q.Text))
+	}
+	if filterPart != "" {
+		chips = append(chips, filterPart)
+	}
+	return strings.Join(chips, muted.Render("  │  "))
+}
+
+func layoutConnectionList(state PageState) connectionListLayout {
+	q := resolvePageQuery(state)
+	parts := []string{RenderConnModeSwitchComponent(state.ViewMode, state.Width, state.InlineMode, state.Paused, state.PausedUpdates), ""}
+	if bar := renderQuerySummary(state, q); bar != "" {
+		parts = append(parts, bar)
 	}
 	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(common.TokyoBlue())
 	parts = append(parts, components.RenderTableHeader(headerStyle, state.Width),
 		common.TableBorderStyle().Render(strings.Repeat("─", max(state.Width-2, 1))))
 	layout := connectionListLayout{
 		header:      strings.Join(parts, "\n"),
-		connections: filterConnections(connectionsByViewMode(state), state.FilterText),
+		connections: queryConnections(connectionsByViewMode(state), q, time.Now()),
 	}
 	layout.rowsY = lipgloss.Height(layout.header)
 	// Keep the existing three-row footer/hint budget and inline split.

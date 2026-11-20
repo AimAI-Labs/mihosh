@@ -44,6 +44,7 @@ type PageState struct {
 	InlineScroll    int  // 内联详情滚动偏移
 	Paused          bool // 是否暂停实时刷新
 	PausedUpdates   int  // 暂停期间收到的后台更新次数
+	Query           ConnQuery
 	Unlock          unlockView
 }
 
@@ -143,26 +144,6 @@ func renderConnectionListTab(state PageState) string {
 		)
 	}
 	return content
-}
-
-// filterConnections 过滤连接
-func filterConnections(connections []model.Connection, filter string) []model.Connection {
-	if filter == "" {
-		return connections
-	}
-
-	filter = strings.ToLower(filter)
-	var filtered []model.Connection
-	for _, conn := range connections {
-		// 搜索主机、规则、代理链
-		if strings.Contains(strings.ToLower(conn.Metadata.Host), filter) ||
-			strings.Contains(strings.ToLower(conn.Rule), filter) ||
-			containsAnyLower(conn.Chains, filter) ||
-			strings.Contains(strings.ToLower(conn.Metadata.DestinationIP), filter) {
-			filtered = append(filtered, conn)
-		}
-	}
-	return filtered
 }
 
 // containsAnyLower 检查字符串切片中是否有包含子串的元素

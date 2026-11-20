@@ -1,17 +1,20 @@
 package model
 
+import "time"
+
 // Connection 连接信息
 type Connection struct {
-	ID            string   `json:"id"`
-	Metadata      Metadata `json:"metadata"`
-	Upload        int64    `json:"upload"`
-	Download      int64    `json:"download"`
-	Start         string   `json:"start"`
-	Chains        []string `json:"chains"`
-	Rule          string   `json:"rule"`
-	RulePayload   string   `json:"rulePayload"`
-	DownloadSpeed int64    `json:"downloadSpeed"`
-	UploadSpeed   int64    `json:"uploadSpeed"`
+	ID            string    `json:"id"`
+	Metadata      Metadata  `json:"metadata"`
+	Upload        int64     `json:"upload"`
+	Download      int64     `json:"download"`
+	Start         string    `json:"start"`
+	Chains        []string  `json:"chains"`
+	Rule          string    `json:"rule"`
+	RulePayload   string    `json:"rulePayload"`
+	DownloadSpeed int64     `json:"downloadSpeed"`
+	UploadSpeed   int64     `json:"uploadSpeed"`
+	ClosedAt      time.Time `json:"-"`
 }
 
 // Metadata 连接元数据

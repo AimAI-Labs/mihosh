@@ -1,16 +1,40 @@
 package connections
 
 import (
+	"time"
+
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 )
 
-// ApplyWSConnections 处理 WebSocket 连接推送（含历史记录检测）
+// ApplyWSConnections 处理 WebSocket 连接推送（含历史记录检测与相邻样本速率估算）
 func (s State) ApplyWSConnections(data api.ConnectionsData) State {
+	return s.applyWSConnectionsAt(data, time.Now())
+}
+
+func (s State) applyWSConnectionsAt(data api.ConnectionsData, now time.Time) State {
 	s.connGen++
+	dt := 0.0
+	if !s.lastWSAt.IsZero() {
+		dt = now.Sub(s.lastWSAt).Seconds()
+	}
+
 	currentIDs := make(map[string]model.Connection, len(data.Connections))
-	for _, conn := range data.Connections {
-		currentIDs[conn.ID] = model.Connection{
+	conns := make([]model.Connection, len(data.Connections))
+	for i, conn := range data.Connections {
+		dlSpeed := conn.DownloadSpeed
+		ulSpeed := conn.UploadSpeed
+		if dlSpeed == 0 && ulSpeed == 0 && dt > 0 {
+			if prev, exists := s.PrevConnIDs[conn.ID]; exists {
+				if d := conn.Download - prev.Download; d > 0 {
+					dlSpeed = int64(float64(d) / dt)
+				}
+				if u := conn.Upload - prev.Upload; u > 0 {
+					ulSpeed = int64(float64(u) / dt)
+				}
+			}
+		}
+		item := model.Connection{
 			ID:            conn.ID,
 			Upload:        conn.Upload,
 			Download:      conn.Download,
@@ -18,8 +42,8 @@ func (s State) ApplyWSConnections(data api.ConnectionsData) State {
 			Chains:        conn.Chains,
 			Rule:          conn.Rule,
 			RulePayload:   conn.RulePayload,
-			DownloadSpeed: conn.DownloadSpeed,
-			UploadSpeed:   conn.UploadSpeed,
+			DownloadSpeed: dlSpeed,
+			UploadSpeed:   ulSpeed,
 			Metadata: model.Metadata{
 				Network:         conn.Metadata.Network,
 				Type:            conn.Metadata.Type,
@@ -32,6 +56,8 @@ func (s State) ApplyWSConnections(data api.ConnectionsData) State {
 				ProcessPath:     conn.Metadata.ProcessPath,
 			},
 		}
+		currentIDs[conn.ID] = item
+		conns[i] = item
 	}
 
 	// 检测已关闭的连接写入 Ring Buffer
@@ -48,7 +74,12 @@ func (s State) ApplyWSConnections(data api.ConnectionsData) State {
 		}
 	}
 	s.PrevConnIDs = currentIDs
-	s.Connections = ConvertToConnectionsResponse(data)
+	s.lastWSAt = now
+	s.Connections = &model.ConnectionsResponse{
+		DownloadTotal: data.DownloadTotal,
+		UploadTotal:   data.UploadTotal,
+		Connections:   conns,
+	}
 	if s.paused {
 		s.pausedUpdates++
 	}

@@ -2,7 +2,6 @@ package connections
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
@@ -28,6 +27,7 @@ const (
 type State struct {
 	Connections *model.ConnectionsResponse
 	PrevConnIDs map[string]model.Connection
+	lastWSAt    time.Time
 	// Ring Buffer for closed connections (bounded at common.ClosedConnCap)
 	closedConns       []model.Connection
 	closedTimes       []time.Time        // 新增：记录关闭时间
@@ -40,6 +40,12 @@ type State struct {
 	frozenConnections *model.ConnectionsResponse
 	frozenClosedConns []model.Connection
 	pausedUpdates     int
+
+	// 排序与筛选条件（与视图/鼠标/键盘/批量关闭共用）
+	sortField   ConnSortField
+	sortDesc    bool
+	filterField ConnFilterField
+	protoFilter string
 
 	filterList              common.FilterList
 	connDetailMode          bool
@@ -82,6 +88,7 @@ func NewState(proxyAddr string, siteTests []model.SiteTest, client *api.Client, 
 	return State{
 		closedConns: make([]model.Connection, common.ClosedConnCap),
 		closedTimes: make([]time.Time, common.ClosedConnCap),
+		sortDesc:    true,
 		proxyAddr:   proxyAddr,
 		siteTests:   siteTests,
 		filterList:  fl,
@@ -182,9 +189,11 @@ func (s *State) rebuildCachedClosedConns() {
 // appendClosed 向 Ring Buffer 追加一条历史连接
 func (s *State) appendClosed(conn model.Connection) {
 	s.ensureClosedRing()
+	now := time.Now()
+	conn.ClosedAt = now
 	s.connGen++
 	s.closedConns[s.closedHead] = conn
-	s.closedTimes[s.closedHead] = time.Now()
+	s.closedTimes[s.closedHead] = now
 	s.closedHead = (s.closedHead + 1) % common.ClosedConnCap
 	if s.closedCount < common.ClosedConnCap {
 		s.closedCount++
@@ -246,6 +255,7 @@ func (s State) ToPageState(chartData *model.ChartData, width, height int) PageSt
 		InlineScroll:       s.inlineDetailPanel.ScrollTop,
 		Paused:             s.paused,
 		PausedUpdates:      s.pausedUpdates,
+		Query:              s.currentQuery(),
 		Unlock:             s.unlock.unlockView,
 	}
 }
@@ -367,6 +377,47 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case msg.String() == "p", msg.String() == " ":
 			s = s.TogglePause()
 
+		case msg.String() == "s":
+			s.sortField = (s.sortField + 1) % connSortFieldCount
+			if s.sortField != ConnSortDefault && !s.sortDesc {
+				// Keep user's explicit direction when cycling non-default fields
+			}
+			s.filterList.SetCursor(0)
+			s.filterList.ScrollTop = 0
+			s.inlineDetailPanel.Reset()
+
+		case msg.String() == "S":
+			if s.sortField == ConnSortDefault {
+				s.sortField = ConnSortStart
+				s.sortDesc = false
+			} else {
+				s.sortDesc = !s.sortDesc
+			}
+			s.filterList.SetCursor(0)
+			s.filterList.ScrollTop = 0
+			s.inlineDetailPanel.Reset()
+
+		case msg.String() == "t":
+			switch s.protoFilter {
+			case "":
+				s.protoFilter = "tcp"
+			case "tcp":
+				s.protoFilter = "udp"
+			default:
+				s.protoFilter = ""
+			}
+			s.filterList.SetCursor(0)
+			s.filterList.ScrollTop = 0
+			s.filterList.SetItemCount(s.filteredConnCount())
+			s.inlineDetailPanel.Reset()
+
+		case msg.String() == "f":
+			s.filterField = (s.filterField + 1) % connFilterFieldCount
+			s.filterList.SetCursor(0)
+			s.filterList.ScrollTop = 0
+			s.filterList.SetItemCount(s.filteredConnCount())
+			s.inlineDetailPanel.Reset()
+
 		case msg.String() == "i":
 			if s.connViewMode == ConnViewActive || s.connViewMode == ConnViewHistory {
 				s.inlineDetailMode = !s.inlineDetailMode
@@ -420,8 +471,12 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case key.Matches(msg, common.Keys.Escape):
 			if s.inlineDetailFocused {
 				s.inlineDetailFocused = false
-			} else if s.filterList.FilterValue() != "" {
+			} else if s.filterList.FilterValue() != "" || s.protoFilter != "" || s.filterField != ConnFilterAll {
 				s.filterList.ResetFilter()
+				s.protoFilter = ""
+				s.filterField = ConnFilterAll
+				s.filterList.SetCursor(0)
+				s.filterList.ScrollTop = 0
 			}
 		}
 
@@ -452,44 +507,14 @@ func (s *State) setConnViewMode(mode int) {
 	s.filterList.ScrollTop = 0
 }
 
-// selectedConnection 获取当前选中的连接
+// selectedConnection 获取当前选中的连接（与渲染、鼠标命中共享同一筛选排序结果）
 func (s State) selectedConnection() *model.Connection {
-	if s.connViewMode == ConnViewTraffic {
+	conns := s.filteredConnections()
+	if s.filterList.Cursor < 0 || s.filterList.Cursor >= len(conns) {
 		return nil
 	}
-	var conns []model.Connection
-	if s.connViewMode == ConnViewActive {
-		visible := s.visibleConnections()
-		if visible == nil || len(visible.Connections) == 0 {
-			return nil
-		}
-		conns = visible.Connections
-	} else {
-		closed := s.visibleClosedConnections()
-		if len(closed) == 0 {
-			return nil
-		}
-		conns = closed
-	}
-
-	if s.filterList.FilterValue() == "" {
-		if s.filterList.Cursor >= 0 && s.filterList.Cursor < len(conns) {
-			return &conns[s.filterList.Cursor]
-		}
-		return nil
-	}
-
-	filter := strings.ToLower(s.filterList.FilterValue())
-	idx := 0
-	for i := range conns {
-		if connMatchesFilter(conns[i], filter) {
-			if idx == s.filterList.Cursor {
-				return &conns[i]
-			}
-			idx++
-		}
-	}
-	return nil
+	selected := conns[s.filterList.Cursor]
+	return &selected
 }
 
 // findConnectionByName 根据名称（进程/域名/IP）查找第一个匹配的连接
