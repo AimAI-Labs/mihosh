@@ -357,6 +357,11 @@ type CoreStatusMsg struct {
 	Status coreinfra.Status
 	Err    error
 }
+type CoreServiceLogMsg struct {
+	Unit   string
+	Output string
+	Err    error
+}
 type CoreGeoDataMsg struct {
 	Files []service.GeoDataFile
 	Err   error

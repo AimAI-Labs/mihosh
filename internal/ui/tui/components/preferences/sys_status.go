@@ -2,6 +2,7 @@ package preferences
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"regexp"
 	"runtime"
@@ -63,9 +64,6 @@ func (s *SysStatusState) UpdateContent(sysLogs []model.LogEntry) {
 
 func FetchSysStatusCmd() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-
 		args := []string{"status", "mihomo", "--no-pager", "-n", "0"}
 		if cfg, err := config.Load(); err == nil {
 			if cfg.Core.Mode != "managed" && cfg.Core.ExternalController != "" {
@@ -80,14 +78,41 @@ func FetchSysStatusCmd() tea.Cmd {
 				}
 			}
 		}
-		cmd := exec.CommandContext(ctx, "systemctl", args...)
-		// systemctl often returns exit code 3 if service is not running but status is requested
-		out, err := cmd.CombinedOutput()
+		out, err := systemctlStatus(args...)
 		return messages.SysStatusResultMsg{
-			Output: string(out),
+			Output: out,
 			Err:    err,
 		}
 	}
+}
+
+func FetchManagedSysStatusCmd() tea.Cmd {
+	if runtime.GOOS != "linux" {
+		return nil
+	}
+	return func() tea.Msg {
+		cfg, err := config.Load()
+		if err != nil || cfg.Core.Mode != "managed" {
+			return nil
+		}
+		root, err := config.GetConfigDir()
+		if err != nil {
+			return nil
+		}
+		unit := host.ServiceName(root) + ".service"
+		out, err := systemctlStatus("--user", "status", unit, "--no-pager", "--full", "--lines=10")
+		return messages.CoreServiceLogMsg{Unit: unit, Output: out, Err: err}
+	}
+}
+
+func systemctlStatus(args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "systemctl", args...)
+	cmd.Env = append(os.Environ(), "SYSTEMD_COLORS=0")
+	// Inactive units often return exit status 3 together with useful output.
+	out, err := cmd.CombinedOutput()
+	return string(out), err
 }
 
 func TickSysStatusCmd() tea.Cmd {

@@ -324,11 +324,15 @@ func TestDailyOverviewShowsCoreDetailsWithoutGuidance(t *testing.T) {
 	}
 }
 
-func TestCoreMihomoPageShowsManagedUnitBelowOverrides(t *testing.T) {
+func TestCoreMihomoPageShowsManagedStatusLogsBelowOverrides(t *testing.T) {
 	i18n.Init()
 	s := State{tab: 4, Status: service.CoreStatus{
 		Mode: "managed", ServiceUnit: "mihosh-example.service", ServiceInstalled: true, ServiceRunning: true, AutoStart: true,
 	}}
+	s, _ = s.Update(messages.CoreServiceLogMsg{
+		Unit:   s.Status.ServiceUnit,
+		Output: "● mihosh-example.service\n   Active: active (running)\n\nNov 20 10:12:00 node mihosh[42]: Started managed core",
+	})
 	page := ansi.Strip(s.layout(100, 40).content)
 	firstLine, _, _ := strings.Cut(page, "\n")
 	if strings.Contains(firstLine, i18n.T("core.heading")) {
@@ -337,15 +341,18 @@ func TestCoreMihomoPageShowsManagedUnitBelowOverrides(t *testing.T) {
 	settings := strings.Index(page, i18n.T("settings.panel_title"))
 	card := strings.Index(page, i18n.T("settings.sys_status.panel_title"))
 	unit := strings.Index(page, "mihosh-example.service")
-	if settings < 0 || card <= settings || unit <= card || !strings.Contains(page, i18n.T("core.service.status_running")) ||
-		!strings.Contains(page, i18n.T("core.autostart")+" "+i18n.T("core.enabled")) {
-		t.Fatal("managed service card does not show its unit, status and startup state")
+	if settings < 0 || card <= settings || unit <= card ||
+		!strings.Contains(page, "Active: active (running)") || !strings.Contains(page, "Started managed core") {
+		t.Fatal("managed service card does not show the command output and recent service logs")
+	}
+	if strings.Contains(page, i18n.T("core.autostart")+" "+i18n.T("core.enabled")) {
+		t.Fatal("managed service card repeats the old startup summary")
 	}
 	wheel := messages.PageMouseScrollMsg{X: 30, Y: 6, Width: 80, Height: 13}
 	for range 20 {
 		s, _ = s.Update(wheel)
 	}
-	if !strings.Contains(ansi.Strip(s.Render(80, 13)), "mihosh-example.service") {
+	if !strings.Contains(ansi.Strip(s.Render(80, 13)), "Started managed core") {
 		t.Fatal("managed service card is unreachable in a short terminal")
 	}
 }

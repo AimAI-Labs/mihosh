@@ -877,6 +877,7 @@
   "core.network.off": "关闭并恢复",
   "core.network.status": "查看网络设置",
   "core.service.install": "安装后台服务",
+  "core.service.status_loading": "正在读取 systemctl 日志…",
   "core.service.status_not_installed": "未安装",
   "core.service.status_stopped": "已停止",
   "core.service.status_running": "运行中",

@@ -1,10 +1,17 @@
 package preferences
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/host"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSysStatusState_Update(t *testing.T) {
@@ -54,4 +61,32 @@ func TestParseSystemctlStatusCompact(t *testing.T) {
 	if outputMissing == "" {
 		t.Errorf("Should not be empty on partial match")
 	}
+}
+
+func TestFetchManagedSysStatusKeepsLogsFromInactiveUnit(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("systemctl is a Linux command")
+	}
+	root := t.TempDir()
+	t.Setenv("MIHOSH_CONFIG_DIR", root)
+	t.Setenv("PATH", root)
+	cfg := config.DefaultConfig
+	cfg.Core.Mode = "managed"
+	require.NoError(t, config.Save(&cfg))
+	script := `#!/bin/sh
+printf '%s\n' "$@" > "$MIHOSH_CONFIG_DIR/systemctl-args"
+printf '%s\n' 'Active: inactive (dead)' 'Nov 20 10:12:00 node mihosh[42]: Stopped managed core'
+exit 3
+`
+	require.NoError(t, os.WriteFile(filepath.Join(root, "systemctl"), []byte(script), 0700))
+
+	msg, ok := FetchManagedSysStatusCmd()().(messages.CoreServiceLogMsg)
+	require.True(t, ok)
+	require.Error(t, msg.Err)
+	require.Contains(t, msg.Output, "Active: inactive (dead)")
+	require.Contains(t, msg.Output, "Stopped managed core")
+	require.Equal(t, host.ServiceName(root)+".service", msg.Unit)
+	args, err := os.ReadFile(filepath.Join(root, "systemctl-args"))
+	require.NoError(t, err)
+	require.Equal(t, []string{"--user", "status", msg.Unit, "--no-pager", "--full", "--lines=10"}, strings.Fields(string(args)))
 }

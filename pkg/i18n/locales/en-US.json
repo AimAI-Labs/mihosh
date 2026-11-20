@@ -877,6 +877,7 @@
   "core.network.off": "Disable and restore",
   "core.network.status": "Show network settings",
   "core.service.install": "Install background service",
+  "core.service.status_loading": "Reading systemctl logs…",
   "core.service.status_not_installed": "Not installed",
   "core.service.status_stopped": "Stopped",
   "core.service.status_running": "Running",

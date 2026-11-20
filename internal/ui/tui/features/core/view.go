@@ -380,24 +380,17 @@ func (s State) downloadsLayout(width, height int, parts []string, result pageLay
 }
 
 func (s State) systemdPanel(width int) string {
-	status := "core.service.status_not_installed"
-	if s.Status.ServiceInstalled {
-		status = "core.service.status_stopped"
-		if s.Status.ServiceRunning {
-			status = "core.service.status_running"
+	body := s.Status.ServiceUnit + "\n" + i18n.T("core.service.status_loading")
+	if s.serviceLog.Unit == s.Status.ServiceUnit {
+		body = strings.TrimRight(ansi.Strip(s.serviceLog.Output), "\r\n")
+		if body == "" && s.serviceLog.Err != nil {
+			body = s.serviceLog.Err.Error()
+		}
+		if body == "" {
+			body = s.Status.ServiceUnit
 		}
 	}
-	rows := []string{wrap(s.Status.ServiceUnit, width-4)}
-	if s.Status.ServiceError != "" {
-		rows = append(rows, wrap(s.Status.ServiceError, width-4))
-	} else {
-		auto := "core.disabled"
-		if s.Status.AutoStart {
-			auto = "core.enabled"
-		}
-		rows = append(rows, i18n.T(status), i18n.T("core.autostart")+" "+i18n.T(auto))
-	}
-	return panel(i18n.T("settings.sys_status.panel_title"), strings.Join(rows, "\n"), width)
+	return panel(i18n.T("settings.sys_status.panel_title"), wrap(body, width-4), width)
 }
 
 type coreTabItem struct {

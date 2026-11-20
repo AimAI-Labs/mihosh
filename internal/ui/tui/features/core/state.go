@@ -20,6 +20,7 @@ import (
 )
 
 type State struct {
+	serviceLog        messages.CoreServiceLogMsg
 	svc               *service.CoreService
 	Status            service.CoreStatus
 	Release           coreinfra.Release
@@ -81,7 +82,7 @@ func (s State) Refresh() tea.Cmd {
 		return tea.Batch(status, s.refreshGeoData())
 	}
 	if s.tab == 4 {
-		return tea.Batch(status, s.editor.Refresh())
+		return tea.Batch(status, s.editor.Refresh(), preferences.FetchManagedSysStatusCmd())
 	}
 	if s.isAdvancedPage() && runtime.GOOS == "linux" && s.Status.Mode != "managed" {
 		return tea.Batch(status, preferences.FetchSysStatusCmd())
@@ -283,6 +284,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		if msg.Err != nil {
 			s.Err = msg.Err
 		}
+		return s, nil
+	case messages.CoreServiceLogMsg:
+		s.serviceLog = msg
 		return s, nil
 	case messages.CoreGeoDataMsg:
 		s.geoFiles, s.geoErr = msg.Files, msg.Err
