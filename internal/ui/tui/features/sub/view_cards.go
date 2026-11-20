@@ -31,21 +31,19 @@ func renderList(state PageState, grid common.CardGrid) string {
 
 func renderSubCard(p profile.Profile, active, updating, selected bool, width, height int) string {
 	palette := theme.Current()
-	border, background, titleColor := palette.Border, palette.Surface, palette.Bright
-	if active {
-		border, titleColor = palette.Primary, palette.Primary
-	}
-	if selected {
-		border, background = palette.Primary, palette.Selected
-	}
+	border, titleColor := palette.Border, palette.Bright
 	title := strings.Join(strings.Fields(ansi.Strip(p.Name)), " ")
 	if active {
 		title = common.SymbolCheck + title
+		titleColor = palette.Primary
+	}
+	if selected {
+		title = common.SymbolSelectActive + title
+		border, titleColor = palette.Primary, palette.Primary
 	}
 	title = lipgloss.NewStyle().Foreground(theme.Resolve(titleColor)).Bold(true).Render(title)
 	if height < 3 {
-		line := lipgloss.NewStyle().Width(width).Background(theme.Resolve(background)).
-			Render(ansi.Truncate(title, width, "…"))
+		line := lipgloss.NewStyle().Width(width).Render(ansi.Truncate(title, width, "…"))
 		return lipgloss.PlaceVertical(height, lipgloss.Top, line)
 	}
 
@@ -105,5 +103,5 @@ func renderSubCard(p profile.Profile, active, updating, selected bool, width, he
 		}
 	}
 	lines := []string{common.CardHeading(inner, title, action), kind, updated, traffic, expiry, transfer, progress}
-	return common.RenderCard(width, border, background, lines[:height-2])
+	return common.RenderCard(width, border, "", lines[:height-2])
 }

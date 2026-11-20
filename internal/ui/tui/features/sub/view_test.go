@@ -23,7 +23,8 @@ func TestRenderedSubscriptionRowsMatchClicksAfterResize(t *testing.T) {
 	for i := 0; i < 40; i++ {
 		subs = append(subs, profile.Profile{UID: fmt.Sprint(i), Name: fmt.Sprintf("sub-%02d", i)})
 	}
-	for _, width := range []int{99, 100} {
+	for _, viewport := range []struct{ width, columns int }{{99, 1}, {100, 2}, {149, 2}, {150, 3}, {250, 3}} {
+		width := viewport.width
 		for _, height := range []int{12, 24, 48} {
 			for _, selected := range []int{0, 19, 39} {
 				t.Run(fmt.Sprintf("%d/%d/selected=%d", width, height, selected), func(t *testing.T) {
@@ -31,6 +32,7 @@ func TestRenderedSubscriptionRowsMatchClicksAfterResize(t *testing.T) {
 					state.selected, state.scrollTop = selected, 15
 					ps := state.ToPageState(width, height)
 					grid := layoutSubList(ps)
+					require.Len(t, grid.Widths, viewport.columns)
 					found := 0
 					for y, line := range strings.Split(ansi.Strip(RenderSubPage(ps)), "\n") {
 						for i, sub := range subs {
@@ -105,7 +107,7 @@ func TestRenderSubCardUsageFitsViewport(t *testing.T) {
 	}
 }
 
-func TestSubscriptionCardUsesThemeSurfaceAndRefreshesClickedProfile(t *testing.T) {
+func TestSubscriptionCardUsesThemeForegroundAndRefreshesClickedProfile(t *testing.T) {
 	previousTheme, profileMode := theme.CurrentName(), lipgloss.ColorProfile()
 	t.Cleanup(func() {
 		theme.SetTheme(previousTheme)
@@ -113,24 +115,25 @@ func TestSubscriptionCardUsesThemeSurfaceAndRefreshesClickedProfile(t *testing.T
 	})
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	subs := sampleSubs()
-	subs[1], subs[2] = subs[2], subs[1]
 	state := State{}.ApplySubs(subs, "a1")
-	page := state.ToPageState(100, 25)
+	page := state.ToPageState(150, 25)
+	grid := layoutSubList(page)
 	require.True(t, theme.SetTheme("dracula"))
-	dracula := RenderSubPage(page)
+	dracula := renderList(page, grid)
 	require.True(t, theme.SetTheme("solarized-light"))
-	solarized := RenderSubPage(page)
+	solarized := renderList(page, grid)
 	require.NotEqual(t, dracula, solarized)
-	require.Contains(t, solarized, "\x1b[48;2;")
+	require.Contains(t, solarized, "38;2;")
+	require.NotContains(t, solarized, "48;2;")
+	require.NotContains(t, dracula, "48;2;")
 	require.Equal(t, ansi.Strip(dracula), ansi.Strip(solarized))
 
-	grid := layoutSubList(page)
-	x, y, width := grid.CardOrigin(1)
-	require.Positive(t, x, "the second card should be beside the first")
+	x, y, width := grid.CardOrigin(2)
+	require.Positive(t, x, "the third card should be beside the first")
 	state, cmd := state.HandleMouseLeft(x+width-3, y+subFixedLines+1, page.Width, page.Height)
 	require.NotNil(t, cmd)
-	assert.Equal(t, 1, state.selected)
-	assert.Equal(t, page.Subs[1].UID, cmd().(messages.SubFetchErrorMsg).UID)
+	assert.Equal(t, 2, state.selected)
+	assert.Equal(t, page.Subs[2].UID, cmd().(messages.SubFetchErrorMsg).UID)
 }
 
 func TestRenderSubPage_AddFormOverlay(t *testing.T) {

@@ -230,7 +230,7 @@ func buildHints(state PageState) []common.InlineHelpHint {
 		}
 	}
 	selection := "↑↓"
-	if len(subCardWidths(state.Width)) > 1 {
+	if subCardColumns(state.Width) > 1 {
 		selection = "↑↓←→"
 	}
 	return []common.InlineHelpHint{

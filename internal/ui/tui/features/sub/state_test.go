@@ -159,6 +159,18 @@ func TestSubscriptionScrollUsesActualHeight(t *testing.T) {
 	assert.Equal(t, 17, s.scrollTop)
 }
 
+func TestSubscriptionKeyboardMovesAcrossThreeColumns(t *testing.T) {
+	s := State{}.ApplySubs(make([]profile.Profile, 6), "")
+	s, _ = s.Update(messages.PageResizeMsg{Width: 150, Height: 25})
+	for _, step := range []struct {
+		key  tea.KeyType
+		want int
+	}{{tea.KeyRight, 1}, {tea.KeyRight, 2}, {tea.KeyRight, 2}, {tea.KeyDown, 5}, {tea.KeyLeft, 4}, {tea.KeyUp, 1}} {
+		s, _ = s.Update(tea.KeyMsg{Type: step.key})
+		require.Equal(t, step.want, s.selected, step.key.String())
+	}
+}
+
 func TestActivateSelected_NoSelection(t *testing.T) {
 	s := State{}.ApplySubs([]profile.Profile{}, "")
 	_, cmd := s.activateSelected()

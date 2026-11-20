@@ -202,17 +202,18 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			return s.handleFilterMode(msg)
 		}
 
+		columns := subCardColumns(s.pageWidth)
 		switch {
 		case key.Matches(msg, common.Keys.Up):
-			s.moveSelection(-len(subCardWidths(s.pageWidth)))
+			s.moveSelection(-columns)
 		case key.Matches(msg, common.Keys.Down):
-			s.moveSelection(len(subCardWidths(s.pageWidth)))
-		case len(subCardWidths(s.pageWidth)) > 1 && key.Matches(msg, common.Keys.Left):
-			if s.selected%2 == 1 {
+			s.moveSelection(columns)
+		case columns > 1 && key.Matches(msg, common.Keys.Left):
+			if s.selected%columns > 0 {
 				s.moveSelection(-1)
 			}
-		case len(subCardWidths(s.pageWidth)) > 1 && key.Matches(msg, common.Keys.Right):
-			if s.selected%2 == 0 {
+		case columns > 1 && key.Matches(msg, common.Keys.Right):
+			if s.selected%columns < columns-1 {
 				s.moveSelection(1)
 			}
 		case msg.String() == "enter":
@@ -379,7 +380,7 @@ func (s State) HandleMouseScroll(up bool) State {
 	if s.Querying() {
 		return s
 	}
-	step := len(subCardWidths(s.pageWidth))
+	step := subCardColumns(s.pageWidth)
 	if up {
 		step = -step
 	}
