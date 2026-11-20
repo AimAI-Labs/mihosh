@@ -54,18 +54,9 @@ type PageState struct {
 func RenderSubPage(state PageState) string {
 	var sections []string
 
-	// 统计
-	remoteCount := 0
-	for _, idx := range state.FilteredIdx {
-		if idx >= 0 && idx < len(state.Subs) && state.Subs[idx].Source.Kind == profile.SourceRemote {
-			remoteCount++
-		}
-	}
 	stats := i18n.Tf("sub.stats", len(state.FilteredIdx))
 	if state.FilterText != "" {
 		stats += i18n.Tf("sub.stats_filtered", len(state.Subs))
-	} else {
-		stats += "  " + i18n.Tf("sub.stats_remote", remoteCount)
 	}
 
 	searchBox := renderSearchBox(state.FilterText, state.FilterMode, state.FilterEngine)

@@ -734,7 +734,6 @@
   "sub.empty": "No subscriptions yet, press n to add",
   "sub.stats": "%d subscriptions",
   "sub.stats_filtered": " (filtered from %d)",
-  "sub.stats_remote": "%d remote",
   "sub.updating": "updating",
   "sub.layout.cards": "Cards",
   "sub.layout.list": "List",
