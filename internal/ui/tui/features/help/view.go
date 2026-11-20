@@ -341,6 +341,7 @@ func buildRulesSections(ctx HelpContext) []section {
 				title: i18n.T("rules.edit_title"),
 				bindings: []keybinding{
 					{"← / →", i18n.T("help.rules_add.type")},
+					{"Space", i18n.T("help.rules_add.type_input")},
 					{"↑ / ↓", i18n.T("help.rules_add.field")},
 					{"↵", i18n.T("help.rules_add.confirm")},
 					{"Esc", i18n.T("help.rules_add.cancel")},

@@ -384,6 +384,8 @@
   "rules.picker_search": "Search: ",
   "rules.picker_search_hint": "Fuzzy search",
   "rules.picker_stats": "Selected %s  %d/%d",
+  "rules.type_picker_placeholder": "Search or enter a rule type",
+  "rules.type_picker_custom": "Use custom type %s",
   "rules.picker_empty": "No matches",
   "rules.add_err_payload": "Payload cannot be empty",
   "rules.add_err_proxy": "Policy cannot be empty",
@@ -625,6 +627,7 @@
   "help.rules.edit": "Edit Config",
 
   "help.section.rules_add": "Add Rule",
+  "help.rules_add.type_input": "Enter type",
   "help.rules_add.type": "Cycle type",
   "help.rules_add.field": "Cycle field",
   "help.rules_add.confirm": "Save",

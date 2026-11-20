@@ -14,6 +14,8 @@ description: Browse and manage proxy rules
 | `Enter` | Edit the selected rule |
 | `d` | Confirm deletion of the selected rule |
 
+In the add or edit form, focus Type and press Space to search. Matching is case-insensitive. Use the arrow keys or mouse to select a match, or confirm a custom type name.
+
 Click a type to filter the list, or use `←` / `→` and `Space`. Types absent from the current configuration appear in gray. You can select several types and combine them with text search. Press `Esc` to clear the type filter when its row is visible.
 
 Mihosh saves rule additions, changes and deletions in `rule-edits.yaml` and applies them when generating the configuration. The source snapshot and `merge.yaml` stay intact. When a subscription refreshes, its latest rules are combined with the saved edits. An edit or deletion applies when its original rule is present. Remote rule editing requires an active subscription and applies in memory on the remote core.

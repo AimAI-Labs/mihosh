@@ -104,7 +104,7 @@ func (s State) handleAddFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	default:
 		// 透传给当前 textinput（Backspace / 可打印字符等）
 		// 策略和 no-resolve 行为只读，不接收文本输入
-		if form.isProxyField() || form.isNoResolveField() || !isTextInputKey(msg) {
+		if form.isTypeField() || form.isProxyField() || form.isNoResolveField() || !isTextInputKey(msg) {
 			break
 		}
 		cur := form.fields[form.fieldCursor]
@@ -209,7 +209,7 @@ func (s State) handleEditFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		}
 
 	default:
-		if form.isProxyField() || form.isNoResolveField() || !isTextInputKey(msg) {
+		if form.isTypeField() || form.isProxyField() || form.isNoResolveField() || !isTextInputKey(msg) {
 			break
 		}
 		cur := form.fields[form.fieldCursor]

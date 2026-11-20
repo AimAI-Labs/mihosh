@@ -384,6 +384,8 @@
   "rules.picker_search": "搜索: ",
   "rules.picker_search_hint": "模糊搜索",
   "rules.picker_stats": "已选 %s  %d/%d",
+  "rules.type_picker_placeholder": "搜索或输入类型",
+  "rules.type_picker_custom": "使用自定义类型 %s",
   "rules.picker_empty": "无匹配项",
   "rules.add_err_payload": "匹配值不能为空",
   "rules.add_err_proxy": "策略不能为空",
@@ -629,6 +631,7 @@
   "help.rules_delete.cancel": "取消",
 
   "help.section.rules_add": "添加规则",
+  "help.rules_add.type_input": "输入类型",
   "help.rules_add.type": "切换类型",
   "help.rules_add.field": "切换字段",
   "help.rules_add.confirm": "保存",

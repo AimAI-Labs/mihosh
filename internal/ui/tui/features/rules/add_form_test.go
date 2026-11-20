@@ -5,6 +5,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/stretchr/testify/require"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -788,4 +792,45 @@ func TestAddForm_TypeFieldIgnoresTextInput(t *testing.T) {
 	if s.addForm.currentType() != typeBefore {
 		t.Fatalf("type changed via text input on read-only field: %s -> %s", typeBefore, s.addForm.currentType())
 	}
+}
+
+func TestAddRuleTypePickerMatchesAllTypesIgnoringCase(t *testing.T) {
+	s := State{}.ApplyRules([]model.Rule{{Type: "Vendor-Rule"}})
+	s, _ = s.Update(keyMsg('n'))
+	s, _ = s.Update(pressShiftTab())
+	s, _ = s.Update(keyMsg(' '))
+	require.True(t, s.addForm.typePickerOpen)
+
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("pRoCeSs-NaMe")})
+	picker, choices := typePickerDialog(s.ToPageState(80, 22))
+	require.Len(t, choices, 3)
+	require.Equal(t, "PROCESS-NAME-REGEX", choices[2].name)
+	require.Contains(t, ansi.Strip(RenderRulesPage(s.ToPageState(80, 22))), "PROCESS-NAME-REGEX")
+
+	left, top, _, _ := picker.Bounds()
+	s, cmd := s.HandleMouseLeft(left+3, top+4, 80, 22)
+	require.Nil(t, cmd)
+	require.True(t, s.ShowAddForm())
+	require.False(t, s.addForm.typePickerOpen)
+	require.Equal(t, "PROCESS-NAME-REGEX", s.addForm.currentType())
+
+	s, _ = s.Update(keyMsg(' '))
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("VeNdOr")})
+	_, choices = typePickerDialog(s.ToPageState(80, 22))
+	require.Equal(t, "VENDOR-RULE", choices[0].name)
+	s, _ = s.Update(pressKey("esc"))
+	require.Equal(t, "PROCESS-NAME-REGEX", s.addForm.currentType())
+
+	s, _ = s.Update(keyMsg(' '))
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("FuTuRe-TyPe")})
+	s, cmd = s.Update(pressKey("enter"))
+	require.Nil(t, cmd)
+	require.False(t, s.addForm.typePickerOpen)
+	require.Equal(t, "FUTURE-TYPE", s.addForm.currentType())
+	require.Equal(t, "FUTURE-TYPE,a.example,DIRECT", buildRuleLine(s.addForm.currentType(), "a.example", "DIRECT", false))
+
+	s, _ = s.Update(keyMsg(' '))
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("mAtCh")})
+	s, _ = s.Update(pressKey("enter"))
+	require.Equal(t, "MATCH", s.addForm.currentType())
 }

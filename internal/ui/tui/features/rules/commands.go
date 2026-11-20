@@ -67,12 +67,15 @@ var camelToConfigType = map[string]string{
 }
 
 // normalizeRuleType 将 API 返回的规则类型标准化为配置文件格式（大写横杠分隔）。
-// 如果类型不在映射表中，回退为 strings.ToUpper。
+// 其余已知类型使用控制器与类型筛选共用的名称映射。
 func normalizeRuleType(apiType string) string {
+	if strings.EqualFold(apiType, "IP-CIDR6") {
+		return "IP-CIDR6"
+	}
 	if mapped, ok := camelToConfigType[apiType]; ok {
 		return mapped
 	}
-	return strings.ToUpper(apiType)
+	return filterTypeName(apiType)
 }
 
 func (s State) applyRuleEdit(noticeKey string, edit profile.RuleEdit) tea.Cmd {

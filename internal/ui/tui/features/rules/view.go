@@ -124,6 +124,11 @@ func RenderRulesPage(state PageState) string {
 		result = renderProxyPickerOverlay(result, state, state.Width, state.Height)
 	}
 
+	if state.AddForm.typePickerOpen {
+		picker, _ := typePickerDialog(state)
+		result = picker.Overlay(result, true)
+	}
+
 	return renderRulesInlineHelp(result, state)
 }
 
@@ -136,6 +141,13 @@ func RenderRulesPage(state PageState) string {
 
 // buildRulesInlineHelpHints 根据规则页上下文构建内联帮助条目
 func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
+	if state.AddForm.typePickerOpen {
+		return []common.InlineHelpHint{
+			{Key: "↑/↓", Desc: i18n.T("help.rules_add.picker_pick")},
+			{Key: "↵", Desc: i18n.T("help.rules_add.confirm")},
+			{Key: "Esc", Desc: i18n.T("help.rules_add.picker_back")},
+		}
+	}
 	// 策略选择二级弹窗：Tab 切分类 + ↑↓ 移动 + Enter 选中 + Esc 返回
 	if state.ShowAddForm && state.AddForm.isProxyPickerOpen() {
 		return []common.InlineHelpHint{
@@ -168,6 +180,7 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 	if state.ShowAddForm {
 		return []common.InlineHelpHint{
 			{Key: "←/→", Desc: i18n.T("help.rules_add.type")},
+			{Key: "Space", Desc: i18n.T("help.rules_add.type_input")},
 			{Key: "↑/↓", Desc: i18n.T("help.rules_add.field")},
 			{Key: "↵", Desc: i18n.T("help.rules_add.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.rules_add.cancel")},
@@ -178,6 +191,7 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 	if state.ShowEditForm {
 		return []common.InlineHelpHint{
 			{Key: "←/→", Desc: i18n.T("help.rules_add.type")},
+			{Key: "Space", Desc: i18n.T("help.rules_add.type_input")},
 			{Key: "↑/↓", Desc: i18n.T("help.rules_add.field")},
 			{Key: "↵", Desc: i18n.T("help.rules_add.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.rules_add.cancel")},

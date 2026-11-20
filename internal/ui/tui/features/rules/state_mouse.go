@@ -12,6 +12,12 @@ func (s State) HandleMouseScroll(up bool) State {
 	if s.showDeleteConfirm || s.ruleFilterMode {
 		return s
 	}
+	if s.addForm.typePickerOpen {
+		if up {
+			return s.moveTypePicker(-1)
+		}
+		return s.moveTypePicker(1)
+	}
 	// 如果显示添加表单或编辑表单，滚动切换字段焦点
 	if s.showAddForm || s.showEditForm {
 		// 如果策略选择器打开，则滚动策略选择器的列表
@@ -55,6 +61,16 @@ func (s State) HandleMouseScroll(up bool) State {
 // HandleMouseLeft 处理规则页面鼠标左键事件。
 // 弹窗打开时：点击弹窗外则确认并关闭；点击列表项则移动光标，双击切换选中。
 func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, tea.Cmd) {
+	if s.addForm.typePickerOpen {
+		picker, choices := typePickerDialog(s.ToPageState(pageWidth, pageHeight))
+		left, top, right, bottom := picker.Bounds()
+		if pageX < left || pageX >= right || pageY < top || pageY >= bottom {
+			s.addForm.typePickerOpen = false
+		} else if index := pageY - top - 2; index >= 0 && index < len(choices) {
+			s.addForm.chooseType(choices[index].name)
+		}
+		return s, nil
+	}
 	// 添加规则弹窗打开时
 	if s.showAddForm {
 		// 策略选择二级弹窗优先处理

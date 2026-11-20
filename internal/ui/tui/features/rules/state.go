@@ -116,6 +116,15 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	case messages.PageMouseClickMsg:
 		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
 	case tea.KeyMsg:
+		if s.showAddForm || s.showEditForm {
+			if s.addForm.typePickerOpen {
+				return s.updateTypePicker(msg)
+			}
+			if !s.addForm.isProxyPickerOpen() && s.addForm.isTypeField() && msg.String() == " " {
+				cmd := s.addForm.openTypePicker()
+				return s, cmd
+			}
+		}
 		// 编辑规则弹窗优先拦截（吞掉所有按键）
 		if s.showEditForm {
 			return s.handleEditFormMode(msg)

@@ -10,6 +10,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -80,16 +81,18 @@ type editOrigin struct {
 // Enter 可打开「选择策略」二级弹窗（picker 子状态）从中选定并回填。
 // addFieldProxy 槽位仍保留一个 textinput.Model 仅作占位以维持字段索引与
 // 布局高度一致，其值不参与提交。
-// addFieldType / addFieldNoResolve 同样为只读选择器/复选框，槽位保留占位
-// textinput.Model 以避免 Focus() 空指针。
+// addFieldType 保存类型搜索输入，addFieldNoResolve 的输入槽用于保持字段索引。
 //
 // isEdit 为 true 时表示当前处于编辑模式（修改已有规则而非新增）。
 // editOrigin 保存原始规则的完整信息，提交时走 ReplaceRule（删旧+插新）。
 // 位置字段在编辑模式下预填充为原始索引+1，但用户可修改插入位置。
 type addForm struct {
-	fields      []textinput.Model // length == addFieldCount；type/proxy/noResolve 槽为占位
-	fieldCursor int               // 当前聚焦字段
-	typeCursor  int               // 类型选择器光标（ruleTypePresets 索引）
+	fields           []textinput.Model // length == addFieldCount；proxy/noResolve 槽为占位
+	fieldCursor      int               // 当前聚焦字段
+	typeCursor       int               // 类型选择器光标（ruleTypePresets 索引）
+	typeName         string
+	typePickerOpen   bool
+	typePickerCursor int
 
 	// 策略：分类候选 + 当前回填选中名
 	proxyGroups   []string // [DIRECT, REJECT, ...proxy-groups]
@@ -134,9 +137,11 @@ func newEditForm(configPath string, rule model.Rule, origIndex int) addForm {
 func newFormWithRule(configPath string, rule model.Rule, origIndex int, isEdit bool) addForm {
 	fields := make([]textinput.Model, addFieldCount)
 
-	// type 槽位保留 textinput.Model 仅作占位，实际值由 typeCursor + cycleType 切换。
+	// 类型输入用于搜索和输入自定义类型。
 	typeSlot := textinput.New()
 	typeSlot.Prompt = ""
+	typeSlot.Placeholder = i18n.T("rules.type_picker_placeholder")
+	typeSlot.CharLimit = 64
 	fields[addFieldType] = typeSlot
 
 	payload := textinput.New()
@@ -178,7 +183,7 @@ func newFormWithRule(configPath string, rule model.Rule, origIndex int, isEdit b
 	if isEdit && rule.Type != "" {
 		// 预填充原始规则值
 		normalizedType := normalizeRuleType(rule.Type)
-		form.typeCursor = indexOfPreset(normalizedType)
+		form.chooseType(normalizedType)
 		form.proxySelected = rule.Proxy
 		form.noResolve = rule.NoResolve
 		form.fields[addFieldPayload].SetValue(rule.Payload)
@@ -214,6 +219,9 @@ func indexOfPreset(name string) int {
 
 // currentType 返回当前选中的规则类型字符串。
 func (f addForm) currentType() string {
+	if f.typeName != "" {
+		return f.typeName
+	}
 	if f.typeCursor < 0 || f.typeCursor >= len(ruleTypePresets) {
 		return ruleTypePresets[0]
 	}
@@ -256,6 +264,7 @@ func (f *addForm) cycleField(dir int) {
 // cycleType 循环切换类型（dir=1 下一项，dir=-1 上一项）。
 // 切换后若新类型非 IP 类，自动重置 noResolve 状态。
 func (f *addForm) cycleType(dir int) {
+	f.typeName = ""
 	n := len(ruleTypePresets)
 	f.typeCursor = ((f.typeCursor+dir)%n + n) % n
 	if !f.isIPType() {
