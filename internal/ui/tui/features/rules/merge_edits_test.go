@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -84,10 +85,17 @@ func TestRuleFormsPersistAndApplyMergeEdits(t *testing.T) {
 	merge, err := profile.ReadMerge()
 	require.NoError(t, err)
 	require.Contains(t, string(merge), "# keep")
-	require.Contains(t, string(merge), "rules:")
-	require.NotContains(t, string(merge), "rule-edits:")
-	require.NotContains(t, string(merge), "edited.example")
-	require.Contains(t, string(merge), "MATCH,DIRECT")
+	require.Equal(t, "# keep\nmode: rule\n", string(merge))
+	ruleEditsPath, err := profile.RuleEditsPath()
+	require.NoError(t, err)
+	edits, err := os.ReadFile(ruleEditsPath)
+	require.NoError(t, err)
+	require.NotContains(t, string(edits), "MATCH,DIRECT")
+	generated, err := profile.GenerateSourcePreview([]byte("rules: ['DOMAIN,updated.example,DIRECT', 'MATCH,DIRECT']\n"))
+	require.NoError(t, err)
+	require.Contains(t, string(generated.Data), "DOMAIN,updated.example,DIRECT")
+	require.Contains(t, string(generated.Data), "DOMAIN-SUFFIX,new.example,DIRECT")
+	require.NotContains(t, string(generated.Data), "edited.example")
 
 	reject.Store(true)
 	s, _ = s.Update(runeKey('n'))
@@ -97,6 +105,9 @@ func TestRuleFormsPersistAndApplyMergeEdits(t *testing.T) {
 	after, err := profile.ReadMerge()
 	require.NoError(t, err)
 	require.Equal(t, merge, after)
+	storedEdits, err := os.ReadFile(ruleEditsPath)
+	require.NoError(t, err)
+	require.Equal(t, edits, storedEdits)
 	untouched, err := profile.ReadRawFile(source.UID)
 	require.NoError(t, err)
 	require.Equal(t, raw, untouched)

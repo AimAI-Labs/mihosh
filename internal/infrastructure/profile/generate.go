@@ -167,8 +167,9 @@ func GenerateOverrideConfigWithMerge(uid, path string, mergeBytes []byte, cleare
 			return nil, fmt.Errorf("解析覆写配置失败: %w", err)
 		}
 	}
-	// A runtime file already incorporates applied rule edits. Replay them only from a raw subscription.
-	final, err := applyMerge(&raw, merge, uid != "")
+	// The runtime already contains edits, unless native rules replace its list.
+	replay := uid != "" || findMappingValue(topLevelMapping(merge), "rules") != nil
+	final, err := applyProfileMerge(&raw, merge, replay)
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +286,7 @@ func generateFromRaw(raw *yaml.Node, managedPath string, cleared []string, manag
 	if mergeErr != nil {
 		merge = nil // 降级：忽略覆写
 	}
-	final, err := ApplyMerge(raw, merge)
+	final, err := applyProfileMerge(raw, merge, true)
 	if err != nil {
 		return GeneratedConfig{}, err
 	}

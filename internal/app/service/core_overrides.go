@@ -165,7 +165,7 @@ func (s *CoreService) applyMergeMutation(ctx context.Context, mutation mergeMuta
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}, err
 	}
-	newMerge, savedOverrides := next.data, next.overrides
+	savedOverrides := next.overrides
 	generated, err := next.generate(uid, path, true)
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}, err
@@ -221,11 +221,12 @@ func (s *CoreService) applyMergeMutation(ctx context.Context, mutation mergeMuta
 	identityChanged := controllerIdentityChanged(oldConfig, data)
 	portChanged := mixedPortChanged(oldConfig, data)
 	recovery := profileRecovery{
-		Config:       oldConfig,
-		ActiveSub:    cfg.ActiveSub,
-		HasMerge:     true,
-		MergeExisted: mergeExisted,
-		Merge:        oldMerge,
+		Config:    oldConfig,
+		ActiveSub: cfg.ActiveSub,
+		RuleEdits: next.ruleEdits,
+	}
+	if next.ruleEdits == nil {
+		recovery.HasMerge, recovery.MergeExisted, recovery.Merge = true, mergeExisted, oldMerge
 	}
 	journal := filepath.Join(root, "runtime", "profile-recovery.json")
 	running := s.process != nil
@@ -234,13 +235,11 @@ func (s *CoreService) applyMergeMutation(ctx context.Context, mutation mergeMuta
 	// SystemProxy also needs a controlled restart when mixed-port changes.
 	if running && (identityChanged || (portChanged && cfg.Core.SystemProxy)) {
 		change := &managedConfigReplacement{
-			root:      root,
-			path:      path,
-			recovery:  recovery,
-			candidate: data,
-			writeMerge: func() error {
-				return profile.WriteMerge(newMerge)
-			},
+			root:           root,
+			path:           path,
+			recovery:       recovery,
+			candidate:      data,
+			writeOverrides: next.write,
 		}
 		if err = s.replaceCore(ctx, change); err != nil {
 			return MihomoOverridesSaveResult{Restored: change.restored, Err: err}, err
@@ -273,7 +272,7 @@ func (s *CoreService) applyMergeMutation(ctx context.Context, mutation mergeMuta
 		joined := errors.Join(cause, restoreErr, reloadErr)
 		return MihomoOverridesSaveResult{Restored: restoreErr == nil, Err: joined}, joined
 	}
-	if err = profile.WriteMerge(newMerge); err != nil {
+	if err = next.write(); err != nil {
 		return rollback(err)
 	}
 	if err = privateWrite(path, data); err != nil {
@@ -330,7 +329,7 @@ func (s *ConfigService) applyLocalExternalOverrides(cfg *config.Config, client *
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
 	}
-	newMerge, savedOverrides := next.data, next.overrides
+	savedOverrides := next.overrides
 	oldConfig, configExisted, err := readOptionalFile(path)
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
@@ -355,7 +354,7 @@ func (s *ConfigService) applyLocalExternalOverrides(cfg *config.Config, client *
 	}
 	restoreAll := func(cause error) MihomoOverridesSaveResult {
 		restoreCfgErr := restoreConfigFile(path, configExisted, oldConfig)
-		restoreMergeErr := restoreMergeFile(mergePath, mergeExisted, oldMerge)
+		restoreMergeErr := next.restore(mergePath, mergeExisted, oldMerge)
 		joined := errors.Join(cause, restoreCfgErr, restoreMergeErr)
 		return MihomoOverridesSaveResult{
 			Restored: restoreCfgErr == nil && restoreMergeErr == nil,
@@ -363,11 +362,11 @@ func (s *ConfigService) applyLocalExternalOverrides(cfg *config.Config, client *
 		}
 	}
 
-	if err = profile.WriteMerge(newMerge); err != nil {
+	if err = next.write(); err != nil {
 		return MihomoOverridesSaveResult{Err: err}
 	}
 	if err = profile.WriteFinal(path, data); err != nil {
-		restoreMergeErr := restoreMergeFile(mergePath, mergeExisted, oldMerge)
+		restoreMergeErr := next.restore(mergePath, mergeExisted, oldMerge)
 		return MihomoOverridesSaveResult{
 			Restored: restoreMergeErr == nil,
 			Err:      errors.Join(fmt.Errorf("write external config failed: %w", err), restoreMergeErr),
@@ -452,7 +451,7 @@ func (s *ConfigService) applyRemoteExternalOverrides(cfg *config.Config, client 
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
 	}
-	newMerge, savedOverrides := next.data, next.overrides
+	savedOverrides := next.overrides
 	identityPending := identityRequestedForRemote(savedOverrides, cfg.Core.ExternalController, cfg.Core.ExternalSecret)
 
 	if uid != "" {
@@ -460,7 +459,7 @@ func (s *ConfigService) applyRemoteExternalOverrides(cfg *config.Config, client 
 		if genErr != nil {
 			return MihomoOverridesSaveResult{Remote: true, Err: genErr}
 		}
-		if err = profile.WriteMerge(newMerge); err != nil {
+		if err = next.write(); err != nil {
 			return MihomoOverridesSaveResult{Remote: true, Err: err}
 		}
 		if client == nil {
@@ -473,7 +472,7 @@ func (s *ConfigService) applyRemoteExternalOverrides(cfg *config.Config, client 
 			}
 		}
 		if reloadErr := client.ReloadConfigPayload(data); reloadErr != nil {
-			restoreErr := restoreMergeFile(mergePath, mergeExisted, oldMerge)
+			restoreErr := next.restore(mergePath, mergeExisted, oldMerge)
 			return MihomoOverridesSaveResult{
 				Remote:   true,
 				Restored: restoreErr == nil,
@@ -501,7 +500,7 @@ func (s *ConfigService) applyRemoteExternalOverrides(cfg *config.Config, client 
 			break
 		}
 	}
-	if err = profile.WriteMerge(newMerge); err != nil {
+	if err = next.write(); err != nil {
 		return MihomoOverridesSaveResult{Remote: true, Err: err}
 	}
 	if client == nil {
@@ -523,7 +522,7 @@ func (s *ConfigService) applyRemoteExternalOverrides(cfg *config.Config, client 
 		}
 	}
 	if patchErr := client.PatchConfig(patch); patchErr != nil {
-		restoreErr := restoreMergeFile(mergePath, mergeExisted, oldMerge)
+		restoreErr := next.restore(mergePath, mergeExisted, oldMerge)
 		return MihomoOverridesSaveResult{
 			Remote:   true,
 			Restored: restoreErr == nil,
@@ -541,14 +540,14 @@ func (s *ConfigService) applyRemoteExternalOverrides(cfg *config.Config, client 
 }
 
 type managedConfigReplacement struct {
-	root       string
-	path       string
-	recovery   profileRecovery
-	candidate  []byte
-	writeMerge func() error
-	afterSave  func() error
-	journaled  bool
-	restored   bool
+	root           string
+	path           string
+	recovery       profileRecovery
+	candidate      []byte
+	writeOverrides func() error
+	afterSave      func() error
+	journaled      bool
+	restored       bool
 }
 
 func (c *managedConfigReplacement) apply(_ bool) error {
@@ -560,8 +559,8 @@ func (c *managedConfigReplacement) apply(_ bool) error {
 		return err
 	}
 	c.journaled = true
-	if c.writeMerge != nil {
-		if err = c.writeMerge(); err != nil {
+	if c.writeOverrides != nil {
+		if err = c.writeOverrides(); err != nil {
 			return err
 		}
 	}

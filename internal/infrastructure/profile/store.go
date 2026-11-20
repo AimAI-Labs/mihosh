@@ -245,6 +245,9 @@ func WriteMerge(data []byte) error {
 			}
 		}
 	}
+	if err := PreserveLegacyRuleEdits(previous); err != nil {
+		return err
+	}
 	return atomicWrite(p, data, 0600)
 }
 

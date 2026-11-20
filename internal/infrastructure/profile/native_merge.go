@@ -83,14 +83,26 @@ func NormalizeLegacyMerge(data []byte, uid string, localPath func() (string, err
 	root := topLevelMapping(doc)
 	affected := make(map[string]bool, 3)
 	for i := 0; i < len(root.Content); i += 2 {
-		if target := legacyMergeTarget(root.Content[i].Value); target != "" {
+		if target := legacyMergeTarget(root.Content[i].Value); target != "" && target != "rules" {
 			affected[target] = true
 		}
 	}
+	hasLegacyRules, _ := legacyRuleOverrides(root)
 	if len(affected) == 0 {
-		return data, nil
+		if !hasLegacyRules {
+			return data, nil
+		}
+		removeLegacyFields(root)
+		return marshalYAML2Spaces(doc)
 	}
 
+	// The rule directives move to rule-edits.yaml, independent of this source.
+	for i := len(root.Content) - 2; i >= 0; i -= 2 {
+		key := root.Content[i].Value
+		if legacyMergeTarget(key) == "rules" {
+			removeOverride(root, key)
+		}
+	}
 	var raw *yaml.Node
 	if uid != "" {
 		raw, err = ReadRaw(uid)
@@ -129,13 +141,8 @@ func NormalizeLegacyMerge(data []byte, uid string, localPath func() (string, err
 	if err != nil {
 		return nil, err
 	}
-	for i := len(root.Content) - 2; i >= 0; i -= 2 {
-		key := root.Content[i].Value
-		if legacyMergeTarget(key) != "" {
-			removeOverride(root, key)
-		}
-	}
-	for _, key := range []string{"rules", "proxies", "proxy-groups"} {
+	removeLegacyFields(root)
+	for _, key := range []string{"proxies", "proxy-groups"} {
 		if affected[key] {
 			if err := replaceMergeList(root, key, findMappingValue(effective, key)); err != nil {
 				return nil, err
@@ -163,20 +170,13 @@ func listAlreadyMerged(current, additional *yaml.Node, kind mergeKind) bool {
 	return true
 }
 
-// ReplaceMergeRules persists the effective rules after a rule editor change.
-func ReplaceMergeRules(merge, effective []byte) ([]byte, error) {
-	doc, err := parseOverrideDocument(merge)
-	if err != nil {
-		return nil, err
+func removeLegacyFields(root *yaml.Node) {
+	for i := len(root.Content) - 2; i >= 0; i -= 2 {
+		key := root.Content[i].Value
+		if legacyMergeTarget(key) != "" {
+			removeOverride(root, key)
+		}
 	}
-	config, err := parseOverrideDocument(effective)
-	if err != nil {
-		return nil, err
-	}
-	if err := replaceMergeList(topLevelMapping(doc), "rules", findMappingValue(topLevelMapping(config), "rules")); err != nil {
-		return nil, err
-	}
-	return marshalYAML2Spaces(doc)
 }
 
 func replaceMergeList(root *yaml.Node, key string, source *yaml.Node) error {

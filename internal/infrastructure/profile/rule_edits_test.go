@@ -41,20 +41,26 @@ rule-edits:
 	require.ErrorIs(t, err, ErrRuleEditTarget)
 }
 
-func TestNormalizeLegacyMergeUsesNativeRules(t *testing.T) {
+func TestNormalizeLegacyRulesKeepsDeltasAcrossSubscriptionRefresh(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
-	raw := []byte("rules: ['DOMAIN,old.test,DIRECT', 'MATCH,DIRECT']\n")
-	require.NoError(t, WriteRaw("active", raw))
 	legacy := []byte("# keep\nmode: rule\nprepend-rules: ['DOMAIN,first.test,DIRECT']\nrule-edits: [{match: 'DOMAIN,old.test,DIRECT', rule: 'MATCH,REJECT'}]\n")
-	normalized, err := NormalizeLegacyMerge(legacy, "active", nil)
+	mergePath, err := MergePath()
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(mergePath, legacy, 0600))
+
+	normalized, err := NormalizeLegacyMerge(legacy, "", nil)
 	require.NoError(t, err)
 	require.NoError(t, WriteMerge(normalized))
 	require.Contains(t, string(normalized), "# keep")
+	require.NotContains(t, string(normalized), "rules:")
 	require.NotContains(t, string(normalized), "rule-edits:")
-	require.NotContains(t, string(normalized), "prepend-rules:")
+
+	preview, err := GenerateSourcePreview([]byte("rules: ['DOMAIN,old.test,DIRECT', 'DOMAIN,new.test,DIRECT', 'MATCH,DIRECT']\n"))
+	require.NoError(t, err)
+	require.NoError(t, preview.MergeErr)
 	var doc struct{ Rules []string }
-	require.NoError(t, yaml.Unmarshal(normalized, &doc))
-	require.Equal(t, []string{"DOMAIN,first.test,DIRECT", "MATCH,REJECT", "MATCH,DIRECT"}, doc.Rules)
+	require.NoError(t, yaml.Unmarshal(preview.Data, &doc))
+	require.Equal(t, []string{"DOMAIN,first.test,DIRECT", "MATCH,REJECT", "DOMAIN,new.test,DIRECT", "MATCH,DIRECT"}, doc.Rules)
 }
 
 func TestWriteMergeRejectsNonNativeFieldsAndInvalidLists(t *testing.T) {

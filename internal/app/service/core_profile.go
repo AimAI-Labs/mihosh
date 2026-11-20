@@ -27,11 +27,17 @@ import (
 )
 
 type profileRecovery struct {
-	Config       []byte `json:"config"`
-	ActiveSub    string `json:"active_sub"`
-	HasMerge     bool   `json:"has_merge,omitempty"`
-	MergeExisted bool   `json:"merge_existed,omitempty"`
-	Merge        []byte `json:"merge,omitempty"`
+	Config       []byte               `json:"config"`
+	ActiveSub    string               `json:"active_sub"`
+	HasMerge     bool                 `json:"has_merge,omitempty"`
+	MergeExisted bool                 `json:"merge_existed,omitempty"`
+	Merge        []byte               `json:"merge,omitempty"`
+	RuleEdits    *profileFileRecovery `json:"rule_edits,omitempty"`
+}
+
+type profileFileRecovery struct {
+	Existed bool   `json:"existed"`
+	Data    []byte `json:"data,omitempty"`
 }
 
 var validationURL = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.-]*://[^\s"'<>]+`)
@@ -213,6 +219,15 @@ func recoverManagedProfile(root string) error {
 	}
 	if recovery.HasMerge {
 		if err = restoreMergeFile(filepath.Join(root, "merge.yaml"), recovery.MergeExisted, recovery.Merge); err != nil {
+			return err
+		}
+	}
+	if rules := recovery.RuleEdits; rules != nil {
+		path, err := profile.RuleEditsPath()
+		if err != nil {
+			return err
+		}
+		if err = restoreMergeFile(path, rules.Existed, rules.Data); err != nil {
 			return err
 		}
 	}

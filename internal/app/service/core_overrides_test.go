@@ -54,14 +54,19 @@ func TestManagedOverridesApplyClearAndPreserveInboundProtection(t *testing.T) {
 	assert.Contains(t, string(mergeData), "log-level: debug")
 	assert.Contains(t, string(mergeData), "mixed-port: 7895")
 	assert.NotContains(t, string(mergeData), "prepend-rules:")
-	assert.Contains(t, string(mergeData), "rules:")
+	assert.NotContains(t, string(mergeData), "rules:")
+	ruleEditsPath, err := profile.RuleEditsPath()
+	require.NoError(t, err)
+	ruleEdits, err := os.ReadFile(ruleEditsPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(ruleEdits), "DOMAIN,keep.example,DIRECT")
 	backups, err := filepath.Glob(mergePath + ".legacy-*.bak")
 	require.NoError(t, err)
 	require.Len(t, backups, 1)
 	saved, err := os.ReadFile(backups[0])
 	require.NoError(t, err)
 	require.Equal(t, legacy, saved)
-	assert.Contains(t, string(mergeData), "DOMAIN,keep.example,DIRECT")
+	assert.NotContains(t, string(mergeData), "DOMAIN,keep.example,DIRECT")
 
 	path, err := config.ManagedMihomoConfigPath()
 	require.NoError(t, err)
@@ -96,7 +101,7 @@ func TestManagedOverridesApplyClearAndPreserveInboundProtection(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, string(mergeData), "allow-lan")
 	assert.NotContains(t, string(mergeData), "log-level")
-	assert.Contains(t, string(mergeData), "DOMAIN,keep.example,DIRECT")
+	assert.NotContains(t, string(mergeData), "DOMAIN,keep.example,DIRECT")
 
 	applied, err = config.ReadMihomoYAML(path)
 	require.NoError(t, err)
@@ -225,9 +230,13 @@ func TestManagedOverridesForwardedToBackgroundOwner(t *testing.T) {
 	require.True(t, outcome.WriteOK)
 	merge, err := profile.ReadMerge()
 	require.NoError(t, err)
-	require.Contains(t, string(merge), "rules:")
-	require.NotContains(t, string(merge), "rule-edits:")
-	require.Contains(t, string(merge), "DOMAIN,forwarded.example,DIRECT")
+	require.NotContains(t, string(merge), "rules:")
+	require.NotContains(t, string(merge), "DOMAIN,forwarded.example,DIRECT")
+	rulePath, err := profile.RuleEditsPath()
+	require.NoError(t, err)
+	edits, err := os.ReadFile(rulePath)
+	require.NoError(t, err)
+	require.Contains(t, string(edits), "DOMAIN,forwarded.example,DIRECT")
 }
 
 func TestManagedRuleEditsPersistAndDoNotReplayAgainstRuntime(t *testing.T) {
@@ -257,6 +266,29 @@ func TestManagedRuleEditsPersistAndDoNotReplayAgainstRuntime(t *testing.T) {
 	actualRaw, err := profile.ReadRawFile(uid)
 	require.NoError(t, err)
 	require.Equal(t, raw, actualRaw)
+}
+
+func TestRuleEditsKeepExplicitNativeRulesAcrossOverrideSaves(t *testing.T) {
+	ctx := context.Background()
+	svc, _, _ := prepareManagedProfile(t)
+	cfgSvc := NewConfigService()
+	path, err := config.ManagedMihomoConfigPath()
+	require.NoError(t, err)
+	merge := []byte("rules: ['MATCH,DIRECT']\n")
+	require.NoError(t, profile.WriteMerge(merge))
+	require.NoError(t, cfgSvc.ApplyRuleEdit(ctx, svc, nil, profile.RuleEdit{Rule: "DOMAIN,only-the-edit.example,DIRECT", Index: 1}).Err)
+	after, err := profile.ReadMerge()
+	require.NoError(t, err)
+	require.Equal(t, merge, after)
+
+	require.NoError(t, cfgSvc.ApplyMihomoOverrides(ctx, svc, nil, map[string]string{"log-level": "warning"}).Err)
+	got, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, 1, strings.Count(string(got), "DOMAIN,only-the-edit.example,DIRECT"))
+	require.Contains(t, string(got), "MATCH,DIRECT")
+	after, err = profile.ReadMerge()
+	require.NoError(t, err)
+	require.NotContains(t, string(after), "only-the-edit.example")
 }
 
 func TestRuleEditPreservesLegacyRuntimeRules(t *testing.T) {
