@@ -23,8 +23,8 @@ func subCardWidths(width int) []int {
 		column := available / 3
 		return []int{column, column, available - 2*column}
 	case 2:
-		left := available * 43 / 100
-		return []int{left, available - left}
+		column := available / 2
+		return []int{column, column}
 	default:
 		return []int{available}
 	}

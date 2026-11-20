@@ -33,6 +33,9 @@ func TestRenderedSubscriptionRowsMatchClicksAfterResize(t *testing.T) {
 					ps := state.ToPageState(width, height)
 					grid := layoutSubList(ps)
 					require.Len(t, grid.Widths, viewport.columns)
+					if viewport.columns == 2 {
+						require.Equal(t, grid.Widths[0], grid.Widths[1])
+					}
 					found := 0
 					for y, line := range strings.Split(ansi.Strip(RenderSubPage(ps)), "\n") {
 						for i, sub := range subs {

@@ -24,6 +24,7 @@ func renderList(state PageState, grid common.CardGrid) string {
 		return renderSubCard(p, p.UID == state.ActiveUID, p.UID == state.UpdatingUID,
 			i == grid.Window.Selected, width, height)
 	})
+	list = lipgloss.PlaceHorizontal(state.Width-subScrollWidth, lipgloss.Left, list)
 	bar := common.BuildVerticalScrollbar((grid.Rows.End-grid.Rows.Start)*grid.CardHeight,
 		grid.TotalRows*grid.CardHeight, grid.Rows.Start*grid.CardHeight, false)
 	return lipgloss.JoinHorizontal(lipgloss.Top, list, bar)
