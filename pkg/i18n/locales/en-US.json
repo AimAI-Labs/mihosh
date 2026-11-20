@@ -741,6 +741,8 @@
   "sub.card.traffic": "Traffic %s / %s",
   "sub.card.used": "Traffic used %s",
   "sub.card.expires": "Expires %s",
+  "sub.card.expired": "Expired %s",
+  "sub.card.remaining": "%s left",
   "sub.err.source_changed": "Subscription source changed during the update. Update it again.",
   "sub.never_updated": "never updated",
   "sub.time_just_now": "just now",

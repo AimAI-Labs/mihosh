@@ -146,7 +146,7 @@ func TestClampScroll(t *testing.T) {
 
 func TestSubscriptionScrollUsesActualHeight(t *testing.T) {
 	s := State{}.ApplySubs(make([]profile.Profile, 40), "")
-	s, _ = s.Update(messages.PageResizeMsg{Width: 100, Height: 126})
+	s, _ = s.Update(messages.PageResizeMsg{Width: 99, Height: 166})
 	for i := 0; i < 16; i++ {
 		s, _ = s.Update(tea.KeyMsg{Type: tea.KeyDown})
 	}

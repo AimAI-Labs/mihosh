@@ -203,8 +203,8 @@ func TestProfileServicePersistsUsageOnlyOnSuccessfulFetch(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch mode.Load() {
 		case 0:
-			w.Header().Add("Subscription-Userinfo", "upload=512; download=1024")
-			w.Header().Add("Subscription-Userinfo", "total=8192; expire=2000000000")
+			w.Header().Add("X-Amz-Meta-Subscription-Userinfo", "upload=512; download=1024")
+			w.Header().Add("X-Amz-Meta-Subscription-Userinfo", "total=8192; expire=2000000000")
 		case 1:
 			w.Header().Set("Subscription-Userinfo", "upload=6000; total=8192")
 			_, _ = w.Write([]byte("invalid configuration"))
@@ -219,7 +219,11 @@ func TestProfileServicePersistsUsageOnlyOnSuccessfulFetch(t *testing.T) {
 	require.NoError(t, s.FetchProfile(p.UID))
 	loaded, err := s.findProfile(p.UID)
 	require.NoError(t, err)
-	require.Equal(t, &profile.SubscriptionUsage{UsedBytes: 1536, TotalBytes: 8192, ExpiresAt: 2000000000}, loaded.Usage)
+	upload, download := int64(512), int64(1024)
+	require.Equal(t, &profile.SubscriptionUsage{
+		UsedBytes: 1536, TotalBytes: 8192, ExpiresAt: 2000000000,
+		UploadBytes: &upload, DownloadBytes: &download,
+	}, loaded.Usage)
 
 	mode.Store(1)
 	require.Error(t, s.FetchProfile(p.UID))

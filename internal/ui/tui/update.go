@@ -119,6 +119,9 @@ func (m *Model) onPageChange() tea.Cmd {
 		}
 	case layout.PageLogs:
 		return logsTick()
+	case layout.PageSub:
+		width, height := m.getPageSize()
+		m.subState, _ = m.subState.Update(messages.PageResizeMsg{Width: width, Height: height})
 	}
 	return cmd
 }

@@ -13,9 +13,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -121,7 +123,22 @@ func fetchRemoteContext(ctx context.Context, url string) ([]byte, *SubscriptionU
 	if err != nil {
 		return nil, nil, fmt.Errorf(i18n.T("profile.fetcher.err_read_resp"), err)
 	}
-	return body, parseSubscriptionUsage(strings.Join(resp.Header.Values("Subscription-Userinfo"), ";")), nil
+	return body, subscriptionUsage(resp.Header), nil
+}
+
+func subscriptionUsage(headers http.Header) *SubscriptionUsage {
+	if usage := parseSubscriptionUsage(strings.Join(headers.Values("Subscription-Userinfo"), ";")); usage != nil {
+		return usage
+	}
+	// Object storage providers can prefix custom response metadata.
+	for _, key := range slices.Sorted(maps.Keys(headers)) {
+		if strings.HasSuffix(strings.ToLower(key), "-subscription-userinfo") {
+			if usage := parseSubscriptionUsage(strings.Join(headers[key], ";")); usage != nil {
+				return usage
+			}
+		}
+	}
+	return nil
 }
 
 func parseSubscriptionUsage(header string) *SubscriptionUsage {
@@ -136,8 +153,10 @@ func parseSubscriptionUsage(header string) *SubscriptionUsage {
 		switch strings.ToLower(strings.TrimSpace(key)) {
 		case "upload":
 			upload = number
+			usage.UploadBytes = &number
 		case "download":
 			download = number
+			usage.DownloadBytes = &number
 		case "total":
 			usage.TotalBytes = number
 		case "expire":

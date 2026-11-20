@@ -78,9 +78,11 @@ type Profile struct {
 }
 
 type SubscriptionUsage struct {
-	UsedBytes  int64 `mapstructure:"used_bytes" yaml:"used_bytes"`
-	TotalBytes int64 `mapstructure:"total_bytes" yaml:"total_bytes"`
-	ExpiresAt  int64 `mapstructure:"expires_at" yaml:"expires_at"`
+	UsedBytes     int64  `mapstructure:"used_bytes" yaml:"used_bytes"`
+	TotalBytes    int64  `mapstructure:"total_bytes" yaml:"total_bytes"`
+	ExpiresAt     int64  `mapstructure:"expires_at" yaml:"expires_at"`
+	UploadBytes   *int64 `mapstructure:"upload_bytes" yaml:"upload_bytes,omitempty"`
+	DownloadBytes *int64 `mapstructure:"download_bytes" yaml:"download_bytes,omitempty"`
 }
 
 // 错误哨兵。集中定义，便于调用方用 errors.Is 判别。

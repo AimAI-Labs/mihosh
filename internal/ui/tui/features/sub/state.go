@@ -166,7 +166,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		s.clampScroll()
 		return s, nil
 	case messages.PageMouseScrollMsg:
-		s.pageHeight = msg.Height
+		s.pageWidth, s.pageHeight = msg.Width, msg.Height
 		if s.file.mode != fileClosed {
 			delta := 1
 			if msg.Up {
@@ -204,14 +204,16 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 
 		switch {
 		case key.Matches(msg, common.Keys.Up):
-			if s.selected > 0 {
-				s.selected--
-				s.clampScroll()
-			}
+			s.moveSelection(-len(subCardWidths(s.pageWidth)))
 		case key.Matches(msg, common.Keys.Down):
-			if s.selected < len(s.filteredIdx)-1 {
-				s.selected++
-				s.clampScroll()
+			s.moveSelection(len(subCardWidths(s.pageWidth)))
+		case len(subCardWidths(s.pageWidth)) > 1 && key.Matches(msg, common.Keys.Left):
+			if s.selected%2 == 1 {
+				s.moveSelection(-1)
+			}
+		case len(subCardWidths(s.pageWidth)) > 1 && key.Matches(msg, common.Keys.Right):
+			if s.selected%2 == 0 {
+				s.moveSelection(1)
 			}
 		case msg.String() == "enter":
 			return s.activateSelected()
@@ -305,7 +307,7 @@ func (s State) activateSelected() (State, tea.Cmd) {
 
 // updateSelected 拉取当前选中订阅。
 func (s State) updateSelected() (State, tea.Cmd) {
-	if len(s.filteredIdx) == 0 || s.selected < 0 || s.selected >= len(s.filteredIdx) {
+	if s.updatingUID != "" || len(s.filteredIdx) == 0 || s.selected < 0 || s.selected >= len(s.filteredIdx) {
 		return s, nil
 	}
 	uid := s.subs[s.filteredIdx[s.selected]].UID
@@ -377,24 +379,17 @@ func (s State) HandleMouseScroll(up bool) State {
 	if s.Querying() {
 		return s
 	}
-	s.clampScroll()
+	step := len(subCardWidths(s.pageWidth))
 	if up {
-		if s.selected > 0 {
-			s.selected--
-			s.clampScroll()
-		}
-	} else {
-		if s.selected < len(s.filteredIdx)-1 {
-			s.selected++
-			s.clampScroll()
-		}
+		step = -step
 	}
+	s.moveSelection(step)
 	return s
 }
 
 // HandleMouseLeft 处理列表单击/双击。
 func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, tea.Cmd) {
-	s.pageHeight = pageHeight
+	s.pageWidth, s.pageHeight = pageWidth, pageHeight
 	s.clampScroll()
 	// 弹窗激活时点击弹窗外 → 取消关闭（删除确认/添加表单）
 	if s.showDeleteConf || s.showAddForm || s.showEditForm {
@@ -420,9 +415,18 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 	if s.filterMode {
 		return s, nil
 	}
-	idx := resolveListItemAt(s.ToPageState(pageWidth, pageHeight), pageY, pageHeight)
+	grid := layoutSubList(s.ToPageState(pageWidth, pageHeight))
+	y := pageY - subFixedLines
+	idx := grid.ItemAt(pageX, y)
 	if idx < 0 {
 		return s, nil
+	}
+
+	originX, originY, cardWidth := grid.CardOrigin(idx)
+	if grid.CardHeight >= 3 && y == originY+1 && pageX == originX+cardWidth-3 &&
+		s.subs[s.filteredIdx[idx]].Source.Kind == profile.SourceRemote {
+		s.selected = idx
+		return s.updateSelected()
 	}
 
 	now := time.Now()
@@ -438,9 +442,14 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 	return s, nil
 }
 
+func (s *State) moveSelection(delta int) {
+	s.selected += delta
+	s.clampScroll()
+}
+
 // clampScroll 确保选中项可见。
 func (s *State) clampScroll() {
-	window := layoutSubList(s.ToPageState(0, s.pageHeight)).window
+	window := layoutSubList(s.ToPageState(s.pageWidth, s.pageHeight)).Window
 	s.selected, s.scrollTop = window.Selected, window.Start
 }
 

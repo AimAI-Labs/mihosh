@@ -6,9 +6,14 @@ import (
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
+	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,17 +30,20 @@ func TestRenderedSubscriptionRowsMatchClicksAfterResize(t *testing.T) {
 					state := State{}.ApplySubs(subs, "")
 					state.selected, state.scrollTop = selected, 15
 					ps := state.ToPageState(width, height)
+					grid := layoutSubList(ps)
 					found := 0
-					for y, line := range strings.Split(RenderSubPage(ps), "\n") {
+					for y, line := range strings.Split(ansi.Strip(RenderSubPage(ps)), "\n") {
 						for i, sub := range subs {
-							if !strings.Contains(line, sub.Name) {
+							at := strings.Index(line, sub.Name)
+							if at < 0 {
 								continue
 							}
 							found++
-							if got := resolveListItemAt(ps, y, height); got != i {
+							x := lipgloss.Width(line[:at])
+							if got := grid.ItemAt(x, y-subFixedLines); got != i {
 								t.Fatalf("rendered sub[%d] at y=%d resolves to %d", i, y, got)
 							}
-							next, _ := state.HandleMouseLeft(1, y, width, height)
+							next, _ := state.HandleMouseLeft(x, y, width, height)
 							if next.selected != i {
 								t.Fatalf("click at rendered sub[%d] selected %d", i, next.selected)
 							}
@@ -71,13 +79,14 @@ func TestRenderSubPage_WithSubs(t *testing.T) {
 }
 
 func TestRenderSubCardUsageFitsViewport(t *testing.T) {
+	up, down := int64(1024), int64(3072)
 	p := profile.Profile{
 		Name:   "订阅名称带有emoji 🌍 与很长的文本",
 		Source: profile.SubSource{Kind: profile.SourceRemote, URL: "https://example.com/sub?token=hidden"},
-		Usage:  &profile.SubscriptionUsage{UsedBytes: 4096, TotalBytes: 8192, ExpiresAt: 2000000000},
+		Usage:  &profile.SubscriptionUsage{UsedBytes: 4096, TotalBytes: 8192, ExpiresAt: 2000000000, UploadBytes: &up, DownloadBytes: &down},
 	}
 	for _, width := range []int{40, 99, 100} {
-		card := renderSubCard(p, true, false, true, width, subCardHeight)
+		card := ansi.Strip(renderSubCard(p, true, false, true, width, subCardHeight))
 		rows := strings.Split(card, "\n")
 		require.Len(t, rows, subCardHeight)
 		for _, row := range rows {
@@ -88,8 +97,40 @@ func TestRenderSubCardUsageFitsViewport(t *testing.T) {
 		assert.NotContains(t, card, "token")
 		assert.Contains(t, card, utils.FormatBytes(4096)+" / "+utils.FormatBytes(8192))
 		assert.Contains(t, card, "2033")
-		assert.Contains(t, card, strings.Repeat("━", 12)+strings.Repeat("─", 12))
+		assert.Contains(t, card, i18n.Tf("sub.card.remaining", utils.FormatBytes(4096)))
+		assert.Contains(t, card, "↑"+utils.FormatBytes(up))
+		assert.Contains(t, card, "↓"+utils.FormatBytes(down))
+		half := (width - 4) / 2
+		assert.Contains(t, card, strings.Repeat("━", half)+strings.Repeat("─", width-4-half))
 	}
+}
+
+func TestSubscriptionCardUsesThemeSurfaceAndRefreshesClickedProfile(t *testing.T) {
+	previousTheme, profileMode := theme.CurrentName(), lipgloss.ColorProfile()
+	t.Cleanup(func() {
+		theme.SetTheme(previousTheme)
+		lipgloss.SetColorProfile(profileMode)
+	})
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	subs := sampleSubs()
+	subs[1], subs[2] = subs[2], subs[1]
+	state := State{}.ApplySubs(subs, "a1")
+	page := state.ToPageState(100, 25)
+	require.True(t, theme.SetTheme("dracula"))
+	dracula := RenderSubPage(page)
+	require.True(t, theme.SetTheme("solarized-light"))
+	solarized := RenderSubPage(page)
+	require.NotEqual(t, dracula, solarized)
+	require.Contains(t, solarized, "\x1b[48;2;")
+	require.Equal(t, ansi.Strip(dracula), ansi.Strip(solarized))
+
+	grid := layoutSubList(page)
+	x, y, width := grid.CardOrigin(1)
+	require.Positive(t, x, "the second card should be beside the first")
+	state, cmd := state.HandleMouseLeft(x+width-3, y+subFixedLines+1, page.Width, page.Height)
+	require.NotNil(t, cmd)
+	assert.Equal(t, 1, state.selected)
+	assert.Equal(t, page.Subs[1].UID, cmd().(messages.SubFetchErrorMsg).UID)
 }
 
 func TestRenderSubPage_AddFormOverlay(t *testing.T) {
@@ -121,17 +162,20 @@ func TestRenderSubPage_DeleteConfirmOverlay(t *testing.T) {
 	assert.NotEmpty(t, out)
 }
 
-func TestResolveListItemAt(t *testing.T) {
+func TestSubscriptionGridHitBoundaries(t *testing.T) {
 	state := PageState{
 		FilteredIdx: []int{0, 1, 2},
 		ScrollTop:   0,
 		Height:      30,
+		Width:       100,
 	}
-	// 列表起始行 = subHeaderHeight + 1 = 4
-	assert.Equal(t, -1, resolveListItemAt(state, 0, 30), "header 区域不应命中")
-	assert.Equal(t, -1, resolveListItemAt(state, 3, 30), "header 分隔行不应命中")
-	assert.Equal(t, 0, resolveListItemAt(state, 4, 30), "第一项应命中")
-	assert.Equal(t, 1, resolveListItemAt(state, 4+subCardHeight, 30), "第二项应命中")
+	grid := layoutSubList(state)
+	assert.Equal(t, -1, grid.ItemAt(1, -1))
+	assert.Equal(t, -1, grid.ItemAt(grid.Widths[0], 0))
+	assert.Equal(t, 0, grid.ItemAt(1, 0))
+	assert.Equal(t, 1, grid.ItemAt(grid.Widths[0]+common.CardGap, 0))
+	assert.Equal(t, 2, grid.ItemAt(1, subCardHeight))
+	assert.Equal(t, -1, grid.ItemAt(grid.Widths[0]+common.CardGap, subCardHeight))
 }
 
 func TestRelativeTime(t *testing.T) {

@@ -178,12 +178,6 @@ func relativeTime(ts int64) string {
 	}
 }
 
-// resolveListItemAt 根据 pageY 定位命中的列表项索引（filteredIdx 内的索引）。
-func resolveListItemAt(state PageState, pageY, pageHeight int) int {
-	state.Height = pageHeight
-	return layoutSubList(state).itemAt(pageY)
-}
-
 // ============================================================
 // 内联帮助（右下角浮层）
 // ============================================================
@@ -235,8 +229,12 @@ func buildHints(state PageState) []common.InlineHelpHint {
 			{Key: "Ctrl+R/F", Desc: i18n.T("help.rules_search.regex_fuzzy")},
 		}
 	}
+	selection := "↑↓"
+	if len(subCardWidths(state.Width)) > 1 {
+		selection = "↑↓←→"
+	}
 	return []common.InlineHelpHint{
-		{Key: "↑↓", Desc: i18n.T("help.sub.select")},
+		{Key: selection, Desc: i18n.T("help.sub.select")},
 		{Key: "↵", Desc: i18n.T("help.sub.activate")},
 		{Key: "u", Desc: i18n.T("help.sub.update"), Tone: common.InlineHelpToneSuccess},
 		{Key: "m", Desc: i18n.T("help.sub.edit_merge")},
