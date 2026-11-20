@@ -6,6 +6,9 @@ package sub
 // 所有 tea.Cmd 在此封装，返回 messages.Sub* 消息。
 
 import (
+	"context"
+	"time"
+
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
@@ -88,6 +91,39 @@ func UpdateSubCmd(svc *service.ProfileService, uid string) tea.Cmd {
 			return messages.SubFetchErrorMsg{UID: uid, Err: err}
 		}
 		return messages.SubFetchDoneMsg{UID: uid}
+	}
+}
+
+// UpdateAllRemoteSubsCmd 一键批量更新全部远程订阅。
+func UpdateAllRemoteSubsCmd(svc *service.ProfileService) tea.Cmd {
+	return func() tea.Msg {
+		if svc == nil {
+			return messages.SubBatchFetchDoneMsg{Err: errNoService}
+		}
+		res, err := svc.UpdateAllRemoteProfiles(context.Background())
+		return messages.SubBatchFetchDoneMsg{
+			Total:   res.Total,
+			Updated: res.Updated,
+			Failed:  res.Failed,
+			Err:     err,
+		}
+	}
+}
+
+// AutoUpdateDueSubsCmd 检查并更新所有达到定时自动更新周期的远程订阅。
+func AutoUpdateDueSubsCmd(svc *service.ProfileService) tea.Cmd {
+	return func() tea.Msg {
+		if svc == nil {
+			return messages.SubBatchFetchDoneMsg{Auto: true}
+		}
+		res, err := svc.UpdateDueRemoteProfiles(context.Background(), time.Now())
+		return messages.SubBatchFetchDoneMsg{
+			Total:   res.Total,
+			Updated: res.Updated,
+			Failed:  res.Failed,
+			Auto:    true,
+			Err:     err,
+		}
 	}
 }
 

@@ -247,6 +247,18 @@ type SubFetchErrorMsg struct {
 
 func (m SubFetchErrorMsg) Error() string { return m.Err.Error() }
 
+// SubBatchFetchDoneMsg 批量或定时自动更新远程订阅完成。
+type SubBatchFetchDoneMsg struct {
+	Total   int
+	Updated int
+	Failed  int
+	Auto    bool
+	Err     error
+}
+
+// SubAutoUpdateTickMsg 触发一次远程订阅定时过期检查。
+type SubAutoUpdateTickMsg time.Time
+
 // SubActivatedMsg 激活订阅流程结束。
 // Err != nil 表示生成/备份/写入/重载中某步失败（配置可能已写入，见 ProfileService.Activate）。
 // MergeErr != nil 表示 merge.yaml 语法错误（已降级忽略覆写，非致命）。

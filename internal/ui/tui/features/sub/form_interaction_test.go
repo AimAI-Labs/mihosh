@@ -196,6 +196,14 @@ func TestEditFormFetchOptionsPersistAndPreserveUsageForSameURL(t *testing.T) {
 	}
 	s, _ = s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeyRight})
 
+	// Tab to Interval (6) -> select 30m -> 1h
+	s, _ = s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeyTab})
+	if !s.editForm.isIntervalField() {
+		t.Fatalf("expected focus on Interval field, got %d", s.editForm.fieldCursor)
+	}
+	s, _ = s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeyRight})
+	s, _ = s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeyRight})
+
 	// Submit via Enter
 	s, cmd := s.handleEditFormUpdate(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd == nil || s.showEditForm {
@@ -210,10 +218,17 @@ func TestEditFormFetchOptionsPersistAndPreserveUsageForSameURL(t *testing.T) {
 		t.Fatalf("failed to reload subs: %v", err)
 	}
 	got := subs[0]
-	if !got.Source.UseProxy || got.Source.UserAgent != "MyCustomUA/2.0" || !got.Source.InsecureSkipVerify {
+	if !got.Source.UseProxy || got.Source.UserAgent != "MyCustomUA/2.0" || !got.Source.InsecureSkipVerify || got.Source.UpdateInterval != 60 {
 		t.Fatalf("fetch options were not persisted: %+v", got.Source)
 	}
 	if got.Usage == nil || got.Usage.UsedBytes != 1024 || got.Usage.TotalBytes != 4096 || got.Usage.ExpiresAt != 1900000000 {
 		t.Fatalf("existing subscription usage was lost when editing fetch options: %+v", got.Usage)
+	}
+
+	// Press 'U' to trigger batch update all remote subscriptions
+	s = s.ApplySubs(subs, "")
+	s, batchCmd := s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("U")})
+	if !s.BatchUpdating() || batchCmd == nil {
+		t.Fatal("expected U shortcut to start batch remote update")
 	}
 }

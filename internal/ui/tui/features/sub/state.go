@@ -52,7 +52,8 @@ type State struct {
 	// 鼠标双击
 	doubleClickDetector common.DoubleClickDetector[struct{}]
 
-	updatingUID string // 当前正在更新的订阅 UID
+	updatingUID   string // 当前正在更新的订阅 UID
+	batchUpdating bool   // 当前是否正在批量更新远程订阅
 
 	svc *service.ProfileService
 }
@@ -224,6 +225,8 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			return s.activateSelected()
 		case msg.String() == "u":
 			return s.updateSelected()
+		case msg.String() == "U":
+			return s.updateAllRemote()
 		case msg.String() == "m":
 			return s.openMergeExternalEditor()
 		case msg.String() == "c":
@@ -312,12 +315,36 @@ func (s State) activateSelected() (State, tea.Cmd) {
 
 // updateSelected 拉取当前选中订阅。
 func (s State) updateSelected() (State, tea.Cmd) {
-	if s.updatingUID != "" || len(s.filteredIdx) == 0 || s.selected < 0 || s.selected >= len(s.filteredIdx) {
+	if s.updatingUID != "" || s.batchUpdating || len(s.filteredIdx) == 0 || s.selected < 0 || s.selected >= len(s.filteredIdx) {
 		return s, nil
 	}
 	uid := s.subs[s.filteredIdx[s.selected]].UID
 	s.updatingUID = uid
 	return s, UpdateSubCmd(s.svc, uid)
+}
+
+// updateAllRemote 一键批量更新全部远程订阅。
+func (s State) updateAllRemote() (State, tea.Cmd) {
+	if s.updatingUID != "" || s.batchUpdating {
+		return s, nil
+	}
+	s.batchUpdating = true
+	return s, UpdateAllRemoteSubsCmd(s.svc)
+}
+
+// BatchUpdating 返回是否正在执行批量/自动订阅更新。
+func (s State) BatchUpdating() bool { return s.batchUpdating }
+
+// SetBatchUpdating 标记正在批量更新远程订阅。
+func (s State) SetBatchUpdating() State {
+	s.batchUpdating = true
+	return s
+}
+
+// ClearBatchUpdating 清除批量更新标记。
+func (s State) ClearBatchUpdating() State {
+	s.batchUpdating = false
+	return s
 }
 
 // SetUpdating 标记指定的订阅为正在更新。
@@ -345,6 +372,7 @@ func (s State) openEditForm() (State, tea.Cmd) {
 	form.useProxy = p.Source.UseProxy
 	form.uaField.SetValue(p.Source.UserAgent)
 	form.skipTLS = p.Source.InsecureSkipVerify
+	form.updateInterval = p.Source.UpdateInterval
 	form.copySource = sourceClipboardAvailable()
 	form.resize(s.pageWidth, s.pageHeight)
 	// 焦点重新落到名称字段（SetValue 后 textinput 仍处于 Focus 状态）

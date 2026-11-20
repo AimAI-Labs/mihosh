@@ -47,6 +47,12 @@ func autoRefreshTick() tea.Cmd {
 	})
 }
 
+func subAutoUpdateTick() tea.Cmd {
+	return tea.Tick(time.Minute, func(t time.Time) tea.Msg {
+		return messages.SubAutoUpdateTickMsg(t)
+	})
+}
+
 // reloadConfigCmd 通知 mihomo 核心重新加载配置文件。
 // 失败回退为 ErrMsg（沿用现有全局错误显示），不回滚已写入的文件。
 func reloadConfigCmd(client interface {
@@ -495,6 +501,42 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 	case messages.SubFetchErrorMsg:
 		m.publishError(msg.Err)
 		m.subState = m.subState.ClearUpdating()
+
+	case messages.SubAutoUpdateTickMsg:
+		if m.subState.BatchUpdating() {
+			return m, subAutoUpdateTick()
+		}
+		m.subState = m.subState.SetBatchUpdating()
+		return m, tea.Batch(subAutoUpdateTick(), sub.AutoUpdateDueSubsCmd(m.profileSvc))
+
+	case messages.SubBatchFetchDoneMsg:
+		m.subState = m.subState.ClearBatchUpdating()
+		if msg.Err != nil {
+			if !msg.Auto {
+				m.publishError(msg.Err)
+			}
+			return m, nil
+		}
+		if msg.Total == 0 {
+			if !msg.Auto {
+				m.publishNotice(i18n.T("sub.batch_empty"), messages.NoticeInfo)
+			}
+			return m, nil
+		}
+		if msg.Auto {
+			if msg.Failed > 0 {
+				m.publishNotice(i18n.Tf("sub.auto_partial", msg.Updated, msg.Total, msg.Failed), messages.NoticeWarning)
+			} else if msg.Updated > 0 {
+				m.publishNotice(i18n.Tf("sub.auto_updated", msg.Updated), messages.NoticeSuccess)
+			}
+		} else {
+			if msg.Failed > 0 {
+				m.publishNotice(i18n.Tf("sub.batch_partial", msg.Updated, msg.Total, msg.Failed), messages.NoticeWarning)
+			} else {
+				m.publishNotice(i18n.Tf("sub.batch_done", msg.Updated), messages.NoticeSuccess)
+			}
+		}
+		return m, sub.FetchSubs(m.profileSvc)
 
 	case messages.SubActivatedMsg:
 		if msg.Err != nil {

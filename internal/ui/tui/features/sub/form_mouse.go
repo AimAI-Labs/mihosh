@@ -82,6 +82,11 @@ func (s State) clickForm(x, y, width, height int) (State, tea.Cmd) {
 		if x >= formLabelWidth()+1 {
 			f.skipTLS = !f.skipTLS
 		}
+	case addFieldInterval:
+		f.fieldCursor = addFieldInterval
+		if x >= formLabelWidth()+1 {
+			f.cycleInterval(1)
+		}
 	default:
 		return s, nil
 	}

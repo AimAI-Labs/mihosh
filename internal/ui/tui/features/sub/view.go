@@ -217,6 +217,7 @@ func buildHints(state PageState) []common.InlineHelpHint {
 		{Key: selection, Desc: i18n.T("help.sub.select")},
 		{Key: "↵", Desc: i18n.T("help.sub.activate")},
 		{Key: "u", Desc: i18n.T("help.sub.update"), Tone: common.InlineHelpToneSuccess},
+		{Key: "U", Desc: i18n.T("help.sub.update_all"), Tone: common.InlineHelpToneSuccess},
 		{Key: "m", Desc: i18n.T("help.sub.edit_merge")},
 		{Key: "c", Desc: i18n.T("help.sub.view_raw")},
 		{Key: "e", Desc: i18n.T("help.sub.edit_profile")},
@@ -243,6 +244,7 @@ func formLabelWidth() int {
 		"sub.add_field_proxy",
 		"sub.add_field_ua",
 		"sub.add_field_skip_tls",
+		"sub.add_field_interval",
 	} {
 		width = max(width, common.DisplayWidth(i18n.T(key)))
 	}
@@ -332,6 +334,12 @@ func formBodyLayout(form addForm, width, height int) (lines []string, spans []fo
 		appendField(addFieldProxy, renderFieldRow(i18n.T("sub.add_field_proxy"), renderBoolToggle(form.useProxy), form.isProxyField(), innerWidth))
 		appendField(addFieldUA, renderFieldRow(i18n.T("sub.add_field_ua"), form.uaField.View(), form.isUAField(), innerWidth))
 		appendField(addFieldSkipTLS, renderFieldRow(i18n.T("sub.add_field_skip_tls"), renderBoolToggle(form.skipTLS), form.isSkipTLSField(), innerWidth))
+		intervalLabel := i18n.T("sub.interval_off")
+		if form.updateInterval > 0 {
+			intervalLabel = profile.FormatUpdateInterval(form.updateInterval)
+		}
+		intervalVal := "◀ " + lipgloss.NewStyle().Foreground(common.TokyoCyan()).Bold(true).Render(intervalLabel) + " ▶"
+		appendField(addFieldInterval, renderFieldRow(i18n.T("sub.add_field_interval"), intervalVal, form.isIntervalField(), innerWidth))
 	}
 
 	// 高度预算：最大高度 height-1，减去边框(2)+分隔线(1)+底部提示(1) = height-5
@@ -400,6 +408,8 @@ func buildFormModal(title string, form addForm, width, height int) string {
 		footer = common.TokyoMutedStyle().Render(i18n.T("sub.add_ua_hint"))
 	case form.isSkipTLSField():
 		footer = common.TokyoMutedStyle().Render(i18n.T("sub.add_skip_tls_hint"))
+	case form.isIntervalField():
+		footer = common.TokyoMutedStyle().Render(i18n.T("sub.add_interval_hint"))
 	default:
 		footer = common.TokyoMutedStyle().Render(i18n.T("sub.add_src_hint"))
 	}

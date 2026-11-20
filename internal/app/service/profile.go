@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
@@ -85,6 +86,9 @@ func (s *ProfileService) AddProfile(name string, src profile.SubSource) (profile
 		src.UseProxy = false
 		src.UserAgent = ""
 		src.InsecureSkipVerify = false
+		src.UpdateInterval = 0
+	} else if src.UpdateInterval < 0 {
+		src.UpdateInterval = 0
 	}
 
 	uid, err := newUID()
@@ -177,6 +181,9 @@ func (s *ProfileService) EditProfile(uid, name string, src profile.SubSource) er
 		src.UseProxy = false
 		src.UserAgent = ""
 		src.InsecureSkipVerify = false
+		src.UpdateInterval = 0
+	} else if src.UpdateInterval < 0 {
+		src.UpdateInterval = 0
 	}
 	return s.mutateProfile(uid, func(p *profile.Profile) {
 		p.Name = name
@@ -245,6 +252,79 @@ func (s *ProfileService) FetchProfileContext(ctx context.Context, uid string) er
 		}
 		return ErrSubNotFound
 	})
+}
+
+// BatchUpdateResult summarizes a concurrent batch update of remote subscriptions.
+type BatchUpdateResult struct {
+	Total   int
+	Updated int
+	Failed  int
+	Errors  []string
+}
+
+// BatchUpdateRemoteProfiles fetches the specified remote profiles reusing FetchProfileContext
+// with bounded concurrency.
+func (s *ProfileService) BatchUpdateRemoteProfiles(ctx context.Context, uids []string) BatchUpdateResult {
+	res := BatchUpdateResult{Total: len(uids)}
+	if len(uids) == 0 {
+		return res
+	}
+	limit := min(model.TestConcurrency, 4)
+	sem := make(chan struct{}, limit)
+	var (
+		wg sync.WaitGroup
+		mu sync.Mutex
+	)
+	for _, uid := range uids {
+		wg.Add(1)
+		go func(id string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			err := s.FetchProfileContext(ctx, id)
+			mu.Lock()
+			if err != nil {
+				res.Failed++
+				res.Errors = append(res.Errors, err.Error())
+			} else {
+				res.Updated++
+			}
+			mu.Unlock()
+		}(uid)
+	}
+	wg.Wait()
+	return res
+}
+
+// UpdateAllRemoteProfiles updates every configured remote subscription.
+func (s *ProfileService) UpdateAllRemoteProfiles(ctx context.Context) (BatchUpdateResult, error) {
+	subs, _, err := s.ListProfiles()
+	if err != nil {
+		return BatchUpdateResult{}, err
+	}
+	var uids []string
+	for _, p := range subs {
+		if p.Source.Kind == profile.SourceRemote {
+			uids = append(uids, p.UID)
+		}
+	}
+	return s.BatchUpdateRemoteProfiles(ctx, uids), nil
+}
+
+// UpdateDueRemoteProfiles checks and updates remote subscriptions whose configured
+// auto-update interval has elapsed as of now.
+func (s *ProfileService) UpdateDueRemoteProfiles(ctx context.Context, now time.Time) (BatchUpdateResult, error) {
+	subs, _, err := s.ListProfiles()
+	if err != nil {
+		return BatchUpdateResult{}, err
+	}
+	var uids []string
+	for _, p := range subs {
+		if p.IsDueForUpdate(now) {
+			uids = append(uids, p.UID)
+		}
+	}
+	return s.BatchUpdateRemoteProfiles(ctx, uids), nil
 }
 
 // LoadMerge 读取全局 merge.yaml 内容（不存在返回 nil）。

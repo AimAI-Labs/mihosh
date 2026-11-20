@@ -69,6 +69,9 @@ func renderSubCard(p profile.Profile, active, updating, selected bool, width, he
 		updated = i18n.Tf("sub.card.updated", relativeTime(p.UpdatedAt))
 		updated += " · " + time.Unix(p.UpdatedAt, 0).Local().Format("2006-01-02 15:04")
 	}
+	if p.Source.Kind == profile.SourceRemote && p.Source.UpdateInterval > 0 {
+		updated += " · ↻ " + profile.FormatUpdateInterval(p.Source.UpdateInterval)
+	}
 	if updating {
 		updated = i18n.T("sub.updating")
 	}

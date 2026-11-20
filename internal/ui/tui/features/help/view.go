@@ -495,6 +495,7 @@ func buildSubSections(ctx HelpContext) []section {
 				{"↑/↓", i18n.T("help.sub.select")},
 				{"Enter / 双击", i18n.T("help.sub.activate")},
 				{"u", i18n.T("help.sub.update")},
+				{"U", i18n.T("help.sub.update_all")},
 				{"m", i18n.T("help.sub.edit_merge")},
 				{"e", i18n.T("help.sub.edit_profile")},
 				{"n", i18n.T("help.sub.add")},

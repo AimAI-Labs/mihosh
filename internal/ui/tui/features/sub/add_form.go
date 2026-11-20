@@ -23,28 +23,32 @@ import (
 )
 
 const (
-	addFieldName    = 0
-	addFieldKind    = 1
-	addFieldSrc     = 2
-	addFieldProxy   = 3
-	addFieldUA      = 4
-	addFieldSkipTLS = 5
-	addFieldLocalN  = 3
-	addFieldRemoteN = 6
+	addFieldName     = 0
+	addFieldKind     = 1
+	addFieldSrc      = 2
+	addFieldProxy    = 3
+	addFieldUA       = 4
+	addFieldSkipTLS  = 5
+	addFieldInterval = 6
+	addFieldLocalN   = 3
+	addFieldRemoteN  = 7
 )
+
+var updateIntervalPresets = []int{0, 30, 60, 360, 720, 1440, 10080}
 
 // addForm 添加/编辑订阅表单。
 type addForm struct {
-	nameField    textinput.Model
-	srcField     textarea.Model
-	uaField      textinput.Model
-	fieldCursor  int
-	kindRemote   bool // true=remote, false=local
-	kindExplicit bool
-	useProxy     bool
-	skipTLS      bool
-	copySource   bool
-	errMsg       string
+	nameField      textinput.Model
+	srcField       textarea.Model
+	uaField        textinput.Model
+	fieldCursor    int
+	kindRemote     bool // true=remote, false=local
+	kindExplicit   bool
+	useProxy       bool
+	skipTLS        bool
+	updateInterval int
+	copySource     bool
+	errMsg         string
 }
 
 // newAddForm 构造初始空表单，焦点在名称字段。
@@ -88,7 +92,23 @@ func (f addForm) isKindField() bool    { return f.fieldCursor == addFieldKind }
 func (f addForm) isSrcField() bool     { return f.fieldCursor == addFieldSrc }
 func (f addForm) isProxyField() bool   { return f.kindRemote && f.fieldCursor == addFieldProxy }
 func (f addForm) isUAField() bool      { return f.kindRemote && f.fieldCursor == addFieldUA }
-func (f addForm) isSkipTLSField() bool { return f.kindRemote && f.fieldCursor == addFieldSkipTLS }
+func (f addForm) isSkipTLSField() bool  { return f.kindRemote && f.fieldCursor == addFieldSkipTLS }
+func (f addForm) isIntervalField() bool { return f.kindRemote && f.fieldCursor == addFieldInterval }
+
+func (f *addForm) cycleInterval(dir int) {
+	idx := -1
+	for i, v := range updateIntervalPresets {
+		if v == f.updateInterval {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		idx = 0
+	}
+	n := len(updateIntervalPresets)
+	f.updateInterval = updateIntervalPresets[(idx+dir%n+n)%n]
+}
 
 // cycleField 按方向循环切换字段。
 func (f *addForm) cycleField(dir int) {
@@ -185,6 +205,7 @@ func (f addForm) buildSource() profile.SubSource {
 		src.UseProxy = f.useProxy
 		src.UserAgent = strings.TrimSpace(f.uaField.Value())
 		src.InsecureSkipVerify = f.skipTLS
+		src.UpdateInterval = f.updateInterval
 	} else {
 		src.Path = val
 	}
@@ -267,6 +288,10 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 			form.skipTLS = !form.skipTLS
 			return form, false, nil, false
 		}
+		if form.isIntervalField() {
+			form.cycleInterval(-1)
+			return form, false, nil, false
+		}
 		var c tea.Cmd
 		if form.isNameField() {
 			form.nameField, c = form.nameField.Update(msg)
@@ -289,6 +314,10 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 		}
 		if form.isSkipTLSField() {
 			form.skipTLS = !form.skipTLS
+			return form, false, nil, false
+		}
+		if form.isIntervalField() {
+			form.cycleInterval(1)
 			return form, false, nil, false
 		}
 		var c tea.Cmd
@@ -315,6 +344,10 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 			form.skipTLS = !form.skipTLS
 			return form, false, nil, false
 		}
+		if form.isIntervalField() {
+			form.cycleInterval(1)
+			return form, false, nil, false
+		}
 		var c tea.Cmd
 		if form.isNameField() {
 			form.nameField, c = form.nameField.Update(msg)
@@ -328,7 +361,7 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 
 	default:
 		// 仅名称、来源值与 User-Agent 字段接收文本输入
-		if form.isKindField() || form.isProxyField() || form.isSkipTLSField() {
+		if form.isKindField() || form.isProxyField() || form.isSkipTLSField() || form.isIntervalField() {
 			return form, false, nil, false
 		}
 		var c tea.Cmd

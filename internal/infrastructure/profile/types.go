@@ -10,7 +10,9 @@
 package profile
 
 import (
+	"fmt"
 	"strings"
+	"time"
 )
 
 // SourceKind 订阅来源类型。
@@ -56,6 +58,7 @@ type SubSource struct {
 	UseProxy           bool       `mapstructure:"use_proxy"            yaml:"use_proxy,omitempty"`            // 通过当前 Mihomo 代理拉取远程订阅
 	UserAgent          string     `mapstructure:"user_agent"           yaml:"user_agent,omitempty"`           // 自定义 User-Agent（空则使用默认值）
 	InsecureSkipVerify bool       `mapstructure:"insecure_skip_verify" yaml:"insecure_skip_verify,omitempty"` // 跳过 TLS 证书校验
+	UpdateInterval     int        `mapstructure:"update_interval"      yaml:"update_interval,omitempty"`      // 自动更新周期（分钟），0=关闭
 }
 
 // SameOrigin reports whether two SubSources point to the exact same remote URL
@@ -86,6 +89,33 @@ type Profile struct {
 	Source    SubSource          `mapstructure:"source"     yaml:"source"`     // 原始配置来源
 	UpdatedAt int64              `mapstructure:"updated_at" yaml:"updated_at"` // 最近成功拉取的 unix 时间戳（秒），0=从未更新
 	Usage     *SubscriptionUsage `mapstructure:"usage" yaml:"usage,omitempty"`
+}
+
+// IsDueForUpdate reports whether a remote subscription has an enabled auto-update
+// schedule whose interval has elapsed (or has never been updated).
+func (p Profile) IsDueForUpdate(now time.Time) bool {
+	if p.Source.Kind != SourceRemote || p.Source.UpdateInterval <= 0 {
+		return false
+	}
+	if p.UpdatedAt <= 0 {
+		return true
+	}
+	interval := time.Duration(p.Source.UpdateInterval) * time.Minute
+	return now.Sub(time.Unix(p.UpdatedAt, 0)) >= interval
+}
+
+// FormatUpdateInterval formats an update interval in minutes as a compact label (e.g. 30m, 12h, 7d).
+func FormatUpdateInterval(minutes int) string {
+	if minutes <= 0 {
+		return ""
+	}
+	if minutes%(24*60) == 0 {
+		return fmt.Sprintf("%dd", minutes/(24*60))
+	}
+	if minutes%60 == 0 {
+		return fmt.Sprintf("%dh", minutes/60)
+	}
+	return fmt.Sprintf("%dm", minutes)
 }
 
 type SubscriptionUsage struct {

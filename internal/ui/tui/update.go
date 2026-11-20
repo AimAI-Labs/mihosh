@@ -55,6 +55,7 @@ func (m Model) Init() tea.Cmd {
 			return messages.CoreConnectionMsg{Epoch: m.connectionEpoch, Version: version.Version}
 		},
 		autoRefreshTick(),
+		subAutoUpdateTick(),
 		listenWSMessages(m.wsCtx, m.wsMsgChan),
 		func() tea.Msg {
 			info, err := service.CheckUpdate(model.Version)
@@ -71,7 +72,7 @@ func (m Model) Init() tea.Cmd {
 		}, sub.RefreshSubs(m.profileSvc), func() tea.Msg {
 			p, err := m.profileSvc.AutoImportLocalSub()
 			return messages.LocalSubImportedMsg{Profile: p, Err: err}
-		}),
+		}, sub.AutoUpdateDueSubsCmd(m.profileSvc)),
 	)
 }
 
