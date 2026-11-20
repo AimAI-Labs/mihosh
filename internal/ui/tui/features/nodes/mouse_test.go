@@ -1,9 +1,12 @@
 package nodes
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // stateCardPoint 返回第 groupIndex 张卡片内第 lineOffset 行的可点击坐标。
@@ -143,5 +146,98 @@ func TestHandleMouseLeft_GroupHeaderDelayIconTriggersGroupBatchTest(t *testing.T
 	}
 	if _, total := next.testBatch.Progress(); total != 2 {
 		t.Fatalf("expected g2 batch total=2, got %d", total)
+	}
+}
+
+func TestNodesLayoutSwitchesWithTopBarAndKeyboard(t *testing.T) {
+	state := State{SelectedGroup: 1, SelectedProxy: 2}
+	const width, height = 120, 30
+	state, cmd := state.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("v")})
+	if cmd != nil || state.ToPageState(width, height).Layout != LayoutColumns {
+		t.Fatal("v did not select the column layout")
+	}
+	for _, target := range []NodesLayout{LayoutCards, LayoutColumns} {
+		clicked := false
+		for x := width - 1; x > 0; x-- {
+			hit := ResolveMouseHit(state.ToPageState(width, height), x, 1)
+			if hit.Target == MouseTargetLayout && hit.Index == int(target) {
+				state, cmd = state.HandleMouseLeft(x, 1, width, height)
+				clicked = true
+				break
+			}
+		}
+		if !clicked || cmd != nil || state.Layout != target || state.SelectedGroup != 1 || state.SelectedProxy != 2 {
+			t.Fatalf("top bar did not select layout %d and retain selections", target)
+		}
+	}
+	state, _ = state.Update(messages.CoreTargetChangedMsg{Reset: true})
+	if state.Layout != LayoutColumns {
+		t.Fatal("changing the core target reset the chosen layout")
+	}
+}
+
+func TestColumnsMouseSelectionAndIndependentScroll(t *testing.T) {
+	for _, width := range []int{78, 130} {
+		t.Run(fmt.Sprint(width), func(t *testing.T) {
+			const height = 22
+			names := make([]string, 30)
+			groupNames := make([]string, 30)
+			groups := make(map[string]model.Group)
+			for i := range names {
+				names[i] = fmt.Sprintf("node-%02d", i)
+				groupNames[i] = fmt.Sprintf("group-%02d", i)
+			}
+			for _, group := range groupNames {
+				groups[group] = model.Group{Type: "Selector", All: names}
+			}
+			state := State{Layout: LayoutColumns}.ApplyGroups(groups, groupNames)
+			page := state.ToPageState(width, height)
+			metrics := calcColumnsLayoutMetrics(width, cardAreaHeight(page))
+
+			state, cmd := state.HandleMouseLeft(3, metrics.DataStartY+1, width, height)
+			if cmd != nil || state.SelectedGroup != 1 || len(state.CurrentProxies) != len(names) {
+				t.Fatal("group row click did not update the node list")
+			}
+			for range metrics.GroupMaxLines {
+				state = state.HandleMouseScroll(false, 3, metrics.AreaStartY+1, width, height)
+			}
+			if state.GroupScrollTop == 0 || state.SelectedProxy != 0 {
+				t.Fatal("scrolling over the group panel did not move its window independently")
+			}
+			first := ResolveMouseHit(state.ToPageState(width, height), 3, metrics.DataStartY)
+			if first.Target != MouseTargetGroup || first.Index != state.GroupScrollTop {
+				t.Fatalf("scrolled group row maps to %+v, want %d", first, state.GroupScrollTop)
+			}
+
+			proxyX, proxyY := metrics.ProxyPanelX+3, metrics.DataStartY
+			if !metrics.Wide {
+				proxyY = metrics.stackedProxyY(len(groupNames)) + 2
+			}
+			selectedGroup := state.SelectedGroup
+			for range metrics.ProxyMaxLines {
+				state = state.HandleMouseScroll(false, proxyX, proxyY-1, width, height)
+			}
+			if state.ProxyScrollTop == 0 || state.SelectedGroup != selectedGroup {
+				t.Fatal("scrolling over the node panel moved the group selection")
+			}
+			node := ResolveMouseHit(state.ToPageState(width, height), proxyX, proxyY)
+			if node.Target != MouseTargetProxy || node.Index != state.ProxyScrollTop {
+				t.Fatalf("scrolled proxy row maps to %+v, want %d", node, state.ProxyScrollTop)
+			}
+			state, cmd = state.HandleMouseLeft(proxyX, proxyY, width, height)
+			if cmd != nil || state.SelectedProxy != node.Index {
+				t.Fatal("first click did not select the visible node")
+			}
+			_, cmd = state.HandleMouseLeft(proxyX, proxyY, width, height)
+			if cmd == nil {
+				t.Fatal("double click did not dispatch proxy selection")
+			}
+
+			state = state.ApplyGroups(nil, nil)
+			if len(state.CurrentProxies) != 0 || state.SelectedGroup != 0 || state.SelectedProxy != 0 ||
+				state.GroupScrollTop != 0 || state.ProxyScrollTop != 0 {
+				t.Fatal("old row positions survived a refresh with no groups")
+			}
+		})
 	}
 }

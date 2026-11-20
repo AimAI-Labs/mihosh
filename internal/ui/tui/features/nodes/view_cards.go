@@ -239,22 +239,16 @@ func calcCardLayout(state PageState, areaH int) cardLayout {
 	return l
 }
 
-// ResolveMouseHit 根据页面坐标定位命中的模式按钮、策略组卡片或节点格子。
+// ResolveMouseHit 根据页面坐标定位命中的模式/布局按钮、策略组或节点。
 func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 	none := MouseHit{Target: MouseTargetNone, Index: -1}
 
 	if pageY >= 0 && pageY < cardsModeSwitchHeight && pageX >= 0 {
-		if pageY == 1 {
-			const buttonWidth = 6
-			const step = buttonWidth + 1
-			for i := 0; i < 3; i++ {
-				start := 1 + i*step
-				if pageX >= start && pageX < start+buttonWidth {
-					return MouseHit{Target: MouseTargetMode, Index: i}
-				}
-			}
-		}
-		return none
+		return resolveModeBarMouseHit(state.Width, pageX, pageY)
+	}
+
+	if state.Layout == LayoutColumns {
+		return resolveColumnsMouseHit(state, pageX, pageY)
 	}
 
 	l := calcCardLayout(state, cardAreaHeight(state))

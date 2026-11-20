@@ -201,6 +201,7 @@ func buildNodesSections(ctx HelpContext) []section {
 			{"t", i18n.T("help.nodes.test")},
 			{"a", i18n.T("help.nodes.test_all")},
 			{"m", i18n.T("help.nodes.mode")},
+			{"v", i18n.T("help.nodes.layout")},
 			{"s", i18n.T("help.nodes.sort")},
 			{"/", i18n.T("help.nodes.search")},
 			{"f", i18n.T("help.nodes.test_detail")},

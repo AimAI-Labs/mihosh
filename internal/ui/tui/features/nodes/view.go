@@ -15,11 +15,14 @@ import (
 // PageState 节点页面状态（由 Model 传入）
 type PageState struct {
 	Mode             string
+	Layout           NodesLayout
 	Groups           map[string]model.Group
 	Proxies          map[string]model.Proxy
 	GroupNames       []string
 	SelectedGroup    int
 	SelectedProxy    int
+	GroupScrollTop   int
+	ProxyScrollTop   int
 	CurrentProxies   []string
 	Testing          bool
 	TestingTarget    string
@@ -42,7 +45,7 @@ func displayWidth(s string) int {
 
 // RenderNodesPage 渲染节点管理页面
 func RenderNodesPage(state PageState) string {
-	modeSwitch := RenderModeSwitchComponent(state.Mode, state.Width)
+	modeSwitch := RenderModeSwitchComponent(state.Mode, state.Width, state.Layout)
 
 	// ── 底部固定行：搜索提示 + 失败徽标 ──────────────────────────────
 	// 搜索行始终占一行（空行或内容行），确保其位置固定在底栏上方，
@@ -74,17 +77,22 @@ func RenderNodesPage(state PageState) string {
 			" " + common.MutedStyle().Render(i18n.T("nodes.view_detail"))
 	}
 
-	// 卡片流区域：按宽度自适应分列，选中的策略组卡片展开显示节点网格。
+	// 主体区域：按所选布局渲染卡片流或经典双列列表。
 	areaHeight := cardAreaHeight(state)
-	cardArea := clampToLines(renderCardArea(state, areaHeight), areaHeight)
+	var bodyArea string
+	if state.Layout == LayoutColumns {
+		bodyArea = clampToLines(renderColumnsArea(state, areaHeight), areaHeight)
+	} else {
+		bodyArea = clampToLines(renderCardArea(state, areaHeight), areaHeight)
+	}
 
-	// ── 拼接：模式切换 + 卡片区 + 搜索行 + 结果徽标 ──────────────
+	// ── 拼接：模式切换 + 主体区 + 搜索行 + 结果徽标 ──────────────
 	bottomParts := []string{searchLine}
 	if resultBadge != "" {
 		bottomParts = append(bottomParts, resultBadge)
 	}
 	mainContent := lipgloss.JoinVertical(lipgloss.Left,
-		append([]string{modeSwitch, "", cardArea}, bottomParts...)...,
+		append([]string{modeSwitch, "", bodyArea}, bottomParts...)...,
 	)
 
 	mainContent = renderNodesInlineHelp(mainContent, state)

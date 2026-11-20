@@ -8,6 +8,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	_ "github.com/mattn/go-runewidth"
 )
 
@@ -189,6 +190,65 @@ func TestParseHexColor(t *testing.T) {
 		}
 		if string(color) != tt.expected {
 			t.Errorf("parseHexColor(%q) color = %q, want %q", tt.input, string(color), tt.expected)
+		}
+	}
+}
+
+func TestModeBarDisplaysClickableLayoutsAtRight(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	for _, lang := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(lang)
+		const width = 120
+		bar := RenderModeSwitchComponent("rule", width, LayoutColumns)
+		lines := strings.Split(ansi.Strip(bar), "\n")
+		for _, line := range lines {
+			if lipgloss.Width(line) != width {
+				t.Fatalf("%s: mode bar has incorrect width: %q", lang, line)
+			}
+		}
+		row := lines[1]
+		modes, layouts := modeSwitchLabels(), layoutSwitchLabels()
+		wantRight := " " + strings.Join(layouts, " │ ") + " │"
+		if !strings.HasSuffix(row, wantRight) || !strings.Contains(row, strings.Join(modes, " │ ")) {
+			t.Fatalf("%s: expected left mode and right layout labels: %q", lang, row)
+		}
+		for i, label := range layouts {
+			at := strings.LastIndex(row, label)
+			hit := resolveModeBarMouseHit(width, lipgloss.Width(row[:at]), 1)
+			if hit.Target != MouseTargetLayout || hit.Index != i {
+				t.Fatalf("%s: click on %q mapped to %+v", lang, label, hit)
+			}
+		}
+	}
+}
+
+func TestColumnLayoutStacksBelowWideBreakpoint(t *testing.T) {
+	i18n.Init()
+	for _, dims := range [][2]int{{130, 32}, {78, 28}, {78, 16}} {
+		width, height := dims[0], dims[1]
+		state := cardTestState(width, height)
+		state.Layout = LayoutColumns
+		areaH := cardAreaHeight(state)
+		metrics := calcColumnsLayoutMetrics(width, areaH)
+		lines := strings.Split(ansi.Strip(RenderNodesPage(state)), "\n")
+		group := metrics.DataStartY
+		node := metrics.DataStartY
+		if width < nodesWideBreakpoint {
+			node = metrics.stackedProxyY(len(state.GroupNames)) + 2
+		}
+		if group >= len(lines) || node >= len(lines) {
+			t.Fatalf("%dx%d: node/group rows missing at %d/%d: %q", width, height, node, group, lines)
+		}
+		groupRow := ansi.Cut(lines[group], 0, metrics.GroupPanelWidth)
+		nodeRow := ansi.Cut(lines[node], metrics.ProxyPanelX, width)
+		at := strings.Index(nodeRow, "Hong Kong 1")
+		if !strings.Contains(groupRow, "Proxy") || at < 0 {
+			t.Fatalf("%dx%d: expected group and node in their panels: %q / %q", width, height, groupRow, nodeRow)
+		}
+		nodeX := metrics.ProxyPanelX + lipgloss.Width(nodeRow[:at])
+		if hit := ResolveMouseHit(state, nodeX, node); hit.Target != MouseTargetProxy || hit.Index != 0 {
+			t.Fatalf("node row at %dx%d mapped to %+v", width, height, hit)
 		}
 	}
 }

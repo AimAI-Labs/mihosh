@@ -45,6 +45,14 @@ const (
 
 var sortOrderLabels = []string{"默认顺序", "按名称排序", "按延迟排序", "仅可用节点"}
 
+// NodesLayout is the node page's presentation mode.
+type NodesLayout int
+
+const (
+	LayoutCards NodesLayout = iota
+	LayoutColumns
+)
+
 type nodesMouseFocus int
 
 const (
@@ -73,6 +81,9 @@ type State struct {
 	CurrentProxies []string
 	SelectedGroup  int
 	SelectedProxy  int
+	Layout         NodesLayout
+	GroupScrollTop int
+	ProxyScrollTop int
 	Testing        bool
 	TestingTarget  string
 	testBatch      service.TestBatch
@@ -175,6 +186,9 @@ func (s State) displayProxies() []string {
 func (s State) ToPageState(width, height int) PageState {
 	return PageState{
 		Mode:             s.Mode,
+		Layout:           s.Layout,
+		GroupScrollTop:   s.GroupScrollTop,
+		ProxyScrollTop:   s.ProxyScrollTop,
 		Groups:           s.Groups,
 		Proxies:          s.Proxies,
 		GroupNames:       s.GroupNames,
@@ -202,7 +216,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.CoreTargetChangedMsg:
 		if msg.Reset {
-			return NewState(s.client, s.testURL, s.timeout), nil
+			next := NewState(s.client, s.testURL, s.timeout)
+			next.Layout = s.Layout
+			return next, nil
 		}
 		if msg.Invalidate {
 			return s.ResetTesting(), nil
@@ -246,6 +262,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			s.MouseFocus = nodesMouseFocusProxy
 			if s.SelectedProxy > 0 {
 				s.SelectedProxy--
+				s.ProxyScrollTop = min(s.ProxyScrollTop, s.SelectedProxy)
 			}
 
 		case key.Matches(msg, common.Keys.Down):
@@ -256,19 +273,11 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 
 		case key.Matches(msg, common.Keys.Left):
 			s.MouseFocus = nodesMouseFocusGroup
-			if s.SelectedGroup > 0 {
-				s.SelectedGroup--
-				s.updateCurrentProxies()
-				s.SelectedProxy = 0
-			}
+			s.applyGroupSelection(s.SelectedGroup - 1)
 
 		case key.Matches(msg, common.Keys.Right):
 			s.MouseFocus = nodesMouseFocusGroup
-			if s.SelectedGroup < len(s.GroupNames)-1 {
-				s.SelectedGroup++
-				s.updateCurrentProxies()
-				s.SelectedProxy = 0
-			}
+			s.applyGroupSelection(s.SelectedGroup + 1)
 
 		case key.Matches(msg, common.Keys.Enter):
 			if len(s.GroupNames) > 0 && s.SelectedGroup < len(s.GroupNames) &&
@@ -308,11 +317,18 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			nextMode := modes[(currentIdx+1)%len(modes)]
 			return s, UpdateConfigMode(s.client, nextMode)
 
+		case msg.String() == "v":
+			if s.Layout == LayoutColumns {
+				s.selectLayout(LayoutCards)
+			} else {
+				s.selectLayout(LayoutColumns)
+			}
+
 		case msg.String() == "s":
 			s.ProxySortOrder = (s.ProxySortOrder + 1) % ProxySortOrder(len(sortOrderLabels))
 			s.applySortOrder()
 			s.updateFilteredProxies()
-			s.SelectedProxy = 0
+			s.SelectedProxy, s.ProxyScrollTop = 0, 0
 
 		case msg.String() == "/":
 			s.NodeFilterMode = true
@@ -320,7 +336,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case key.Matches(msg, common.Keys.Escape):
 			if s.NodeFilter != "" {
 				s.NodeFilter = ""
-				s.SelectedProxy = 0
+				s.SelectedProxy, s.ProxyScrollTop = 0, 0
 				s.updateFilteredProxies()
 			}
 		}
@@ -335,17 +351,17 @@ func (s State) handleNodeFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	case key.Matches(msg, common.Keys.Escape):
 		s.NodeFilterMode = false
 		s.NodeFilter = ""
-		s.SelectedProxy = 0
+		s.SelectedProxy, s.ProxyScrollTop = 0, 0
 		s.updateFilteredProxies()
 	case key.Matches(msg, common.Keys.Enter):
 		s.NodeFilterMode = false
-		s.SelectedProxy = 0
+		s.SelectedProxy, s.ProxyScrollTop = 0, 0
 	default:
 		query := common.SearchQuery{Text: s.NodeFilter, Engine: s.FilterEngine}
 		if query.Edit(msg) {
 			s.NodeFilter, s.FilterEngine = query.Text, query.Engine
 			s.updateFilteredProxies()
-			s.SelectedProxy = 0
+			s.SelectedProxy, s.ProxyScrollTop = 0, 0
 		}
 	}
 	return s, nil
@@ -430,6 +446,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		}
 		s.MouseFocus = nodesMouseFocusProxy
 		s.SelectedProxy = hit.Index
+		s.ProxyScrollTop = min(s.ProxyScrollTop, s.SelectedProxy)
 
 		if !s.doubleClickDetector.IsDoubleClick(MouseTargetProxy, hit.Index, now) {
 			return s, nil
@@ -440,6 +457,10 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		groupName := s.GroupNames[s.SelectedGroup]
 		proxyName := display[s.SelectedProxy]
 		return s, SelectProxy(s.client, groupName, proxyName)
+
+	case MouseTargetLayout:
+		s.selectLayout(NodesLayout(hit.Index))
+		return s, nil
 
 	case MouseTargetMode:
 		modes := []string{"rule", "global", "direct"}
@@ -459,6 +480,13 @@ func (s State) ApplyConfigMode(mode string) State {
 	return s
 }
 
+func (s *State) selectLayout(layout NodesLayout) {
+	if layout != s.Layout && (layout == LayoutCards || layout == LayoutColumns) {
+		s.Layout = layout
+		s.doubleClickDetector = common.DoubleClickDetector[MouseTarget]{}
+	}
+}
+
 func (s *State) applyGroupSelection(groupIdx int) {
 	if groupIdx < 0 || groupIdx >= len(s.GroupNames) {
 		return
@@ -468,8 +496,10 @@ func (s *State) applyGroupSelection(groupIdx int) {
 	}
 
 	s.SelectedGroup = groupIdx
+	s.GroupScrollTop = min(s.GroupScrollTop, groupIdx)
+	s.doubleClickDetector = common.DoubleClickDetector[MouseTarget]{}
 	s.updateCurrentProxies()
-	s.SelectedProxy = 0
+	s.SelectedProxy, s.ProxyScrollTop = 0, 0
 }
 
 // HandleMouseScroll 处理鼠标滚轮（弹窗打开时控制弹窗滚动，否则切换选中的策略组或节点，
@@ -489,32 +519,26 @@ func (s State) HandleMouseScroll(up bool, pageX, pageY, pageWidth, pageHeight in
 		return s
 	}
 
-	hit := ResolveMouseHit(s.ToPageState(pageWidth, pageHeight), pageX, pageY)
-
-	// 鼠标在策略组卡片上，或鼠标不在节点格子上且当前焦点是策略组
-	if hit.Target == MouseTargetGroup || (hit.Target != MouseTargetProxy && s.MouseFocus == nodesMouseFocusGroup) {
-		if up {
-			if s.SelectedGroup > 0 {
-				s.SelectedGroup--
-				s.updateCurrentProxies()
-				s.SelectedProxy = 0
-			}
-		} else if s.SelectedGroup < len(s.GroupNames)-1 {
-			s.SelectedGroup++
-			s.updateCurrentProxies()
-			s.SelectedProxy = 0
-		}
-		return s
+	state := s.ToPageState(pageWidth, pageHeight)
+	hit := ResolveMouseHit(state, pageX, pageY)
+	focus := s.MouseFocus
+	if hit.Target == MouseTargetGroup {
+		focus = nodesMouseFocusGroup
+	} else if hit.Target == MouseTargetProxy {
+		focus = nodesMouseFocusProxy
 	}
 
-	// 否则在展开卡片的节点网格中移动选中项
-	display := s.displayProxies()
+	delta := 1
 	if up {
-		if s.SelectedProxy > 0 {
-			s.SelectedProxy--
-		}
-	} else if s.SelectedProxy < len(display)-1 {
-		s.SelectedProxy++
+		delta = -1
+	}
+	if s.Layout == LayoutColumns {
+		return s.scrollColumns(state, focus, delta, pageX, pageY)
+	}
+	if focus == nodesMouseFocusGroup {
+		s.applyGroupSelection(s.SelectedGroup + delta)
+	} else if len(state.CurrentProxies) > 0 {
+		s.SelectedProxy = clampInt(s.SelectedProxy+delta, 0, len(state.CurrentProxies)-1)
 	}
 	return s
 }
@@ -522,33 +546,33 @@ func (s State) HandleMouseScroll(up bool, pageX, pageY, pageWidth, pageHeight in
 // ApplyGroups 应用策略组刷新结果（保留选中项）
 func (s State) ApplyGroups(Groups map[string]model.Group, orderedNames []string) State {
 	var selectedGroupName, selectedProxyName string
-	if len(s.GroupNames) > 0 && s.SelectedGroup < len(s.GroupNames) {
+	if s.SelectedGroup >= 0 && s.SelectedGroup < len(s.GroupNames) {
 		selectedGroupName = s.GroupNames[s.SelectedGroup]
 	}
-	if len(s.CurrentProxies) > 0 && s.SelectedProxy < len(s.CurrentProxies) {
-		selectedProxyName = s.CurrentProxies[s.SelectedProxy]
+	if display := s.displayProxies(); s.SelectedProxy >= 0 && s.SelectedProxy < len(display) {
+		selectedProxyName = display[s.SelectedProxy]
 	}
 
 	s.Groups = Groups
 	s.GroupNames = orderedNames
-
-	if selectedGroupName != "" {
-		for i, name := range s.GroupNames {
-			if name == selectedGroupName {
-				s.SelectedGroup = i
-				break
-			}
+	s.SelectedGroup = clampInt(s.SelectedGroup, 0, max(0, len(orderedNames)-1))
+	for i, name := range orderedNames {
+		if name == selectedGroupName {
+			s.SelectedGroup = i
+			break
 		}
 	}
+	s.GroupScrollTop = min(s.GroupScrollTop, s.SelectedGroup)
 	s.updateCurrentProxies()
-	if selectedProxyName != "" {
-		for i, name := range s.CurrentProxies {
-			if name == selectedProxyName {
-				s.SelectedProxy = i
-				break
-			}
+	display := s.displayProxies()
+	s.SelectedProxy = clampInt(s.SelectedProxy, 0, max(0, len(display)-1))
+	for i, name := range display {
+		if name == selectedProxyName {
+			s.SelectedProxy = i
+			break
 		}
 	}
+	s.ProxyScrollTop = min(s.ProxyScrollTop, s.SelectedProxy)
 	return s
 }
 
@@ -603,19 +627,15 @@ func (s State) LaunchBatchTests() (State, tea.Cmd) {
 
 // updateCurrentProxies 更新当前策略组的节点列表（指针接收者，修改自身）
 func (s *State) updateCurrentProxies() {
-	if len(s.GroupNames) > 0 && s.SelectedGroup < len(s.GroupNames) {
-		groupName := s.GroupNames[s.SelectedGroup]
-		if group, ok := s.Groups[groupName]; ok {
-			// 保存原始顺序副本
-			original := make([]string, len(group.All))
-			copy(original, group.All)
-			s.OriginalProxies = original
-			// 应用当前排序
-			s.CurrentProxies = original
-			s.applySortOrder()
-			s.updateFilteredProxies()
-		}
+	s.OriginalProxies = nil
+	s.CurrentProxies = nil
+	if s.SelectedGroup >= 0 && s.SelectedGroup < len(s.GroupNames) {
+		group := s.Groups[s.GroupNames[s.SelectedGroup]]
+		s.OriginalProxies = append([]string(nil), group.All...)
+		s.CurrentProxies = s.OriginalProxies
+		s.applySortOrder()
 	}
+	s.updateFilteredProxies()
 }
 
 // applySortOrder 根据当前排序模式重新排列 CurrentProxies
