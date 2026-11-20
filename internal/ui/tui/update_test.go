@@ -260,8 +260,7 @@ func TestUpdate_InlineHelpMenuClick(t *testing.T) {
 	findLabelX := func(view, label string) (int, int) {
 		t.Helper()
 		lines := strings.Split(ansi.Strip(view), "\n")
-		_, pageHeight := m.getPageSize()
-		y := pageTop + pageHeight - 1
+		y := m.height - common.StatusBarHeight - 1
 		if y < 0 || y >= len(lines) {
 			t.Fatalf("invalid bottom hint row %d", y)
 		}

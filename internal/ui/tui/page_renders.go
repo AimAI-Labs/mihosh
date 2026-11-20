@@ -12,12 +12,14 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/sub"
 )
 
-const pageTop = layout.TopNavHeight + notice.Height
+const pageTop = layout.TopNavHeight
 
 // getPageSize 计算页面内容的可用宽度和高度
 func (m *Model) getPageSize() (pageWidth, pageHeight int) {
-	return max(m.width, common.MinMainWidth), max(m.height-pageTop-common.StatusBarHeight, common.MinContentHeight)
+	return max(m.width, common.MinMainWidth), max(m.height-pageTop-notice.Height-common.StatusBarHeight, common.MinContentHeight)
 }
+
+func noticeRow(pageHeight int) int { return pageTop + pageHeight - 1 }
 
 // renderNodesPage 渲染节点管理页面
 func (m *Model) renderNodesPage() string {

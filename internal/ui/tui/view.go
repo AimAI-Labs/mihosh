@@ -82,7 +82,9 @@ func (m Model) View() string {
 		m.hasUpdate,
 	)
 
-	fullPage := lipgloss.JoinVertical(lipgloss.Left, topNav, notice.Render(m.visibleNotice(), m.width), pageContent, statusBar)
+	footer := strings.LastIndexByte(pageContent, '\n')
+	fullPage := lipgloss.JoinVertical(lipgloss.Left, topNav, pageContent[:footer],
+		notice.Render(m.visibleNotice(), m.width), pageContent[footer+1:], statusBar)
 
 	// ── 报错弹窗叠加 ──
 	if m.notice.DetailsOpen {

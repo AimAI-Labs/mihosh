@@ -6,6 +6,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/notice"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -44,11 +45,12 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if isMouseLeftPress(msg) && msg.Y == layout.TopNavHeight {
-		m.notice.OpenDetails(msg.X, m.width)
-		if m.notice.DetailsOpen {
-			return m, nil
+	_, mainHeight := m.getPageSize()
+	if msg.Y == noticeRow(mainHeight) {
+		if isMouseLeftPress(msg) {
+			m.notice.OpenDetails(msg.X, m.width)
 		}
+		return m, nil
 	}
 	if m.pageInputCapture().Active {
 		pageX, pageY, pageWidth, pageHeight, ok := m.resolveMainPageMouseHit(msg.X, msg.Y)
@@ -72,13 +74,8 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 	switch {
 	case isMouseLeftPress(msg):
-		if msg.Y == layout.TopNavHeight {
-			return m, nil
-		}
-
 		// 检查是否点击了底栏 (Status Bar)
-		_, pageHeight := m.getPageSize()
-		if msg.Y >= pageTop+pageHeight {
+		if msg.Y >= pageTop+mainHeight+notice.Height {
 			if m.hasUpdate && msg.X >= m.width-5 {
 				m.showUpdateDialog = true
 				return m, nil
@@ -133,9 +130,6 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 // handleMouseScroll 处理鼠标滚轮滚动
 func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
-	if y == layout.TopNavHeight {
-		return m, nil
-	}
 	if y >= 0 && y < layout.TopNavHeight {
 		m.onPageLeave()
 		if up {
@@ -165,6 +159,12 @@ func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
 func (m *Model) resolveMainPageMouseHit(x, y int) (pageX, pageY, pageWidth, pageHeight int, ok bool) {
 	pageWidth, pageHeight = m.getPageSize()
 	pageY = y - pageTop
+	if y == noticeRow(pageHeight) {
+		return 0, 0, 0, 0, false
+	}
+	if y > noticeRow(pageHeight) {
+		pageY -= notice.Height
+	}
 	if pageY < 0 || pageY >= pageHeight || x < 0 || x >= pageWidth {
 		return 0, 0, 0, 0, false
 	}
