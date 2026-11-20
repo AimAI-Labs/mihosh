@@ -50,7 +50,7 @@ func TestCoreFirstUseExplainsNextStepWithoutConnectionDiagnostics(t *testing.T) 
 			t.Errorf("first-use guidance missing %q", want)
 		}
 	}
-	for _, raw := range []string{"true", "false", "connection refused", "SHA-256", "TUN"} {
+	for _, raw := range []string{"true", "false", "connection refused", "SHA-256", "TUN", i18n.T("core.desc.setup")} {
 		if strings.Contains(view, raw) {
 			t.Errorf("advanced detail %q leaked into first-use view", raw)
 		}

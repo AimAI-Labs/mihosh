@@ -12,7 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// The view and mouse routing share these bounds, including wrapped descriptions.
+// The view and mouse routing share these bounds, including wrapped rows.
 type actionHit struct {
 	x, y, width, height int
 	index               int
@@ -79,12 +79,12 @@ func (s State) actionPanel(width int, title string, items []actionItem, firstInd
 	}
 	for index, item := range items {
 		i := firstIndex + index
-		prefix, titleKey, descKey := "  ", "core.action."+item.action, "core.desc."+item.action
+		prefix, titleKey := "  ", "core.action."+item.action
 		if id, ok := strings.CutPrefix(item.action, "api:"); ok {
-			titleKey, descKey = "settings.action."+id, ""
+			titleKey = "settings.action." + id
 		}
 		if serviceMenu {
-			titleKey, descKey = "core.service."+item.action, "core.service.desc."+item.action
+			titleKey = "core.service." + item.action
 		}
 		if i == s.selected {
 			prefix = "› "
@@ -127,13 +127,11 @@ func (s State) actionPanel(width int, title string, items []actionItem, firstInd
 		}
 		switch {
 		case serviceMenu:
-			for _, line := range strings.Split(wrap(i18n.T(descKey), innerW-2), "\n") {
+			for _, line := range strings.Split(wrap(i18n.T("core.service.desc."+item.action), innerW-2), "\n") {
 				rows = append(rows, muted.Render("  "+line))
 			}
 		case reason != "":
 			rows = append(rows, muted.Render("  "+ansi.Truncate(i18n.T(reason), innerW-2, "…")))
-		case i == s.selected && descKey != "" && item.action != "details":
-			rows = append(rows, muted.Render("  "+ansi.Truncate(i18n.T(descKey), innerW-2, "…")))
 		}
 		hits = append(hits, actionHit{x: 1, y: rowY, width: width - 2, height: len(rows) + 1 - rowY, index: i})
 	}
