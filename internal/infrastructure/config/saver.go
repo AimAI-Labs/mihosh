@@ -56,6 +56,10 @@ func saveLocked(cfg *Config) error {
 	} else {
 		writer.Set("subs", cfg.Subs)
 	}
+	// Older clients replace subs on save, but round-trip unknown top-level keys.
+	if records := subscriptionUsageRecords(cfg.Subs); len(records) > 0 || writer.IsSet(subscriptionUsageKey) {
+		writer.Set(subscriptionUsageKey, records)
+	}
 	writer.Set("active_sub", cfg.ActiveSub)
 	writer.Set("core", cfg.Core)
 

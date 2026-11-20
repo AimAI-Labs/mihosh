@@ -197,7 +197,7 @@ func TestProfileService_FetchLocal(t *testing.T) {
 	assert.NotZero(t, got.UpdatedAt)
 }
 
-func TestProfileServicePersistsUsageOnlyOnSuccessfulFetch(t *testing.T) {
+func TestProfileServiceKeepsLastGoodSubscriptionUsage(t *testing.T) {
 	s := newIsolatedService(t)
 	var mode atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -236,7 +236,7 @@ func TestProfileServicePersistsUsageOnlyOnSuccessfulFetch(t *testing.T) {
 	require.NoError(t, s.FetchProfile(p.UID))
 	withoutHeader, err := s.findProfile(p.UID)
 	require.NoError(t, err)
-	require.Nil(t, withoutHeader.Usage)
+	require.Equal(t, loaded.Usage, withoutHeader.Usage)
 }
 
 func TestProfileService_MergeRoundTrip(t *testing.T) {

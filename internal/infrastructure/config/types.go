@@ -39,6 +39,8 @@ type Config struct {
 	// raw/merge 内容按 UID 存为独立文件（见 profile 包），不进本结构。
 	Subs      []profile.Profile `mapstructure:"subs"`
 	ActiveSub string            `mapstructure:"active_sub"`
+
+	subscriptionUsageNeedsBackup bool
 }
 
 // DefaultConfig 默认配置

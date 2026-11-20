@@ -222,7 +222,9 @@ func (s *ProfileService) FetchProfileContext(ctx context.Context, uid string) er
 				return err
 			}
 			current.UpdatedAt = time.Now().Unix()
-			current.Usage = usage
+			if usage != nil {
+				current.Usage = usage
+			}
 			return nil
 		}
 		return ErrSubNotFound

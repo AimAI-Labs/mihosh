@@ -392,5 +392,6 @@ func loadLocked() (*Config, error) {
 		return nil, err
 	}
 
+	restoreSubscriptionUsage(reader, &cfg)
 	return &cfg, nil
 }

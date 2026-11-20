@@ -64,7 +64,12 @@ func (m Model) Init() tea.Cmd {
 			}
 			return messages.UpdateCheckedMsg{Info: info}
 		},
-		tea.Sequence(sub.RefreshSubs(m.profileSvc), func() tea.Msg {
+		tea.Sequence(func() tea.Msg {
+			if err := config.PreserveSubscriptionUsage(); err != nil {
+				return messages.ErrMsg{Err: err}
+			}
+			return nil
+		}, sub.RefreshSubs(m.profileSvc), func() tea.Msg {
 			p, err := m.profileSvc.AutoImportLocalSub()
 			return messages.LocalSubImportedMsg{Profile: p, Err: err}
 		}),
