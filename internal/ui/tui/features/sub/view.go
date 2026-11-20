@@ -390,9 +390,7 @@ func buildHints(state PageState) []common.InlineHelpHint {
 // 弹窗叠加（暗化底层 → 居中弹窗 → 逐行嵌入）
 // ============================================================
 
-const (
-	deleteModalWidth = 54
-)
+const ()
 
 func formLabelWidth() int {
 	width := 0
@@ -530,57 +528,19 @@ func resolveFormBounds(state PageState, width, height int) (left, top, right, bo
 // ===== 删除确认 =====
 
 func renderDeleteConfirmOverlay(background string, state PageState, width, height int) string {
-	return dialog.New(buildDeleteConfirmModal(state, width, height), width, height).Below(subHeaderHeight+1).Overlay(background, true)
-}
-
-func buildDeleteConfirmModal(state PageState, width, height int) string {
-	modalWidth := deleteModalWidth
-	if modalWidth > width-4 {
-		modalWidth = width - 4
-	}
-	if modalWidth < 36 {
-		modalWidth = 36
-	}
-	innerWidth := modalWidth - 4
-	if innerWidth < 10 {
-		innerWidth = 10
-	}
-
-	// 查找待删除订阅信息
-	var name, srcStr string
-	isActive := false
+	var name, source, warning string
 	for _, p := range state.Subs {
 		if p.UID == state.DeleteUID {
 			name = p.Name
-			srcStr = p.Source.Kind.String() + " " + p.Source.Display()
-			isActive = p.UID == state.ActiveUID
+			source = p.Source.Kind.String() + " " + p.Source.Display()
+			if p.UID == state.ActiveUID {
+				warning = i18n.T("sub.delete_warn_active")
+			}
 			break
 		}
 	}
-
 	nameLine := lipgloss.NewStyle().Foreground(common.Bright()).Render(name)
-	srcLine := lipgloss.NewStyle().Foreground(common.Secondary()).Render(srcStr)
-
-	var warn string
-	if isActive {
-		warn = lipgloss.NewStyle().Foreground(common.Warning()).Render(i18n.T("sub.delete_warn_active"))
-	}
-
-	divider := lipgloss.NewStyle().Foreground(common.TokyoBlue()).Render(strings.Repeat("─", innerWidth))
-	prompt := common.TokyoMutedStyle().Render(i18n.T("sub.delete_confirm_hint"))
-
-	rows := []string{"", nameLine, srcLine}
-	if isActive {
-		rows = append(rows, warn)
-	}
-	rows = append(rows, "", divider, prompt)
-	content := lipgloss.JoinVertical(lipgloss.Left, rows...)
-
-	return common.RenderBorderedPanel(
-		i18n.T("sub.delete_title"),
-		content,
-		modalWidth,
-		common.Danger(),
-		common.TokyoForeground(),
-	)
+	sourceLine := lipgloss.NewStyle().Foreground(common.Secondary()).Render(source)
+	return dialog.DeleteConfirmation(width, height, i18n.T("sub.delete_title"), i18n.T("sub.delete_confirm_hint"),
+		warning, nameLine, sourceLine).Below(subHeaderHeight+1).Overlay(background, true)
 }
