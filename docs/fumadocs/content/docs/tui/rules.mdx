@@ -18,7 +18,17 @@ In the add or edit form, focus Type and press Space to search. Matching is case-
 
 Click a type to filter the list, or use `←` / `→` and `Space`. Types absent from the current configuration appear in gray. You can select several types and combine them with text search. Press `Esc` to clear the type filter when its row is visible.
 
-Mihosh saves rule additions, changes and deletions in `rule-edits.yaml` and applies them when generating the configuration. The source snapshot and `merge.yaml` stay intact. When a subscription refreshes, its latest rules are combined with the saved edits. An edit or deletion applies when its original rule is present. Remote rule editing requires an active subscription and applies in memory on the remote core.
+The Rules page saves additions, edits and deletions in `rule-edits.yaml`. Remote rule editing requires an active subscription and applies in memory on the remote core.
+
+## Rule conflicts and best practices
+
+Mihosh applies `merge.yaml` to the subscription, then applies the saved rule changes. If `merge.yaml` defines `rules`, that list replaces the entire subscription rule list. New rules are inserted at their saved positions. Edits and deletions match the original rule and are skipped if that rule is absent from the current list.
+
+In rule mode, Mihomo checks rules from top to bottom and usually uses the first match. Placing `DOMAIN,login.example.com,DIRECT` above `DOMAIN-SUFFIX,example.com,REJECT` gives the login domain priority for direct routing. [Mihomo rule priority](https://wiki.metacubex.one/en/config/rules/#priority)
+
+- **Use the Rules page for a few local changes while following subscription updates.** Set `rules` in `merge.yaml` when you intend to maintain the whole list.
+- **Edit the existing rule when changing its policy.** Put specific exceptions above broader rules that would match the same traffic, and keep the fallback `MATCH` last.
+- **Check the final order after refreshing or switching subscriptions.** On the Subscriptions page, press `c` and open the activated file or diff. A change in the subscription list can move other rules relative to a saved insertion. [Subscription management](/docs/tui/subscriptions)
 
 ## Interface Features
 

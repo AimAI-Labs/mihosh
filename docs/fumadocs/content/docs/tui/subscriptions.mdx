@@ -20,7 +20,7 @@ description: Manage remote proxy subscriptions
 
 Place `.yaml` or `.yml` profiles in `raw/` under the Mihosh configuration root. Mihosh imports them at startup and when you open or refresh the Subscriptions page. Each imported profile keeps a snapshot. Use `u` to refresh it after editing the source. To prevent a deleted subscription from being imported again, move its source out of `raw/`.
 
-Press `c` to choose the source snapshot, the activated configuration generated with `merge.yaml`, or a diff. The source and activated views open read-only temporary copies in Vim and use One Dark Pro for YAML highlighting. Make sure `vim` is on PATH. The copies are removed when Vim exits. The views also work for inactive subscriptions. The diff uses side-by-side panes from 100 columns and stacked panes in narrower terminals.
+Press `c` to choose the source snapshot, the activated configuration with `merge.yaml` and saved rule changes applied, or a diff between them. The source and activated views open read-only temporary copies in Vim and use One Dark Pro for YAML highlighting. Make sure `vim` is on PATH. The copies are removed when Vim exits. The views also work for inactive subscriptions. The diff uses side-by-side panes from 100 columns and stacked panes in narrower terminals.
 
 In a diff, press `o` or click **Diff options** in the footer to ignore indentation, other whitespace, invisible format characters such as a BOM, or punctuation and symbols. All four options start enabled and are saved across subscriptions and app restarts. The activated preview displays printable Unicode directly, and the diff treats an escaped character and its literal equivalent as equal.
 
@@ -29,6 +29,11 @@ In a diff, press `o` or click **Diff options** in the footer to ignore indentati
 Press `m` to edit `merge.yaml` with the same native Mihomo fields used by a subscription. A list such as `rules`, `proxies` or `proxy-groups` replaces its source list. Remove the field to use the subscription's list again.
 
 When Mihosh saves a legacy override file, it moves rule prepend, append and edit directives into `rule-edits.yaml` and retains the original as `merge.yaml.legacy-*.bak`. Legacy proxy and proxy-group list directives are converted using the active subscription or local configuration.
+
+### Maintaining subscription rules
+
+- **When following subscription updates**, use the subscription's rule list and make local changes on the Rules page. Set `rules` in `merge.yaml` when you maintain the whole rule list yourself. Saved changes from the Rules page also apply to this custom list.
+- **After refreshing or switching subscriptions**, press `c` to inspect the activated configuration or diff and confirm where your custom rules appear. When two rules match the same traffic, check which comes first. Put specific exceptions above broader rules and keep `MATCH` last. [Rule management](/docs/tui/rules)
 
 ## Interface Features
 
