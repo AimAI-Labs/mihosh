@@ -192,8 +192,12 @@ func TestGeoFilesPanelKeepsDirectoryAndRestartHintReachable(t *testing.T) {
 	}
 	s = s.selectTab(3)
 	page := s.layout(120, 26)
-	if !strings.Contains(ansi.Strip(page.content), i18n.T("core.geo.files")) {
-		t.Fatal("GEO files card is missing")
+	lines := strings.Split(ansi.Strip(page.content), "\n")
+	directory := i18n.T("core.geo.directory") + ": " + filepath.Join(root, "runtime")
+	if !strings.Contains(lines[page.geoBounds.y], i18n.T("core.geo.files")) ||
+		!strings.Contains(lines[page.geoBounds.y+1], directory) ||
+		page.actions[0].y <= page.geoBounds.y+1 {
+		t.Fatal("GEO directory should be above the first selectable file")
 	}
 	s.selected = len(s.geoFiles) - 1
 	view := strings.Split(ansi.Strip(s.Render(80, 22)), "\n")

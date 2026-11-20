@@ -31,6 +31,16 @@ func (s State) geoPanel(width int) (string, []actionHit) {
 	selected := lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true)
 	var rows []string
 	var hits []actionHit
+	if s.Status.Mode == "managed" {
+		path := s.Status.ConfigPath
+		if path == "" {
+			path, _ = config.ManagedMihomoConfigPath()
+		}
+		if path != "" {
+			directory := i18n.T("core.geo.directory") + ": " + filepath.Dir(path)
+			rows = append(rows, strings.Split(muted.Render(wrap(directory, width-4)), "\n")...)
+		}
+	}
 	for i, file := range s.geoFiles {
 		prefix := "  "
 		if s.tab == 3 && i == s.selected {
@@ -52,20 +62,15 @@ func (s State) geoPanel(width int) (string, []actionHit) {
 		rows = append(rows, label)
 		rows = append(rows, strings.Split(muted.Render(detail), "\n")...)
 	}
-	if len(rows) == 0 {
+	if len(s.geoFiles) == 0 {
 		key := "core.geo.no_files"
 		if s.Status.Mode != "managed" {
 			key = "core.geo.managed_only"
 		}
 		rows = append(rows, wrap(i18n.T(key), width-4))
 	}
-	if s.Status.Mode == "managed" {
-		if path, err := config.ManagedMihomoConfigPath(); err == nil {
-			rows = append(rows, muted.Render(wrap(filepath.Dir(path), width-4)))
-		}
-		if s.geoErr != nil {
-			rows = append(rows, common.ErrorStyle().Render(wrap(s.geoErr.Error(), width-4)))
-		}
+	if s.Status.Mode == "managed" && s.geoErr != nil {
+		rows = append(rows, common.ErrorStyle().Render(wrap(s.geoErr.Error(), width-4)))
 	}
 	return panel(i18n.T("core.geo.files"), strings.Join(rows, "\n"), width), hits
 }

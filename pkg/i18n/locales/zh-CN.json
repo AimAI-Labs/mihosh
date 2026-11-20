@@ -933,6 +933,7 @@
   "core.geo.managed_only": "文件管理需要使用 Mihosh 托管内核。外部内核可在Core → Mihomo 配置更新 GEO。",
   "core.geo.restart_hint": "更新后按 z 重启内核，使新数据生效。",
   "core.geo.files": "GEO 数据文件",
+  "core.geo.directory": "保存目录",
   "core.geo.missing": "尚未下载",
   "core.geo.custom": "自定义来源，请通过内核管理",
   "core.geo.no_files": "暂无可管理的数据文件",
