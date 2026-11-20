@@ -253,6 +253,7 @@ func buildConnectionsSections(ctx HelpContext) []section {
 				{"←/→", i18n.T("help.conns_traffic.select_site")},
 				{"s", i18n.T("help.conns_traffic.test_site")},
 				{"S", i18n.T("help.conns_traffic.test_all")},
+				{"U", i18n.T("conns.unlock.title")},
 			},
 		}}
 
@@ -267,6 +268,7 @@ func buildConnectionsSections(ctx HelpContext) []section {
 				{"/", i18n.T("help.conns_active.search")},
 				{"h", i18n.T("help.conns_active.switch")},
 				{"Esc", i18n.T("help.conns_active.clear")},
+				{"U", i18n.T("conns.unlock.title")},
 			},
 		}}
 
@@ -279,6 +281,7 @@ func buildConnectionsSections(ctx HelpContext) []section {
 				{"/", i18n.T("help.conns_history.search")},
 				{"h", i18n.T("help.conns_history.switch")},
 				{"Esc", i18n.T("help.conns_history.clear")},
+				{"U", i18n.T("conns.unlock.title")},
 			},
 		}}
 	}

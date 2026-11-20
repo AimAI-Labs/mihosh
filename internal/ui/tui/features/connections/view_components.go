@@ -325,6 +325,13 @@ func connectionsByViewMode(state PageState) []model.Connection {
 
 // buildConnectionsInlineHelpHints 根据连接页上下文构建内联帮助条目
 func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
+	if state.Unlock.open {
+		return []common.InlineHelpHint{
+			{Key: "S", Desc: i18n.T("conns.unlock.run_all"), Tone: common.InlineHelpToneSuccess},
+			{Key: "↵", Desc: i18n.T("conns.unlock.run_one")},
+			{Key: "Esc", Desc: i18n.T("conns.unlock.close")},
+		}
+	}
 	// 详情模式：左右面板切换 + 滚动 + 关闭
 	if state.DetailMode {
 		return []common.InlineHelpHint{
@@ -350,6 +357,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		}
 	}
 
+	unlock := common.InlineHelpHint{Key: "U", Desc: i18n.T("conns.unlock.title")}
 	// 按 tab 分流
 	switch state.ViewMode {
 	case ConnViewTraffic:
@@ -364,6 +372,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		return append(hints,
 			common.InlineHelpHint{Key: "h", Desc: i18n.T("help.conns.hint_switch")},
 			common.InlineHelpHint{Key: "?", Desc: i18n.T("core.inline.help")},
+			unlock,
 		)
 
 	case ConnViewActive:
@@ -381,7 +390,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		} else {
 			hints = append(hints, common.InlineHelpHint{Key: "?", Desc: i18n.T("core.inline.help")})
 		}
-		return hints
+		return append(hints, unlock)
 
 	case ConnViewHistory:
 		hints := []common.InlineHelpHint{
@@ -397,7 +406,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		} else {
 			hints = append(hints, common.InlineHelpHint{Key: "?", Desc: i18n.T("core.inline.help")})
 		}
-		return hints
+		return append(hints, unlock)
 	}
 
 	return nil
@@ -416,5 +425,9 @@ func renderConnectionsInlineHelp(page string, state PageState) string {
 	}
 
 	body := common.FormatInlineHintRow(hints)
+	if state.Height > 0 {
+		rows := strings.Split(page, "\n")
+		page = strings.Join(rows[:min(len(rows), state.Height)], "\n")
+	}
 	return common.OverlayHelpAtBottomRight(page, body, state.Width, state.Height)
 }

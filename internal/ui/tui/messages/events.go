@@ -104,6 +104,12 @@ type SiteTestMsg struct {
 	TaskID  int
 }
 
+type UnlockTestMsg struct {
+	BatchID uint64
+	TaskID  int
+	Result  service.UnlockResult
+}
+
 // ========= Rules Messages =========
 
 type RulesMsg []model.Rule

@@ -11,6 +11,9 @@ import (
 func (s State) HandleMouseLeft(
 	pageX, pageY, pageWidth, pageHeight int,
 ) (State, tea.Cmd) {
+	if s.unlock.open {
+		return s.clickUnlock(pageX, pageY, pageWidth, pageHeight)
+	}
 	chartData := s.chartData
 	timeout := s.timeout
 
@@ -148,6 +151,14 @@ func (s State) HandleMouseLeft(
 
 // HandleMouseScroll 鼠标滚轮处理
 func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight int) (State, tea.Cmd) {
+	if s.unlock.open {
+		delta := 1
+		if up {
+			delta = -1
+		}
+		s.unlock.move(delta)
+		return s, nil
+	}
 	if s.connDetailMode {
 		layout := layoutConnectionDetail(s.ToPageState(s.chartData, mainWidth, mainHeight))
 		panel := layout.detail.PanelAt(mainX, mainY-layout.detailY)

@@ -67,6 +67,7 @@ type State struct {
 	siteTestIndices []int
 	testCtx         context.Context
 	testCancel      context.CancelFunc
+	unlock          unlockState
 }
 
 // NewState 初始化连接状态
@@ -130,6 +131,7 @@ func (s *State) appendClosed(conn model.Connection) {
 
 // CancelTest 取消当前正在进行的测试
 func (s *State) CancelTest() {
+	s.unlock.cancelChecks()
 	if s.testCancel != nil {
 		s.testCancel()
 		s.testCancel = nil
@@ -180,6 +182,7 @@ func (s State) ToPageState(chartData *model.ChartData, width, height int) PageSt
 		InlineMode:         s.inlineDetailMode,
 		InlineFocused:      s.inlineDetailFocused,
 		InlineScroll:       s.inlineDetailPanel.ScrollTop,
+		Unlock:             s.unlock.unlockView,
 	}
 }
 
@@ -191,16 +194,24 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			s.CancelTest()
 			return NewState(msg.ProxyURL, model.DefaultSiteTests(), s.client, s.timeout, s.chartData), nil
 		}
-		if msg.Invalidate {
+		if msg.Invalidate || msg.ProxyURL != s.proxyAddr {
 			s.CancelTest()
+			for i := range s.unlock.items {
+				s.unlock.items[i].result = service.UnlockResult{}
+			}
 		}
 		return s.UpdateProxyAddr(msg.ProxyURL), nil
 
+	case messages.UnlockTestMsg:
+		return s.completeUnlock(msg)
 	case messages.PageMouseScrollMsg:
 		return s.HandleMouseScroll(msg.Up, msg.X, msg.Y, msg.Width, msg.Height)
 	case messages.PageMouseClickMsg:
 		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
 	case tea.KeyMsg:
+		if s.unlock.open {
+			return s.handleUnlockKey(msg)
+		}
 		// 继续处理 KeyMsg
 		if s.connDetailMode {
 			switch {
@@ -245,6 +256,11 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			_, cmd := s.filterList.Update(msg)
 			s.filterList.SetItemCount(s.filteredConnCount()) // Update again after filter string changes
 			return s, cmd
+		}
+
+		if msg.String() == "U" {
+			s.openUnlock()
+			return s, nil
 		}
 
 		// tab 切换键（所有 viewMode 通用）
@@ -431,5 +447,5 @@ func (s State) findConnectionByName(name string) *model.Connection {
 
 // InputCapture declares which input belongs to the current page mode.
 func (s State) InputCapture() common.InputCapture {
-	return common.InputCapture{Active: s.FilterMode() || s.connDetailMode || s.topNModalMode, Interrupt: s.FilterMode()}
+	return common.InputCapture{Active: s.FilterMode() || s.connDetailMode || s.topNModalMode || s.unlock.open, Interrupt: s.FilterMode()}
 }

@@ -42,6 +42,7 @@ type PageState struct {
 	InlineMode      bool // 是否开启内联详情模式
 	InlineFocused   bool // 内联详情是否获取焦点
 	InlineScroll    int  // 内联详情滚动偏移
+	Unlock          unlockView
 }
 
 // RenderConnectionsPage 渲染连接监控页面
@@ -56,11 +57,18 @@ func RenderConnectionsPage(state PageState) string {
 		return renderConnectionsInlineHelp(mainContent, state)
 	}
 
-	if state.ViewMode != ConnViewTraffic {
-		return renderConnectionsInlineHelp(renderConnectionListTab(state), state)
+	var page string
+	if state.ViewMode == ConnViewTraffic {
+		modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width, state.InlineMode)
+		page = renderTrafficTab(state, []string{modeSwitch, ""})
+	} else {
+		page = renderConnectionListTab(state)
 	}
-	modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width, state.InlineMode)
-	return renderConnectionsInlineHelp(renderTrafficTab(state, []string{modeSwitch, ""}), state)
+	if state.Unlock.open {
+		popup, _ := state.Unlock.popup(state.Width, state.Height)
+		page = popup.Overlay(page, true)
+	}
+	return renderConnectionsInlineHelp(page, state)
 }
 
 // renderTrafficTab 渲染流量监控 tab
