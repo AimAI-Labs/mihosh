@@ -255,7 +255,7 @@ func renderSettingsPage(state PageState, width, height int, standalone bool) str
 				if lipgloss.Width(logo) > width || lipgloss.Height(logo) >= space {
 					logo = "mihosh"
 				}
-				styled := lipgloss.NewStyle().Bold(true).Foreground(theme.Resolve(common.Active())).Render(logo)
+				styled := lipgloss.NewStyle().Bold(true).Foreground(theme.Resolve(theme.Current().Primary)).Render(logo)
 				padding := max(1, (space-lipgloss.Height(logo))/2)
 				mainContent += "\n" + strings.Repeat("\n", padding) + lipgloss.PlaceHorizontal(width, lipgloss.Center, styled)
 			}
