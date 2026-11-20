@@ -353,13 +353,18 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 	// 按 tab 分流
 	switch state.ViewMode {
 	case ConnViewTraffic:
-		// 流量监控 tab：测速 + 选站 + 切换
-		return []common.InlineHelpHint{
-			{Key: "h", Desc: i18n.T("help.conns.hint_switch")},
-			{Key: "s/S", Desc: i18n.T("help.conns.hint_test")},
-			{Key: "←→", Desc: i18n.T("help.conns.hint_site")},
-			{Key: "?", Desc: i18n.T("core.inline.help")},
+		var hints []common.InlineHelpHint
+		if len(state.SiteTests) > 0 {
+			hints = append(hints,
+				common.InlineHelpHint{Key: "S", Desc: i18n.T("help.conns.hint_test_all"), Tone: common.InlineHelpToneSuccess},
+				common.InlineHelpHint{Key: "s", Desc: i18n.T("help.conns.hint_test"), Tone: common.InlineHelpToneSuccess},
+				common.InlineHelpHint{Key: "←→", Desc: i18n.T("help.conns.hint_site")},
+			)
 		}
+		return append(hints,
+			common.InlineHelpHint{Key: "h", Desc: i18n.T("help.conns.hint_switch")},
+			common.InlineHelpHint{Key: "?", Desc: i18n.T("core.inline.help")},
+		)
 
 	case ConnViewActive:
 		hints := []common.InlineHelpHint{

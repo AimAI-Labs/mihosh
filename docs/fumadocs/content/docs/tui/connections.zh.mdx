@@ -9,6 +9,8 @@ import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
 <Tabs items={['流量 (Traffic)', '活跃 (Active)', '历史 (History)']}>
   <Tab value="流量 (Traffic)">
     包含微型图表 (Sparkline) 显示上传和下载的实时速度。同时提供内存使用情况图表，帮助你直观了解 Mihomo 核心的资源占用。
+
+    点击右下角的「S 全测」或按大写 `S`，可测量所有网站的延时。各网站卡片会显示各自的结果。小写 `s` 测试选中的网站。
   </Tab>
   <Tab value="活跃 (Active)">
     列表显示所有当前活跃的连接详情，包括：源 IP、目标地址、上传/下载量以及使用的具体节点。支持选中特定连接并强制关闭它。

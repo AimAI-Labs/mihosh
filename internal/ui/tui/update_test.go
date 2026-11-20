@@ -3,6 +3,8 @@ package tui
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
@@ -291,5 +294,56 @@ func TestUpdate_InlineHelpMenuClick(t *testing.T) {
 	m = next.(Model)
 	if !m.showHelp {
 		t.Fatal("clicking bottom-right help menu item did not open help popup")
+	}
+}
+
+func TestUpdate_TrafficTestAllMenuClick(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	i18n.Init()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(2 * time.Millisecond)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	m := NewModel(api.NewClient(config.MihomoEndpoint{}, 1000), "", 1000)
+	defer func() {
+		m.connsState.CancelTest()
+		m.Close()
+	}()
+	m.width, m.height, m.currentPage = 80, 26, layout.PageConnections
+	sites := []model.SiteTest{
+		{Name: "Site A", URL: server.URL + "/a"},
+		{Name: "Site B", URL: server.URL + "/b"},
+	}
+	m.connsState = connections.NewState("", sites, nil, 1000, nil)
+
+	label := "S " + i18n.T("help.conns.hint_test_all")
+	y := m.height - common.StatusBarHeight - 1
+	row := strings.Split(ansi.Strip(m.View()), "\n")[y]
+	at := strings.Index(row, label)
+	if at < 0 {
+		t.Fatalf("batch test menu item %q is missing from %q", label, row)
+	}
+	next, cmd := m.Update(tea.MouseMsg{
+		X: lipgloss.Width(row[:at]), Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress,
+	})
+	m = next.(Model)
+	if cmd == nil {
+		t.Fatal("clicking the batch test menu item did not launch a site test")
+	}
+	batch, ok := cmd().(tea.BatchMsg)
+	if !ok || len(batch) != len(sites) {
+		t.Fatalf("batch launched %d commands for %d sites", len(batch), len(sites))
+	}
+	for _, probe := range batch {
+		next, _ = m.Update(probe())
+		m = next.(Model)
+	}
+	width, height := m.getPageSize()
+	for _, site := range m.connsState.ToPageState(m.chartData, width, height).SiteTests {
+		if site.Testing || site.Delay <= 0 || site.Error != "" {
+			t.Errorf("site %q did not receive a successful latency result: %+v", site.Name, site)
+		}
 	}
 }
