@@ -1,6 +1,7 @@
 package core
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 
@@ -140,11 +141,15 @@ func TestAdvancedInlineSwitchesRenderAndApplyDirectTargets(t *testing.T) {
 	svc := service.NewCoreService()
 	defer svc.Close()
 
+	actions := []string{"shell-proxy"}
+	if runtime.GOOS == "linux" {
+		actions = append(actions, "system-proxy", "tun")
+	}
 	for _, language := range []string{"zh-CN", "en-US"} {
 		i18n.SetLanguageOverride(language)
 		for _, width := range []int{24, 40, 80, 120} {
 			for _, height := range []int{12, 24, 30} {
-				for _, action := range []string{"system-proxy", "tun", "shell-proxy"} {
+				for _, action := range actions {
 					for _, enabled := range []bool{false, true} {
 						s := State{svc: svc, tab: 2, followSelection: true, Status: service.CoreStatus{
 							Mode:        "managed",

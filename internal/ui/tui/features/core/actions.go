@@ -1,6 +1,7 @@
 package core
 
 import (
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -106,9 +107,25 @@ func (s State) switchValue(action string) (bool, bool) {
 	}
 }
 
+func (s State) switchUnavailable(action string) string {
+	if action != "system-proxy" && action != "tun" {
+		return ""
+	}
+	if s.Status.Mode != "managed" {
+		return "core.switch.managed_only"
+	}
+	if runtime.GOOS != "linux" {
+		if action == "system-proxy" {
+			return "core.switch.gnome_only"
+		}
+		return "core.switch.linux_only"
+	}
+	return ""
+}
+
 func (s State) setSwitchAction(action string, target bool) (State, tea.Cmd) {
 	current, ok := s.switchValue(action)
-	if !ok || target == current {
+	if !ok || target == current || s.Busy || s.switchUnavailable(action) != "" {
 		return s, nil
 	}
 	s.args = []string{strconv.FormatBool(target)}

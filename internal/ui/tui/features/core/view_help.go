@@ -36,7 +36,7 @@ func (s State) inlineHelpHints(width int) []common.InlineHelpHint {
 	if s.isAdvancedPage() && !s.Editing && !s.Busy {
 		items := s.actions()
 		action := items[min(s.selected, len(items)-1)].action
-		if _, isSwitch := s.switchValue(action); isSwitch {
+		if _, isSwitch := s.switchValue(action); isSwitch && s.switchUnavailable(action) == "" {
 			hints = append(hints, common.InlineHelpHint{Key: "Space", Desc: i18n.T("core.inline.toggle")})
 		}
 	}

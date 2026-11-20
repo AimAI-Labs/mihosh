@@ -93,16 +93,20 @@ func (s State) actionPanel(width int, title string, items []actionItem, firstInd
 		if item.key != "" && item.key != "enter" {
 			label += " [" + item.key + "]"
 		}
+		reason := s.switchUnavailable(item.action)
 		style := lipgloss.NewStyle()
 		if i == s.selected {
 			style = selected
+		}
+		if reason != "" {
+			style = style.Foreground(theme.Resolve(t.Muted))
 		}
 		renderLabel := func(avail int) string {
 			return style.Render(common.PadString(ansi.Truncate(label, avail, "…"), avail))
 		}
 
 		rowY := len(rows) + 1
-		if enabled, isSwitch := s.switchValue(item.action); isSwitch && !serviceMenu {
+		if enabled, isSwitch := s.switchValue(item.action); isSwitch && reason == "" && !serviceMenu {
 			switchStr, offOffset, offW, onOffset, onW := renderInlineSwitch(enabled, innerW)
 			switchW := lipgloss.Width(switchStr)
 			ctrlX, ctrlY := 2, rowY
@@ -126,6 +130,8 @@ func (s State) actionPanel(width int, title string, items []actionItem, firstInd
 			for _, line := range strings.Split(wrap(i18n.T(descKey), innerW-2), "\n") {
 				rows = append(rows, muted.Render("  "+line))
 			}
+		case reason != "":
+			rows = append(rows, muted.Render("  "+ansi.Truncate(i18n.T(reason), innerW-2, "…")))
 		case i == s.selected && descKey != "" && item.action != "details":
 			rows = append(rows, muted.Render("  "+ansi.Truncate(i18n.T(descKey), innerW-2, "…")))
 		}

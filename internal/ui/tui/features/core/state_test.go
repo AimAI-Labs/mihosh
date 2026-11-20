@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -69,11 +70,15 @@ func TestServiceFormAndNetworkActionsRemainInCoreState(t *testing.T) {
 	svc := service.NewCoreService()
 	defer svc.Close()
 	s := NewState(svc, nil, nil)
+	s.Status.Mode = "managed"
 	s, cmd := s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
 	if !s.Editing || s.form != "service" || cmd != nil || len(s.fields) != 0 {
 		t.Fatal("service menu should open without text inputs or a background command")
 	}
 	s = s.Leave()
+	if runtime.GOOS != "linux" {
+		return
+	}
 	s, cmd = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
 	if s.Editing || !s.Busy || s.task != "system-proxy" || cmd == nil {
 		t.Fatal("system proxy shortcut must toggle inline without opening a dialog")

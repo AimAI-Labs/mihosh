@@ -368,6 +368,33 @@ func TestCoreStatusLineAndDetails(t *testing.T) {
 	}
 }
 
+func TestCoreExternalSystemProxyExplainsUnavailableState(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("en-US")
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	s := selectTestAction(t, State{followSelection: true, connected: true,
+		Status: service.CoreStatus{Mode: "external"}}, "system-proxy")
+	const width, height = 80, 24
+	view := ansi.Strip(s.Render(width, height))
+	if !strings.Contains(view, i18n.T("core.switch.managed_only")) {
+		t.Fatal("the unavailable proxy switch is missing its explanation")
+	}
+	page := s.layout(width, height-footerHeight)
+	for _, control := range page.controls {
+		if control.action == "switch:system-proxy" {
+			t.Fatal("the unavailable proxy switch still has active pills")
+		}
+	}
+	hit := page.actions[s.selected]
+	for _, input := range []tea.Msg{coreKey("y"), coreKey("enter"), coreKey(" "),
+		messages.PageMouseClickMsg{X: hit.x, Y: hit.y - s.viewportOffset(page, height-footerHeight), Width: width, Height: height}} {
+		next, cmd := s.Update(input)
+		if next.Busy || next.Editing || cmd != nil {
+			t.Fatalf("unavailable system proxy was activated by %v", input)
+		}
+	}
+}
+
 func TestCoreMihomoPageShowsManagedStatusLogsBelowOverrides(t *testing.T) {
 	i18n.Init()
 	s := State{tab: 4, Status: service.CoreStatus{
