@@ -53,6 +53,16 @@ You can switch between different pages using:
 | `Tab` | Switch to the next page |
 | `Shift+Tab` | Switch to the previous page |
 
+## Auto-refresh
+
+The **Auto refresh** countdown in the top navigation shows when Mihosh will next read the node list, proxy groups, active nodes and proxy mode from the connected Mihomo core. This keeps the Nodes page in sync when another client changes a selection or switches between Rule, Global and Direct modes. After a successful read, the countdown briefly shows `✔`. Mihosh shows a sync notice when it detects changes to the groups, their members, their active nodes or the mode.
+
+Set the interval in **Settings → Auto Refresh(s)** or with `mihosh config set auto-refresh-interval 5`. The default is five seconds. Set it to `0` to turn off periodic polling.
+
+When a connection to Mihomo becomes ready, Mihosh preloads data for the Nodes, Connections, Rules, Subscriptions and Core pages. When periodic polling is enabled, the next tick reads the node data again. Clicking a navigation tab refreshes that page, including when you click the tab that is already open.
+
+To check periodic sync, leave the TUI on the Nodes page. In another terminal connected to the same core, run `mihosh select "Group name" "Another node"` for a group that allows manual selection. Watch the group's active node after the next countdown, then restore the original node. Updated latency values can appear one cycle before latency-based ordering catches up.
+
 ## Responsive Layout
 
 The TUI supports a responsive layout, automatically adjusting the display based on your terminal window width:
