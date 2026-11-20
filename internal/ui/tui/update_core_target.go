@@ -27,6 +27,7 @@ func (m *Model) updateCoreTarget(endpoint config.MihomoEndpoint, update coreTarg
 	if reset || update != coreTargetSync {
 		m.connectionEpoch++
 		m.connectionReady = false
+		m.connectionChecking = false
 		if m.client != nil {
 			m.client.UpdateEndpoint(endpoint.ExternalController, endpoint.Secret)
 		}
@@ -50,7 +51,7 @@ func (m *Model) updateCoreTarget(endpoint config.MihomoEndpoint, update coreTarg
 		return nil
 	}
 	if reset || update == coreTargetReconnect {
-		return m.checkCoreConnection()
+		return m.checkCoreConnection(false)
 	}
 	return nil
 }

@@ -106,10 +106,13 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.coreState, _ = m.coreState.Update(msg)
 		m.connectionChecked = true
+		m.connectionChecking = false
 		m.connectionReady = msg.Err == nil
 		m.syncProcessLogs()
 		if msg.Err != nil {
-			m.currentPage = layout.PageCore
+			if !msg.KeepPage {
+				m.currentPage = layout.PageCore
+			}
 			return m, nil
 		}
 		var stream tea.Cmd

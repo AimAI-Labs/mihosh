@@ -3,7 +3,6 @@ package tui
 import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/preferences"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/rules"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/sub"
 
@@ -135,10 +134,13 @@ func (m *Model) onPageChange() tea.Cmd {
 
 func (m *Model) refreshMenu() tea.Cmd {
 	if m.connectionChecked && !m.connectionReady && m.currentPage != layout.PageCore && m.currentPage != layout.PageSub && m.currentPage != layout.PageSettings && m.currentPage != layout.PageLogs {
-		return nil
+		return m.checkCoreConnection(true)
 	}
 	switch m.currentPage {
 	case layout.PageCore:
+		if m.connectionChecked && !m.connectionReady {
+			return tea.Batch(m.coreState.Refresh(), m.checkCoreConnection(true))
+		}
 		return m.coreState.Refresh()
 	case layout.PageNodes:
 		return m.fetchNodes()
@@ -189,37 +191,28 @@ func (m *Model) refreshCurrentPage() tea.Cmd {
 		m.coreState, cmd = m.coreState.RefreshCurrent()
 		check := m.updateCoreTarget(config.ResolveMihomoEndpoint(), coreTargetSync)
 		if check == nil {
-			check = m.checkCoreConnection()
+			check = m.checkCoreConnection(false)
 		}
 		return tea.Batch(cmd, check)
-	case layout.PageNodes:
-		return tea.Batch(nodes.FetchGroups(m.client), nodes.FetchProxies(m.client))
-	case layout.PageRules:
-		return rules.FetchRules(m.client)
-	case layout.PageSub:
-		return sub.RefreshSubs(m.profileSvc)
-	case layout.PageSettings:
-		cfg, _ := m.configSvc.LoadConfig()
-		m.config = cfg
-		return preferences.FetchMihomoVersion(m.client)
 	}
-	return nil
+	return m.refreshMenu()
 }
 
 func (m Model) topNavActive() bool {
 	return false
 }
 
-func (m *Model) checkCoreConnection() tea.Cmd {
-	epoch := m.connectionEpoch
-	client := m.client
-	if client != nil {
-		client = client.Snapshot()
+func (m *Model) checkCoreConnection(keepPage bool) tea.Cmd {
+	if m.client == nil || m.connectionChecking {
+		return nil
 	}
+	m.connectionChecking = true
+	epoch := m.connectionEpoch
+	client := m.client.Snapshot()
 	return func() tea.Msg {
 		version, err := client.GetVersion()
 		if err != nil {
-			return messages.CoreConnectionMsg{Epoch: epoch, Err: err}
+			return messages.CoreConnectionMsg{Epoch: epoch, Err: err, KeepPage: keepPage}
 		}
 		return messages.CoreConnectionMsg{Epoch: epoch, Version: version.Version}
 	}

@@ -64,14 +64,15 @@ type Model struct {
 	notice notice.State
 
 	// WebSocket
-	connectionEpoch   uint64
-	connectionChecked bool
-	connectionReady   bool
-	wsStarted         bool
-	wsClient          *api.WSClient
-	wsMsgChan         chan interface{}
-	wsCtx             context.Context
-	wsCancel          context.CancelFunc
+	connectionEpoch    uint64
+	connectionChecked  bool
+	connectionChecking bool
+	connectionReady    bool
+	wsStarted          bool
+	wsClient           *api.WSClient
+	wsMsgChan          chan interface{}
+	wsCtx              context.Context
+	wsCancel           context.CancelFunc
 
 	// IP 解析器
 	ipResolver *service.IPResolver

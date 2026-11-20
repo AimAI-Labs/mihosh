@@ -403,9 +403,10 @@ type CoreProcessLogsMsg struct {
 }
 
 type CoreConnectionMsg struct {
-	Version string
-	Epoch   uint64
-	Err     error
+	Version  string
+	Epoch    uint64
+	Err      error
+	KeepPage bool
 }
 
 type ManagedCoreStartedMsg struct{ Epoch uint64 }

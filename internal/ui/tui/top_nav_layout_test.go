@@ -1,12 +1,15 @@
 package tui
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -116,6 +119,61 @@ func TestClickingCurrentNodesMenuRefreshesNodes(t *testing.T) {
 	batch, ok := cmd().(tea.BatchMsg)
 	if !ok || len(batch) != 3 {
 		t.Fatalf("expected groups, proxies, and mode refresh, got %v", batch)
+	}
+}
+
+func TestNodeMenuRetriesControllerAfterFailedStartup(t *testing.T) {
+	i18n.Init()
+	available := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/version" {
+			http.NotFound(w, r)
+			return
+		}
+		select {
+		case <-available:
+			_, _ = w.Write([]byte(`{"version":"v1.20.0"}`))
+		default:
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+	}))
+	defer server.Close()
+
+	m := Model{
+		currentPage:       layout.PageNodes,
+		width:             100,
+		height:            30,
+		client:            api.NewClient(config.MihomoEndpoint{ExternalController: server.URL}, 1000),
+		connectionChecked: true,
+		wsStarted:         true,
+	}
+	click := tea.MouseMsg{X: 2, Y: 1, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress}
+	next, cmd := m.Update(click)
+	if cmd == nil {
+		t.Fatal("opening the node menu must recheck an unavailable controller")
+	}
+	m = next.(Model)
+	if _, duplicate := m.Update(click); duplicate != nil {
+		t.Fatal("the version check is already in flight")
+	}
+	result := cmd().(messages.CoreConnectionMsg)
+	if result.Err == nil {
+		t.Fatal("expected the unavailable controller to fail the first menu check")
+	}
+	next, _ = m.Update(result)
+	m = next.(Model)
+	if m.currentPage != layout.PageNodes || m.connectionReady {
+		t.Fatal("an unsuccessful menu check must keep the current page")
+	}
+
+	close(available)
+	next, cmd = m.Update(click)
+	if cmd == nil {
+		t.Fatal("menu refresh must retry after an unsuccessful check")
+	}
+	next, refresh := next.Update(cmd())
+	if !next.(Model).connectionReady || refresh == nil {
+		t.Fatal("recovered controller must refresh page data")
 	}
 }
 
