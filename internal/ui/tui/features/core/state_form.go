@@ -36,11 +36,6 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 	if isChoiceForm(kind) {
 		return s, nil
 	}
-	if kind == "service" {
-		s.selected, s.scroll = 0, 0
-		s.followSelection = true
-		return s, nil
-	}
 	if kind != "network" {
 		count := 1
 		if kind == "import" || kind == "external" {
@@ -140,21 +135,6 @@ func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 		}
 		return s, nil
 	}
-	if s.form == "service" {
-		switch msg.String() {
-		case "esc":
-			return s.closeForm(), nil
-		case "up", "k":
-			s.selected = max(0, s.selected-1)
-			s.followSelection = true
-		case "down", "j":
-			s.selected = min(len(serviceActions)-1, s.selected+1)
-			s.followSelection = true
-		case "enter":
-			return s.submitService()
-		}
-		return s, nil
-	}
 	switch msg.String() {
 	case "esc":
 		return s.closeForm(), nil
@@ -210,16 +190,6 @@ func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 	var cmd tea.Cmd
 	s.fields[s.focus], cmd = s.fields[s.focus].Update(msg)
 	return s, cmd
-}
-
-func (s State) submitService() (State, tea.Cmd) {
-	if s.Busy {
-		return s, nil
-	}
-	action := serviceActions[s.selected]
-	s = s.closeForm()
-	s.args = []string{action}
-	return s.begin("service")
 }
 
 func (s State) closeForm() State {

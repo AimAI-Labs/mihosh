@@ -15,7 +15,6 @@ type actionItem struct {
 
 var tabs = []string{"advanced", "versions", "advanced", "geo", "mihomo"}
 var tabOrder = []int{0, 1, 4}
-var serviceActions = []string{"install", "start", "stop", "restart", "enable", "disable", "boot", "uninstall"}
 
 func (s State) isAdvancedPage() bool  { return s.tab == 0 || s.tab == 2 }
 func (s State) isDownloadsPage() bool { return s.tab == 1 || s.tab == 3 }
@@ -149,7 +148,9 @@ func (s State) choose(action string) (State, tea.Cmd) {
 		return s.editForm(action)
 	case "system-proxy", "tun", "shell-proxy":
 		return s.toggleSwitch(action)
-	case "network", "version", "import", "external", "service", "details", "configure", "recover", "basic-config", "stop", "restart", "api:restart", "api:update_geo":
+	case "service":
+		return s.openServiceStatus()
+	case "network", "version", "import", "external", "details", "configure", "recover", "basic-config", "stop", "restart", "api:restart", "api:update_geo":
 		return s.editForm(action)
 	default:
 		if id, ok := strings.CutPrefix(action, "api:"); ok {
@@ -163,6 +164,7 @@ func (s State) selectTab(tab int) State {
 	s.editor = s.editor.CancelEdit()
 	s.tab = (tab + len(tabs)) % len(tabs)
 	s.selected, s.scroll, s.serviceScroll = 0, 0, 0
+	s.serviceFocus, s.pendingServiceFocus, s.serviceActionIdx = false, false, 0
 	s.followSelection = true
 	if s.tab == 1 {
 		index, _ := s.releaseIndex(s.Release.Tag)

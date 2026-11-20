@@ -58,7 +58,7 @@ func TestDownloadAllowsInspectingAdvancedDialogsWithoutConcurrentOperations(t *t
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	svc := service.NewCoreService()
 	defer svc.Close()
-	for _, action := range []string{"service", "configure", "recover"} {
+	for _, action := range []string{"configure", "recover"} {
 		s := releaseFixture(t)
 		s.svc = svc
 		s, _ = s.begin("install")
@@ -74,17 +74,10 @@ func TestDownloadAllowsInspectingAdvancedDialogsWithoutConcurrentOperations(t *t
 			t.Fatal("pending download allowed a concurrent operation")
 		}
 		page, _ := s.formDialog(120, 30)
-		if action == "service" || action == "configure" || action == "recover" {
-			var hit actionHit
-			if action == "service" {
-				hit = page.actions[s.selected]
-			} else {
-				hit = page.controls[0].actionHit
-			}
-			s, cmd = s.Update(messages.PageMouseClickMsg{X: hit.x, Y: hit.y, Width: 120, Height: 30})
-			if cmd != nil || !s.Editing || !s.Busy || s.generation != id || s.args != nil {
-				t.Fatal("mouse confirmation changed the pending download")
-			}
+		hit := page.controls[0].actionHit
+		s, cmd = s.Update(messages.PageMouseClickMsg{X: hit.x, Y: hit.y, Width: 120, Height: 30})
+		if cmd != nil || !s.Editing || !s.Busy || s.generation != id || s.args != nil {
+			t.Fatal("mouse confirmation changed the pending download")
 		}
 		s, _ = s.Update(messages.CoreOperationMsg{ID: id, Action: "install"})
 		if s.Busy || !s.Editing {
@@ -106,8 +99,8 @@ func TestAdvancedDialogsCancelWithoutOperationsAndRestoreSelection(t *testing.T)
 			t.Fatal("duplicate mihomo action must not appear on the advanced tab")
 		}
 		s := NewState(svc, nil, nil).selectTab(2)
-		if _, isSwitch := s.switchValue(item.action); isSwitch || item.action == "setup" {
-			continue // Two-option settings toggle inline without opening a dialog.
+		if _, isSwitch := s.switchValue(item.action); isSwitch || item.action == "setup" || item.action == "service" {
+			continue // Two-option settings toggle inline; service jumps to Mihomo service status card.
 		}
 		s.selected, s.scroll = i, 3
 		s, _ = s.choose(item.action)
@@ -242,14 +235,11 @@ func TestAdvancedDialogsPreserveBackgroundAndMouseMatchesVisibleControls(t *test
 	t.Cleanup(func() { i18n.SetLanguageOverride("") })
 	for _, language := range []string{"zh-CN", "en-US"} {
 		i18n.SetLanguageOverride(language)
-		for _, action := range []string{"service", "configure", "recover"} {
+		for _, action := range []string{"configure", "recover"} {
 			for _, width := range []int{24, 80, 120} {
 				for _, height := range []int{8, 24, 30} {
 					s := State{tab: 2, selected: 2}
 					s, _ = s.choose(action)
-					if action == "service" {
-						s.selected = len(serviceActions) - 1
-					}
 					view := ansi.Strip(s.Render(width, height))
 					if lipgloss.Height(view) != height {
 						t.Fatal("dialog exceeds height")
@@ -268,13 +258,8 @@ func TestAdvancedDialogsPreserveBackgroundAndMouseMatchesVisibleControls(t *test
 						t.Fatal("outside click did not dismiss safely")
 					}
 					page, _ := s.formDialog(width, height)
-					if action == "service" {
-						hit := page.actions[s.selected]
-						next, cmd = s.Update(messages.PageMouseClickMsg{X: hit.x, Y: hit.y, Width: width, Height: height})
-					} else {
-						hit := page.controls[0]
-						next, cmd = s.Update(messages.PageMouseClickMsg{X: hit.x, Y: hit.y, Width: width, Height: height})
-					}
+					hit := page.controls[0]
+					next, cmd = s.Update(messages.PageMouseClickMsg{X: hit.x, Y: hit.y, Width: width, Height: height})
 					defer next.Close()
 					if next.Editing || !next.Busy || cmd == nil {
 						t.Fatal("visible dialog action did not execute")
@@ -310,17 +295,9 @@ func TestCoreDialogsScrollIndependentlyAndRestoreParentOnOutsideClick(t *testing
 			if after.scrollOffset != after.maxScroll {
 				t.Fatal("dialog did not clamp at its end")
 			}
-			if action == "service" {
-				s, _ = s.Update(coreKey("down"))
-			} else {
-				s, _ = s.Update(tea.KeyMsg{Type: tea.KeyTab})
-			}
+			s, _ = s.Update(tea.KeyMsg{Type: tea.KeyTab})
 			after, _ = s.formDialog(width, 10)
-			focus := s.focus
-			if action == "service" {
-				focus = s.selected
-			}
-			if after.actions[focus].height == 0 {
+			if after.actions[s.focus].height == 0 {
 				t.Fatal("keyboard focus remained outside the scrolled dialog")
 			}
 			s, cmd := s.Update(messages.PageMouseClickMsg{X: 0, Y: 0, Width: width, Height: 10})
@@ -331,38 +308,84 @@ func TestCoreDialogsScrollIndependentlyAndRestoreParentOnOutsideClick(t *testing
 	}
 }
 
-func TestServiceDialogWheelSelectsVisibleActions(t *testing.T) {
+func TestServiceStatusCardKeyboardNavigationAndJumpShortcut(t *testing.T) {
 	i18n.Init()
-	for _, width := range []int{24, 80, 120} {
-		for _, height := range []int{10, 30} {
-			s := State{tab: 2, selected: 1, scroll: 3}
-			s, _ = s.editForm("service")
-			wheel := messages.PageMouseScrollMsg{X: width / 2, Y: height / 2, Width: width, Height: height}
-			for i := range len(serviceActions) + 2 {
-				var cmd tea.Cmd
-				s, cmd = s.Update(wheel)
-				page, _ := s.formDialog(width, height)
-				if s.selected != min(i+1, len(serviceActions)-1) || page.actions[s.selected].height == 0 || s.Busy || cmd != nil {
-					t.Fatalf("%dx%d: wheel did not select a visible action", width, height)
-				}
-			}
-			wheel.Up = true
-			for range len(serviceActions) + 2 {
-				s, _ = s.Update(wheel)
-			}
-			if s.selected != 0 {
-				t.Fatal("wheel did not clamp at the first action")
-			}
-			wheel.X, wheel.Y, wheel.Up = 0, 0, false
-			unchanged, _ := s.Update(wheel)
-			if unchanged.selected != s.selected {
-				t.Fatal("wheel outside dialog changed selection")
-			}
-			s, cmd := s.Update(messages.PageMouseClickMsg{X: 0, Y: 0, Width: width, Height: height})
-			if s.Editing || s.selected != 1 || s.scroll != 3 || s.dialogScroll != 0 || cmd != nil {
-				t.Fatal("closing service dialog did not restore parent")
-			}
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	svc := service.NewCoreService()
+	defer svc.Close()
+
+	s := NewState(svc, nil, nil).selectTab(2)
+	s.viewWidth, s.viewHeight = 100, 26
+	s.Status = service.CoreStatus{
+		Mode:             "managed",
+		Version:          "v1.2.3",
+		Running:          true,
+		ServiceUnit:      "mihosh-example.service",
+		ServiceInstalled: true,
+		ServiceRunning:   true,
+	}
+	s, _ = s.Update(messages.CoreServiceLogMsg{
+		Unit:   s.Status.ServiceUnit,
+		Output: "● mihosh-example.service\nline1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10",
+	})
+
+	// Pressing 'h' on Runtime & Proxy jumps to Mihomo Config tab and focuses the service status card.
+	s, _ = s.Update(coreKey("h"))
+	if s.tab != 4 || s.Editing || !s.serviceFocus || s.serviceActionIdx != 0 {
+		t.Fatalf("expected 'h' to jump to Mihomo service status card, got tab=%d editing=%t focus=%t idx=%d", s.tab, s.Editing, s.serviceFocus, s.serviceActionIdx)
+	}
+
+	// Arrow keys move across all available quick actions without leaving the card.
+	actions := s.serviceQuickActions()
+	for i := 1; i < len(actions); i++ {
+		s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRight})
+		if s.tab != 4 || !s.serviceFocus || s.serviceActionIdx != i {
+			t.Fatalf("right arrow did not move service focus to %d (got %d)", i, s.serviceActionIdx)
 		}
+	}
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	if s.serviceActionIdx != len(actions)-2 {
+		t.Fatalf("left arrow did not move service focus back, got %d", s.serviceActionIdx)
+	}
+
+	// Down/Up scroll service logs; Up at top returns focus to Mihomo config editor.
+	s, _ = s.Update(coreKey("down"))
+	if s.serviceScroll != 1 || !s.serviceFocus {
+		t.Fatalf("down arrow did not scroll service logs, scroll=%d focus=%t", s.serviceScroll, s.serviceFocus)
+	}
+	s, _ = s.Update(coreKey("up"))
+	if s.serviceScroll != 0 || !s.serviceFocus {
+		t.Fatalf("up arrow did not scroll service logs back to top, scroll=%d focus=%t", s.serviceScroll, s.serviceFocus)
+	}
+	s, _ = s.Update(coreKey("up"))
+	if s.serviceFocus {
+		t.Fatal("up arrow at top of service logs should return focus to Mihomo config editor")
+	}
+
+	// Tab focuses the service card again and Enter triggers the focused service action.
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if !s.serviceFocus {
+		t.Fatal("Tab did not focus the service status card")
+	}
+	s.serviceActionIdx = 1 // restart when installed & running
+	next, cmd := s.Update(coreKey("enter"))
+	defer next.Close()
+	if next.Editing || !next.Busy || next.task != "service" || cmd == nil {
+		t.Fatal("Enter on focused service quick action did not queue service task")
+	}
+
+	// During a busy task, Enter on the service card does not start a concurrent operation.
+	busy := s
+	busy.Busy, busy.task = true, "install"
+	busyNext, busyCmd := busy.Update(coreKey("enter"))
+	if busyCmd != nil || busyNext.task != "install" {
+		t.Fatal("service card queued a concurrent action while busy")
+	}
+
+	// Escape returns focus to the Mihomo config panel.
+	s, _ = s.Update(coreKey("esc"))
+	if s.serviceFocus {
+		t.Fatal("Esc did not return focus from service card")
 	}
 }
 func TestStopAndRestartShortcutsRequireConfirmation(t *testing.T) {

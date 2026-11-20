@@ -20,9 +20,12 @@ import (
 )
 
 type State struct {
-	serviceLog        messages.CoreServiceLogMsg
-	serviceScroll     int
-	svc               *service.CoreService
+	serviceLog          messages.CoreServiceLogMsg
+	serviceScroll       int
+	serviceFocus        bool
+	pendingServiceFocus bool
+	serviceActionIdx    int
+	svc                 *service.CoreService
 	Status            service.CoreStatus
 	Release           coreinfra.Release
 	Progress          coreinfra.Progress
@@ -284,6 +287,12 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		return s, nil
 	case messages.CoreStatusMsg:
 		s.Status = msg.Status
+		if s.tab == 4 && s.pendingServiceFocus && s.hasServiceCard() {
+			s.serviceFocus = true
+			s.pendingServiceFocus = false
+			s.serviceActionIdx = 0
+		}
+		s = s.clampServiceSelection()
 		if !s.Editing {
 			s.selected = min(s.selected, s.selectionCount()-1)
 		}
@@ -398,11 +407,24 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 				if hit.height > 0 && msg.X >= hit.x && msg.X < hit.x+hit.width && y >= hit.y && y < hit.y+hit.height {
 					if action, ok := strings.CutPrefix(control.action, "service:"); ok {
 						s.editor = s.editor.CancelEdit()
+						s.serviceFocus = true
+						s.pendingServiceFocus = false
+						s.serviceActionIdx = hit.index
+						s = s.clampServiceSelection()
 						s.args = []string{action}
 						return s.begin("service")
 					}
 				}
 			}
+			if s.hasServiceCard() && y >= page.systemdY {
+				s.editor = s.editor.CancelEdit()
+				s.serviceFocus = true
+				s.pendingServiceFocus = false
+				s = s.clampServiceSelection()
+				return s, nil
+			}
+			s.serviceFocus = false
+			s.pendingServiceFocus = false
 			msg.Y = y
 			return s.updateEditorMouse(msg, page.editorY)
 		}
@@ -505,6 +527,28 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		return s, nil
 	case tea.KeyMsg:
 		if s.tab == 4 && !s.Editing {
+			if s.serviceFocus && !s.hasServiceCard() {
+				s.serviceFocus = false
+			}
+			if s.serviceFocus && !s.editor.IsEditing() {
+				return s.updateServiceCardKey(msg)
+			}
+			if !s.editor.IsEditing() && s.hasServiceCard() {
+				switch msg.String() {
+				case "h", "tab", "shift+tab":
+					s.serviceFocus = true
+					s.pendingServiceFocus = false
+					s = s.clampServiceSelection()
+					return s, nil
+				case "down", "j":
+					if s.editor.SelectedSettingIndex() == 5 {
+						s.serviceFocus = true
+						s.pendingServiceFocus = false
+						s = s.clampServiceSelection()
+						return s, nil
+					}
+				}
+			}
 			if s.editor.IsEditing() || !isCoreTabKey(msg.String()) {
 				if s.Busy || s.editor.IsSaving() {
 					return s, nil
@@ -512,6 +556,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 				if !s.editor.IsEditing() && msg.String() == "r" {
 					return s, s.Refresh()
 				}
+				s.pendingServiceFocus = false
 				var cmd tea.Cmd
 				s.editor, cmd = s.editor.Update(msg)
 				return s, cmd
@@ -538,7 +583,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case "right":
 			return s.stepTab(1)
 		case "h":
-			return s.editForm("service")
+			return s.openServiceStatus()
 		case "y":
 			return s.choose("system-proxy")
 		case "n":
@@ -613,6 +658,7 @@ func (s State) Leave() State {
 		s = s.closeForm()
 	}
 	s.args = nil
+	s.serviceFocus, s.pendingServiceFocus, s.serviceActionIdx = false, false, 0
 	s.editor = s.editor.CancelEdit()
 	return s
 }

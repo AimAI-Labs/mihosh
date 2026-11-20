@@ -151,7 +151,7 @@ func TestCoreSettingsDialogsBlockGlobalNavigationAndMouse(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	svc := service.NewCoreService()
 	defer svc.Close()
-	for _, shortcut := range []string{"e", "h", "m", "c"} {
+	for _, shortcut := range []string{"e", "m", "c"} {
 		s := corepage.NewState(svc, nil, nil)
 		tab := "3"
 		if shortcut == "e" {
@@ -178,6 +178,13 @@ func TestCoreSettingsDialogsBlockGlobalNavigationAndMouse(t *testing.T) {
 				t.Fatal("mouse navigation escaped the settings dialog")
 			}
 		}
+	}
+	s := corepage.NewState(svc, nil, nil)
+	s.Status.Mode = "managed"
+	s.Status.ServiceUnit = "mihosh-example.service"
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	if !s.IsMihomoPage() || s.Editing {
+		t.Fatal("h shortcut did not jump to the Mihomo service status page")
 	}
 }
 

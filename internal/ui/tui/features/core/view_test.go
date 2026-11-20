@@ -66,7 +66,14 @@ func TestCoreEnterFollowsSelectionAndServiceMenuCapturesKeys(t *testing.T) {
 	svc := service.NewCoreService()
 	defer svc.Close()
 	s := NewState(svc, nil, nil)
-	s.Status = service.CoreStatus{Mode: "managed", Version: "v1", Running: true}
+	s.Status = service.CoreStatus{
+		Mode:             "managed",
+		Version:          "v1",
+		Running:          true,
+		ServiceUnit:      "mihosh-example.service",
+		ServiceInstalled: true,
+		ServiceRunning:   true,
+	}
 	for _, item := range s.actions() {
 		if item.action == "profile" || item.key == "o" {
 			t.Fatal("duplicate subscription entry remains in the daily menu")
@@ -80,22 +87,22 @@ func TestCoreEnterFollowsSelectionAndServiceMenuCapturesKeys(t *testing.T) {
 	s = selectTestAction(t, s, "service")
 	s.selected--
 	s, _ = s.Update(coreKey("down"))
-	s, cmd = s.Update(coreKey("enter"))
-	if !s.Editing || s.form != "service" || s.Busy || cmd != nil {
-		t.Fatal("selected background service entry did not open its menu")
+	s, _ = s.Update(coreKey("enter"))
+	if s.Editing || s.tab != 4 || !s.serviceFocus || s.Busy {
+		t.Fatal("selected background service entry did not jump to the Mihomo service status card")
 	}
 	s, cmd = s.Update(coreKey("y"))
 	if s.Busy || cmd != nil || len(s.fields) != 0 {
-		t.Fatal("service menu allowed an underlying network action or text input")
+		t.Fatal("service status focus allowed an underlying network action or text input")
 	}
-	s, _ = s.Update(coreKey("down"))
-	if s.selected != 1 {
-		t.Fatal("service selection did not move")
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRight})
+	if s.serviceActionIdx != 1 {
+		t.Fatal("service quick action focus did not move")
 	}
 	s, cmd = s.Update(coreKey("enter"))
 	defer s.Close()
-	if s.Editing || !s.Busy || cmd == nil {
-		t.Fatal("selected service action was not queued")
+	if s.Editing || !s.Busy || s.task != "service" || cmd == nil {
+		t.Fatal("focused service action was not queued")
 	}
 	// Do not execute the command: real system services must not be touched by UI tests.
 }
@@ -260,7 +267,7 @@ func TestCoreAllSectionsAndFormsRespectTerminalBounds(t *testing.T) {
 					s.Err = errors.New(strings.Repeat("a long error message ", 12))
 					states = append(states, s)
 				}
-				for _, form := range []string{"network", "version", "import", "external", "service"} {
+				for _, form := range []string{"network", "version", "import", "external"} {
 					s, _ := NewState(svc, nil, nil).editForm(form)
 					states = append(states, s)
 				}

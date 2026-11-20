@@ -66,20 +66,27 @@ func TestCoreFormLeaveClearsSensitiveInputs(t *testing.T) {
 	}
 }
 
-func TestServiceFormAndNetworkActionsRemainInCoreState(t *testing.T) {
+func TestServiceJumpAndNetworkActionsRemainInCoreState(t *testing.T) {
 	svc := service.NewCoreService()
 	defer svc.Close()
 	s := NewState(svc, nil, nil)
 	s.Status.Mode = "managed"
-	s, cmd := s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
-	if !s.Editing || s.form != "service" || cmd != nil || len(s.fields) != 0 {
-		t.Fatal("service menu should open without text inputs or a background command")
+	s.Status.ServiceUnit = "mihosh-example.service"
+	s.Status.ServiceInstalled = true
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	if s.Editing || s.tab != 4 || !s.serviceFocus || len(s.fields) != 0 {
+		t.Fatal("service shortcut should jump to Mihomo service status card without opening a modal")
 	}
 	s = s.Leave()
+	if s.serviceFocus {
+		t.Fatal("leaving core page did not clear service focus")
+	}
 	if runtime.GOOS != "linux" {
 		return
 	}
-	s, cmd = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	s = s.selectTab(2)
+	s.Status.Mode = "managed"
+	s, cmd := s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
 	if s.Editing || !s.Busy || s.task != "system-proxy" || cmd == nil {
 		t.Fatal("system proxy shortcut must toggle inline without opening a dialog")
 	}

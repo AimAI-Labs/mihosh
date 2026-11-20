@@ -26,7 +26,30 @@ func (s State) ReleaseHelpNotes() []string {
 
 func (s State) inlineHelpHints(width int) []common.InlineHelpHint {
 	if s.tab == 4 && !s.Editing && !s.Busy && s.task == "" && s.Err == nil {
-		return s.editor.InlineHelpHints(width)
+		if s.serviceFocus && s.hasServiceCard() {
+			hints := []common.InlineHelpHint{
+				{Key: "←→", Desc: i18n.T("core.inline.select")},
+				{Key: "Enter", Desc: i18n.T("core.inline.run")},
+				{Key: "↑↓", Desc: i18n.T("core.inline.scroll")},
+				{Key: "Tab/Esc", Desc: i18n.T("core.tab.mihomo")},
+			}
+			help := common.InlineHelpHint{Key: "?", Desc: i18n.T("core.inline.help")}
+			for len(hints) > 0 && lipgloss.Width(common.FormatInlineHintRow(append(hints, help))) > width-1 {
+				hints = hints[:len(hints)-1]
+			}
+			return append(hints, help)
+		}
+		hints := s.editor.InlineHelpHints(width)
+		if s.hasServiceCard() && !s.editor.IsEditing() {
+			svcHint := common.InlineHelpHint{Key: "Tab", Desc: i18n.T("core.inline.service")}
+			if len(hints) > 0 {
+				candidate := append(append([]common.InlineHelpHint(nil), hints[:len(hints)-1]...), svcHint, hints[len(hints)-1])
+				if lipgloss.Width(common.FormatInlineHintRow(candidate)) <= width-1 {
+					return candidate
+				}
+			}
+		}
+		return hints
 	}
 	hints := []common.InlineHelpHint{
 		{Key: "←→", Desc: i18n.T("core.inline.sections")},
@@ -67,9 +90,6 @@ func (s State) inlineHelpHints(width int) []common.InlineHelpHint {
 				{Key: "↑↓", Desc: i18n.T("core.inline.scroll")},
 				{Key: "Esc", Desc: i18n.T("core.inline.cancel")},
 			}
-		case "service":
-			hints[0] = common.InlineHelpHint{Key: "↑↓", Desc: i18n.T("core.inline.select")}
-			hints[1].Desc = i18n.T("core.inline.run")
 		default:
 			if isChoiceForm(s.form) {
 				hints = hints[1:]

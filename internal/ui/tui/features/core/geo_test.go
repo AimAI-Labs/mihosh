@@ -167,10 +167,10 @@ func TestGeoEmptyAndCustomSourceDoNotStartDownloads(t *testing.T) {
 	if next, cmd := s.Update(coreKey("enter")); next.Busy || cmd != nil {
 		t.Fatal("custom source started an official download")
 	}
-	s.Editing, s.form, s.selected = true, "service", len(serviceActions)-1
+	s.Editing, s.form, s.selected = true, "external", 2
 	s, _ = s.Update(messages.CoreGeoDataMsg{Files: []service.GeoDataFile{{Key: "mmdb"}}})
-	if s.selected != len(serviceActions)-1 {
-		t.Fatal("background GEO response changed the selection in the service dialog")
+	if s.selected != 2 {
+		t.Fatal("background GEO response changed the selection in an open dialog")
 	}
 }
 

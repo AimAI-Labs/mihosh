@@ -59,9 +59,6 @@ func (s State) formDialog(width, height int) (pageLayout, int) {
 	popupWidth = max(24, min(width, popupWidth))
 	var page pageLayout
 	switch s.form {
-	case "service":
-		page.content, page.actions, _ = s.actionPanel(popupWidth, "core.action.service", nil, 0)
-		page.focusY = page.actions[s.selected].y
 	case "details":
 		page.content = s.coreDetails(popupWidth)
 	default:
@@ -129,10 +126,6 @@ func (s State) clickForm(msg messages.PageMouseClickMsg) (State, tea.Cmd) {
 	}
 	for _, hit := range page.actions {
 		if msg.X >= hit.x && msg.X < hit.x+hit.width && msg.Y >= hit.y && msg.Y < hit.y+hit.height {
-			if s.form == "service" {
-				s.selected = hit.index
-				return s.submitService()
-			}
 			s.fields[s.focus].Blur()
 			s.focus = hit.index
 			s.formFollowFocus = true
@@ -164,12 +157,6 @@ func (s State) scrollForm(msg messages.PageMouseScrollMsg) (State, tea.Cmd) {
 	delta := 1
 	if msg.Up {
 		delta = -1
-	}
-	if s.form == "service" {
-		s.selected = max(0, min(len(serviceActions)-1, s.selected+delta))
-		s.dialogScroll = page.scrollOffset
-		s.formFollowFocus = true
-		return s, nil
 	}
 	s.dialogScroll = max(0, min(page.maxScroll, page.scrollOffset+delta))
 	s.formFollowFocus = false

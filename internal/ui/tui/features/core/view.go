@@ -71,20 +71,11 @@ func (s State) actionPanel(width int, title string, items []actionItem, firstInd
 	var rows []string
 	var hits []actionHit
 	var controls []releaseControl
-	serviceMenu := s.Editing && s.form == "service"
-	if serviceMenu {
-		for _, action := range serviceActions {
-			items = append(items, actionItem{action: action})
-		}
-	}
 	for index, item := range items {
 		i := firstIndex + index
 		prefix, titleKey := "  ", "core.action."+item.action
 		if id, ok := strings.CutPrefix(item.action, "api:"); ok {
 			titleKey = "settings.action." + id
-		}
-		if serviceMenu {
-			titleKey = "core.service." + item.action
 		}
 		if i == s.selected {
 			prefix = "› "
@@ -106,7 +97,7 @@ func (s State) actionPanel(width int, title string, items []actionItem, firstInd
 		}
 
 		rowY := len(rows) + 1
-		if enabled, isSwitch := s.switchValue(item.action); isSwitch && reason == "" && !serviceMenu {
+		if enabled, isSwitch := s.switchValue(item.action); isSwitch && reason == "" {
 			switchStr, offOffset, offW, onOffset, onW := renderInlineSwitch(enabled, innerW)
 			switchW := lipgloss.Width(switchStr)
 			ctrlX, ctrlY := 2, rowY
@@ -125,12 +116,7 @@ func (s State) actionPanel(width int, title string, items []actionItem, firstInd
 		} else {
 			rows = append(rows, renderLabel(innerW))
 		}
-		switch {
-		case serviceMenu:
-			for _, line := range strings.Split(wrap(i18n.T("core.service.desc."+item.action), innerW-2), "\n") {
-				rows = append(rows, muted.Render("  "+line))
-			}
-		case reason != "":
+		if reason != "" {
 			rows = append(rows, muted.Render("  "+ansi.Truncate(i18n.T(reason), innerW-2, "…")))
 		}
 		hits = append(hits, actionHit{x: 1, y: rowY, width: width - 2, height: len(rows) + 1 - rowY, index: i})
@@ -243,12 +229,8 @@ func (s State) coreDetails(width int) string {
 
 func (s State) layout(width, height int) pageLayout {
 	width = max(24, width)
-	if s.Editing && s.form != "service" {
-		return s.formLayout(width)
-	}
 	if s.Editing {
-		content, hits, controls := s.actionPanel(width, "core.action.service", nil, 0)
-		return pageLayout{content: content, actions: hits, controls: controls}
+		return s.formLayout(width)
 	}
 	var result pageLayout
 	selectedTab := s.tab
@@ -266,8 +248,12 @@ func (s State) layout(width, height int) pageLayout {
 	}
 	top := lipgloss.Height(strings.Join(parts, "\n"))
 	if s.tab == 4 {
-		parts = append(parts, preferences.RenderEmbedded(s.editor.ToPageState(s.editor.Config, nil), width))
-		if s.Status.ServiceUnit != "" {
+		editorState := s.editor.ToPageState(s.editor.Config, nil)
+		if s.serviceFocus && s.hasServiceCard() {
+			editorState.SelectedSetting = -1
+		}
+		parts = append(parts, preferences.RenderEmbedded(editorState, width))
+		if s.hasServiceCard() {
 			systemdY := lipgloss.Height(strings.Join(parts, "\n")) + 1
 			panelView, controls, maxScroll := s.systemdPanel(width, height-systemdY)
 			for i := range controls {
@@ -368,8 +354,21 @@ func (s State) downloadsLayout(width, height int, parts []string, result pageLay
 	return result
 }
 
-func (s State) serviceQuickStyle(action string) lipgloss.Style {
+func (s State) serviceQuickStyle(action string, focused bool) lipgloss.Style {
 	t := theme.Current()
+	if focused && !s.Busy {
+		bg := t.Primary
+		switch action {
+		case "stop":
+			bg = t.Warning
+		case "uninstall":
+			bg = t.Danger
+		}
+		return lipgloss.NewStyle().
+			Background(theme.Resolve(bg)).
+			Foreground(theme.Resolve(t.Background)).
+			Bold(true)
+	}
 	base := lipgloss.NewStyle().Background(theme.Resolve(t.Selected))
 	if s.Busy {
 		return base.Foreground(theme.Resolve(t.Muted))
@@ -387,30 +386,13 @@ func (s State) serviceQuickStyle(action string) lipgloss.Style {
 }
 
 func (s State) serviceQuickMenu(width int) ([]string, []releaseControl) {
-	type group struct {
-		label   string
-		actions []string
-	}
-	var groups []group
-	installation := []string{"install"}
-	if s.Status.ServiceInstalled {
-		lifecycle := []string{"start"}
-		if s.Status.ServiceRunning {
-			lifecycle = []string{"stop", "restart"}
-		}
-		groups = append(groups,
-			group{"runtime", lifecycle},
-			group{"autostart", []string{"enable", "boot", "disable"}},
-		)
-		installation = append(installation, "uninstall")
-	}
-	groups = append(groups, group{"manage", installation})
-
+	groups := s.serviceQuickGroups()
 	muted := common.DimStyle()
 	var rows []string
 	var controls []releaseControl
 	var line string
 	x := 0
+	actionIdx := 0
 	for _, section := range groups {
 		title := i18n.T("core.service.group." + section.label)
 		titleWidth := lipgloss.Width(title)
@@ -448,12 +430,14 @@ func (s State) serviceQuickMenu(width int) ([]string, []releaseControl) {
 			}
 			if !s.Busy {
 				controls = append(controls, releaseControl{
-					actionHit: actionHit{x: 2 + x, y: len(rows) + 1, width: btnW, height: 1},
+					actionHit: actionHit{x: 2 + x, y: len(rows) + 1, width: btnW, height: 1, index: actionIdx},
 					action:    "service:" + action,
 				})
 			}
-			line += s.serviceQuickStyle(action).Render(label)
+			focused := s.serviceFocus && actionIdx == s.serviceActionIdx
+			line += s.serviceQuickStyle(action, focused).Render(label)
 			x += btnW
+			actionIdx++
 		}
 	}
 	return append(rows, line), controls
@@ -567,8 +551,12 @@ func (s State) viewportOffset(page pageLayout, height int) int {
 		return 0
 	}
 	offset := s.scroll
-	if s.Editing && s.form != "service" {
+	if s.Editing {
 		offset = max(0, page.focusY-height+2)
+	} else if s.tab == 4 && s.serviceFocus && page.systemdY > 0 {
+		if page.systemdY+3 > offset+height {
+			offset = page.systemdY
+		}
 	} else if s.followSelection && len(page.actions) > 0 {
 		index := min(s.selected, len(page.actions)-1)
 		hit := page.actions[index]
