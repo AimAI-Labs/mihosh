@@ -29,6 +29,10 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 		}
 		return s, nil
 	}
+	if kind == "details" {
+		s.formFollowFocus = false
+		return s, nil
+	}
 	if isChoiceForm(kind) {
 		return s, nil
 	}
@@ -109,6 +113,20 @@ func isChoiceForm(kind string) bool {
 }
 
 func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
+	if s.form == "details" {
+		switch msg.String() {
+		case "esc", "enter":
+			return s.closeForm(), nil
+		case "up", "k", "down", "j":
+			page, _ := s.formDialog(s.viewWidth, s.viewHeight)
+			delta := 1
+			if msg.String() == "up" || msg.String() == "k" {
+				delta = -1
+			}
+			s.dialogScroll = min(max(0, page.scrollOffset+delta), page.maxScroll)
+		}
+		return s, nil
+	}
 	s.formFollowFocus = true
 	if s.Busy && s.form != "network" && msg.String() == "enter" {
 		return s, nil

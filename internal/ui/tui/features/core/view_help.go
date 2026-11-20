@@ -33,6 +33,13 @@ func (s State) inlineHelpHints(width int) []common.InlineHelpHint {
 		{Key: "↑↓", Desc: i18n.T("core.inline.select")},
 		{Key: "Enter", Desc: i18n.T("core.inline.run")},
 	}
+	if s.isAdvancedPage() && !s.Editing && !s.Busy {
+		items := s.actions()
+		action := items[min(s.selected, len(items)-1)].action
+		if _, isSwitch := s.switchValue(action); isSwitch {
+			hints = append(hints, common.InlineHelpHint{Key: "Space", Desc: i18n.T("core.inline.toggle")})
+		}
+	}
 	if s.isDownloadsPage() {
 		primary := i18n.T("core.inline.download")
 		if s.tab == 3 {
@@ -55,6 +62,11 @@ func (s State) inlineHelpHints(width int) []common.InlineHelpHint {
 			{Key: "Esc", Desc: i18n.T("core.inline.cancel")},
 		}
 		switch s.form {
+		case "details":
+			hints = []common.InlineHelpHint{
+				{Key: "↑↓", Desc: i18n.T("core.inline.scroll")},
+				{Key: "Esc", Desc: i18n.T("core.inline.cancel")},
+			}
 		case "service":
 			hints[0] = common.InlineHelpHint{Key: "↑↓", Desc: i18n.T("core.inline.select")}
 			hints[1].Desc = i18n.T("core.inline.run")

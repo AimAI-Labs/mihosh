@@ -45,7 +45,7 @@ func TestCoreFirstUseExplainsNextStepWithoutConnectionDiagnostics(t *testing.T) 
 	s := State{followSelection: true}
 	s, _ = s.Update(messages.CoreConnectionMsg{Err: errors.New("dial tcp: connection refused")})
 	view := ansi.Strip(s.Render(120, 28))
-	for _, want := range []string{"欢迎使用", "一键开始使用", "已有内核", "版本", "内核路径"} {
+	for _, want := range []string{"欢迎使用", "一键开始使用", "已有内核", "内核详情"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("first-use guidance missing %q", want)
 		}
@@ -100,47 +100,53 @@ func TestCoreEnterFollowsSelectionAndServiceMenuCapturesKeys(t *testing.T) {
 	// Do not execute the command: real system services must not be touched by UI tests.
 }
 
-func TestCoreMenuWheelSelectsAndKeepsActionsVisible(t *testing.T) {
+func TestCoreWheelScrollsActionsAndKeepsHeaderAndSelection(t *testing.T) {
 	i18n.Init()
 	t.Cleanup(func() { i18n.SetLanguageOverride("") })
 	for _, language := range []string{"zh-CN", "en-US"} {
 		i18n.SetLanguageOverride(language)
 		for _, width := range []int{40, 80, 120} {
 			for _, tab := range []int{0, 2} {
-				s := State{tab: tab, followSelection: true}
-				s.Status = service.CoreStatus{Mode: "managed", Version: "v1", Running: true}
-				wheel := messages.PageMouseScrollMsg{X: width / 2, Y: 6, Width: width, Height: 16}
-				for _, up := range []bool{false, true} {
-					wheel.Up = up
-					for range s.selectionCount() + 2 {
-						want := min(s.selectionCount()-1, s.selected+1)
-						if up {
-							want = max(0, s.selected-1)
-						}
-						next, cmd := s.Update(wheel)
-						s = next
-						if s.selected != want || !s.followSelection || cmd != nil || s.Busy || s.Editing {
-							t.Fatalf("%s width=%d tab=%d: wheel did not select %d without running it", language, width, tab, want)
-						}
-						height := wheel.Height - footerHeight
-						page := s.layout(width, height)
-						offset := s.viewportOffset(page, height)
-						hit := page.actions[s.selected]
-						if hit.y < offset || hit.y >= offset+height {
-							t.Fatalf("%s width=%d tab=%d: selected action is outside the viewport", language, width, tab)
-						}
+				s := State{tab: tab, followSelection: true, connected: true,
+					Status: service.CoreStatus{Mode: "managed", Version: "v1", Running: true}}
+				const height = 14
+				contentHeight := height - footerHeight
+				page := s.layout(width, contentHeight)
+				wheel := messages.PageMouseScrollMsg{X: 4, Y: page.pinnedRows - 1, Width: width, Height: height}
+				initial := strings.Split(ansi.Strip(s.Render(width, height)), "\n")
+				same, cmd := s.Update(wheel)
+				if same.scroll != 0 || !same.followSelection || cmd != nil {
+					t.Fatal("wheel over the status row scrolled the actions")
+				}
+				wheel.Y++
+				for range lipgloss.Height(page.content) {
+					next, cmd := s.Update(wheel)
+					if next.selected != s.selected || next.Busy || next.Editing || cmd != nil {
+						t.Fatal("content wheel changed or ran the selected action")
 					}
+					s = next
+				}
+				if s.scroll != lipgloss.Height(page.content)-contentHeight || s.followSelection {
+					t.Fatal("wheel did not reach the end of the action list")
+				}
+				scrolled := strings.Split(ansi.Strip(s.Render(width, height)), "\n")
+				if strings.Join(initial[:page.pinnedRows], "\n") != strings.Join(scrolled[:page.pinnedRows], "\n") {
+					t.Fatalf("%s width=%d tab=%d: the header moved while scrolling", language, width, tab)
+				}
+				hit := page.tabs[0]
+				clicked, _ := s.Update(messages.PageMouseClickMsg{X: hit.x, Y: hit.y, Width: width, Height: height})
+				if clicked.tab != 0 || clicked.scroll != 0 {
+					t.Fatal("the pinned tab could not be clicked after scrolling")
+				}
+
+				s, _ = s.Update(coreKey("down"))
+				page = s.layout(width, contentHeight)
+				offset := s.viewportOffset(page, contentHeight)
+				if y := page.actions[s.selected].y - offset; s.selected != 1 || y < page.pinnedRows || y >= contentHeight {
+					t.Fatal("keyboard navigation did not follow and reveal the selected action")
 				}
 			}
 		}
-	}
-	s := State{tab: 2, followSelection: true}
-	s = selectTestAction(t, s, "service")
-	s.selected--
-	s, _ = s.Update(messages.PageMouseScrollMsg{Width: 120, Height: 30})
-	s, cmd := s.Update(coreKey("enter"))
-	if !s.Editing || s.form != "service" || cmd != nil {
-		t.Fatal("Enter did not open the menu item selected by the wheel")
 	}
 }
 
@@ -168,7 +174,7 @@ func TestCoreTabsCanBeSelectedByMouse(t *testing.T) {
 		}
 	}
 	for y, line := range strings.Split(view, "\n") {
-		if at := strings.Index(line, "Advanced"); at >= 0 {
+		if at := strings.Index(line, i18n.T("core.tab.advanced")); at >= 0 {
 			next, cmd := s.Update(messages.PageMouseClickMsg{X: lipgloss.Width(line[:at]), Y: y, Width: 120, Height: 28})
 			if next.tab != 0 || next.Busy || next.Editing || cmd != nil {
 				t.Fatal("tab click did not change section without running an action")
@@ -295,31 +301,69 @@ func TestCoreHelpStaysAtBottomRightWhileScrolling(t *testing.T) {
 	i18n.SetLanguageOverride("")
 }
 
-func TestDailyOverviewShowsCoreDetailsWithoutGuidance(t *testing.T) {
+func TestCoreStatusLineAndDetails(t *testing.T) {
 	i18n.Init()
 	i18n.SetLanguageOverride("en-US")
 	t.Cleanup(func() { i18n.SetLanguageOverride("") })
-	s := State{Status: service.CoreStatus{Mode: "managed", Version: "v1.2.3", BinaryPath: "/core/mihomo", ConfigPath: "/runtime/config.yaml", Controller: "127.0.0.1:9090", MixedPort: 7890}}
-	view := ansi.Strip(s.overview(70))
-	for _, want := range []string{"v1.2.3", "/core/mihomo", "/runtime/config.yaml", "127.0.0.1:9090", "7890"} {
-		if !strings.Contains(view, want) {
-			t.Errorf("overview missing %q", want)
+	s := State{followSelection: true, connectionChecked: true, Status: service.CoreStatus{
+		Mode: "managed", Running: true, Version: "v1.2.3", BinaryPath: "/core/mihomo",
+		ConfigPath: "/runtime/config.yaml", Controller: "127.0.0.1:9090", MixedPort: 7890,
+	}}
+	for _, width := range []int{80, 99, 100, 120} {
+		view := ansi.Strip(s.Render(width, 24))
+		status := strings.Split(view, "\n")[s.layout(width, 24-footerHeight).pinnedRows-1]
+		for _, want := range []string{i18n.T("core.state.running_unreachable"), "v1.2.3", "7890"} {
+			if !strings.Contains(status, want) {
+				t.Errorf("width %d: status line missing %q: %s", width, want, status)
+			}
+		}
+		for _, key := range []string{"core.action.system-proxy", "core.action.tun", "core.action.shell-proxy"} {
+			if !strings.Contains(view, i18n.T(key)) {
+				t.Errorf("width %d: proxy switch %q is missing from the first screen", width, key)
+			}
+		}
+		if strings.Contains(view, "/core/mihomo") || strings.Contains(view, "/runtime/config.yaml") {
+			t.Fatal("full paths should be in the details dialog")
 		}
 	}
-	if strings.Contains(view, i18n.T("core.hint.start")) {
-		t.Fatal("daily overview still contains guidance")
+	details, cmd := s.Update(coreKey("enter"))
+	if !details.Editing || details.form != "details" || cmd != nil {
+		t.Fatal("the running core should default to opening details")
 	}
+	view := ansi.Strip(details.Render(120, 30))
+	for _, want := range []string{"/core/mihomo", "/runtime/config.yaml", "127.0.0.1:9090", i18n.T("core.connection_unavailable")} {
+		if !strings.Contains(view, want) {
+			t.Errorf("details missing %q", want)
+		}
+	}
+	details, _ = details.Update(messages.PageResizeMsg{Width: 40, Height: 10})
+	for range 30 {
+		details, _ = details.Update(coreKey("down"))
+	}
+	page, _ := details.formDialog(40, 10)
+	if page.maxScroll == 0 || details.dialogScroll != page.maxScroll {
+		t.Fatal("details keyboard scrolling did not stop at the end")
+	}
+	details, _ = details.Update(coreKey("k"))
+	if details.dialogScroll != page.maxScroll-1 {
+		t.Fatal("keyboard did not scroll back from the end")
+	}
+	details, _ = details.Update(coreKey("esc"))
+	if details.Editing || details.dialogScroll != 0 {
+		t.Fatal("closing details did not clear dialog state")
+	}
+
 	s.Status.Mode = "external"
 	s, _ = s.Update(messages.CoreConnectionMsg{Version: "v9.8.7"})
-	view = ansi.Strip(s.overview(70))
+	view = ansi.Strip(s.coreDetails(70))
 	if !strings.Contains(view, "v9.8.7") || strings.Contains(view, "v1.2.3") {
-		t.Fatal("external overview did not use the connected core version")
+		t.Fatal("external details did not use the connected core version")
 	}
 	if !strings.Contains(view, "/core/mihomo") {
 		t.Fatal("external executable path is not visible")
 	}
 	s.Status.BinaryPath = ""
-	if !strings.Contains(ansi.Strip(s.overview(70)), i18n.T("core.path_unavailable")) {
+	if !strings.Contains(ansi.Strip(s.coreDetails(70)), i18n.T("core.path_unavailable")) {
 		t.Fatal("unavailable executable path is not explained")
 	}
 }

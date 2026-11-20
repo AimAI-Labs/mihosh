@@ -39,6 +39,8 @@ type State struct {
 	formScroll        int
 	dialogScroll      int
 	formFollowFocus   bool
+	viewWidth         int
+	viewHeight        int
 	scroll            int
 	tab               int
 	selected          int
@@ -254,6 +256,9 @@ func (s State) begin(action string) (State, tea.Cmd) {
 }
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
+	case messages.PageResizeMsg:
+		s.viewWidth, s.viewHeight = msg.Width, msg.Height
+		return s, nil
 	case messages.MihomoConfigMsg:
 		s.editor = s.editor.ApplyMihomoConfig(&msg)
 		return s, nil
@@ -360,7 +365,10 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			return s, nil
 		}
 		page := s.layout(msg.Width, contentHeight)
-		y := msg.Y + s.viewportOffset(page, contentHeight)
+		y := msg.Y
+		if y >= page.pinnedRows {
+			y += s.viewportOffset(page, contentHeight)
+		}
 		for _, hit := range page.tabs {
 			if msg.X >= hit.x && msg.X < hit.x+hit.width && y == hit.y {
 				return s.openTab(hit.index)
@@ -421,6 +429,23 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	case messages.PageMouseScrollMsg:
 		if s.Editing {
 			return s.scrollForm(msg)
+		}
+		if s.isAdvancedPage() {
+			height := max(1, msg.Height-footerHeight)
+			page := s.layout(msg.Width, height)
+			if msg.X < 0 || msg.X >= msg.Width || msg.Y < page.pinnedRows || msg.Y >= height {
+				return s, nil
+			}
+			delta := 1
+			if msg.Up {
+				delta = -1
+			}
+			offset := s.viewportOffset(page, height)
+			limit := max(0, lipgloss.Height(page.content)-height)
+			if scroll := min(max(0, offset+delta), limit); scroll != offset {
+				s.scroll, s.followSelection = scroll, false
+			}
+			return s, nil
 		}
 		if s.isDownloadsPage() {
 			height := max(1, msg.Height-footerHeight)

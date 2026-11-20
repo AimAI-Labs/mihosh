@@ -23,6 +23,7 @@ type pageLayout struct {
 	systemdY                int
 	serviceMaxScroll        int
 	content                 string
+	pinnedRows              int
 	actions                 []actionHit
 	tabs                    []actionHit
 	focusY                  int
@@ -62,7 +63,7 @@ func renderInlineSwitch(enabled bool, width int) (control string, offOffset, off
 	return rendered, 1, offW, 1 + offW + 1, onW
 }
 
-func (s State) actionPanel(width int, serviceMenu bool) (string, []actionHit, []releaseControl) {
+func (s State) actionPanel(width int, title string, items []actionItem, firstIndex int) (string, []actionHit, []releaseControl) {
 	t := theme.Current()
 	muted := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted))
 	selected := lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true)
@@ -70,14 +71,14 @@ func (s State) actionPanel(width int, serviceMenu bool) (string, []actionHit, []
 	var rows []string
 	var hits []actionHit
 	var controls []releaseControl
-	items := s.actions()
+	serviceMenu := s.Editing && s.form == "service"
 	if serviceMenu {
-		items = nil
 		for _, action := range serviceActions {
 			items = append(items, actionItem{action: action})
 		}
 	}
-	for i, item := range items {
+	for index, item := range items {
+		i := firstIndex + index
 		prefix, titleKey, descKey := "  ", "core.action."+item.action, "core.desc."+item.action
 		if id, ok := strings.CutPrefix(item.action, "api:"); ok {
 			titleKey, descKey = "settings.action."+id, ""
@@ -92,187 +93,148 @@ func (s State) actionPanel(width int, serviceMenu bool) (string, []actionHit, []
 		if item.key != "" && item.key != "enter" {
 			label += " [" + item.key + "]"
 		}
-		var desc string
-		if descKey != "" {
-			desc = "  " + strings.ReplaceAll(wrap(i18n.T(descKey), width-6), "\n", "\n  ")
-		}
-		if enabled, isSwitch := s.switchValue(item.action); isSwitch && !serviceMenu {
-			switchStr, offOff, offW, onOff, onW := renderInlineSwitch(enabled, innerW)
-			switchW := lipgloss.Width(switchStr)
-			if innerW >= switchW+1+8 {
-				leftAvail := innerW - switchW - 1
-				leftText := common.PadString(ansi.Truncate(label, leftAvail, "…"), leftAvail)
-				if i == s.selected {
-					leftText = selected.Render(leftText)
-				}
-				rowY := len(rows) + 1
-				ctrlX := 2 + leftAvail + 1
-				controls = append(controls,
-					releaseControl{actionHit: actionHit{x: ctrlX + offOff, y: rowY, width: offW, height: 1, index: 0}, action: "switch:" + item.action},
-					releaseControl{actionHit: actionHit{x: ctrlX + onOff, y: rowY, width: onW, height: 1, index: 1}, action: "switch:" + item.action},
-				)
-				hits = append(hits, actionHit{x: 1, y: rowY, width: width - 2, height: 1 + lipgloss.Height(desc), index: i})
-				rows = append(rows, leftText+" "+switchStr)
-				rows = append(rows, strings.Split(muted.Render(desc), "\n")...)
-				continue
-			}
-			labelLine := ansi.Truncate(label, innerW, "…")
-			if i == s.selected {
-				labelLine = selected.Render(common.PadString(labelLine, innerW))
-			}
-			indent := "  "
-			if innerW < switchW+2 {
-				indent = ""
-			}
-			rowY := len(rows) + 1
-			ctrlY := rowY + 1
-			ctrlX := 2 + lipgloss.Width(indent)
-			controls = append(controls,
-				releaseControl{actionHit: actionHit{x: ctrlX + offOff, y: ctrlY, width: offW, height: 1, index: 0}, action: "switch:" + item.action},
-				releaseControl{actionHit: actionHit{x: ctrlX + onOff, y: ctrlY, width: onW, height: 1, index: 1}, action: "switch:" + item.action},
-			)
-			hits = append(hits, actionHit{x: 1, y: rowY, width: width - 2, height: 2 + lipgloss.Height(desc), index: i})
-			rows = append(rows, labelLine, indent+switchStr)
-			rows = append(rows, strings.Split(muted.Render(desc), "\n")...)
-			continue
-		}
-		label = ansi.Truncate(label, innerW, "…")
+		style := lipgloss.NewStyle()
 		if i == s.selected {
-			label = selected.Render(common.PadString(label, innerW))
+			style = selected
 		}
-		height := 1
-		if desc != "" {
-			height += lipgloss.Height(desc)
+		renderLabel := func(avail int) string {
+			return style.Render(common.PadString(ansi.Truncate(label, avail, "…"), avail))
 		}
-		hit := actionHit{x: 1, y: len(rows) + 1, width: width - 2, height: height, index: i}
-		hits = append(hits, hit)
-		rows = append(rows, label)
-		if desc != "" {
-			rows = append(rows, strings.Split(muted.Render(desc), "\n")...)
+
+		rowY := len(rows) + 1
+		if enabled, isSwitch := s.switchValue(item.action); isSwitch && !serviceMenu {
+			switchStr, offOffset, offW, onOffset, onW := renderInlineSwitch(enabled, innerW)
+			switchW := lipgloss.Width(switchStr)
+			ctrlX, ctrlY := 2, rowY
+			if left := innerW - switchW - 1; left >= 8 {
+				rows = append(rows, renderLabel(left)+" "+switchStr)
+				ctrlX += left + 1
+			} else {
+				indent := min(2, innerW-switchW)
+				rows = append(rows, renderLabel(innerW), strings.Repeat(" ", indent)+switchStr)
+				ctrlX, ctrlY = ctrlX+indent, ctrlY+1
+			}
+			controls = append(controls,
+				releaseControl{actionHit: actionHit{x: ctrlX + offOffset, y: ctrlY, width: offW, height: 1, index: 0}, action: "switch:" + item.action},
+				releaseControl{actionHit: actionHit{x: ctrlX + onOffset, y: ctrlY, width: onW, height: 1, index: 1}, action: "switch:" + item.action},
+			)
+		} else {
+			rows = append(rows, renderLabel(innerW))
 		}
-	}
-	title := "core.tab." + tabs[s.tab]
-	if serviceMenu {
-		title = "core.action.service"
+		switch {
+		case serviceMenu:
+			for _, line := range strings.Split(wrap(i18n.T(descKey), innerW-2), "\n") {
+				rows = append(rows, muted.Render("  "+line))
+			}
+		case i == s.selected && descKey != "" && item.action != "details":
+			rows = append(rows, muted.Render("  "+ansi.Truncate(i18n.T(descKey), innerW-2, "…")))
+		}
+		hits = append(hits, actionHit{x: 1, y: rowY, width: width - 2, height: len(rows) + 1 - rowY, index: i})
 	}
 	return panel(i18n.T(title), strings.Join(rows, "\n"), width), hits, controls
 }
 
-func (s State) overview(width int) string {
+func (s State) statusLine(width int) string {
 	t := theme.Current()
 	status, color := "core.state.external", t.Info
-	if s.Status.Mode == "managed" {
+	switch {
+	case s.Status.Mode == "managed":
 		status, color = "core.state.stopped", t.Warning
 		if s.Status.Running {
 			status, color = "core.state.running", t.Success
+			if s.controllerUnavailable() {
+				status, color = "core.state.running_unreachable", t.Warning
+			}
 		}
-	} else if s.connected {
+	case s.connected:
 		status, color = "core.state.connected", t.Success
-	}
-	if s.Status.Version == "" && s.Status.Mode != "managed" && !s.connected {
+	case s.Status.Version == "":
 		status = "core.state.welcome"
 	}
-	version := s.Status.Version
-	if version == "" {
+	parts := []string{lipgloss.NewStyle().Foreground(theme.Resolve(color)).Bold(true).Render("● " + i18n.T(status))}
+	if s.Status.RecoveryPending {
+		parts = append(parts, lipgloss.NewStyle().Foreground(theme.Resolve(t.Warning)).Render(i18n.T("core.state.recovery_pending")))
+	}
+	if version := s.coreVersion(); version != "" {
+		parts = append(parts, strings.Join(strings.Fields(ansi.Strip(version)), " "))
+	}
+	if s.Status.MixedPort > 0 {
+		parts = append(parts, i18n.T("core.mixed_port_label")+" "+fmt.Sprint(s.Status.MixedPort))
+	}
+	return ansi.Truncate("  "+strings.Join(parts, " · "), width, "…")
+}
+
+func (s State) coreVersion() string {
+	if s.Status.Mode == "managed" {
+		return s.Status.Version
+	}
+	return s.externalVersion
+}
+
+func (s State) controllerUnavailable() bool {
+	return s.Status.Mode == "managed" && s.Status.Running && s.connectionChecked && !s.connected
+}
+
+func (s State) coreDetails(width int) string {
+	value := func(text string) string {
+		if text == "" {
+			return i18n.T("core.unknown_version")
+		}
+		return text
+	}
+	version := value(s.coreVersion())
+	if s.Status.Mode == "managed" && s.Status.Version == "" {
 		version = i18n.T("core.not_installed")
 	}
-	mode := "core.mode.external"
+	binaryPath := s.Status.BinaryPath
+	if binaryPath == "" {
+		binaryPath = i18n.T("core.path_unavailable")
+	}
+	var rows []string
+	for _, field := range []struct{ key, value string }{
+		{"core.version", version},
+		{"core.binary_path", binaryPath},
+		{"core.config_path", value(s.Status.ConfigPath)},
+		{"core.controller_address", value(s.Status.Controller)},
+	} {
+		rows = append(rows, wrap(i18n.T(field.key)+": "+field.value, width-4))
+	}
+	if s.Status.MixedPort > 0 {
+		rows = append(rows, i18n.T("core.mixed_port_label")+": "+fmt.Sprint(s.Status.MixedPort))
+	}
 	if s.Status.Mode == "managed" {
-		mode = "core.mode.managed"
-	} else if status == "core.state.welcome" {
-		mode = "core.mode.choose"
-	}
-	rows := []string{
-		lipgloss.NewStyle().Foreground(theme.Resolve(color)).Bold(true).Render("● " + i18n.T(status)),
-		i18n.T(mode),
-	}
-	if s.Status.Mode == "managed" {
-		rows = append(rows, i18n.T("core.version")+": "+version)
-	}
-	if s.connectionChecked && !s.connected && s.Status.Mode == "managed" && s.Status.Running {
-		rows = append(rows, lipgloss.NewStyle().Foreground(theme.Resolve(t.Warning)).Render(wrap(i18n.T("core.connection_unavailable"), width-4)))
-	}
-	switch s.tab {
-	case 0, 2:
-		value := func(text string) string {
-			if text == "" {
-				return i18n.T("core.unknown_version")
-			}
-			return text
-		}
-		if s.Status.Mode != "managed" {
-			version = value(s.externalVersion)
-		}
-		binaryPath := s.Status.BinaryPath
-		if binaryPath == "" {
-			binaryPath = i18n.T("core.path_unavailable")
-		}
-		rows = rows[:1]
-		for _, field := range []struct{ key, value string }{
-			{"core.version", version},
-			{"core.binary_path", binaryPath},
-			{"core.config_path", value(s.Status.ConfigPath)},
-			{"core.controller_address", value(s.Status.Controller)},
-		} {
-			rows = append(rows, wrap(i18n.T(field.key)+": "+field.value, width-4))
-		}
-		if s.Status.MixedPort > 0 {
-			rows = append(rows, i18n.T("core.mixed_port_label")+": "+fmt.Sprint(s.Status.MixedPort))
-		}
-		if s.Status.Mode == "managed" {
-			runtime := "core.runtime.session"
-			if s.Status.Runtime == "service" {
-				runtime = "core.runtime.service"
-			}
-			rows = append(rows, i18n.T("core.runtime")+": "+i18n.T(runtime))
-			if s.Status.Runtime == "service" {
-				state := "core.service.status_not_installed"
-				if s.Status.ServiceInstalled {
-					state = "core.service.status_stopped"
-					if s.Status.ServiceRunning {
-						state = "core.service.status_running"
-					}
-				}
-				rows = append(rows, wrap(i18n.T("settings.sys_status.panel_title")+": "+i18n.T(state), width-4))
-				autoStart := "core.disabled"
-				if s.Status.AutoStart {
-					autoStart = "core.enabled"
-				}
-				rows = append(rows, wrap(i18n.T("core.autostart")+": "+i18n.T(autoStart), width-4))
-			}
-		} else if s.editor.SysStatus.LastOutput != "" {
-			rows = append(rows, "", wrap(s.editor.SysStatus.LastOutput, width-4))
-		}
-		if s.Status.RecoveryPending {
-			rows = append(rows, lipgloss.NewStyle().Foreground(theme.Resolve(t.Warning)).Render(wrap(i18n.T("core.hint.recovery"), width-4)))
-		}
-	case 1:
-		tag := s.Release.Tag
-		if tag == "" {
-			tag = i18n.T("core.unknown_version")
-		}
-		rows = append(rows, "", i18n.T("core.available")+": "+tag,
-			wrap(i18n.Tf("core.installed_count", len(s.Status.Installed)), width-4))
-	default:
 		runtime := "core.runtime.session"
 		if s.Status.Runtime == "service" {
 			runtime = "core.runtime.service"
 		}
-		setting := func(label string, enabled bool) string {
-			value := "core.disabled"
-			if enabled {
-				value = "core.enabled"
+		rows = append(rows, i18n.T("core.runtime")+": "+i18n.T(runtime))
+		if s.Status.Runtime == "service" {
+			state := "core.service.status_not_installed"
+			if s.Status.ServiceInstalled {
+				state = "core.service.status_stopped"
+				if s.Status.ServiceRunning {
+					state = "core.service.status_running"
+				}
 			}
-			return i18n.T(label) + ": " + i18n.T(value)
+			rows = append(rows, wrap(i18n.T("settings.sys_status.panel_title")+": "+i18n.T(state), width-4))
+			autoStart := "core.disabled"
+			if s.Status.AutoStart {
+				autoStart = "core.enabled"
+			}
+			rows = append(rows, wrap(i18n.T("core.autostart")+": "+i18n.T(autoStart), width-4))
 		}
-		rows = append(rows, "", i18n.T(runtime), setting("core.autostart", s.Status.AutoStart),
-			setting("core.system_proxy", s.Status.SystemProxy), setting("core.tun_label", s.Status.TUN),
-			"", wrap(i18n.T("core.hint.network"), width-4))
-		if s.Status.RecoveryPending {
-			rows = append(rows, lipgloss.NewStyle().Foreground(theme.Resolve(t.Warning)).Render(wrap(i18n.T("core.hint.recovery"), width-4)))
-		}
+	} else if s.editor.SysStatus.LastOutput != "" {
+		rows = append(rows, "", wrap(s.editor.SysStatus.LastOutput, width-4))
 	}
-	return panel(i18n.T("core.overview"), strings.Join(rows, "\n"), width)
+	t := theme.Current()
+	warning := lipgloss.NewStyle().Foreground(theme.Resolve(t.Warning))
+	if s.controllerUnavailable() {
+		rows = append(rows, warning.Render(wrap(i18n.T("core.connection_unavailable"), width-4)))
+	}
+	if s.Status.RecoveryPending {
+		rows = append(rows, warning.Render(wrap(i18n.T("core.hint.recovery"), width-4)))
+	}
+	return panel(i18n.T("core.action.details"), strings.Join(rows, "\n"), width)
 }
 
 func (s State) layout(width, height int) pageLayout {
@@ -281,7 +243,7 @@ func (s State) layout(width, height int) pageLayout {
 		return s.formLayout(width)
 	}
 	if s.Editing {
-		content, hits, controls := s.actionPanel(width, true)
+		content, hits, controls := s.actionPanel(width, "core.action.service", nil, 0)
 		return pageLayout{content: content, actions: hits, controls: controls}
 	}
 	var result pageLayout
@@ -315,35 +277,42 @@ func (s State) layout(width, height int) pageLayout {
 		result.content, result.editorY = strings.Join(parts, "\n"), top
 		return result
 	}
+	parts[len(parts)-1] = s.statusLine(width)
+	result.pinnedRows = top
+	run, proxy, maintenance := s.advancedActions()
+	appendPanel := func(title string, items []actionItem, panelWidth, x, y int) string {
+		content, hits, controls := s.actionPanel(panelWidth, title, items, len(result.actions))
+		for i := range hits {
+			hits[i].x += x
+			hits[i].y += y
+		}
+		for i := range controls {
+			controls[i].x += x
+			controls[i].y += y
+		}
+		result.actions = append(result.actions, hits...)
+		result.controls = append(result.controls, controls...)
+		return content
+	}
+
 	leftWidth, rightWidth := width, width
+	proxyX, proxyY := 0, top
 	if width >= 100 {
 		leftWidth = width * 43 / 100
 		rightWidth = width - leftWidth
+		proxyX = leftWidth
 	}
-	left := s.overview(leftWidth)
-	right, hits, controls := s.actionPanel(rightWidth, false)
-	for i := range hits {
-		hits[i].y += top
-		if width >= 100 {
-			hits[i].x += leftWidth
-		} else {
-			hits[i].y += lipgloss.Height(left) + 1
-		}
+	running := appendPanel("core.group.running", run, leftWidth, 0, top)
+	if proxyX == 0 {
+		proxyY += lipgloss.Height(running)
 	}
-	for i := range controls {
-		controls[i].y += top
-		if width >= 100 {
-			controls[i].x += leftWidth
-		} else {
-			controls[i].y += lipgloss.Height(left) + 1
-		}
-	}
-	result.actions = hits
-	result.controls = controls
-	if width >= 100 {
-		parts = append(parts, lipgloss.JoinHorizontal(lipgloss.Top, left, right))
+	switches := appendPanel("core.group.proxy", proxy, rightWidth, proxyX, proxyY)
+	tools := appendPanel("core.group.maintenance", maintenance, rightWidth, proxyX, proxyY+lipgloss.Height(switches))
+	right := lipgloss.JoinVertical(lipgloss.Left, switches, tools)
+	if proxyX != 0 {
+		parts = append(parts, lipgloss.JoinHorizontal(lipgloss.Top, running, right))
 	} else {
-		parts = append(parts, left, "", right)
+		parts = append(parts, running, right)
 	}
 	result.content = strings.Join(parts, "\n")
 	return result
@@ -561,8 +530,8 @@ func (s State) viewportOffset(page pageLayout, height int) int {
 		if bottom > offset+height {
 			offset = bottom - height
 		}
-		if hit.y < offset {
-			offset = hit.y
+		if hit.y < offset+page.pinnedRows {
+			offset = hit.y - page.pinnedRows
 		}
 	} else if s.tab == 3 && s.followSelection {
 		offset = max(0, page.geoBounds.y-height+2)
@@ -585,7 +554,13 @@ func (s State) Render(width, height int) string {
 	page := s.layout(width, contentHeight)
 	lines := strings.Split(page.content, "\n")
 	offset := s.viewportOffset(page, contentHeight)
-	lines = lines[offset:min(len(lines), offset+contentHeight)]
+	end := min(len(lines), offset+contentHeight)
+	if page.pinnedRows == 0 {
+		lines = lines[offset:end]
+	} else {
+		pinned := min(page.pinnedRows, contentHeight)
+		lines = append(lines[:pinned], lines[pinned+offset:end]...)
+	}
 	for i := range lines {
 		lines[i] = ansi.Truncate(lines[i], width, "…")
 	}

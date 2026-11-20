@@ -90,6 +90,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		pw, ph := m.getPageSize()
 		m.coreState, _ = m.coreState.HandleEditorMsg(nil, pw, ph, m.logsState.GetSysLogs())
 		resizeMsg := messages.PageResizeMsg{Width: pw, Height: ph}
+		if m.currentPage != layout.PageCore {
+			m.coreState, _ = m.coreState.Update(resizeMsg)
+		}
 		newModel, cmd := m.dispatchToPage(resizeMsg)
 		m = newModel.(Model)
 		return m, tea.Batch(tea.ClearScreen, cmd)

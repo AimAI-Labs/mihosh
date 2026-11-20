@@ -28,7 +28,7 @@ func (s State) primaryAction() actionItem {
 	case !s.Status.Running:
 		return actionItem{"s", "start"}
 	default:
-		return actionItem{"x", "stop"}
+		return actionItem{"", "details"}
 	}
 }
 
@@ -43,8 +43,13 @@ func (s State) actions() []actionItem {
 		}
 		return items
 	}
+	run, proxy, maintenance := s.advancedActions()
+	return append(append(run, proxy...), maintenance...)
+}
+
+func (s State) advancedActions() (running, proxy, maintenance []actionItem) {
 	primary := s.primaryAction()
-	items := []actionItem{primary}
+	running = []actionItem{primary}
 	run := actionItem{"s", "start"}
 	if s.Status.Running {
 		run = actionItem{"x", "stop"}
@@ -57,19 +62,24 @@ func (s State) actions() []actionItem {
 		}
 		others = append(others, actionItem{"u", "external"})
 	}
+	others = append(others, actionItem{"h", "service"}, actionItem{"", "details"})
 	for _, item := range others {
 		if item.action != primary.action {
-			items = append(items, item)
+			running = append(running, item)
 		}
 	}
-	items = append(items, actionItem{"h", "service"}, actionItem{"y", "system-proxy"}, actionItem{"w", "shell-proxy"})
+	proxy = []actionItem{{"y", "system-proxy"}}
+	if s.Status.Mode == "managed" {
+		proxy = append(proxy, actionItem{"n", "tun"})
+	}
+	proxy = append(proxy, actionItem{"w", "shell-proxy"})
 	if s.Status.Mode == "managed" || s.Status.RecoveryPending {
-		items = append(items, actionItem{"c", "recover"})
+		maintenance = append(maintenance, actionItem{"c", "recover"})
 	}
 	if s.Status.Mode == "managed" {
-		items = append(items, actionItem{"n", "tun"}, actionItem{"", "basic-config"})
+		maintenance = append(maintenance, actionItem{"", "basic-config"})
 	} else {
-		items = append(items, actionItem{"m", "configure"})
+		maintenance = append(maintenance, actionItem{"m", "configure"})
 	}
 	if s.connected {
 		apiActions := []string{"reload", "flush_dns", "flush_fakeip"}
@@ -77,10 +87,10 @@ func (s State) actions() []actionItem {
 			apiActions = append(apiActions, "restart", "upgrade_auto", "upgrade_release", "upgrade_alpha", "update_geo")
 		}
 		for _, id := range apiActions {
-			items = append(items, actionItem{"", "api:" + id})
+			maintenance = append(maintenance, actionItem{"", "api:" + id})
 		}
 	}
-	return items
+	return running, proxy, maintenance
 }
 
 func (s State) switchValue(action string) (bool, bool) {
@@ -122,7 +132,7 @@ func (s State) choose(action string) (State, tea.Cmd) {
 		return s.editForm(action)
 	case "system-proxy", "tun", "shell-proxy":
 		return s.toggleSwitch(action)
-	case "network", "version", "import", "external", "service", "configure", "recover", "basic-config", "stop", "restart", "api:restart", "api:update_geo":
+	case "network", "version", "import", "external", "service", "details", "configure", "recover", "basic-config", "stop", "restart", "api:restart", "api:update_geo":
 		return s.editForm(action)
 	default:
 		if id, ok := strings.CutPrefix(action, "api:"); ok {

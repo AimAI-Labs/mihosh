@@ -60,8 +60,10 @@ func (s State) formDialog(width, height int) (pageLayout, int) {
 	var page pageLayout
 	switch s.form {
 	case "service":
-		page.content, page.actions, _ = s.actionPanel(popupWidth, true)
+		page.content, page.actions, _ = s.actionPanel(popupWidth, "core.action.service", nil, 0)
 		page.focusY = page.actions[s.selected].y
+	case "details":
+		page.content = s.coreDetails(popupWidth)
 	default:
 		if isChoiceForm(s.form) {
 			page = s.choiceLayout(popupWidth)

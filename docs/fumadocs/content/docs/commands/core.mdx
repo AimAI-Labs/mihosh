@@ -16,7 +16,7 @@ The baseline configuration provides direct connections, not proxy nodes. System 
 | Key | Action |
 | --- | --- |
 | `↑` / `↓`, `Enter` | Select / run an action (defaults to Set up and start on first use) |
-| `←` / `→` or `1` / `2` / `5` | Switch Advanced, Downloads and Mihomo configuration |
+| `←` / `→` or `1` / `2` / `5` | Switch Runtime & proxy, Downloads and Mihomo configuration |
 | `2` / `4` | Focus the version list or GEO files in Downloads |
 | `v` / `t` | Open or refresh the release browser / look up a stable tag |
 | `Enter` / `i` (Versions), `a` | Download the selected release / activate it after installation |
@@ -29,14 +29,15 @@ The baseline configuration provides direct connections, not proxy nodes. System 
 | `w` | Shell proxy preference, automatic startup setup and refresh prompt |
 | `h` | Install, control and configure automatic startup of the background service |
 | `y` / `n` | Toggle system proxy / TUN |
+| `Space` | Toggle the selected proxy switch |
 | `c` | Recover network settings after an unexpected exit |
 | `p` / `5` | Open unified Mihomo configuration |
 | `u` | Connect to an external API; leave the address empty for auto-discovery |
 | `r` | Refresh status and retry the connection. In Downloads, also refresh versions and GEO files |
-| Mouse wheel | Move selection in Advanced and GEO, or scroll dialog contents |
+| Mouse wheel | Scroll Runtime & proxy, the version list or dialog contents, or move the selection in GEO |
 | `Esc` | Cancel the task or leave the form; downloads also have a clickable Cancel download control |
 
-**Advanced** shows core details, service state and lifecycle controls. Stopping or restarting the core requires confirmation. **Downloads** shows versions and GEO files on the same page. **Mihomo configuration** contains the override form. On managed Linux setups, the panel beneath it shows the status and 10 recent log entries from `systemctl --user status`. Switches show saved preferences, whose effects depend on the running core. Wide terminals use 43% / 57% panels. Narrow terminals stack the content. Use `Tab` and `Enter` inside forms. Exiting Mihosh stops the child owned by a session. A background service continues after the TUI exits. Existing external cores remain under their original owner.
+**Runtime & proxy** keeps the tabs and a one-line status summary visible above the runtime, proxy and maintenance controls. Open **Core details** to see full paths and service status. Stopping or restarting the core requires confirmation. **Downloads** shows versions and GEO files on the same page. **Mihomo configuration** contains the override form. On managed Linux setups, the panel beneath it shows the status and 10 recent log entries from `systemctl --user status`. Switches show saved preferences, whose effects depend on the running core. Wide terminals use 43% / 57% panels. Narrow terminals stack the content. Use `Tab` and `Enter` inside forms. Exiting Mihosh stops the child owned by a session. A background service continues after the TUI exits. Existing external cores remain under their original owner.
 
 ## GEO management
 
