@@ -12,7 +12,10 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-const unlockGridTop = 4 // Three toolbar lines and one spacer.
+const (
+	unlockGridTop   = 3 // Dialog border, heading, and spacer.
+	unlockGridInset = 2 // Dialog border and padding.
+)
 
 type unlockCardLayout struct {
 	grid       common.CardGrid
@@ -23,20 +26,14 @@ type unlockCardLayout struct {
 func unlockPanelWidth(width int) int { return max(12, min(116, width-2)) }
 
 func unlockColumns(width int) int {
-	return min(3, max(1, (unlockPanelWidth(width)-1+common.CardGap)/(32+common.CardGap)))
+	gridWidth := unlockPanelWidth(width) - 2*unlockGridInset - 1
+	return min(3, max(1, (gridWidth+common.CardGap)/(32+common.CardGap)))
 }
 
 func (u unlockView) popup(width, height int) (dialog.Dialog, unlockCardLayout) {
 	panelWidth := unlockPanelWidth(width)
-	columns := unlockColumns(width)
-	gridWidth := panelWidth - 1 - (columns-1)*common.CardGap
-	widths := make([]int, columns)
-	for column := range widths {
-		widths[column] = gridWidth / columns
-	}
-	widths[columns-1] += gridWidth % columns
-	grid := common.LayoutCardGrid(len(u.items), u.cursor, 0, height-1-unlockGridTop, 5, widths...)
-
+	bodyWidth := panelWidth - 2*unlockGridInset
+	viewportHeight := max(1, height-1)
 	palette := theme.Current()
 	buttonColor := palette.Primary
 	for _, item := range u.items {
@@ -47,21 +44,33 @@ func (u unlockView) popup(width, height int) (dialog.Dialog, unlockCardLayout) {
 	}
 	title := lipgloss.NewStyle().Foreground(theme.Resolve(palette.Bright)).Bold(true).Render(i18n.T("conns.unlock.title"))
 	button := "S " + i18n.T("conns.unlock.run_all")
-	if panelWidth-4 < lipgloss.Width(button)+4 {
+	if bodyWidth < lipgloss.Width(button)+4 {
 		button = "S"
 	}
 	buttonWidth := lipgloss.Width(button)
 	button = lipgloss.NewStyle().Foreground(theme.Resolve(buttonColor)).Bold(true).Render(button)
-	toolbar := common.RenderCard(panelWidth, palette.Border, palette.Surface, []string{common.CardHeading(panelWidth-4, title, button)})
-
-	cards := grid.Render(func(index, width, height int) string {
-		return renderUnlockCard(u.items[index], index == grid.Window.Selected, width, height)
-	})
-	bar := common.BuildVerticalScrollbar((grid.Rows.End-grid.Rows.Start)*grid.CardHeight,
-		grid.TotalRows*grid.CardHeight, grid.Rows.Start*grid.CardHeight, false)
-	body := lipgloss.JoinVertical(lipgloss.Left, toolbar, "", lipgloss.JoinHorizontal(lipgloss.Top, cards, bar))
-	return dialog.New(body, width, max(1, height-1)).Clipped(),
-		unlockCardLayout{grid: grid, allButtonX: panelWidth - 2 - buttonWidth, allButtonW: buttonWidth}
+	body := []string{common.CardHeading(bodyWidth, title, button)}
+	var grid common.CardGrid
+	if available := viewportHeight - unlockGridTop - 1; available > 0 && len(u.items) > 0 {
+		columns := unlockColumns(width)
+		gridWidth := bodyWidth - 1 - (columns-1)*common.CardGap
+		widths := make([]int, columns)
+		for column := range widths {
+			widths[column] = gridWidth / columns
+		}
+		widths[columns-1] += gridWidth % columns
+		grid = common.LayoutCardGrid(len(u.items), u.cursor, 0, available, 5, widths...)
+		cards := grid.Render(func(index, width, height int) string {
+			return renderUnlockCard(u.items[index], index == grid.Window.Selected, width, height)
+		})
+		bar := common.BuildVerticalScrollbar((grid.Rows.End-grid.Rows.Start)*grid.CardHeight,
+			grid.TotalRows*grid.CardHeight, grid.Rows.Start*grid.CardHeight, false)
+		body = append(body, "")
+		body = append(body, strings.Split(lipgloss.JoinHorizontal(lipgloss.Top, cards, bar), "\n")...)
+	}
+	panel := common.RenderCard(panelWidth, palette.Primary, body)
+	return dialog.New(panel, width, viewportHeight).Clipped(),
+		unlockCardLayout{grid: grid, allButtonX: panelWidth - unlockGridInset - buttonWidth, allButtonW: buttonWidth}
 }
 
 func renderUnlockCard(item unlockItem, selected bool, width, height int) string {
@@ -80,14 +89,14 @@ func renderUnlockCard(item unlockItem, selected bool, width, height int) string 
 		status, tone, border = "checking", palette.Info, palette.Info
 		action = "⟳"
 	}
-	name, titleColor, background := item.name, palette.Bright, palette.Surface
+	name, titleColor := item.name, palette.Bright
 	if selected {
 		name = common.SymbolSelectActive + name
-		titleColor, background = palette.Primary, palette.Selected
+		titleColor = palette.Primary
 	}
 	title := lipgloss.NewStyle().Foreground(theme.Resolve(titleColor)).Bold(true).Render(name)
 	if height < 3 {
-		line := lipgloss.NewStyle().Width(width).Background(theme.Resolve(background)).Render(ansi.Truncate(title, width, "…"))
+		line := lipgloss.NewStyle().Width(width).Render(ansi.Truncate(title, width, "…"))
 		return lipgloss.PlaceVertical(height, lipgloss.Top, line)
 	}
 	inner := width - 4
@@ -107,5 +116,5 @@ func renderUnlockCard(item unlockItem, selected bool, width, height int) string 
 		checked = lipgloss.PlaceHorizontal(inner, lipgloss.Right, checked)
 	}
 	rows := []string{common.CardHeading(inner, title, action), result, checked}
-	return common.RenderCard(width, border, background, rows[:height-2])
+	return common.RenderCard(width, border, rows[:height-2])
 }

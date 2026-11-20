@@ -104,10 +104,11 @@ func (s State) clickUnlock(x, y, width, height int) (State, tea.Cmd) {
 	if y == 1 && x >= layout.allButtonX && x < layout.allButtonX+layout.allButtonW {
 		return s.startAllUnlockChecks()
 	}
-	if index := layout.grid.ItemAt(x, y-unlockGridTop); index >= 0 {
+	x, y = x-unlockGridInset, y-unlockGridTop
+	if index := layout.grid.ItemAt(x, y); index >= 0 {
 		s.unlock.cursor = index
 		cardX, cardY, cardWidth := layout.grid.CardOrigin(index)
-		if layout.grid.CardHeight >= 3 && x == cardX+cardWidth-3 && y == unlockGridTop+cardY+1 {
+		if layout.grid.CardHeight >= 3 && x == cardX+cardWidth-3 && y == cardY+1 {
 			return s.startUnlock([]int{index})
 		}
 	}

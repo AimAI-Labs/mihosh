@@ -103,5 +103,5 @@ func renderSubCard(p profile.Profile, active, updating, selected bool, width, he
 		}
 	}
 	lines := []string{common.CardHeading(inner, title, action), kind, updated, traffic, expiry, transfer, progress}
-	return common.RenderCard(width, border, "", lines[:height-2])
+	return common.RenderCard(width, border, lines[:height-2])
 }

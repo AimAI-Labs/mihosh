@@ -119,4 +119,6 @@ func TestConnectionFooterUnlockTestsUseProxyAndHandleResults(t *testing.T) {
 	m.connsState = connections.NewState(proxy.URL, nil, nil, 1000, nil)
 	require.Nil(t, clickFooter("U "+i18n.T("conns.unlock.title")))
 	require.Contains(t, ansi.Strip(m.View()), i18n.T("conns.unlock.failed"), "a fresh page should restore checked results")
+	require.Nil(t, click("", 0, pageTop))
+	require.False(t, m.connsState.InputCapture().Active, "clicking outside the frame must close the dialog")
 }
