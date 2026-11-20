@@ -35,6 +35,7 @@ type State struct {
 	filterEngine FilterEngine
 	selected     int
 	scrollTop    int
+	listMode     bool
 	pageHeight   int
 	pageWidth    int
 
@@ -90,6 +91,7 @@ func (s State) ToPageState(width, height int) PageState {
 		FilterEngine:   s.filterEngine,
 		Selected:       s.selected,
 		ScrollTop:      s.scrollTop,
+		ListMode:       s.listMode,
 		Width:          width,
 		Height:         height,
 		ShowAddForm:    s.showAddForm,
@@ -202,7 +204,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			return s.handleFilterMode(msg)
 		}
 
-		columns := subCardColumns(s.pageWidth)
+		columns := s.layoutColumns()
 		switch {
 		case key.Matches(msg, common.Keys.Up):
 			s.moveSelection(-columns)
@@ -216,6 +218,8 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			if s.selected%columns < columns-1 {
 				s.moveSelection(1)
 			}
+		case msg.String() == "v":
+			s.setLayout(!s.listMode)
 		case msg.String() == "enter":
 			return s.activateSelected()
 		case msg.String() == "u":
@@ -380,7 +384,7 @@ func (s State) HandleMouseScroll(up bool) State {
 	if s.Querying() {
 		return s
 	}
-	step := subCardColumns(s.pageWidth)
+	step := s.layoutColumns()
 	if up {
 		step = -step
 	}
@@ -416,6 +420,10 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 	if s.filterMode {
 		return s, nil
 	}
+	if list, hit := subLayoutHit(pageX, pageY, pageWidth); hit {
+		s.setLayout(list)
+		return s, nil
+	}
 	grid := layoutSubList(s.ToPageState(pageWidth, pageHeight))
 	y := pageY - subFixedLines
 	idx := grid.ItemAt(pageX, y)
@@ -446,6 +454,21 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 func (s *State) moveSelection(delta int) {
 	s.selected += delta
 	s.clampScroll()
+}
+
+func (s State) layoutColumns() int {
+	if s.listMode {
+		return 1
+	}
+	return subCardColumns(s.pageWidth)
+}
+
+func (s *State) setLayout(list bool) {
+	if s.listMode != list {
+		s.listMode = list
+		s.doubleClickDetector = common.DoubleClickDetector[struct{}]{}
+		s.clampScroll()
+	}
 }
 
 // clampScroll 确保选中项可见。

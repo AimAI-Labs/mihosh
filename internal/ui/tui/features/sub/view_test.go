@@ -11,6 +11,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/muesli/termenv"
@@ -81,6 +82,52 @@ func TestRenderSubPage_WithSubs(t *testing.T) {
 	// 订阅名称应出现在渲染结果中（原样透传）
 	assert.Contains(t, out, "订阅A")
 	assert.Contains(t, out, "订阅B")
+}
+
+func TestSubscriptionLayoutTabsAndKeyboardKeepSelection(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	for _, lang := range []string{"en-US", "zh-CN"} {
+		t.Run(lang, func(t *testing.T) {
+			i18n.SetLanguageOverride(lang)
+			s := State{}.ApplySubs(sampleSubs(), "a1")
+			s, _ = s.Update(messages.PageResizeMsg{Width: 100, Height: 30})
+			require.False(t, s.listMode)
+			click := func(label string, width int) {
+				t.Helper()
+				rendered := ansi.Strip(RenderSubPage(s.ToPageState(width, 30)))
+				row := strings.Split(rendered, "\n")[1]
+				require.Equal(t, width, lipgloss.Width(row))
+				at := strings.LastIndex(row, label)
+				require.NotEqual(t, -1, at, row)
+				next, cmd := s.HandleMouseLeft(lipgloss.Width(row[:at]), 1, width, 30)
+				require.Nil(t, cmd)
+				s = next
+			}
+
+			click(i18n.T("sub.layout.list"), 100)
+			require.True(t, s.listMode)
+			page := s.ToPageState(100, 30)
+			grid := layoutSubList(page)
+			require.Equal(t, 1, grid.CardHeight)
+			row := strings.Split(ansi.Strip(RenderSubPage(page)), "\n")[subFixedLines]
+			for _, label := range []string{"●", "1.", "订阅A", "a1", "remote", "https://a.io/sub"} {
+				require.Contains(t, row, label)
+			}
+			s, _ = s.Update(tea.KeyMsg{Type: tea.KeyDown})
+			require.Equal(t, 1, s.selected)
+			s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+			require.False(t, s.listMode)
+			require.Equal(t, 1, s.selected)
+			click(i18n.T("sub.layout.list"), 24)
+			require.True(t, s.listMode)
+			s, _ = s.HandleMouseLeft(3, subFixedLines+2, 24, 30)
+			require.Equal(t, 2, s.selected)
+			click(i18n.T("sub.layout.cards"), 24)
+			require.False(t, s.listMode)
+			require.Equal(t, 2, s.selected)
+		})
+	}
 }
 
 func TestRenderSubCardUsageFitsViewport(t *testing.T) {

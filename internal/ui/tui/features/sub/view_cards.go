@@ -21,8 +21,11 @@ func renderList(state PageState, grid common.CardGrid) string {
 	}
 	list := grid.Render(func(i, width, height int) string {
 		p := state.Subs[state.FilteredIdx[i]]
-		return renderSubCard(p, p.UID == state.ActiveUID, p.UID == state.UpdatingUID,
-			i == grid.Window.Selected, width, height)
+		active, updating, selected := p.UID == state.ActiveUID, p.UID == state.UpdatingUID, i == grid.Window.Selected
+		if state.ListMode {
+			return renderSubRow(p, i+1, active, updating, selected, width)
+		}
+		return renderSubCard(p, active, updating, selected, width, height)
 	})
 	list = lipgloss.PlaceHorizontal(state.Width-subScrollWidth, lipgloss.Left, list)
 	bar := common.BuildVerticalScrollbar((grid.Rows.End-grid.Rows.Start)*grid.CardHeight,

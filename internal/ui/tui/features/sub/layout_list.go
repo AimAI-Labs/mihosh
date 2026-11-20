@@ -31,6 +31,11 @@ func subCardWidths(width int) []int {
 }
 
 func layoutSubList(state PageState) common.CardGrid {
+	available := state.Height - subFixedLines - 1
+	if state.ListMode {
+		return common.LayoutCardGrid(len(state.FilteredIdx), state.Selected, state.ScrollTop, available, 1,
+			max(1, state.Width-subScrollWidth))
+	}
 	return common.LayoutCardGrid(len(state.FilteredIdx), state.Selected, state.ScrollTop,
-		state.Height-subFixedLines-1, subCardHeight, subCardWidths(state.Width)...)
+		available, subCardHeight, subCardWidths(state.Width)...)
 }

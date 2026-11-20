@@ -4,7 +4,7 @@ package sub
 //
 // 布局复用 rules 页的 header + 列表 + overlay 弹窗模式：
 //   1. header（搜索框 + 统计）
-//   2. 订阅卡片
+//   2. 订阅卡片或列表
 //   3. 可选叠加：添加表单 / merge 编辑器 / 删除确认
 
 import (
@@ -36,6 +36,7 @@ type PageState struct {
 	FilterEngine
 	Selected  int
 	ScrollTop int
+	ListMode  bool
 	Width     int
 	Height    int
 
@@ -68,7 +69,7 @@ func RenderSubPage(state PageState) string {
 	}
 
 	searchBox := renderSearchBox(state.FilterText, state.FilterMode, state.FilterEngine)
-	header := renderHeader(stats, searchBox, state.Width)
+	header := renderHeader(stats, searchBox, state.Width, state.ListMode)
 	sections = append(sections, header, "")
 
 	list := renderList(state, layoutSubList(state))
@@ -101,34 +102,22 @@ func RenderSubPage(state PageState) string {
 	return result
 }
 
-func renderHeader(stats, searchBox string, width int) string {
+func renderHeader(stats, searchBox string, width int, listMode bool) string {
 	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
 	statsStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
 
-	innerWidth := width - 2
-	if innerWidth < 1 {
-		innerWidth = 1
-	}
+	innerWidth := max(1, width-2)
+	menu := subLayoutTabs(width).render(listMode)
+	available := innerWidth - lipgloss.Width(menu)
 
 	statsText := statsStyle.Render(stats)
-	searchW := lipgloss.Width(searchBox)
-	statsW := lipgloss.Width(statsText)
-	gap := innerWidth - searchW - statsW
-	if gap < 1 {
-		gap = 1
+	var content string
+	if room := available - lipgloss.Width(statsText) - 1; room >= min(lipgloss.Width(searchBox), 10) {
+		content = common.PadString(ansi.Truncate(searchBox, room, "…"), room) + " " + statsText
+	} else {
+		content = common.PadString(ansi.Truncate(searchBox, available, "…"), available)
 	}
-	searchRow := borderStyle.Render("│") +
-		searchBox + strings.Repeat(" ", gap) + statsText +
-		borderStyle.Render("│")
-	// 极窄补齐
-	rowContentWidth := lipgloss.Width(searchBox) + gap + statsW
-	if rowContentWidth < innerWidth {
-		searchRow = borderStyle.Render("│") +
-			searchBox + strings.Repeat(" ", gap) + statsText +
-			strings.Repeat(" ", innerWidth-rowContentWidth) +
-			borderStyle.Render("│")
-	}
-
+	searchRow := borderStyle.Render("│") + content + menu + borderStyle.Render("│")
 	top := borderStyle.Render(theme.Frame().TopLeft + strings.Repeat("─", innerWidth) + theme.Frame().TopRight)
 	bottom := borderStyle.Render(theme.Frame().BottomLeft + strings.Repeat("─", innerWidth) + theme.Frame().BottomRight)
 	return top + "\n" + searchRow + "\n" + bottom
@@ -230,7 +219,7 @@ func buildHints(state PageState) []common.InlineHelpHint {
 		}
 	}
 	selection := "↑↓"
-	if subCardColumns(state.Width) > 1 {
+	if !state.ListMode && subCardColumns(state.Width) > 1 {
 		selection = "↑↓←→"
 	}
 	return []common.InlineHelpHint{
@@ -243,6 +232,7 @@ func buildHints(state PageState) []common.InlineHelpHint {
 		{Key: "n", Desc: i18n.T("help.sub.add")},
 		{Key: "d", Desc: i18n.T("help.sub.delete")},
 		{Key: "/", Desc: i18n.T("help.sub.search")},
+		{Key: "v", Desc: i18n.T("help.sub.layout")},
 		{Key: "?", Desc: i18n.T("core.inline.help")},
 	}
 }

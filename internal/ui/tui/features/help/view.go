@@ -488,6 +488,7 @@ func buildSubSections(ctx HelpContext) []section {
 				{"d", i18n.T("help.sub.delete")},
 				{"r", i18n.T("help.sub.refresh")},
 				{"/", i18n.T("help.sub.search")},
+				{"v", i18n.T("help.sub.layout")},
 			},
 		}}
 	}
