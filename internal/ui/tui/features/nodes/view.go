@@ -47,7 +47,7 @@ func displayWidth(s string) int {
 func RenderNodesPage(state PageState) string {
 	modeSwitch := RenderModeSwitchComponent(state.Mode, state.Width, state.Layout)
 
-	// ── 底部固定行：搜索提示 + 失败徽标 ──────────────────────────────
+	// ── 底部固定行：搜索提示 ──────────────────────────────
 	// 搜索行始终占一行（空行或内容行），确保其位置固定在底栏上方，
 	// 不随卡片内容多少而上下漂移。
 	var searchLine string
@@ -61,22 +61,6 @@ func RenderNodesPage(state PageState) string {
 		searchLine = "" // 占位空行由 clampPanelArea 负责填充
 	}
 
-	var resultBadge string
-	if len(state.TestResults) > 0 {
-		failCount := 0
-		for _, r := range state.TestResults {
-			if r.Error != "" {
-				failCount++
-			}
-		}
-		badgeText := i18n.Tf("nodes.result_badge", len(state.TestResults))
-		if failCount > 0 {
-			badgeText += " " + common.ErrorStyle().Render(i18n.Tf("nodes.result_fail_count", failCount))
-		}
-		resultBadge = common.MutedStyle().Render(badgeText) +
-			" " + common.MutedStyle().Render(i18n.T("nodes.view_detail"))
-	}
-
 	// 主体区域：按所选布局渲染卡片流或经典双列列表。
 	areaHeight := cardAreaHeight(state)
 	var bodyArea string
@@ -86,14 +70,7 @@ func RenderNodesPage(state PageState) string {
 		bodyArea = clampToLines(renderCardArea(state, areaHeight), areaHeight)
 	}
 
-	// ── 拼接：模式切换 + 主体区 + 搜索行 + 结果徽标 ──────────────
-	bottomParts := []string{searchLine}
-	if resultBadge != "" {
-		bottomParts = append(bottomParts, resultBadge)
-	}
-	mainContent := lipgloss.JoinVertical(lipgloss.Left,
-		append([]string{modeSwitch, "", bodyArea}, bottomParts...)...,
-	)
+	mainContent := lipgloss.JoinVertical(lipgloss.Left, modeSwitch, "", bodyArea, searchLine)
 
 	mainContent = renderNodesInlineHelp(mainContent, state)
 	if state.ShowTestDetail {

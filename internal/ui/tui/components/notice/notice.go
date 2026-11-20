@@ -58,9 +58,13 @@ func (s *State) Expire(id uint64) {
 }
 
 func (s *State) OpenDetails(x, width int) {
-	if s.Message.Detail != "" && x >= 1 && x < 1+lipgloss.Width(line(s.Message.Text, width)) {
+	if s.Message.Detail != "" && HitText(s.Message.Text, x, width) {
 		s.DetailsOpen = true
 	}
+}
+
+func HitText(text string, x, width int) bool {
+	return x >= 1 && x < 1+lipgloss.Width(line(text, width))
 }
 
 func line(text string, width int) string {

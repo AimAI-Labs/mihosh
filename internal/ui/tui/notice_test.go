@@ -78,3 +78,24 @@ func assertNoticeRow(t *testing.T, m Model, text string) {
 		t.Fatal("the notice row should not dispatch page clicks")
 	}
 }
+
+func TestNodeResultsUseNoticeRowAndOpenDetails(t *testing.T) {
+	i18n.Init()
+	m := Model{width: 100, height: 25, currentPage: layout.PageNodes}
+	state, cmd := m.nodesState.StartSingleTest("fixture-node")
+	m.nodesState = state
+	next, _ := m.Update(cmd())
+	m = next.(Model)
+
+	summary := i18n.Tf("nodes.result_badge", 1) + " " + i18n.Tf("nodes.result_fail_count", 1) + " " + i18n.T("nodes.view_detail")
+	assertNoticeRow(t, m, summary)
+	if m.visibleNotice().Level != messages.NoticeWarning {
+		t.Fatal("a failed test must use the theme warning color")
+	}
+	next, _ = m.Update(tea.MouseMsg{X: 2, Y: m.height - common.StatusBarHeight - 2,
+		Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	m = next.(Model)
+	if !m.nodesState.ShowTestDetail {
+		t.Fatal("clicking the test result notice did not open the node test details")
+	}
+}

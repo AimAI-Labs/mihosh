@@ -62,17 +62,9 @@ type cardLayout struct {
 	ScrollRows  int
 }
 
-// nodesBottomLines 返回页面底部固定占用的行数（搜索行 + 测速结果徽标）。
-func nodesBottomLines(state PageState) int {
-	if len(state.TestResults) > 0 {
-		return 2
-	}
-	return 1
-}
-
 // cardAreaHeight 返回卡片流可用的行数。
 func cardAreaHeight(state PageState) int {
-	h := state.Height - cardsModeRows - nodesBottomLines(state)
+	h := state.Height - cardsModeRows - 1 // 搜索行
 	if h < cardsMinAreaHeight {
 		h = cardsMinAreaHeight
 	}

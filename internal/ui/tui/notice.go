@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
@@ -35,8 +36,14 @@ func (m *Model) clearErrorNotice() {
 }
 
 func (m Model) visibleNotice() messages.NoticeMsg {
-	if m.notice.Message.Text != "" || !m.nodesState.Testing {
+	if m.notice.Message.Text != "" {
 		return m.notice.Message
+	}
+	if !m.nodesState.Testing {
+		if m.currentPage == layout.PageNodes {
+			return m.nodesState.TestResultsNotice()
+		}
+		return messages.NoticeMsg{}
 	}
 	text := i18n.T("status.testing")
 	if target := strings.TrimSpace(m.nodesState.TestingTarget); target != "" {

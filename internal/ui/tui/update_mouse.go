@@ -48,6 +48,10 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	_, mainHeight := m.getPageSize()
 	if msg.Y == noticeRow(mainHeight) {
 		if isMouseLeftPress(msg) {
+			if m.notice.Message.Text == "" && m.currentPage == layout.PageNodes && !m.nodesState.Testing &&
+				!m.pageInputCapture().Active && notice.HitText(m.visibleNotice().Text, msg.X, m.width) {
+				return m.dispatchToPage(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+			}
 			m.notice.OpenDetails(msg.X, m.width)
 		}
 		return m, nil

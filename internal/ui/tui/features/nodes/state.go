@@ -11,6 +11,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -132,6 +133,27 @@ func (s State) TestResults() []TestResultEntry {
 		result[i] = s.TestResultsArr[idx]
 	}
 	return result
+}
+
+// TestResultsNotice summarizes the retained test records for the global notice row.
+func (s State) TestResultsNotice() messages.NoticeMsg {
+	results := s.TestResults()
+	if len(results) == 0 {
+		return messages.NoticeMsg{}
+	}
+	failed := 0
+	for _, result := range results {
+		if result.Error != "" {
+			failed++
+		}
+	}
+	text := i18n.Tf("nodes.result_badge", len(results))
+	level := messages.NoticeSuccess
+	if failed > 0 {
+		text += " " + i18n.Tf("nodes.result_fail_count", failed)
+		level = messages.NoticeWarning
+	}
+	return messages.NoticeMsg{Text: text + " " + i18n.T("nodes.view_detail"), Level: level}
 }
 
 // sortedTestResults 返回按当前排序模式排列的测速结果列表
