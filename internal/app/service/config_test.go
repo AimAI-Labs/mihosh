@@ -149,3 +149,18 @@ func TestConfigReloadRetainsAPIOnlyPolicy(t *testing.T) {
 		}
 	}
 }
+
+func TestConfigSetThemeValidation(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	s := NewConfigService()
+	if err := s.SetConfigValue("theme", "dracula"); err != nil {
+		t.Fatalf("valid theme rejected: %v", err)
+	}
+	cfg, err := s.LoadConfig()
+	if err != nil || cfg.Theme != "dracula" {
+		t.Fatalf("persisted theme = %q, err = %v", cfg.Theme, err)
+	}
+	if err := s.SetConfigValue("theme", "not-a-theme"); err == nil {
+		t.Fatal("invalid theme was unexpectedly accepted")
+	}
+}
