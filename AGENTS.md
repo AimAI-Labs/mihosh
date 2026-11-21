@@ -17,7 +17,9 @@
   > win下禁止使用类似`2>nul`命令，以防生成nul等保留设备名的文件
   - `mise exec go -- go test ./...` (涉及渲染及逻辑时必须跑测试，不依赖真实服务端环境)
   - `mise exec go -- go build -o mihosh .`（强制，构建后会自动杀死进程并重新运行）
-- **构建后（本地为Win环境时执行）**：执行`.\deploy.ps1`
+- **构建后**：
+  - win：执行`.\deploy.ps1`
+  - linux：打包对应的可执行的mihosh文件，使用rsync上传到测试机的家目录下
 
 ## 2. 架构约定
 - **CLI (`internal/cli`)**: 新增命令须支持 `--output plain|table|json`，以便脚本化。
@@ -33,7 +35,7 @@
 - **页面 State (`features/<page>/state.go`)**: **绝对禁止**将页面局部状态放入主 Model。各页面状态严格封装于自身目录。复杂页面已拆分为 `state_mouse.go`、`state_filter.go`、`state_form.go` 等子文件。
 - **消息定义 (`tui/messages/events.go`)**: 所有 TUI 消息必须集中在此文件定义，载荷极简。跨页通信必须依赖 `tea.Msg`，禁止直接篡改内部字段。
 - **渲染交互**:
-  - 布局尺寸：宽窄屏通过 `width` 参数动态计算面板比例（≥100 列宽屏双面板 43%/57%，＜100 列窄屏垂直堆叠）。
+  - 布局尺寸：宽窄屏通过 `width` 参数动态计算面板比例（≥100 列宽屏双面板 43%/57%，＜100 列窄屏垂直堆叠，卡片除外）。
   - 鼠标坐标：新增鼠标交互优先复用 `resolveMainPageMouseHit`（位于 `update_mouse.go`）。
   - 弹窗拦截：弹窗（如详情）激活时应拦截底层按键，退出时需清理状态。
 
@@ -43,8 +45,11 @@
 - **WebSocket (`infrastructure/api/websocket.go`)**: 必须复用现有的 `WSClient.Start` 和 `connectStream[T]` 泛型封装。禁止自行实现断线重连或重新挂载流。
 
 
-## 5. 第三方工具
-- **噪声简化**：如果当前的开发环境为linux，使用rtk，@RTK.md
+## 5. 固定工作流
+- **自动提交**：每完成一个任务，都在本地进行原子化提交
+
+## 6. 第三方工具
+- **噪声简化**：若当前开发环境为linux，使用rtk，@RTK.md
 - **文档搜索**：使用`npx ctx7`，具体用法详见：https://context7.com/docs/clients/cli
 
 <!-- CODEGRAPH_START -->
