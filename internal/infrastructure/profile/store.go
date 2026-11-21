@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -34,7 +35,12 @@ func RawDirectory() (string, error) {
 }
 
 func rawStoragePath(uid string) (string, error) {
-	if uid == "" || uid == "." || uid == ".." || filepath.Base(uid) != uid {
+	// filepath.IsLocal also anchors the value for CodeQL's path-injection query,
+	// which does not model the equivalent filepath.Base check.
+	if !filepath.IsLocal(uid) {
+		return "", errors.New("invalid profile ID")
+	}
+	if uid == "." || strings.ContainsAny(uid, `/\`) {
 		return "", errors.New("invalid profile ID")
 	}
 	root, err := mihoshConfigDir()
