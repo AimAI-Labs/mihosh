@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	domainrules "github.com/AimAI-Labs/mihosh/internal/domain/rules"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"gopkg.in/yaml.v3"
 )
@@ -250,17 +251,7 @@ var errRuleNotFound = errRuleNotFoundType{}
 // canonicalRuleLine 按 parseRuleLine 期望的形状构造规则行，使目标行与配置行
 // 走同一规范化路径。MATCH 无 payload，输出 "MATCH,PROXY"。
 func canonicalRuleLine(ruleType, payload, proxy string, noResolve bool) string {
-	ruleType = strings.ToUpper(strings.TrimSpace(ruleType))
-	payload = strings.TrimSpace(payload)
-	proxy = strings.TrimSpace(proxy)
-	if ruleType == "MATCH" {
-		return "MATCH," + proxy
-	}
-	line := ruleType + "," + payload + "," + proxy
-	if noResolve {
-		line += ",no-resolve"
-	}
-	return line
+	return domainrules.BuildMatchLine(strings.ToUpper(strings.TrimSpace(ruleType)), payload, proxy, noResolve)
 }
 
 // CountRules 返回配置文件中 rules 列表的条目数；rules 键不存在时返回 0。
@@ -457,13 +448,7 @@ func mappingRoot(doc *yaml.Node) *yaml.Node {
 
 // normalizeInsertIndex 把 1-based index 规范化为 0-based 切片插入位置。
 func normalizeInsertIndex(index, length int) int {
-	if index < 1 {
-		return 0
-	}
-	if index > length {
-		return length
-	}
-	return index - 1
+	return domainrules.NormalizeInsertIndex(index, length)
 }
 
 // marshalYAML 以 2 空格缩进序列化 yaml.Node，保持与 yaml.Marshal 一致的输出格式，
@@ -585,32 +570,6 @@ func ParseRulesNoResolveYAML(data []byte) map[string]bool {
 }
 
 // parseRuleLine 解析一条 Mihomo 规则字符串，返回规范化键和 no-resolve 标记。
-//
-// 规则格式：
-//   - MATCH,PROXY
-//   - TYPE,PAYLOAD,PROXY[,no-resolve]
-//
-// 返回的 key 为 "TYPE,PAYLOAD,PROXY"（类型大写化），hasNR 表示是否带 no-resolve。
 func parseRuleLine(line string) (key string, hasNR bool) {
-	parts := strings.Split(line, ",")
-	if len(parts) < 2 {
-		return "", false
-	}
-
-	ruleType := strings.ToUpper(strings.TrimSpace(parts[0]))
-
-	// MATCH 类型：MATCH,PROXY
-	if ruleType == "MATCH" {
-		proxy := strings.TrimSpace(parts[1])
-		return ruleType + ",," + proxy, false
-	}
-
-	// 普通类型：TYPE,PAYLOAD,PROXY[,no-resolve]
-	if len(parts) < 3 {
-		return "", false
-	}
-	payload := strings.TrimSpace(parts[1])
-	proxy := strings.TrimSpace(parts[2])
-	hasNR = len(parts) >= 4 && strings.EqualFold(strings.TrimSpace(parts[3]), "no-resolve")
-	return ruleType + "," + payload + "," + proxy, hasNR
+	return domainrules.ParseKey(line)
 }

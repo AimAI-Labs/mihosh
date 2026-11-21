@@ -11,118 +11,18 @@ import (
 )
 
 // handleAddFormMode 处理「添加自定义规则」弹窗按键（吞掉所有按键）。
-// 若策略选择二级弹窗已打开，则优先分派至 handleProxyPickerMode。
 func (s State) handleAddFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
-	form := s.addForm
-
-	// 策略选择二级弹窗优先拦截（吞掉所有键）
-	if form.isProxyPickerOpen() {
-		return s.handleProxyPickerMode(msg)
-	}
-
-	switch {
-	case key.Matches(msg, common.Keys.Escape):
-		// 放弃关闭，清空表单
-		s.showAddForm = false
-		s.addForm = newAddForm(s.configPath)
-		return s, nil
-
-	case key.Matches(msg, common.Keys.Enter):
-		// 策略行聚焦时 Enter 打开二级弹窗，不提交
-		if form.isProxyField() {
-			form.openProxyPicker()
-			s.addForm = form
-			return s, nil
-		}
-		ok, errKey := form.validate()
-		if !ok {
-			form.errMsg = i18n.T(errKey)
-			s.addForm = form
-			return s, nil
-		}
-		// 校验通过：发起写盘命令，重置表单
-		submit := form
-		s.showAddForm = false
-		s.addForm = newAddForm(s.configPath)
-		return s, s.applyRuleEdit("rules.added_toast", profile.RuleEdit{
-			Rule:  buildRuleLine(submit.currentType(), submit.fields[addFieldPayload].Value(), submit.currentProxy(), submit.noResolve),
-			Index: submit.resolveIndex(),
-		})
-
-	case msg.String() == "tab":
-		form.cycleField(1)
-
-	case msg.String() == "shift+tab":
-		form.cycleField(-1)
-
-	case key.Matches(msg, common.Keys.Up):
-		// 字段为垂直堆叠，↑/↓ 在字段间上下移动
-		form.cycleField(-1)
-
-	case key.Matches(msg, common.Keys.Down):
-		// 字段为垂直堆叠，↑/↓ 在字段间上下移动
-		form.cycleField(1)
-
-	case key.Matches(msg, common.Keys.Left):
-		// ←/→ 语义随焦点变化：
-		//   - 类型行聚焦 → 切换规则类型
-		//   - 匹配值/位置聚焦 → 透传 textinput 移动光标
-		//   - 策略/no-resolve（只读）→ 忽略
-		switch {
-		case form.isTypeField():
-			form.cycleType(-1)
-		case form.isProxyField(), form.isNoResolveField():
-			// 只读字段，忽略
-		default:
-			updated, cmd := form.fields[form.fieldCursor].Update(msg)
-			form.fields[form.fieldCursor] = updated
-			form.errMsg = ""
-			s.addForm = form
-			return s, cmd
-		}
-
-	case key.Matches(msg, common.Keys.Right):
-		switch {
-		case form.isTypeField():
-			form.cycleType(1)
-		case form.isProxyField(), form.isNoResolveField():
-			// 只读字段，忽略
-		default:
-			updated, cmd := form.fields[form.fieldCursor].Update(msg)
-			form.fields[form.fieldCursor] = updated
-			form.errMsg = ""
-			s.addForm = form
-			return s, cmd
-		}
-
-	case msg.String() == " ":
-		// Space 切换 no-resolve 复选框
-		if form.isNoResolveField() {
-			form.toggleNoResolve()
-		}
-
-	default:
-		// 透传给当前 textinput（Backspace / 可打印字符等）
-		// 策略和 no-resolve 行为只读，不接收文本输入
-		if form.isTypeField() || form.isProxyField() || form.isNoResolveField() || !isTextInputKey(msg) {
-			break
-		}
-		cur := form.fields[form.fieldCursor]
-		updated, cmd := cur.Update(msg)
-		form.fields[form.fieldCursor] = updated
-		form.errMsg = "" // 输入即清除上次错误
-		s.addForm = form
-		return s, cmd
-	}
-
-	s.addForm = form
-	return s, nil
+	return s.handleFormMode(msg, false)
 }
 
 // handleEditFormMode 处理编辑规则弹窗按键（吞掉所有按键）。
-// 逻辑与 handleAddFormMode 完全相同（复用 addForm），仅在提交时：
-//   - 提交时记录原始匹配项和新规则。
 func (s State) handleEditFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
+	return s.handleFormMode(msg, true)
+}
+
+// handleFormMode 统一处理添加/编辑自定义规则弹窗的键盘交互。
+// 若策略选择二级弹窗已打开，则优先分派至 handleProxyPickerMode。
+func (s State) handleFormMode(msg tea.KeyMsg, isEdit bool) (State, tea.Cmd) {
 	form := s.addForm
 
 	// 策略选择二级弹窗优先拦截（吞掉所有键）
@@ -132,10 +32,14 @@ func (s State) handleEditFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 
 	switch {
 	case key.Matches(msg, common.Keys.Escape):
-		// 取消编辑，关闭弹窗
-		s.showEditForm = false
-		s.addForm = addForm{}
-		s.editOriginIndex = 0
+		if isEdit {
+			s.showEditForm = false
+			s.addForm = addForm{}
+			s.editOriginIndex = 0
+		} else {
+			s.showAddForm = false
+			s.addForm = newAddForm(s.configPath)
+		}
 		return s, nil
 
 	case key.Matches(msg, common.Keys.Enter):
@@ -151,14 +55,21 @@ func (s State) handleEditFormMode(msg tea.KeyMsg) (State, tea.Cmd) {
 			s.addForm = form
 			return s, nil
 		}
-		// 校验通过：发起编辑命令（ReplaceRule：删旧+插新），重置弹窗
 		submit := form
-		s.showEditForm = false
-		s.addForm = addForm{}
-		s.editOriginIndex = 0
-		original := submit.editOrigin
-		return s, s.applyRuleEdit("rules.edit_toast", profile.RuleEdit{
-			Match: originalRuleLine(original.ruleType, original.payload, original.proxy, original.noResolve),
+		if isEdit {
+			s.showEditForm = false
+			s.addForm = addForm{}
+			s.editOriginIndex = 0
+			original := submit.editOrigin
+			return s, s.applyRuleEdit("rules.edit_toast", profile.RuleEdit{
+				Match: originalRuleLine(original.ruleType, original.payload, original.proxy, original.noResolve),
+				Rule:  buildRuleLine(submit.currentType(), submit.fields[addFieldPayload].Value(), submit.currentProxy(), submit.noResolve),
+				Index: submit.resolveIndex(),
+			})
+		}
+		s.showAddForm = false
+		s.addForm = newAddForm(s.configPath)
+		return s, s.applyRuleEdit("rules.added_toast", profile.RuleEdit{
 			Rule:  buildRuleLine(submit.currentType(), submit.fields[addFieldPayload].Value(), submit.currentProxy(), submit.noResolve),
 			Index: submit.resolveIndex(),
 		})
