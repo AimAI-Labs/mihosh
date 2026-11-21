@@ -73,7 +73,3 @@ func originalRuleLine(ruleType, payload, proxy string, noResolve bool) string {
 func buildRuleLine(ruleType, payload, proxy string, noResolve bool) string {
 	return domainrules.BuildLine(ruleType, payload, proxy, noResolve)
 }
-
-func isIPRuleType(ruleType string) bool {
-	return domainrules.IsIPRuleType(ruleType)
-}
