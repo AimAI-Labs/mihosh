@@ -4,18 +4,18 @@ import (
 	"encoding/json"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/domain/port"
 )
 
 // ProxyService 代理管理服务
 type ProxyService struct {
-	client  *api.Client
+	client  port.ProxyAPI
 	testURL string
 	timeout int
 }
 
 // NewProxyService 创建代理服务
-func NewProxyService(client *api.Client, testURL string, timeout int) *ProxyService {
+func NewProxyService(client port.ProxyAPI, testURL string, timeout int) *ProxyService {
 	return &ProxyService{
 		client:  client,
 		testURL: testURL,
