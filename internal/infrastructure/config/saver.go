@@ -62,6 +62,9 @@ func saveLocked(cfg *Config) error {
 	}
 	writer.Set("active_sub", cfg.ActiveSub)
 	writer.Set("core", cfg.Core)
+	if cfg.Sync != (SyncConfig{}) || writer.IsSet("sync") {
+		writer.Set("sync", cfg.Sync)
+	}
 
 	writer.SetConfigFile(configFile)
 	writer.SetConfigType("yaml")

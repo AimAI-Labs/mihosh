@@ -11,6 +11,7 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.8
 	github.com/gorilla/websocket v1.5.3
 	github.com/jeandeaual/go-locale v0.0.0-20250612000132-0ef82f21eade
+	github.com/lib/pq v1.10.9
 	github.com/mattn/go-runewidth v0.0.28
 	github.com/minio/selfupdate v0.6.0
 	github.com/muesli/termenv v0.16.0

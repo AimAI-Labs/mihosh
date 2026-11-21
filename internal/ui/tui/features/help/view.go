@@ -464,6 +464,7 @@ func buildSettingsSections(ctx HelpContext) []section {
 		bindings: []keybinding{
 			{"↑/↓", i18n.T("help.settings.select")},
 			{"Enter / 双击", i18n.T("help.settings.edit")},
+			{"b", i18n.T("help.settings.sync")},
 		},
 	}}
 }

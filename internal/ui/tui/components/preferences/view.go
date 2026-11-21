@@ -8,6 +8,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
@@ -80,6 +81,7 @@ type PageState struct {
 	MihomoFromFile  bool // API 不可达时从 YAML 文件降级读取
 	SysStatus       SysStatusState
 	SysLogs         []model.LogEntry
+	SyncModal       SyncModalState
 }
 
 func (p PageState) activeKeys() []string {
@@ -269,7 +271,12 @@ func renderSettingsPage(state PageState, width, height int, standalone bool) str
 	}
 
 	if standalone {
-		return renderSettingsInlineHelp(mainContent, state, width, height)
+		mainContent = renderSettingsInlineHelp(mainContent, state, width, height)
+		if state.SyncModal.Open {
+			modal := buildSyncModal(state, width, height)
+			mainContent = dialog.New(modal, width, height).Clipped().Overlay(mainContent, true)
+		}
+		return mainContent
 	}
 	return mainContent
 }
@@ -374,10 +381,11 @@ func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		}
 	}
 
-	// 普通模式：切换标签 + 选择 + 编辑 + 刷新 + 帮助
+	// 普通模式：切换标签 + 选择 + 编辑 + 同步/备份 + 刷新 + 帮助
 	return []common.InlineHelpHint{
 		{Key: "↑↓", Desc: i18n.T("help.settings.hint_select")},
 		{Key: "↵", Desc: i18n.T("help.settings.hint_edit")},
+		{Key: "b", Desc: i18n.T("help.settings.hint_sync"), Tone: common.InlineHelpToneInfo},
 		{Key: "r", Desc: i18n.T("help.settings.hint_refresh")},
 		{Key: "?", Desc: i18n.T("core.inline.help")},
 	}

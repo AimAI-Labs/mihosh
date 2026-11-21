@@ -66,9 +66,11 @@ type State struct {
 	IsGeoUpdating     bool
 
 	SysStatus SysStatusState
+	syncModal SyncModalState
 
 	configSvc *service.ConfigService
 	coreSvc   *service.CoreService
+	syncSvc   *service.SyncService
 	client    *api.Client
 	Config    *config.Config
 }
@@ -187,6 +189,7 @@ func (s State) ToPageState(cfg *config.Config, sysLogs []model.LogEntry) PageSta
 		MihomoFromFile:  s.mihomoFromFile,
 		SysStatus:       s.SysStatus,
 		SysLogs:         sysLogs,
+		SyncModal:       s.syncModal,
 	}
 }
 
@@ -194,13 +197,22 @@ func (s State) ToPageState(cfg *config.Config, sysLogs []model.LogEntry) PageSta
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.PageMouseScrollMsg:
+		if s.syncModal.Open {
+			return s.handleSyncModalScroll(msg.Up), nil
+		}
 		// actionsPanelBottomY is roughly the height used by Tab bar (3) + Spacer (1) + Config Panel (8) + Spacer (1) + Actions Panel (4) + Desc/Warning (1)
 		newState, cmd := s.HandleMouseScroll(msg.Up, msg.Y, msg.Height, 18)
 		return newState, cmd
 	case messages.PageMouseClickMsg:
+		if s.syncModal.Open {
+			return s.handleSyncModalClick(msg.X, msg.Y, msg.Width, msg.Height)
+		}
 		newState, cmd := s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
 		return newState, cmd
 	case tea.KeyMsg:
+		if s.syncModal.Open {
+			return s.handleSyncModalKey(msg)
+		}
 		if s.activeTab == 1 {
 			if s.overridesSaving {
 				return s, nil
@@ -231,6 +243,10 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case key.Matches(msg, common.Keys.Down):
 			if s.selectedSetting < s.maxSelectionIndex() {
 				s.selectedSetting++
+			}
+		case msg.String() == "b":
+			if s.activeTab == 0 {
+				return s.OpenSyncModal(), nil
 			}
 		case key.Matches(msg, common.Keys.Enter):
 			if s.activeTab == 1 && s.selectedSetting == mihomoApplyIndex {
@@ -1097,5 +1113,8 @@ func (s State) SyncSysStatus(width, height int, cfg *config.Config, sysLogs []mo
 
 // InputCapture declares which input belongs to the current page mode.
 func (s State) InputCapture() common.InputCapture {
-	return common.InputCapture{Active: s.editMode, Interrupt: s.editMode}
+	return common.InputCapture{
+		Active:    s.editMode || s.syncModal.Open,
+		Interrupt: s.editMode || (s.syncModal.Open && s.syncModal.Mode != syncModeMenu),
+	}
 }

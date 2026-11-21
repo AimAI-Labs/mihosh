@@ -23,9 +23,18 @@ type CoreConfig struct {
 	Accelerators           []core.Accelerator `mapstructure:"accelerators" yaml:"accelerators"`
 }
 
+// SyncConfig 保存 PostgreSQL 云端同步设置。
+// DSN 中的敏感凭据绝不会写入导出压缩包或云端同步快照。
+type SyncConfig struct {
+	DSN        string `mapstructure:"dsn" yaml:"dsn,omitempty"`
+	ProfileKey string `mapstructure:"profile_key" yaml:"profile_key,omitempty"`
+	LastSyncAt string `mapstructure:"last_sync_at" yaml:"last_sync_at,omitempty"`
+}
+
 // Config 保存应用偏好、订阅元数据与内核管理设置。
 type Config struct {
 	Core                CoreConfig               `mapstructure:"core"`
+	Sync                SyncConfig               `mapstructure:"sync"`
 	TestURL             string                   `mapstructure:"test_url"`
 	Timeout             int                      `mapstructure:"timeout"`
 	Language            string                   `mapstructure:"language"`

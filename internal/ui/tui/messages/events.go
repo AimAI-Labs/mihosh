@@ -148,6 +148,13 @@ type ProxyChainAppliedMsg struct {
 	Err             error
 }
 
+type SyncDoneMsg struct {
+	Action   string
+	Summary  string
+	Reloaded bool
+	Err      error
+}
+
 // ConfigReloadedMsg 调用 mihomo 核心 ReloadConfig 的结果。
 type ConfigReloadedMsg struct{ Err error }
 

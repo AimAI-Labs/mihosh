@@ -62,6 +62,7 @@ func init() {
 	rootCmd.AddCommand(newEnvCommand())
 	rootCmd.AddCommand(newActivateCommand(), newProxyCommand())
 	rootCmd.AddCommand(newDNSCommand())
+	rootCmd.AddCommand(newSyncCommand())
 }
 
 // Execute 执行命令
@@ -134,6 +135,26 @@ func localizeCommands() {
 			}
 			if f := q.Flags().Lookup("output"); f != nil {
 				f.Usage = i18n.T("cli.dns.query.flag_output")
+			}
+		}
+	}
+	if syncCmd, _, err := rootCmd.Find([]string{"sync"}); err == nil && syncCmd != nil {
+		syncCmd.Short = i18n.T("cli.sync.short")
+		for _, subName := range []string{"export", "import", "push", "pull", "status"} {
+			if sub, _, subErr := syncCmd.Find([]string{subName}); subErr == nil && sub != nil {
+				sub.Short = i18n.T("cli.sync." + subName + ".short")
+				if f := sub.Flags().Lookup("output"); f != nil {
+					f.Usage = i18n.T("cli.sync.flag_output")
+				}
+				if f := sub.Flags().Lookup("dsn"); f != nil {
+					f.Usage = i18n.T("cli.sync.flag_dsn")
+				}
+				if f := sub.Flags().Lookup("key"); f != nil {
+					f.Usage = i18n.T("cli.sync.flag_key")
+				}
+				if f := sub.Flags().Lookup("no-redact"); f != nil {
+					f.Usage = i18n.T("cli.sync.flag_no_redact")
+				}
 			}
 		}
 	}

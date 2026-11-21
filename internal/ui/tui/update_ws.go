@@ -243,6 +243,33 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 	case messages.RulesMsg:
 		m.rulesState = m.rulesState.ApplyRules(msg)
 
+	case messages.SyncDoneMsg:
+		m.settingsState = m.settingsState.CompleteSync(msg)
+		if msg.Err != nil {
+			m.publishError(msg.Err)
+			return m, nil
+		}
+		m.clearErrorNotice()
+		if msg.Reloaded {
+			if cfg, err := config.Load(); err == nil && cfg != nil {
+				m.config = cfg
+				m.settingsState.Config = cfg
+				if cfg.Theme != "" {
+					theme.SetTheme(cfg.Theme)
+				}
+				theme.SetBorderStyle(cfg.BorderStyle)
+				i18n.SetLanguageOverride(cfg.Language)
+				common.InitKeyBindings()
+				m.autoRefreshRemaining = cfg.AutoRefreshInterval
+				m.subState = m.subState.ApplySubs(cfg.Subs, cfg.ActiveSub)
+			}
+			m.nodesState = m.nodesState.ReloadChains()
+		}
+		if msg.Summary != "" {
+			m.publishNotice(msg.Summary, messages.NoticeSuccess)
+		}
+		return m, nil
+
 	case messages.ProxyChainAppliedMsg:
 		m.nodesState = m.nodesState.ApplyChainResult(msg)
 		if msg.Err != nil {
