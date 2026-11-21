@@ -170,6 +170,43 @@ func TestStore_ProfileDirCreation(t *testing.T) {
 	assert.True(t, info.IsDir())
 }
 
+// TestStore_RejectsUnsafeProfileIDs 验证订阅 ID 只能是单个目录名，
+// 不能借由路径分隔符或 .. 逃出配置根目录（CodeQL go/path-injection）。
+func TestStore_RejectsUnsafeProfileIDs(t *testing.T) {
+	mockMihoshConfigDir(t)
+	root, err := mihoshConfigDir()
+	require.NoError(t, err)
+
+	cases := []struct{ name, uid string }{
+		{"empty", ""},
+		{"dot", "."},
+		{"dotdot", ".."},
+		{"parent", "../escape"},
+		{"nested parent", "a/../../escape"},
+		{"separator", "a/b"},
+		{"absolute", filepath.Join(root, "escape")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := RawPath(tc.uid)
+			require.Error(t, err)
+
+			_, err = ReadRawFile(tc.uid)
+			require.Error(t, err)
+
+			require.Error(t, WriteRaw(tc.uid, []byte("mode: rule\n")))
+			require.Error(t, DeleteProfileDir(tc.uid))
+
+			_, err = SaveRawSnapshot(tc.uid, []byte("mode: rule\n"), 1)
+			require.Error(t, err)
+		})
+	}
+
+	entries, err := os.ReadDir(root)
+	require.NoError(t, err)
+	assert.Empty(t, entries, "rejected profile IDs must not create files or directories")
+}
+
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
