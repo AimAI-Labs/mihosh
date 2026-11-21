@@ -1,6 +1,7 @@
 package sub
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -78,5 +80,59 @@ func TestSubHistoryModalListDiffAndRollback(t *testing.T) {
 	restored, err := profile.ReadRawFile(p.UID)
 	if err != nil || !strings.Contains(string(restored), "old-node") {
 		t.Fatalf("expected raw.yaml restored to old-node, got %q err=%v", string(restored), err)
+	}
+}
+
+func TestSubHistoryMouseTabsScrolledRowsAndActions(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("en-US")
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	const width, height = 42, 12
+	click := func(s State, label string) (State, tea.Cmd) {
+		t.Helper()
+		view := ansi.Strip(RenderSubPage(s.ToPageState(width, height)))
+		for y, line := range strings.Split(view, "\n") {
+			if x := strings.Index(line, label); x >= 0 {
+				return s.Update(messages.PageMouseClickMsg{X: lipgloss.Width(line[:x]), Y: y, Width: width, Height: height})
+			}
+		}
+		t.Fatalf("missing control %q in %s", label, view)
+		return s, nil
+	}
+
+	s := State{history: historyView{mode: historyList, kind: profile.SnapshotRaw, uid: "alpha"}}
+	s, cmd := click(s, "Overri")
+	if cmd == nil || s.history.kind != profile.SnapshotMerge {
+		t.Fatal("clicking the override tab did not load its snapshots")
+	}
+	s, cmd = click(s, "Subscr")
+	if cmd == nil || s.history.kind != profile.SnapshotRaw {
+		t.Fatal("clicking the subscription tab did not load its snapshots")
+	}
+
+	s.history.loading = false
+	s.history.snapshots = make([]profile.Snapshot, 10)
+	s.history.selected = 9
+	first := s.history.dialog(width, height).listStart
+	if first <= 0 {
+		t.Fatal("test requires a scrolled list")
+	}
+	s.history.snapshots[first].ID = "clicked-snapshot"
+	label := fmt.Sprintf("#%02d", first+1)
+	s, _ = click(s, label)
+	if s.history.selected != first {
+		t.Fatalf("clicked snapshot index = %d, want %d", s.history.selected, first)
+	}
+	s, cmd = click(s, i18n.T("sub.history.hint_diff"))
+	if cmd == nil || s.history.mode != historyDiff {
+		t.Fatal("clicking Diff did not open the selected snapshot")
+	}
+	s, _ = click(s, i18n.T("sub.history.hint_back"))
+	if s.history.mode != historyList {
+		t.Fatal("clicking Back did not return to the snapshot list")
+	}
+	s, cmd = click(s, i18n.T("sub.history.hint_rollback"))
+	if cmd == nil || s.history.mode != historyClosed || cmd().(messages.SubRollbackDoneMsg).SnapshotID != "clicked-snapshot" {
+		t.Fatal("clicking Rollback did not use the selected snapshot")
 	}
 }

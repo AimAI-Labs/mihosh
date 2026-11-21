@@ -20,14 +20,14 @@ import (
 type InlineHelpTone uint8
 
 const (
-	InlineHelpToneAuto InlineHelpTone = iota
-	InlineHelpToneNav                 // 纯导航提示（不可点击，弱化展示）
-	InlineHelpTonePrimary             // 主操作（确认/切换/运行/刷新）
-	InlineHelpToneSuccess             // 正向操作（新增/测速/应用/更新）
-	InlineHelpToneInfo                // 浏览与筛选（搜索/模式/排序/视图/标签）
-	InlineHelpToneWarning             // 取消/返回/重启/退格
-	InlineHelpToneDanger              // 危险操作（删除/关闭/清空）
-	InlineHelpToneHelp                // 帮助入口（?）
+	InlineHelpToneAuto    InlineHelpTone = iota
+	InlineHelpToneNav                    // 纯导航提示（不可点击，弱化展示）
+	InlineHelpTonePrimary                // 主操作（确认/切换/运行/刷新）
+	InlineHelpToneSuccess                // 正向操作（新增/测速/应用/更新）
+	InlineHelpToneInfo                   // 浏览与筛选（搜索/模式/排序/视图/标签）
+	InlineHelpToneWarning                // 取消/返回/重启/退格
+	InlineHelpToneDanger                 // 危险操作（删除/关闭/清空）
+	InlineHelpToneHelp                   // 帮助入口（?）
 )
 
 // InlineHelp 样式函数（支持主题热切换）
@@ -189,6 +189,44 @@ func FormatInlineHintRow(hints []InlineHelpHint) string {
 	return strings.Join(parts, sep)
 }
 
+// WrapInlineHints groups complete items by display width while keeping their order.
+func WrapInlineHints(hints []InlineHelpHint, width int) [][]InlineHelpHint {
+	var rows [][]InlineHelpHint
+	start, used := 0, 0
+	for i, hint := range hints {
+		itemWidth := lipgloss.Width(hint.Key + " " + hint.Desc)
+		if i > start {
+			if used+3+itemWidth > width {
+				rows = append(rows, hints[start:i])
+				start, used = i, 0
+			} else {
+				used += 3
+			}
+		}
+		used += itemWidth
+	}
+	if start < len(hints) {
+		rows = append(rows, hints[start:])
+	}
+	return rows
+}
+
+// InlineHintAt finds the clickable item at x in a left-aligned hint row.
+func InlineHintAt(hints []InlineHelpHint, x, width int) (InlineHelpHint, bool) {
+	if x < 0 || x >= width {
+		return InlineHelpHint{}, false
+	}
+	start := 0
+	for _, hint := range hints {
+		end := start + lipgloss.Width(hint.Key+" "+hint.Desc)
+		if x >= start && x < end && hint.Clickable() {
+			return hint, true
+		}
+		start = end + 3
+	}
+	return InlineHelpHint{}, false
+}
+
 // FitInlineHints 将条目裁切到 maxWidth 内，优先保留可点击菜单项和末尾的帮助/取消项。
 func FitInlineHints(hints []InlineHelpHint, maxWidth int) []InlineHelpHint {
 	if len(hints) == 0 || maxWidth <= 0 || lipgloss.Width(FormatInlineHintRow(hints)) <= maxWidth {
@@ -224,27 +262,7 @@ func ResolveInlineHelpHit(hints []InlineHelpHint, x, y, width, height int) (Inli
 	if startCol < 0 {
 		startCol = 0
 	}
-	curX := startCol
-	sepW := lipgloss.Width(" · ")
-	maxVisible := max(1, width-1)
-	for i, h := range hints {
-		itemW := lipgloss.Width(h.Key + " " + h.Desc)
-		endX := min(maxVisible, curX+itemW)
-		if x >= curX && x < endX {
-			if h.Clickable() {
-				return h, true
-			}
-			return InlineHelpHint{}, false
-		}
-		curX += itemW
-		if i < len(hints)-1 {
-			curX += sepW
-		}
-		if curX >= maxVisible {
-			break
-		}
-	}
-	return InlineHelpHint{}, false
+	return InlineHintAt(hints, x-startCol, max(1, width-1)-startCol)
 }
 
 // OverlayHelpAtBottomRight 将帮助面板叠加在页面右下角（紧贴底栏上方，距右 1 字符）。

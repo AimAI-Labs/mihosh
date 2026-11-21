@@ -40,6 +40,14 @@ type historyView struct {
 	ignore    profile.FileDiffOptions
 }
 
+type historyDialog struct {
+	dialog.Dialog
+	rawWidth, mergeWidth int
+	listStart, listEnd   int
+	hintTop, innerWidth  int
+	hints                [][]common.InlineHelpHint
+}
+
 func (s State) openHistoryModal() (State, tea.Cmd) {
 	var uid, name string
 	kind := profile.SnapshotMerge
@@ -153,18 +161,9 @@ func (s State) handleHistoryKey(msg tea.KeyMsg) (State, tea.Cmd) {
 	case "tab", "left", "right":
 		if s.history.mode == historyList {
 			if s.history.kind == profile.SnapshotRaw {
-				s.history.kind = profile.SnapshotMerge
-			} else if s.history.uid != "" {
-				s.history.kind = profile.SnapshotRaw
-			} else {
-				return s, nil
+				return s.selectHistoryKind(profile.SnapshotMerge)
 			}
-			s.history.request++
-			s.history.loading = true
-			s.history.selected = 0
-			s.history.snapshots = nil
-			s.history.err = nil
-			return s, s.loadHistoryListCmd()
+			return s.selectHistoryKind(profile.SnapshotRaw)
 		}
 	case "up", "k":
 		if s.history.mode == historyList {
@@ -200,6 +199,17 @@ func (s State) handleHistoryKey(msg tea.KeyMsg) (State, tea.Cmd) {
 	return s, nil
 }
 
+func (s State) selectHistoryKind(kind profile.SnapshotKind) (State, tea.Cmd) {
+	h := &s.history
+	if h.kind == kind || (kind == profile.SnapshotRaw && h.uid == "") {
+		return s, nil
+	}
+	h.kind = kind
+	h.request++
+	h.loading, h.selected, h.snapshots, h.err = true, 0, nil, nil
+	return s, s.loadHistoryListCmd()
+}
+
 func (s State) clickHistory(msg messages.PageMouseClickMsg) (State, tea.Cmd) {
 	d := s.history.dialog(msg.Width, msg.Height)
 	left, top, right, bottom := d.Bounds()
@@ -207,19 +217,45 @@ func (s State) clickHistory(msg messages.PageMouseClickMsg) (State, tea.Cmd) {
 		s.history.mode = historyClosed
 		return s, nil
 	}
-	if s.history.mode == historyList && len(s.history.snapshots) > 0 {
-		// Row layout inside dialog: border(1) + tab row(1) + divider(1) = 3 lines before items
-		row := msg.Y - top - 3
-		if row >= 0 && row < len(s.history.snapshots) {
-			s.history.selected = row
+	x, y := msg.X-left-2, msg.Y-top
+	if y == 1 && s.history.mode == historyList && x >= 0 {
+		if x < d.rawWidth {
+			return s.selectHistoryKind(profile.SnapshotRaw)
+		}
+		if x >= d.rawWidth+2 && x < d.rawWidth+2+d.mergeWidth {
+			return s.selectHistoryKind(profile.SnapshotMerge)
+		}
+	}
+	if row := y - 3; s.history.mode == historyList && row >= 0 && row < d.listEnd-d.listStart && x >= 0 && x < d.innerWidth {
+		s.history.selected = d.listStart + row
+	}
+	if row := y - d.hintTop; row >= 0 && row < len(d.hints) {
+		if hint, ok := common.InlineHintAt(d.hints[row], x, d.innerWidth); ok {
+			key, _ := hint.KeyMsg()
+			return s.handleHistoryKey(key)
 		}
 	}
 	return s, nil
 }
 
-func (h historyView) dialog(width, height int) dialog.Dialog {
-	panelWidth := max(36, min(110, width-4))
-	innerWidth := max(20, panelWidth-4)
+func (h historyView) dialog(width, height int) historyDialog {
+	panelWidth := max(24, min(110, width-4))
+	innerWidth := panelWidth - 4
+	d := historyDialog{innerWidth: innerWidth}
+	hints := []common.InlineHelpHint{
+		{Key: "Tab", Desc: i18n.T("sub.history.hint_tab")},
+		{Key: "↵/d", Desc: i18n.T("sub.history.hint_diff"), Action: "enter", Tone: common.InlineHelpToneInfo},
+		{Key: "r", Desc: i18n.T("sub.history.hint_rollback"), Tone: common.InlineHelpToneWarning},
+		{Key: "Esc", Desc: i18n.T("core.inline.cancel")},
+	}
+	if h.mode == historyDiff {
+		hints = []common.InlineHelpHint{
+			{Key: "↑↓", Desc: i18n.T("core.inline.scroll")},
+			hints[2],
+			{Key: "Esc", Desc: i18n.T("sub.history.hint_back")},
+		}
+	}
+	d.hints = common.WrapInlineHints(hints, innerWidth)
 	t := theme.Current()
 
 	activeTab := lipgloss.NewStyle().Background(theme.Resolve(t.Primary)).Foreground(theme.Resolve(t.Background)).Bold(true)
@@ -241,10 +277,10 @@ func (h historyView) dialog(width, height int) dialog.Dialog {
 		} else if len(h.diff) == 0 {
 			body = append(body, dim.Render(i18n.T("sub.history.diff_identical")))
 		} else {
-			budget := max(4, height-9)
+			budget := max(1, height-5-len(d.hints))
 			top := min(h.top, max(0, len(h.diff)-budget))
 			end := min(len(h.diff), top+budget)
-			half := max(10, (innerWidth-3)/2)
+			half := (innerWidth - 3) / 2
 			header := common.PadString(i18n.T("sub.history.col_before"), half) + " │ " + i18n.T("sub.history.col_after")
 			body = append(body, lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Bold(true).Render(ansi.Truncate(header, innerWidth, "")))
 			for _, row := range h.diff[top:end] {
@@ -265,12 +301,6 @@ func (h historyView) dialog(width, height int) dialog.Dialog {
 				body = append(body, bStr+" │ "+aStr)
 			}
 		}
-		hints := common.FormatInlineHintRow([]common.InlineHelpHint{
-			{Key: "↑↓", Desc: i18n.T("core.inline.scroll")},
-			{Key: "r", Desc: i18n.T("sub.history.hint_rollback"), Tone: common.InlineHelpToneWarning},
-			{Key: "Esc", Desc: i18n.T("sub.history.hint_back")},
-		})
-		body = append(body, dim.Render(strings.Repeat("─", innerWidth)), ansi.Truncate(hints, innerWidth, ""))
 	} else {
 		title = i18n.T("sub.history.title")
 		rawTabLabel := " " + i18n.T("sub.history.tab_raw")
@@ -279,14 +309,23 @@ func (h historyView) dialog(width, height int) dialog.Dialog {
 		}
 		rawTabLabel += " "
 		mergeTabLabel := " " + i18n.T("sub.history.tab_merge") + " "
+		if lipgloss.Width(rawTabLabel)+2+lipgloss.Width(mergeTabLabel) > innerWidth {
+			rawTabLabel = ansi.Truncate(rawTabLabel, max((innerWidth-2)/2, innerWidth-2-lipgloss.Width(mergeTabLabel)), "…")
+			mergeTabLabel = ansi.Truncate(mergeTabLabel, innerWidth-2-lipgloss.Width(rawTabLabel), "…")
+		}
+		d.rawWidth, d.mergeWidth = lipgloss.Width(rawTabLabel), lipgloss.Width(mergeTabLabel)
 
 		var tabsLine string
 		if h.kind == profile.SnapshotRaw {
 			tabsLine = activeTab.Render(rawTabLabel) + "  " + inactiveTab.Render(mergeTabLabel)
 		} else {
-			tabsLine = inactiveTab.Render(rawTabLabel) + "  " + activeTab.Render(mergeTabLabel)
+			rawStyle := inactiveTab
+			if h.uid == "" {
+				rawStyle = dim
+			}
+			tabsLine = rawStyle.Render(rawTabLabel) + "  " + activeTab.Render(mergeTabLabel)
 		}
-		body = append(body, ansi.Truncate(tabsLine, innerWidth, "…"))
+		body = append(body, tabsLine)
 		body = append(body, dim.Render(strings.Repeat("─", innerWidth)))
 
 		if h.loading {
@@ -296,12 +335,13 @@ func (h historyView) dialog(width, height int) dialog.Dialog {
 		} else if len(h.snapshots) == 0 {
 			body = append(body, dim.Render(i18n.T("sub.history.empty")))
 		} else {
-			budget := max(3, height-10)
+			budget := max(1, height-6-len(d.hints))
 			start := 0
 			if h.selected >= budget {
 				start = h.selected - budget + 1
 			}
 			end := min(len(h.snapshots), start+budget)
+			d.listStart, d.listEnd = start, end
 			for i := start; i < end; i++ {
 				snap := h.snapshots[i]
 				prefix := "  "
@@ -323,15 +363,13 @@ func (h historyView) dialog(width, height int) dialog.Dialog {
 			}
 		}
 
-		hints := common.FormatInlineHintRow([]common.InlineHelpHint{
-			{Key: "Tab", Desc: i18n.T("sub.history.hint_tab")},
-			{Key: "↵/d", Desc: i18n.T("sub.history.hint_diff"), Tone: common.InlineHelpToneInfo},
-			{Key: "r", Desc: i18n.T("sub.history.hint_rollback"), Tone: common.InlineHelpToneWarning},
-			{Key: "Esc", Desc: i18n.T("core.inline.cancel")},
-		})
-		body = append(body, dim.Render(strings.Repeat("─", innerWidth)), ansi.Truncate(hints, innerWidth, ""))
 	}
-
+	body = append(body, dim.Render(strings.Repeat("─", innerWidth)))
+	d.hintTop = len(body) + 1
+	for _, row := range d.hints {
+		body = append(body, ansi.Truncate(common.FormatInlineHintRow(row), innerWidth, ""))
+	}
 	panel := common.RenderBorderedPanel(title, strings.Join(body, "\n"), panelWidth, common.TokyoBlue(), common.TokyoForeground())
-	return dialog.New(panel, width, max(1, height-1)).Below(subHeaderHeight + 1).Clipped()
+	d.Dialog = dialog.New(panel, width, max(1, height-1)).Below(subHeaderHeight + 1).Clipped()
+	return d
 }
