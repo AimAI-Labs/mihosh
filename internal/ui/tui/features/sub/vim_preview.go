@@ -3,12 +3,12 @@ package sub
 import (
 	_ "embed"
 	"errors"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
 
@@ -31,14 +31,14 @@ func (v *vimPreview) Run() error {
 	if err != nil {
 		return errors.New(i18n.T("sub.file.vim_missing"))
 	}
-	data, err := profile.ReadRawFile(v.uid)
+	data, err := service.ReadRawFile(v.uid)
 	if err != nil {
 		return err
 	}
 	name := "source.yaml"
 	var mergeWarning error
 	if v.activated {
-		generated, err := profile.GenerateSourcePreview(data)
+		generated, err := service.GenerateSourcePreview(data)
 		if err != nil {
 			return err
 		}

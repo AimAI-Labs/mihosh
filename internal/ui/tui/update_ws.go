@@ -1,9 +1,9 @@
 package tui
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"time"
 
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
@@ -281,7 +281,7 @@ func (m *Model) refreshOnConnect() tea.Cmd {
 }
 
 func (m *Model) reloadStoredConfig() {
-	cfg, err := config.Load()
+	cfg, err := service.Load()
 	if err != nil {
 		return
 	}

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -57,17 +56,17 @@ func (s State) SetServices(configSvc *service.ConfigService, coreSvc *service.Co
 
 // ReloadChains reads persisted proxy chains from chain-edits.yaml into page-local state.
 func (s State) ReloadChains() State {
-	var edits profile.ChainEdits
+	var edits service.ChainEdits
 	var err error
 	if s.configSvc != nil {
 		edits, err = s.configSvc.ReadProxyChains()
 	} else {
-		edits, err = profile.ReadChainEdits()
+		edits, err = service.ReadChainEdits()
 	}
 	if err != nil {
 		return s
 	}
-	chains := make(map[string]profile.ProxyChain, len(edits.Chains))
+	chains := make(map[string]service.ProxyChain, len(edits.Chains))
 	for _, c := range edits.Chains {
 		if c.Enabled && len(c.Nodes) >= 2 {
 			chains[c.Group] = c
@@ -78,16 +77,16 @@ func (s State) ReloadChains() State {
 }
 
 // ActiveGroupChain returns the active proxy chain for the currently selected group, if any.
-func (s State) ActiveGroupChain() (profile.ProxyChain, bool) {
+func (s State) ActiveGroupChain() (service.ProxyChain, bool) {
 	if len(s.Chains) == 0 {
-		return profile.ProxyChain{}, false
+		return service.ProxyChain{}, false
 	}
 	if s.SelectedGroup >= 0 && s.SelectedGroup < len(s.GroupNames) {
 		if c, ok := s.Chains[s.GroupNames[s.SelectedGroup]]; ok && c.Enabled && len(c.Nodes) >= 2 {
 			return c, true
 		}
 	}
-	return profile.ProxyChain{}, false
+	return service.ProxyChain{}, false
 }
 
 // OpenChainModal opens the proxy chain configuration modal for the currently selected group.
@@ -130,7 +129,7 @@ func (s State) buildChainCandidates(groupName string) []ChainCandidate {
 	var candidates []ChainCandidate
 
 	appendCandidate := func(name string) {
-		if name == "" || profile.IsChainBuiltInProxy(name) {
+		if name == "" || service.IsChainBuiltInProxy(name) {
 			return
 		}
 		if _, dup := seen[name]; dup {
@@ -162,7 +161,7 @@ func (s State) buildChainCandidates(groupName string) []ChainCandidate {
 	extraNames := make([]string, 0, len(s.Proxies))
 	for name := range s.Proxies {
 		if _, exists := seen[name]; !exists {
-			if _, isGroup := s.Groups[name]; !isGroup && !profile.IsChainBuiltInProxy(name) {
+			if _, isGroup := s.Groups[name]; !isGroup && !service.IsChainBuiltInProxy(name) {
 				extraNames = append(extraNames, name)
 			}
 		}
@@ -316,12 +315,12 @@ func (s State) submitChainModal() (State, tea.Cmd) {
 		return s, nil
 	}
 
-	chain := profile.ProxyChain{
+	chain := service.ProxyChain{
 		Group:   m.Group,
 		Nodes:   append([]string(nil), m.DraftNodes...),
 		Enabled: len(m.DraftNodes) >= 2,
 	}
-	if err := profile.ValidateProxyChain(chain); err != nil {
+	if err := service.ValidateProxyChain(chain); err != nil {
 		m.Notice = err.Error()
 		return s, nil
 	}
@@ -331,7 +330,7 @@ func (s State) submitChainModal() (State, tea.Cmd) {
 	return s, s.applyProxyChainCmd(chain)
 }
 
-func (s State) applyProxyChainCmd(chain profile.ProxyChain) tea.Cmd {
+func (s State) applyProxyChainCmd(chain service.ProxyChain) tea.Cmd {
 	configSvc := s.configSvc
 	if configSvc == nil {
 		configSvc = service.NewConfigService()
@@ -344,11 +343,11 @@ func (s State) applyProxyChainCmd(chain profile.ProxyChain) tea.Cmd {
 		switch {
 		case errors.Is(err, service.ErrRemoteChainEditRequiresSubscription):
 			err = errors.New(i18n.T("nodes.chain.remote_needs_subscription"))
-		case errors.Is(err, profile.ErrChainProxyNotFound):
+		case errors.Is(err, service.ErrChainProxyNotFound):
 			err = fmt.Errorf("%s: %w", i18n.T("nodes.chain.proxy_not_found"), err)
-		case errors.Is(err, profile.ErrChainCycle):
+		case errors.Is(err, service.ErrChainCycle):
 			err = errors.New(i18n.T("nodes.chain.cycle_error"))
-		case errors.Is(err, profile.ErrChainConflict):
+		case errors.Is(err, service.ErrChainConflict):
 			err = fmt.Errorf("%s: %w", i18n.T("nodes.chain.conflict_error"), err)
 		case err != nil && result.Restored:
 			err = fmt.Errorf("%s (%w)", i18n.T("settings.toast.mihomo_override_restored"), err)

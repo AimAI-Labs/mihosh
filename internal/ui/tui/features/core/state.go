@@ -8,9 +8,6 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
-	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/preferences"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
@@ -27,8 +24,8 @@ type State struct {
 	serviceActionIdx    int
 	svc                 *service.CoreService
 	Status              service.CoreStatus
-	Release             coreinfra.Release
-	Progress            coreinfra.Progress
+	Release             service.Release
+	Progress            service.Progress
 	Err                 error
 	Busy                bool
 	Editing             bool
@@ -53,7 +50,7 @@ type State struct {
 	connectionChecked   bool
 	task                string
 	cancel              context.CancelFunc
-	updates             chan coreinfra.Progress
+	updates             chan service.Progress
 	generation          uint64
 	catalog             releaseCatalog
 	geoFiles            []service.GeoDataFile
@@ -62,22 +59,22 @@ type State struct {
 	editor              preferences.State
 }
 
-func NewState(svc *service.CoreService, configSvc *service.ConfigService, client *api.Client) State {
+func NewState(svc *service.CoreService, configSvc *service.ConfigService, client *service.Client) State {
 	if configSvc == nil {
 		configSvc = service.NewConfigService()
 	}
 	release := svc.CachedRelease()
 	if !release.IsStable() {
-		release = coreinfra.PinnedRelease()
+		release = service.PinnedRelease()
 	}
 	if asset, err := release.SelectAsset(runtime.GOOS, runtime.GOARCH); err == nil {
-		release.Assets = []coreinfra.Asset{asset}
+		release.Assets = []service.Asset{asset}
 	}
-	var status coreinfra.Status
-	if cfg, err := config.Load(); err == nil && cfg != nil {
+	var status service.Status
+	if cfg, err := service.Load(); err == nil && cfg != nil {
 		status.ShellProxy = cfg.ShellProxy
 	}
-	return State{svc: svc, Status: status, editor: preferences.NewMihomoState(configSvc, client, svc), Release: release, followSelection: true, catalog: releaseCatalog{page: coreinfra.ReleasePage{Releases: []coreinfra.Release{release}}, cleanup: &releaseCleanup{}}}
+	return State{svc: svc, Status: status, editor: preferences.NewMihomoState(configSvc, client, svc), Release: release, followSelection: true, catalog: releaseCatalog{page: service.ReleasePage{Releases: []service.Release{release}}, cleanup: &releaseCleanup{}}}
 }
 func (s State) Refresh() tea.Cmd {
 	if s.svc == nil {
@@ -116,14 +113,14 @@ func (s State) begin(action string) (State, tea.Cmd) {
 	s.Busy = true
 	s.task = action
 	s.Err = nil
-	s.Progress = coreinfra.Progress{}
+	s.Progress = service.Progress{}
 	s.generation++
 	id := s.generation
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
-	updates := make(chan coreinfra.Progress, 1)
+	updates := make(chan service.Progress, 1)
 	s.updates = updates
-	notify := func(p coreinfra.Progress) {
+	notify := func(p service.Progress) {
 		select {
 		case updates <- p:
 		default:
@@ -147,13 +144,13 @@ func (s State) begin(action string) (State, tea.Cmd) {
 	return s, tea.Batch(s.poll(), func() tea.Msg {
 		defer cancel()
 		var err error
-		var result *coreinfra.Release
+		var result *service.Release
 		var shellPath string
-		var releases *coreinfra.ReleasePage
+		var releases *service.ReleasePage
 		switch action {
 		case "releases":
 			var (
-				page coreinfra.ReleasePage
+				page service.ReleasePage
 				e    error
 			)
 			if forceRefresh {
@@ -197,7 +194,7 @@ func (s State) begin(action string) (State, tea.Cmd) {
 				if selectErr != nil {
 					err = selectErr
 				} else {
-					r.Assets = []coreinfra.Asset{asset}
+					r.Assets = []service.Asset{asset}
 					result = &r
 				}
 			}
@@ -327,12 +324,12 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		s.Err = msg.Err
 		if msg.Action == "shell-proxy" && msg.Err == nil {
 			s.shellPath = msg.ShellPath
-			if cfg, err := config.Load(); err == nil && cfg != nil {
+			if cfg, err := service.Load(); err == nil && cfg != nil {
 				s.Status.ShellProxy = cfg.ShellProxy
 			}
 		}
 		if (msg.Action == "system-proxy" || msg.Action == "tun" || msg.Action == "tun-offline") && msg.Err == nil {
-			if cfg, err := config.Load(); err == nil && cfg != nil {
+			if cfg, err := service.Load(); err == nil && cfg != nil {
 				s.Status.SystemProxy = cfg.Core.SystemProxy
 				s.Status.TUN = cfg.Core.TUN
 			}
@@ -564,7 +561,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		}
 		if !s.Editing && !s.Busy && (s.task != "" || s.Err != nil) && (msg.String() == "enter" || msg.String() == "esc") {
 			s.task, s.Err = "", nil
-			s.Progress = coreinfra.Progress{}
+			s.Progress = service.Progress{}
 			return s, nil
 		}
 		if s.Editing {

@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/preferences"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/sub"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
@@ -140,7 +140,7 @@ func (m Model) applySubEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 		cmds := []tea.Cmd{sub.FetchSubs(m.profileSvc), preferences.FetchMihomoOverrides(m.configSvc)}
 		if msg.Restarted {
 			m.reloadStoredConfig()
-			cmds = append(cmds, m.updateCoreTarget(config.ResolveMihomoEndpoint(), coreTargetReconnect))
+			cmds = append(cmds, m.updateCoreTarget(service.ResolveMihomoEndpoint(), coreTargetReconnect))
 		} else if m.connectionReady {
 			cmds = append(cmds, m.refreshOnConnect())
 		}

@@ -9,8 +9,6 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -64,7 +62,7 @@ const (
 )
 
 // NewState 初始化节点状态
-func NewState(client *api.Client, testURL string, timeout int) State {
+func NewState(client *service.Client, testURL string, timeout int) State {
 	return State{
 		client:  client,
 		testURL: testURL,
@@ -74,7 +72,7 @@ func NewState(client *api.Client, testURL string, timeout int) State {
 
 // State 节点页面完整状态
 type State struct {
-	client         *api.Client
+	client         *service.Client
 	configSvc      *service.ConfigService
 	coreSvc        *service.CoreService
 	testURL        string
@@ -108,7 +106,7 @@ type State struct {
 	FilterEngine         FilterEngine
 	FilteredProxyIndices []int // 过滤结果的索引缓存（对应 CurrentProxies 的下标）
 	// 链式代理（页面局部状态）
-	Chains     map[string]profile.ProxyChain
+	Chains     map[string]service.ProxyChain
 	ChainModal ChainModalState
 	// 鼠标
 	MouseFocus          nodesMouseFocus

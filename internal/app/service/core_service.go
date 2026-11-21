@@ -194,7 +194,7 @@ func (s *CoreService) installService(ctx context.Context, root string, manager h
 
 // Serve is the only service-manager entry. The selected kernel remains a child of
 // this coordinator, so upgrades and recovery use exactly the session implementation.
-func (s *CoreService) Serve(ctx context.Context, ready func()) error {
+func (s *CoreService) serveRuntime(ctx context.Context, ready func()) error {
 	s.daemon = true
 	if err := s.Start(ctx); err != nil {
 		return err
@@ -235,7 +235,7 @@ func (s *CoreService) forwardControlRequest(ctx context.Context, request coreCon
 
 // Recovery is allowed only after both locks prove that no session/service owns the
 // runtime. A leftover PID never establishes ownership.
-func (s *CoreService) RecoverNetwork(ctx context.Context) error {
+func (s *CoreService) recoverNetwork(ctx context.Context) error {
 	if !s.mu.TryLock() {
 		return errors.New("another core operation is active")
 	}

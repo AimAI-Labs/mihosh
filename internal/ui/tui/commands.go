@@ -2,16 +2,16 @@ package tui
 
 import (
 	"context"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 // fetchMemory 获取当前内存使用量
-func fetchMemory(client *api.Client) tea.Cmd {
-	return messages.CoreRequest(client, func(client *api.Client) tea.Msg {
+func fetchMemory(client *service.Client) tea.Cmd {
+	return messages.CoreRequest(client, func(client *service.Client) tea.Msg {
 		mem, err := client.GetMemory()
 		if err != nil {
 			// 内存获取失败不报错，返回0
@@ -22,14 +22,14 @@ func fetchMemory(client *api.Client) tea.Cmd {
 }
 
 // startWSStreams 启动WebSocket流
-func startWSStreams(ctx context.Context, wsClient *api.WSClient, msgChan chan interface{}) tea.Cmd {
+func startWSStreams(ctx context.Context, wsClient *service.WSClient, msgChan chan interface{}) tea.Cmd {
 	return func() tea.Msg {
 		if wsClient == nil {
 			return nil
 		}
 
 		// 设置内存处理器
-		wsClient.SetMemoryHandler(func(data api.MemoryData) {
+		wsClient.SetMemoryHandler(func(data service.MemoryData) {
 			select {
 			case msgChan <- messages.CoreWSMsg{Generation: data.Generation, Payload: messages.MemoryWSMsg{Memory: data.Inuse}}:
 			default:
@@ -38,7 +38,7 @@ func startWSStreams(ctx context.Context, wsClient *api.WSClient, msgChan chan in
 		})
 
 		// 设置流量处理器
-		wsClient.SetTrafficHandler(func(data api.TrafficData) {
+		wsClient.SetTrafficHandler(func(data service.TrafficData) {
 			select {
 			case msgChan <- messages.CoreWSMsg{Generation: data.Generation, Payload: messages.TrafficWSMsg{Up: data.Up, Down: data.Down}}:
 			default:
@@ -47,7 +47,7 @@ func startWSStreams(ctx context.Context, wsClient *api.WSClient, msgChan chan in
 		})
 
 		// 设置连接处理器
-		wsClient.SetConnectionsHandler(func(data api.ConnectionsData) {
+		wsClient.SetConnectionsHandler(func(data service.ConnectionsData) {
 			select {
 			case msgChan <- messages.CoreWSMsg{Generation: data.Generation, Payload: messages.ConnectionsWSMsg{Data: data}}:
 			default:
@@ -56,7 +56,7 @@ func startWSStreams(ctx context.Context, wsClient *api.WSClient, msgChan chan in
 		})
 
 		// 设置日志处理器
-		wsClient.SetLogsHandler(func(data api.LogData) {
+		wsClient.SetLogsHandler(func(data service.LogData) {
 			select {
 			case msgChan <- messages.CoreWSMsg{Generation: data.Generation, Payload: messages.LogsWSMsg{LogType: data.Type, Payload: data.Payload}}:
 			default:

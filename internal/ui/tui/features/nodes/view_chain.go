@@ -2,17 +2,17 @@ package nodes
 
 import (
 	"fmt"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"slices"
 	"strings"
 
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
 
-func formatActiveChainSummary(chain profile.ProxyChain, maxWidth int) string {
+func formatActiveChainSummary(chain service.ProxyChain, maxWidth int) string {
 	if !chain.Enabled || len(chain.Nodes) < 2 {
 		return ""
 	}

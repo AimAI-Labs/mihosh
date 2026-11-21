@@ -1,11 +1,10 @@
 package core
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"strconv"
 	"strings"
 
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
-	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -54,7 +53,7 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 		case "import":
 			s.fields[1].SetValue(s.Release.Tag)
 		case "external":
-			cfg, _ := config.Load()
+			cfg, _ := service.Load()
 			if cfg != nil {
 				s.fields[0].SetValue(cfg.Core.ExternalController)
 				s.fields[1].SetValue(cfg.Core.ExternalSecret)
@@ -68,9 +67,9 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 		s.fields[0].Focus()
 		return s, textinput.Blink
 	}
-	cfg, err := config.Load()
+	cfg, err := service.Load()
 	if err != nil {
-		c := config.DefaultConfig
+		c := service.DefaultConfig
 		cfg = &c
 	}
 	s.fields = make([]textinput.Model, 3)
@@ -83,7 +82,7 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 	s.fields[0].EchoMode = textinput.EchoPassword
 	gateways := cfg.Core.Accelerators
 	if gateways == nil {
-		gateways = coreinfra.DefaultAccelerators()
+		gateways = service.DefaultAccelerators()
 	}
 	var urls []string
 	for _, a := range gateways {
@@ -170,10 +169,10 @@ func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 			s.args = args
 			return s.begin(action)
 		}
-		gateways := []coreinfra.Accelerator{}
+		gateways := []service.Accelerator{}
 		for _, raw := range strings.Split(s.fields[1].Value(), ",") {
 			if raw = strings.TrimSpace(raw); raw != "" {
-				gateways = append(gateways, coreinfra.Accelerator{URL: raw, Metadata: true, Asset: true})
+				gateways = append(gateways, service.Accelerator{URL: raw, Metadata: true, Asset: true})
 			}
 		}
 		timeout, err := strconv.Atoi(s.fields[2].Value())
