@@ -136,6 +136,18 @@ type RuleEditAppliedMsg struct {
 	Err             error
 }
 
+type ProxyChainAppliedMsg struct {
+	Group           string
+	ExitNode        string
+	Cleared         bool
+	Applied         bool
+	Remote          bool
+	NeedsRestart    bool
+	Restarted       bool
+	EndpointChanged bool
+	Err             error
+}
+
 // ConfigReloadedMsg 调用 mihomo 核心 ReloadConfig 的结果。
 type ConfigReloadedMsg struct{ Err error }
 

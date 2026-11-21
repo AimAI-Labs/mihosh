@@ -12,21 +12,27 @@ import (
 type mergeMutation struct {
 	overrides map[string]string
 	rule      *profile.RuleEdit
+	chain     *profile.ProxyChain
 }
 
 type preparedMerge struct {
-	data      []byte
-	overrides map[string]string
-	cleared   []string
-	candidate []byte
-	rulePath  string
-	ruleEdits *profileFileRecovery
+	data       []byte
+	overrides  map[string]string
+	cleared    []string
+	candidate  []byte
+	rulePath   string
+	ruleEdits  *profileFileRecovery
+	chainPath  string
+	chainEdits *profileFileRecovery
 }
 
 func (change mergeMutation) prepare(old []byte, uid, path string, managed bool) (preparedMerge, error) {
 	var next preparedMerge
 	if change.rule != nil {
 		return change.prepareRuleEdit(old, uid, path, managed)
+	}
+	if change.chain != nil {
+		return change.prepareChainEdit(old, uid, path, managed)
 	}
 	native, err := profile.NormalizeLegacyMerge(old, uid, func() (string, error) {
 		if path == "" {
@@ -98,6 +104,41 @@ func (change mergeMutation) prepareRuleEdit(merge []byte, uid, path string, mana
 	return next, err
 }
 
+func (change mergeMutation) prepareChainEdit(merge []byte, uid, path string, managed bool) (preparedMerge, error) {
+	var next preparedMerge
+	var err error
+	next.chainPath, err = profile.ChainEditsPath()
+	if err != nil {
+		return next, err
+	}
+	previous, existed, err := readOptionalFile(next.chainPath)
+	if err != nil {
+		return next, err
+	}
+	prevEdits, err := profile.DecodeChainEdits(previous)
+	if err != nil {
+		return next, err
+	}
+	nextEdits, err := profile.DecodeChainEdits(previous)
+	if err != nil {
+		return next, err
+	}
+	if err = nextEdits.SetGroupChain(*change.chain); err != nil {
+		return next, err
+	}
+	next.candidate, err = profile.GenerateOverrideConfigWithChains(uid, path, merge, managed, prevEdits, nextEdits)
+	if err != nil {
+		return next, err
+	}
+	next.data, err = profile.EncodeChainEdits(nextEdits)
+	if err != nil {
+		return next, err
+	}
+	next.chainEdits = &profileFileRecovery{Data: previous, Existed: existed}
+	next.overrides, err = profile.ReadMihomoOverridesFrom(merge)
+	return next, err
+}
+
 func (next preparedMerge) write() error {
 	if next.ruleEdits != nil {
 		if err := os.MkdirAll(filepath.Dir(next.rulePath), 0700); err != nil {
@@ -105,12 +146,21 @@ func (next preparedMerge) write() error {
 		}
 		return privateWrite(next.rulePath, next.data)
 	}
+	if next.chainEdits != nil {
+		if err := os.MkdirAll(filepath.Dir(next.chainPath), 0700); err != nil {
+			return err
+		}
+		return privateWrite(next.chainPath, next.data)
+	}
 	return profile.WriteMerge(next.data)
 }
 
 func (next preparedMerge) restore(mergePath string, mergeExisted bool, oldMerge []byte) error {
 	if restore := next.ruleEdits; restore != nil {
 		return restoreMergeFile(next.rulePath, restore.Existed, restore.Data)
+	}
+	if restore := next.chainEdits; restore != nil {
+		return restoreMergeFile(next.chainPath, restore.Existed, restore.Data)
 	}
 	return restoreMergeFile(mergePath, mergeExisted, oldMerge)
 }
@@ -137,10 +187,14 @@ func readRuleEditBase(uid, path string, old []byte, managed bool) ([]byte, error
 }
 
 func (change mergeMutation) controlRequest() coreControlRequest {
-	if change.rule == nil {
-		return coreControlRequest{Action: "overrides", Overrides: change.overrides}
+	if change.rule != nil {
+		return coreControlRequest{Action: "rule-edit", RuleEdit: change.rule}
 	}
-	return coreControlRequest{Action: "rule-edit", RuleEdit: change.rule}
+	if change.chain != nil {
+		return coreControlRequest{Action: "chain-edit", ChainEdit: change.chain}
+	}
+	return coreControlRequest{Action: "overrides", Overrides: change.overrides}
 }
 
 var ErrRemoteRuleEditRequiresSubscription = errors.New("a remote controller needs an active subscription to apply rule edits")
+var ErrRemoteChainEditRequiresSubscription = errors.New("a remote controller needs an active subscription to apply proxy chains")

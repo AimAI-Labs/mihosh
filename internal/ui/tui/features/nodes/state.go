@@ -10,6 +10,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -74,6 +75,8 @@ func NewState(client *api.Client, testURL string, timeout int) State {
 // State 节点页面完整状态
 type State struct {
 	client         *api.Client
+	configSvc      *service.ConfigService
+	coreSvc        *service.CoreService
 	testURL        string
 	timeout        int
 	Mode           string // 运行模式 "Rule", "Global", "Direct", in mihomo API lowercase.
@@ -104,6 +107,9 @@ type State struct {
 	NodeFilterMode       bool
 	FilterEngine         FilterEngine
 	FilteredProxyIndices []int // 过滤结果的索引缓存（对应 CurrentProxies 的下标）
+	// 链式代理（页面局部状态）
+	Chains     map[string]profile.ProxyChain
+	ChainModal ChainModalState
 	// 鼠标
 	MouseFocus          nodesMouseFocus
 	doubleClickDetector common.DoubleClickDetector[MouseTarget]
@@ -207,6 +213,7 @@ func (s State) displayProxies() []string {
 
 // ToPageState 转换为渲染层所需的 PageState
 func (s State) ToPageState(width, height int) PageState {
+	activeChain, _ := s.ActiveGroupChain()
 	return PageState{
 		Mode:             s.Mode,
 		Layout:           s.Layout,
@@ -230,6 +237,8 @@ func (s State) ToPageState(width, height int) PageState {
 		FilterText:       s.NodeFilter,
 		FilterMode:       s.NodeFilterMode,
 		FilterEngine:     s.FilterEngine,
+		ActiveChain:      activeChain,
+		ChainModal:       s.ChainModal,
 	}
 }
 
@@ -239,7 +248,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.CoreTargetChangedMsg:
 		if msg.Reset {
-			next := NewState(s.client, s.testURL, s.timeout)
+			next := NewState(s.client, s.testURL, s.timeout).SetServices(s.configSvc, s.coreSvc)
 			next.Layout = s.Layout
 			return next, nil
 		}
@@ -252,6 +261,11 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	case messages.PageMouseClickMsg:
 		return s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
 	case tea.KeyMsg:
+		// 链式代理弹窗拦截所有按键
+		if s.ChainModal.Open {
+			return s.handleChainModalKey(msg)
+		}
+
 		// 搜索输入模式：拦截所有按键用于输入
 		if s.NodeFilterMode {
 			return s.handleNodeFilterMode(msg)
@@ -350,6 +364,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case msg.String() == "g":
 			return s.LocateActiveProxy()
 
+		case msg.String() == "c":
+			return s.OpenChainModal()
+
 		case msg.String() == "s":
 			s.ProxySortOrder = (s.ProxySortOrder + 1) % ProxySortOrder(len(sortOrderLabels))
 			s.applySortOrder()
@@ -414,6 +431,9 @@ func (s *State) updateFilteredProxies() {
 
 // HandleMouseLeft 处理 nodes 页面左键单击/双击
 func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, tea.Cmd) {
+	if s.ChainModal.Open {
+		return s.handleChainModalClick(pageX, pageY, pageWidth, pageHeight)
+	}
 	if s.NodeFilterMode {
 		return s, nil
 	}
@@ -531,6 +551,9 @@ func (s *State) applyGroupSelection(groupIdx int) {
 // HandleMouseScroll 处理鼠标滚轮（弹窗打开时控制弹窗滚动，否则切换选中的策略组或节点，
 // 卡片流与节点网格会根据选中项自动滚动到可见位置）
 func (s State) HandleMouseScroll(up bool, pageX, pageY, pageWidth, pageHeight int) State {
+	if s.ChainModal.Open {
+		return s.handleChainModalScroll(up)
+	}
 	if s.NodeFilterMode {
 		return s
 	}
@@ -878,5 +901,8 @@ func (s State) LocateActiveProxy() (State, tea.Cmd) {
 
 // InputCapture declares which input belongs to the current page mode.
 func (s State) InputCapture() common.InputCapture {
-	return common.InputCapture{Active: s.NodeFilterMode || s.ShowTestDetail, Interrupt: s.NodeFilterMode}
+	return common.InputCapture{
+		Active:    s.NodeFilterMode || s.ShowTestDetail || s.ChainModal.Open,
+		Interrupt: s.NodeFilterMode,
+	}
 }

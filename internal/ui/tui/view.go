@@ -126,6 +126,7 @@ func (m *Model) buildHelpContext() help.HelpContext {
 		ConnFilter:         m.connsState.FilterMode(),
 		NodesTestDetail:    m.nodesState.ShowTestDetail,
 		NodesFilterMode:    m.nodesState.NodeFilterMode,
+		NodesChainModal:    m.nodesState.ChainModal.Open,
 		LogsDetail:         m.logsState.DetailMode(),
 		LogsFilter:         m.logsState.FilterMode(),
 		RulesTypeFilter:    m.rulesState.ShowTypeFilter(),

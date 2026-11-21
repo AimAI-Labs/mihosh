@@ -47,6 +47,7 @@ type HelpContext struct {
 	// 节点页子状态
 	NodesTestDetail bool // 测速结果详情弹窗
 	NodesFilterMode bool // 搜索输入
+	NodesChainModal bool // 链式代理弹窗
 
 	// 日志页子状态
 	LogsDetail bool // 日志详情弹窗
@@ -167,6 +168,22 @@ func buildHelpSections(ctx HelpContext) []section {
 
 // buildNodesSections 节点页帮助分区
 func buildNodesSections(ctx HelpContext) []section {
+	if ctx.NodesChainModal {
+		return []section{{
+			title: i18n.T("help.section.nodes_chain"),
+			bindings: []keybinding{
+				{"↑/↓  k/j", i18n.T("help.nodes_chain.navigate")},
+				{"↵ / Space", i18n.T("help.nodes_chain.toggle")},
+				{"Tab", i18n.T("help.nodes_chain.focus")},
+				{"[ / ]", i18n.T("help.nodes_chain.reorder")},
+				{"Backspace / d", i18n.T("help.nodes_chain.remove")},
+				{"x", i18n.T("help.nodes_chain.clear")},
+				{"Ctrl+S / s", i18n.T("help.nodes_chain.apply")},
+				{"Esc", i18n.T("help.nodes_chain.close")},
+			},
+		}}
+	}
+
 	if ctx.NodesFilterMode {
 		return []section{{
 			title: i18n.T("help.section.nodes_search"),
@@ -203,6 +220,7 @@ func buildNodesSections(ctx HelpContext) []section {
 			{"m", i18n.T("help.nodes.mode")},
 			{"v", i18n.T("help.nodes.layout")},
 			{"g", i18n.T("help.nodes.locate")},
+			{"c", i18n.T("help.nodes.chain")},
 			{"s", i18n.T("help.nodes.sort")},
 			{"/", i18n.T("help.nodes.search")},
 			{"f", i18n.T("help.nodes.test_detail")},

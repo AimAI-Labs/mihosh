@@ -133,6 +133,17 @@ func GenerateOverrideConfig(uid, path string, cleared []string, managed bool) ([
 // GenerateOverrideConfigWithMerge generates candidate config bytes using mergeBytes
 // without requiring merge.yaml to be written first.
 func GenerateOverrideConfigWithMerge(uid, path string, mergeBytes []byte, cleared []string, managed bool) ([]byte, error) {
+	return generateOverrideConfig(uid, path, mergeBytes, cleared, managed, nil, nil, false)
+}
+
+// GenerateOverrideConfigWithChains generates candidate config bytes using nextChains
+// without requiring chain-edits.yaml to be written first. When uid is empty (standalone
+// local config without raw.yaml), previousChains dialer-proxy assignments are reverted first.
+func GenerateOverrideConfigWithChains(uid, path string, mergeBytes []byte, managed bool, previousChains, nextChains ChainEdits) ([]byte, error) {
+	return generateOverrideConfig(uid, path, mergeBytes, nil, managed, &previousChains, &nextChains, true)
+}
+
+func generateOverrideConfig(uid, path string, mergeBytes []byte, cleared []string, managed bool, previousChains, nextChains *ChainEdits, strictChains bool) ([]byte, error) {
 	var source []byte
 	var err error
 	if uid != "" {
@@ -161,6 +172,11 @@ func GenerateOverrideConfigWithMerge(uid, path string, mergeBytes []byte, cleare
 			}
 		}
 	}
+	if uid == "" && previousChains != nil {
+		if err = revertChainDialers(topLevelMapping(&raw), *previousChains); err != nil {
+			return nil, err
+		}
+	}
 	var merge *yaml.Node
 	if len(trimSpaceBytes(mergeBytes)) > 0 {
 		if merge, err = parseReadableMerge(mergeBytes); err != nil {
@@ -169,7 +185,7 @@ func GenerateOverrideConfigWithMerge(uid, path string, mergeBytes []byte, cleare
 	}
 	// The runtime already contains edits, unless native rules replace its list.
 	replay := uid != "" || findMappingValue(topLevelMapping(merge), "rules") != nil
-	final, err := applyProfileMerge(&raw, merge, replay)
+	final, err := applyProfileMergeWithChains(&raw, merge, replay, nextChains, strictChains)
 	if err != nil {
 		return nil, err
 	}

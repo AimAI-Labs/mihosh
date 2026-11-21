@@ -33,6 +33,7 @@ type profileRecovery struct {
 	MergeExisted bool                 `json:"merge_existed,omitempty"`
 	Merge        []byte               `json:"merge,omitempty"`
 	RuleEdits    *profileFileRecovery `json:"rule_edits,omitempty"`
+	ChainEdits   *profileFileRecovery `json:"chain_edits,omitempty"`
 }
 
 type profileFileRecovery struct {
@@ -228,6 +229,15 @@ func recoverManagedProfile(root string) error {
 			return err
 		}
 		if err = restoreMergeFile(path, rules.Existed, rules.Data); err != nil {
+			return err
+		}
+	}
+	if chains := recovery.ChainEdits; chains != nil {
+		path, err := profile.ChainEditsPath()
+		if err != nil {
+			return err
+		}
+		if err = restoreMergeFile(path, chains.Existed, chains.Data); err != nil {
 			return err
 		}
 	}

@@ -145,7 +145,7 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 		wsCtx:                wsCtx,
 		wsCancel:             wsCancel,
 		ipResolver:           ipResolver,
-		nodesState:           nodes.NewState(client, testURL, timeout),
+		nodesState:           nodes.NewState(client, testURL, timeout).SetServices(configSvc, coreSvc),
 		connsState:           connections.NewState(config.MixedPortToProxyURL(endpoint.MixedPort), model.DefaultSiteTests(), client, timeout, chartData),
 		logsState:            logs.NewState(ipResolver),
 		rulesState:           newRulesState(client, configSvc, coreSvc),

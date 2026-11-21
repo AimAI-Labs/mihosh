@@ -179,6 +179,16 @@ func resolveModeBarMouseHit(width, pageX, pageY int) MouseHit {
 
 // buildNodesInlineHelpHints 根据节点页上下文构建内联帮助条目
 func buildNodesInlineHelpHints(state PageState) []common.InlineHelpHint {
+	if state.ChainModal.Open {
+		return []common.InlineHelpHint{
+			{Key: "↵", Desc: i18n.T("help.nodes_chain.toggle")},
+			{Key: "Tab", Desc: i18n.T("help.nodes_chain.focus")},
+			{Key: "[/]", Desc: i18n.T("help.nodes_chain.reorder")},
+			{Key: "Ctrl+S", Desc: i18n.T("help.nodes_chain.apply"), Tone: common.InlineHelpTonePrimary},
+			{Key: "Esc", Desc: i18n.T("help.nodes_chain.close")},
+		}
+	}
+
 	if state.FilterMode {
 		return []common.InlineHelpHint{
 			{Key: "↵", Desc: i18n.T("help.nodes_search.confirm")},
@@ -205,6 +215,7 @@ func buildNodesInlineHelpHints(state PageState) []common.InlineHelpHint {
 		{Key: "m", Desc: i18n.T("help.nodes.hint_mode")},
 		{Key: "v", Desc: i18n.T("help.nodes.hint_layout"), Tone: common.InlineHelpToneInfo},
 		{Key: "g", Desc: i18n.T("help.nodes.hint_locate"), Tone: common.InlineHelpToneInfo},
+		{Key: "c", Desc: i18n.T("help.nodes.hint_chain"), Tone: common.InlineHelpToneInfo},
 		{Key: "s", Desc: i18n.T("help.nodes.hint_sort"), Tone: common.InlineHelpToneInfo},
 		{Key: "/", Desc: i18n.T("help.nodes.hint_search")},
 		{Key: "f", Desc: i18n.T("help.nodes.hint_result")},
@@ -212,14 +223,26 @@ func buildNodesInlineHelpHints(state PageState) []common.InlineHelpHint {
 	}
 }
 
+func nodesInlineHelpMaxWidth(state PageState) int {
+	maxW := max(1, state.Width-1)
+	if !state.ChainModal.Open && !state.ShowTestDetail && !state.FilterMode && state.FilterText == "" && state.ActiveChain.Enabled && len(state.ActiveChain.Nodes) >= 2 {
+		badgeW := common.DisplayWidth(formatActiveChainSummary(state.ActiveChain, max(12, state.Width/3)))
+		if avail := maxW - badgeW - 2; avail >= 20 {
+			return avail
+		}
+	}
+	return maxW
+}
+
 // InlineHelpHints 返回节点页当前可见的右下角交互菜单条目。
 func (s State) InlineHelpHints(width, height int) []common.InlineHelpHint {
-	return common.FitInlineHints(buildNodesInlineHelpHints(s.ToPageState(width, height)), max(1, width-1))
+	state := s.ToPageState(width, height)
+	return common.FitInlineHints(buildNodesInlineHelpHints(state), nodesInlineHelpMaxWidth(state))
 }
 
 // renderNodesInlineHelp 渲染右下角内联帮助面板并叠加到页面上
 func renderNodesInlineHelp(page string, state PageState) string {
-	hints := common.FitInlineHints(buildNodesInlineHelpHints(state), max(1, state.Width-1))
+	hints := common.FitInlineHints(buildNodesInlineHelpHints(state), nodesInlineHelpMaxWidth(state))
 	if len(hints) == 0 {
 		return page
 	}

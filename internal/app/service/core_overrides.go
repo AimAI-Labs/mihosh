@@ -50,6 +50,27 @@ func (s *ConfigService) ApplyRuleEdit(ctx context.Context, coreSvc *CoreService,
 	return s.applyMergeMutation(ctx, coreSvc, client, mergeMutation{rule: &edit})
 }
 
+// ReadProxyChains reads persisted proxy chain definitions from chain-edits.yaml.
+func (s *ConfigService) ReadProxyChains() (profile.ChainEdits, error) {
+	return profile.ReadChainEdits()
+}
+
+// ApplyProxyChain persists a group's proxy chain to chain-edits.yaml, regenerates and
+// reloads the active configuration, and switches the target group to the chain's exit node.
+func (s *ConfigService) ApplyProxyChain(ctx context.Context, coreSvc *CoreService, client *api.Client, chain profile.ProxyChain) MihomoOverridesSaveResult {
+	res := s.applyMergeMutation(ctx, coreSvc, client, mergeMutation{chain: &chain})
+	if res.Err != nil || !res.Applied || !chain.Enabled || len(chain.Nodes) < 2 || strings.TrimSpace(chain.Group) == "" {
+		return res
+	}
+	targetClient := client
+	if targetClient == nil {
+		targetClient = api.NewClient(config.ResolveMihomoEndpoint(), 2000)
+	}
+	exitNode := strings.TrimSpace(chain.Nodes[len(chain.Nodes)-1])
+	_ = targetClient.SelectProxy(strings.TrimSpace(chain.Group), exitNode)
+	return res
+}
+
 func (s *ConfigService) applyMergeMutation(ctx context.Context, coreSvc *CoreService, client *api.Client, change mergeMutation) MihomoOverridesSaveResult {
 	if ctx == nil {
 		ctx = context.Background()
@@ -221,11 +242,12 @@ func (s *CoreService) applyMergeMutation(ctx context.Context, mutation mergeMuta
 	identityChanged := controllerIdentityChanged(oldConfig, data)
 	portChanged := mixedPortChanged(oldConfig, data)
 	recovery := profileRecovery{
-		Config:    oldConfig,
-		ActiveSub: cfg.ActiveSub,
-		RuleEdits: next.ruleEdits,
+		Config:     oldConfig,
+		ActiveSub:  cfg.ActiveSub,
+		RuleEdits:  next.ruleEdits,
+		ChainEdits: next.chainEdits,
 	}
-	if next.ruleEdits == nil {
+	if next.ruleEdits == nil && next.chainEdits == nil {
 		recovery.HasMerge, recovery.MergeExisted, recovery.Merge = true, mergeExisted, oldMerge
 	}
 	journal := filepath.Join(root, "runtime", "profile-recovery.json")
@@ -438,6 +460,9 @@ func (s *ConfigService) applyRemoteExternalOverrides(cfg *config.Config, client 
 	uid := activeSubUID(cfg)
 	if mutation.rule != nil && uid == "" {
 		return MihomoOverridesSaveResult{Remote: true, Err: ErrRemoteRuleEditRequiresSubscription}
+	}
+	if mutation.chain != nil && uid == "" {
+		return MihomoOverridesSaveResult{Remote: true, Err: ErrRemoteChainEditRequiresSubscription}
 	}
 	mergePath, err := profile.MergePath()
 	if err != nil {

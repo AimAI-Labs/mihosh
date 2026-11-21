@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -36,6 +37,8 @@ type PageState struct {
 	FilterText       string // 节点搜索关键词
 	FilterMode       bool   // 是否处于搜索输入模式
 	FilterEngine     FilterEngine
+	ActiveChain      profile.ProxyChain
+	ChainModal       ChainModalState
 }
 
 // displayWidth 委托给 common.DisplayWidth
@@ -57,6 +60,8 @@ func RenderNodesPage(state PageState) string {
 		searchLine = common.TableHeaderStyle().Render(i18n.Tf("nodes.search_active", state.FilterText)) + engineIndicator
 	} else if state.FilterText != "" {
 		searchLine = common.MutedStyle().Render(i18n.Tf("nodes.search_inactive", state.FilterText)) + engineIndicator
+	} else if state.ActiveChain.Enabled && len(state.ActiveChain.Nodes) >= 2 {
+		searchLine = formatActiveChainSummary(state.ActiveChain, max(12, state.Width/3))
 	} else {
 		searchLine = "" // 占位空行由 clampPanelArea 负责填充
 	}
@@ -73,7 +78,10 @@ func RenderNodesPage(state PageState) string {
 	mainContent := lipgloss.JoinVertical(lipgloss.Left, modeSwitch, "", bodyArea, searchLine)
 
 	mainContent = renderNodesInlineHelp(mainContent, state)
-	if state.ShowTestDetail {
+	if state.ChainModal.Open {
+		modal := buildChainModal(state)
+		mainContent = dialog.New(modal, state.Width, state.Height).Clipped().Overlay(mainContent, true)
+	} else if state.ShowTestDetail {
 		modal := buildTestResultModal(state)
 		mainContent = dialog.New(modal, state.Width, state.Height).Clipped().Overlay(mainContent, true)
 	}

@@ -28,11 +28,12 @@ type coreOwner struct {
 	Token string `json:"token"`
 }
 type coreControlRequest struct {
-	Action    string            `json:"action"`
-	Version   string            `json:"version,omitempty"`
-	Cleared   []string          `json:"cleared,omitempty"`
-	Overrides map[string]string `json:"overrides,omitempty"`
-	RuleEdit  *profile.RuleEdit `json:"rule_edit,omitempty"`
+	Action    string              `json:"action"`
+	Version   string              `json:"version,omitempty"`
+	Cleared   []string            `json:"cleared,omitempty"`
+	Overrides map[string]string   `json:"overrides,omitempty"`
+	RuleEdit  *profile.RuleEdit   `json:"rule_edit,omitempty"`
+	ChainEdit *profile.ProxyChain `json:"chain_edit,omitempty"`
 }
 
 type coreControlResponse struct {
@@ -126,6 +127,12 @@ func (s *CoreService) startControl(root string) error {
 				return
 			}
 			overrideRes, err = s.applyMergeMutation(r.Context(), mergeMutation{rule: request.RuleEdit})
+		case "chain-edit":
+			if request.ChainEdit == nil {
+				http.Error(w, "missing chain edit", http.StatusBadRequest)
+				return
+			}
+			overrideRes, err = s.applyMergeMutation(r.Context(), mergeMutation{chain: request.ChainEdit})
 		case "system-proxy", "tun":
 			if request.Version != "on" && request.Version != "off" {
 				http.Error(w, "invalid network setting", 400)
@@ -155,7 +162,7 @@ func (s *CoreService) startControl(root string) error {
 			Applied:         overrideRes.Applied,
 			EndpointChanged: overrideRes.EndpointChanged,
 		}
-		if request.Action == "overrides" || request.Action == "rule-edit" {
+		if request.Action == "overrides" || request.Action == "rule-edit" || request.Action == "chain-edit" {
 			response.BackupName = overrideRes.BackupName
 			response.Restarted = overrideRes.Restarted
 		}

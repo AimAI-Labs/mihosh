@@ -103,35 +103,57 @@ func PreserveLegacyRuleEdits(previous []byte) error {
 }
 
 func applyProfileMerge(raw, merge *yaml.Node, replay bool) (*yaml.Node, error) {
+	return applyProfileMergeWithChains(raw, merge, replay, nil, false)
+}
+
+func applyProfileMergeWithChains(raw, merge *yaml.Node, replay bool, chainOverride *ChainEdits, strictChains bool) (*yaml.Node, error) {
 	final, err := applyMerge(raw, merge, replay)
-	if err != nil || !replay {
+	if err != nil {
 		return final, err
 	}
-	path, err := RuleEditsPath()
-	if err != nil {
-		return nil, err
-	}
-	data, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		return final, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	edits, err := DecodeRuleEdits(data)
-	if err != nil {
-		return nil, err
-	}
-	if legacy, _ := legacyRuleOverrides(topLevelMapping(merge)); !legacy && edits.Legacy.Kind != 0 {
-		final, err = ApplyMerge(final, &edits.Legacy)
+	if replay {
+		path, err := RuleEditsPath()
 		if err != nil {
 			return nil, err
 		}
-	}
-	for _, edit := range edits.Edits {
-		if err := applyRuleEdit(final, edit); err != nil && !errors.Is(err, ErrRuleEditTarget) {
+		data, err := os.ReadFile(path)
+		if err != nil && !os.IsNotExist(err) {
 			return nil, err
 		}
+		if err == nil {
+			edits, err := DecodeRuleEdits(data)
+			if err != nil {
+				return nil, err
+			}
+			if legacy, _ := legacyRuleOverrides(topLevelMapping(merge)); !legacy && edits.Legacy.Kind != 0 {
+				final, err = ApplyMerge(final, &edits.Legacy)
+				if err != nil {
+					return nil, err
+				}
+			}
+			for _, edit := range edits.Edits {
+				if err := applyRuleEdit(final, edit); err != nil && !errors.Is(err, ErrRuleEditTarget) {
+					return nil, err
+				}
+			}
+		}
+	}
+
+	if chainOverride != nil {
+		if err := applyChainEdits(final, *chainOverride, strictChains); err != nil {
+			return nil, err
+		}
+		return final, nil
+	}
+	if !replay {
+		return final, nil
+	}
+	chains, err := ReadChainEdits()
+	if err != nil {
+		return nil, err
+	}
+	if err := applyChainEdits(final, chains, false); err != nil {
+		return nil, err
 	}
 	return final, nil
 }

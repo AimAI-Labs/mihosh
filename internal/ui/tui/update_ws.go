@@ -243,6 +243,37 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 	case messages.RulesMsg:
 		m.rulesState = m.rulesState.ApplyRules(msg)
 
+	case messages.ProxyChainAppliedMsg:
+		m.nodesState = m.nodesState.ApplyChainResult(msg)
+		if msg.Err != nil {
+			m.publishError(msg.Err)
+			return m, nil
+		}
+		m.clearErrorNotice()
+		var noticeText string
+		switch {
+		case msg.Remote || msg.NeedsRestart || msg.Restarted:
+			noticeText = i18n.T(mihomoOverrideNotice(messages.MihomoOverridesSavedMsg{
+				Applied: msg.Applied, Remote: msg.Remote, NeedsRestart: msg.NeedsRestart, Restarted: msg.Restarted,
+			}))
+		case !msg.Applied:
+			noticeText = i18n.T("nodes.chain.saved_pending")
+		case msg.Cleared:
+			noticeText = i18n.Tf("nodes.chain.cleared_toast", msg.Group)
+		default:
+			noticeText = i18n.Tf("nodes.chain.applied_toast", msg.Group, msg.ExitNode)
+		}
+		m.publishNotice(noticeText, overrideNoticeLevel(msg.Applied, msg.NeedsRestart))
+		if !msg.Remote && (msg.Restarted || msg.EndpointChanged) {
+			if cmd := m.syncAppliedCore(msg.Restarted, msg.NeedsRestart && msg.Applied); cmd != nil {
+				return m, cmd
+			}
+		}
+		if msg.Applied && m.client != nil {
+			return m, tea.Batch(nodes.FetchGroups(m.client), nodes.FetchProxies(m.client))
+		}
+		return m, nil
+
 	case messages.RuleEditAppliedMsg:
 		if msg.Err != nil {
 			m.publishError(msg.Err)
