@@ -19,6 +19,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/notice"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/bootstrap"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
@@ -99,10 +100,8 @@ type Model struct {
 // NewModel 创建新的 TUI 模型
 func NewModel(client *api.Client, testURL string, timeout int) Model {
 	common.InitKeyBindings()
-	cfg, err := config.Load()
-	if err != nil || cfg == nil {
-		cfg = &config.DefaultConfig
-	}
+	app := bootstrap.NewAppWithClient(client)
+	cfg := app.Config
 
 	// 启动时根据配置初始化主题
 	if cfg.Theme != "" {
@@ -110,47 +109,37 @@ func NewModel(client *api.Client, testURL string, timeout int) Model {
 	}
 	theme.SetBorderStyle(cfg.BorderStyle)
 
-	configSvc := service.NewConfigService()
-	connSvc := service.NewConnectionService(client)
-	coreSvc := service.NewCoreService()
-	profileSvc := service.NewProfileService(client, coreSvc)
-
-	// 连接信息由 mihomo 配置文件自动发现（external-controller/secret/mixed-port）
-	endpoint := config.ResolveMihomoEndpoint()
-	wsClient := api.NewWSClient(endpoint.ExternalController, endpoint.Secret)
 	wsCtx, wsCancel := context.WithCancel(context.Background())
-	ipResolver := service.NewIPResolver()
-
 	chartData := model.NewChartData(common.ChartPoints)
 
 	initialPage := layout.PageNodes
-	if err != nil {
+	if app.ConfigErr != nil {
 		initialPage = layout.PageCore
 	}
 	return Model{
 		client:               client,
 		connectionChecked:    false,
-		coreSvc:              coreSvc,
-		coreState:            corepage.NewState(coreSvc, configSvc, client),
+		coreSvc:              app.CoreSvc,
+		coreState:            corepage.NewState(app.CoreSvc, app.ConfigSvc, client),
 		config:               cfg,
-		configSvc:            configSvc,
-		connSvc:              connSvc,
-		profileSvc:           profileSvc,
+		configSvc:            app.ConfigSvc,
+		connSvc:              app.ConnSvc,
+		profileSvc:           app.ProfileSvc,
 		testURL:              testURL,
 		timeout:              timeout,
 		currentPage:          initialPage,
 		chartData:            chartData,
-		wsClient:             wsClient,
+		wsClient:             app.WSClient,
 		wsMsgChan:            make(chan interface{}, common.WSMsgChanCap),
 		wsCtx:                wsCtx,
 		wsCancel:             wsCancel,
-		ipResolver:           ipResolver,
-		nodesState:           nodes.NewState(client, testURL, timeout).SetServices(configSvc, coreSvc),
-		connsState:           connections.NewState(config.MixedPortToProxyURL(endpoint.MixedPort), model.DefaultSiteTests(), client, timeout, chartData),
-		logsState:            logs.NewState(ipResolver),
-		rulesState:           newRulesState(client, configSvc, coreSvc),
-		subState:             sub.NewState(profileSvc),
-		settingsState:        settings.NewState(configSvc, client),
+		ipResolver:           app.IPResolver,
+		nodesState:           nodes.NewState(client, testURL, timeout).SetServices(app.ConfigSvc, app.CoreSvc),
+		connsState:           connections.NewState(config.MixedPortToProxyURL(app.Endpoint.MixedPort), model.DefaultSiteTests(), client, timeout, chartData),
+		logsState:            logs.NewState(app.IPResolver),
+		rulesState:           newRulesState(client, app.ConfigSvc, app.CoreSvc),
+		subState:             sub.NewState(app.ProfileSvc),
+		settingsState:        settings.NewState(app.ConfigSvc, client),
 		autoRefreshRemaining: cfg.AutoRefreshInterval,
 	}
 }
