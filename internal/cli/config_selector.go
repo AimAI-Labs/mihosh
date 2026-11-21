@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
@@ -74,12 +73,12 @@ func (m selectorModel) View() string {
 
 	for i, choice := range m.choices {
 		checkbox := "[ ]"
+		renderedChoice := choice
 		if m.selected == i {
 			checkbox = lipgloss.NewStyle().Foreground(common.Active()).Render("[x]")
-			s.WriteString(fmt.Sprintf("%s %s\n", checkbox, lipgloss.NewStyle().Foreground(common.Active()).Bold(true).Render(choice)))
-		} else {
-			s.WriteString(fmt.Sprintf("%s %s\n", checkbox, choice))
+			renderedChoice = lipgloss.NewStyle().Foreground(common.Active()).Bold(true).Render(choice)
 		}
+		s.WriteString(checkbox + " " + renderedChoice + "\n")
 	}
 
 	s.WriteString("\n" + lipgloss.NewStyle().Foreground(common.Muted()).Render("(使用方向键选择，回车确认，Esc/q 退出)") + "\n")

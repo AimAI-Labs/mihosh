@@ -29,8 +29,8 @@ func copySourceCmd(value string) tea.Cmd {
 		if err != nil {
 			return messages.SubSourceCopiedMsg{}
 		}
-		defer terminal.Close()
-		_, err = io.WriteString(terminal, ansi.SetSystemClipboard(value))
-		return messages.SubSourceCopiedMsg{Success: err == nil}
+		_, writeErr := io.WriteString(terminal, ansi.SetSystemClipboard(value))
+		closeErr := terminal.Close()
+		return messages.SubSourceCopiedMsg{Success: writeErr == nil && closeErr == nil}
 	}
 }

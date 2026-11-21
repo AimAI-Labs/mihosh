@@ -162,16 +162,20 @@ func writeProxyProbeResults(cmd *cobra.Command, results []service.ProxyProbeResu
 		return writeJSON(cmd.OutOrStdout(), results)
 	}
 	w := newTabWriter(cmd.OutOrStdout())
-	fmt.Fprintf(w, "%s\tIP\t%s\t%s\tASN\t%s\t%s\t%s\n",
+	if _, err := fmt.Fprintf(w, "%s\tIP\t%s\t%s\tASN\t%s\t%s\t%s\n",
 		i18n.T("cli.proxy.source"), i18n.T("cli.proxy.country"), i18n.T("cli.proxy.city"),
-		i18n.T("cli.proxy.org"), i18n.T("cli.proxy.latency"), i18n.T("cli.proxy.error"))
+		i18n.T("cli.proxy.org"), i18n.T("cli.proxy.latency"), i18n.T("cli.proxy.error")); err != nil {
+		return err
+	}
 	for _, result := range results {
 		asn := ""
 		if result.ASN != 0 {
 			asn = fmt.Sprintf("AS%d", result.ASN)
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%d ms\t%s\n",
-			result.Source, result.IP, result.Country, result.City, asn, result.Org, result.LatencyMS, result.Error)
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%d ms\t%s\n",
+			result.Source, result.IP, result.Country, result.City, asn, result.Org, result.LatencyMS, result.Error); err != nil {
+			return err
+		}
 	}
 	return w.Flush()
 }

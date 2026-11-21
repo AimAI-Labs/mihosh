@@ -62,7 +62,7 @@ func serviceHandoffFixture(t *testing.T) (*CoreService, *handoffServices, *api.C
 	freePort := func() int {
 		listener, err := net.Listen("tcp", "127.0.0.1:0")
 		require.NoError(t, err)
-		defer listener.Close()
+		defer func() { require.NoError(t, listener.Close()) }()
 		return listener.Addr().(*net.TCPAddr).Port
 	}
 	controller, mixed := freePort(), freePort()
@@ -123,7 +123,7 @@ func TestServiceHandoffKeepsProxyAfterClientClose(t *testing.T) {
 			endpoint := config.ResolveMihomoEndpoint()
 			proxy, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", endpoint.MixedPort), time.Second)
 			require.NoError(t, err)
-			proxy.Close()
+			require.NoError(t, proxy.Close())
 		})
 	}
 }

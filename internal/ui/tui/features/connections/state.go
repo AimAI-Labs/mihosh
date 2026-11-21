@@ -401,9 +401,6 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 
 		case msg.String() == "s":
 			s.sortField = (s.sortField + 1) % connSortFieldCount
-			if s.sortField != ConnSortDefault && !s.sortDesc {
-				// Keep user's explicit direction when cycling non-default fields
-			}
 			s.filterList.SetCursor(0)
 			s.filterList.ScrollTop = 0
 			s.inlineDetailPanel.Reset()

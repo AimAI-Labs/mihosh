@@ -54,7 +54,7 @@ func (e *mergeEditor) Run() error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 	path := filepath.Join(dir, "merge.yaml")
 	if err := os.WriteFile(path, draft, 0600); err != nil {
 		return err

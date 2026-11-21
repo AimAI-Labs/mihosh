@@ -407,7 +407,7 @@ func DecodeTarGz(data []byte) (Bundle, error) {
 		if hdr.Typeflag == tar.TypeDir {
 			continue
 		}
-		if hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeRegA {
+		if hdr.Typeflag != tar.TypeReg {
 			return Bundle{}, fmt.Errorf("%w: unsupported tar entry type %d for %q", ErrInvalidArchive, hdr.Typeflag, hdr.Name)
 		}
 		name, err := validateArchiveEntryName(hdr.Name)

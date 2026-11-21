@@ -27,5 +27,6 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.4.0
+          # v2.12.2 is built with Go 1.26.2 and can analyze Go 1.25 and 1.26 modules.
+          version: v2.12.2
           args: --timeout=5m

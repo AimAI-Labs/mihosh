@@ -42,9 +42,10 @@ func (s State) applyProcessLogs(msg messages.CoreProcessLogsMsg) State {
 		level := "info"
 		if match := coreLogLevel.FindStringSubmatch(line); match != nil {
 			level = match[1]
-			if level == "warn" {
+			switch level {
+			case "warn":
 				level = "warning"
-			} else if level == "fatal" || level == "panic" {
+			case "fatal", "panic":
 				level = "error"
 			}
 		}

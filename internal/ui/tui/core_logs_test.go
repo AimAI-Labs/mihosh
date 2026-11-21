@@ -47,7 +47,11 @@ func verifyFailedManagedCoreLogs(t *testing.T, script, reason string) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer listener.Close()
+		defer func() {
+			if err := listener.Close(); err != nil {
+				t.Errorf("close listener: %v", err)
+			}
+		}()
 		return listener.Addr().(*net.TCPAddr).Port
 	}
 	if err := svc.SetPorts(port(), port()); err != nil {

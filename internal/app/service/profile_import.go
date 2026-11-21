@@ -35,7 +35,7 @@ func (s *ProfileService) ImportRawDirectory() error {
 		name := entry.Name()
 		ext := filepath.Ext(name)
 		label := strings.TrimSpace(strings.TrimSuffix(name, ext))
-		if label == "" || !entry.Type().IsRegular() || !(strings.EqualFold(ext, ".yaml") || strings.EqualFold(ext, ".yml")) {
+		if label == "" || !entry.Type().IsRegular() || (!strings.EqualFold(ext, ".yaml") && !strings.EqualFold(ext, ".yml")) {
 			continue
 		}
 		path := filepath.Join(dir, name)
