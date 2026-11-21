@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
-	syncinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/sync"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -190,7 +188,7 @@ func (s State) handleSyncPGConfigKey(msg tea.KeyMsg) (State, tea.Cmd) {
 			m.StatusErr = true
 			return s, nil
 		}
-		if newCfg, err := config.Load(); err == nil {
+		if newCfg, err := service.Load(); err == nil {
 			s.Config = newCfg
 		}
 		m.Mode = syncModeMenu
@@ -338,7 +336,7 @@ func modalInputCursor(value string, column, current int) int {
 // CompleteSync applies the async completion of a backup/sync action.
 func (s State) CompleteSync(msg messages.SyncDoneMsg) State {
 	if msg.Reloaded {
-		if loaded, err := config.Load(); err == nil {
+		if loaded, err := service.Load(); err == nil {
 			s.Config = loaded
 		}
 	}
@@ -424,12 +422,12 @@ func runSyncStatusCmd(svc *service.SyncService) tea.Cmd {
 	}
 }
 
-func formatSyncSummaryLine(cfg *config.Config, maxW int) string {
+func formatSyncSummaryLine(cfg *service.Config, maxW int) string {
 	dsn := ""
 	key := "default"
 	last := ""
 	if cfg != nil {
-		dsn = syncinfra.RedactDSN(cfg.Sync.DSN)
+		dsn = service.RedactDSN(cfg.Sync.DSN)
 		if strings.TrimSpace(cfg.Sync.ProfileKey) != "" {
 			key = cfg.Sync.ProfileKey
 		}

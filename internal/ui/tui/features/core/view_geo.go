@@ -1,10 +1,10 @@
 package core
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"path/filepath"
 	"strings"
 
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
@@ -34,7 +34,7 @@ func (s State) geoPanel(width int) (string, []actionHit) {
 	if s.Status.Mode == "managed" {
 		path := s.Status.ConfigPath
 		if path == "" {
-			path, _ = config.ManagedMihomoConfigPath()
+			path, _ = service.ManagedMihomoConfigPath()
 		}
 		if path != "" {
 			directory := i18n.T("core.geo.directory") + ": " + filepath.Dir(path)

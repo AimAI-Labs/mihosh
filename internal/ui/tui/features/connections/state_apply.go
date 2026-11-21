@@ -1,18 +1,18 @@
 package connections
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 )
 
 // ApplyWSConnections 处理 WebSocket 连接推送（含历史记录检测与相邻样本速率估算）
-func (s State) ApplyWSConnections(data api.ConnectionsData) State {
+func (s State) ApplyWSConnections(data service.ConnectionsData) State {
 	return s.applyWSConnectionsAt(data, time.Now())
 }
 
-func (s State) applyWSConnectionsAt(data api.ConnectionsData, now time.Time) State {
+func (s State) applyWSConnectionsAt(data service.ConnectionsData, now time.Time) State {
 	s.connGen++
 	dt := 0.0
 	if !s.lastWSAt.IsZero() {

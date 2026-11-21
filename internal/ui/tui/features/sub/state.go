@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/bubbles/key"
@@ -27,7 +26,7 @@ const (
 
 // State 订阅页完整状态。
 type State struct {
-	subs         []profile.Profile
+	subs         []service.Profile
 	filteredIdx  []int // 过滤后的订阅在 subs 中的索引
 	activeUID    string
 	filter       string
@@ -131,7 +130,7 @@ func (s State) Querying() bool {
 }
 
 // ApplySubs 应用加载的订阅列表与激活 UID，并重建过滤缓存。
-func (s State) ApplySubs(subs []profile.Profile, active string) State {
+func (s State) ApplySubs(subs []service.Profile, active string) State {
 	s.subs = subs
 	s.activeUID = active
 	if cap(s.filteredIdx) < len(subs) {
@@ -409,7 +408,7 @@ func (s State) openEditForm() (State, tea.Cmd) {
 	form := newAddForm()
 	form.nameField.SetValue(p.Name)
 	form.srcField.SetValue(p.Source.Display())
-	form.kindRemote = p.Source.Kind == profile.SourceRemote
+	form.kindRemote = p.Source.Kind == service.SourceRemote
 	form.useProxy = p.Source.UseProxy
 	form.uaField.SetValue(p.Source.UserAgent)
 	form.skipTLS = p.Source.InsecureSkipVerify
@@ -505,7 +504,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 
 	originX, originY, cardWidth := grid.CardOrigin(idx)
 	if grid.CardHeight >= 3 && y == originY+1 && pageX == originX+cardWidth-3 &&
-		s.subs[s.filteredIdx[idx]].Source.Kind == profile.SourceRemote {
+		s.subs[s.filteredIdx[idx]].Source.Kind == service.SourceRemote {
 		s.selected = idx
 		return s.updateSelected()
 	}

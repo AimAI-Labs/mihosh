@@ -2,9 +2,9 @@ package sub
 
 import (
 	"fmt"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"strings"
 
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -47,7 +47,7 @@ func subLayoutHit(x, y, width int) (listMode, hit bool) {
 	return x > separator, x != separator
 }
 
-func renderSubRow(p profile.Profile, position int, active, updating, selected bool, width int) string {
+func renderSubRow(p service.Profile, position int, active, updating, selected bool, width int) string {
 	palette := theme.Current()
 	cell := func(text string, span int, color lipgloss.Color) string {
 		text = strings.Join(strings.Fields(ansi.Strip(text)), " ")
@@ -73,7 +73,7 @@ func renderSubRow(p profile.Profile, position int, active, updating, selected bo
 	if flex >= 16 {
 		nameWidth := max(8, flex/8)
 		kindColor := palette.Primary
-		if p.Source.Kind == profile.SourceLocal {
+		if p.Source.Kind == service.SourceLocal {
 			kindColor = palette.Secondary
 		}
 		row = strings.Join([]string{

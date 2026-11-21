@@ -1,10 +1,10 @@
 package connections
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -61,8 +61,8 @@ func (d dnsQueryView) currentRecordType() string {
 }
 
 // QueryDNS executes Mihomo /dns/query asynchronously.
-func QueryDNS(client *api.Client, domain, recordType string) tea.Cmd {
-	return messages.CoreRequest(client, func(client *api.Client) tea.Msg {
+func QueryDNS(client *service.Client, domain, recordType string) tea.Cmd {
+	return messages.CoreRequest(client, func(client *service.Client) tea.Msg {
 		resp, err := client.QueryDNS(domain, recordType)
 		return messages.DNSQueryResultMsg{
 			Domain:     domain,

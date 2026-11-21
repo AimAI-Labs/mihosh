@@ -1,17 +1,17 @@
 package tui
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"reflect"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func fetchAutoRefresh(client *api.Client, current nodes.State) tea.Cmd {
-	return messages.CoreRequest(client, func(client *api.Client) tea.Msg {
+func fetchAutoRefresh(client *service.Client, current nodes.State) tea.Cmd {
+	return messages.CoreRequest(client, func(client *service.Client) tea.Msg {
 		proxies, err := client.GetProxies()
 		if err != nil {
 			return messages.ErrMsg{Err: err}

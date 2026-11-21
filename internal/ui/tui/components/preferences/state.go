@@ -8,9 +8,6 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
@@ -71,12 +68,12 @@ type State struct {
 	configSvc *service.ConfigService
 	coreSvc   *service.CoreService
 	syncSvc   *service.SyncService
-	client    *api.Client
-	Config    *config.Config
+	client    *service.Client
+	Config    *service.Config
 }
 
 // NewState 创建新的设置页面状态
-func NewState(configSvc *service.ConfigService, client *api.Client) State {
+func NewState(configSvc *service.ConfigService, client *service.Client) State {
 	return State{
 		SysStatus: NewSysStatusState(),
 		configSvc: configSvc,
@@ -84,7 +81,7 @@ func NewState(configSvc *service.ConfigService, client *api.Client) State {
 	}
 }
 
-func NewMihomoState(configSvc *service.ConfigService, client *api.Client, coreSvcs ...*service.CoreService) State {
+func NewMihomoState(configSvc *service.ConfigService, client *service.Client, coreSvcs ...*service.CoreService) State {
 	s := NewState(configSvc, client)
 	s.activeTab = 1
 	s.savedOverrides = map[string]string{}
@@ -97,19 +94,19 @@ func NewMihomoState(configSvc *service.ConfigService, client *api.Client, coreSv
 }
 
 // SetConfig updates the cached application configuration held by the preferences state.
-func (s *State) SetConfig(cfg *config.Config) {
+func (s *State) SetConfig(cfg *service.Config) {
 	s.Config = cfg
 }
 
 func (s *State) reloadConfig() {
 	var (
-		cfg *config.Config
+		cfg *service.Config
 		err error
 	)
 	if s.configSvc != nil {
 		cfg, err = s.configSvc.LoadConfig()
 	} else {
-		cfg, err = config.Load()
+		cfg, err = service.Load()
 	}
 	if err == nil && cfg != nil {
 		s.Config = cfg
@@ -170,8 +167,8 @@ func (s State) IsThemeSelected() bool {
 }
 
 // FetchMihomoVersion 返回一个拉取 Mihomo 版本信息的 Cmd
-func FetchMihomoVersion(client *api.Client) tea.Cmd {
-	return messages.CoreRequest(client, func(client *api.Client) tea.Msg {
+func FetchMihomoVersion(client *service.Client) tea.Cmd {
+	return messages.CoreRequest(client, func(client *service.Client) tea.Msg {
 		if client == nil {
 			return messages.MihomoVersionMsg{Version: "unknown"}
 		}
@@ -191,7 +188,7 @@ func (s State) ApplyMihomoVersion(version string) State {
 }
 
 // ToPageState 转换为渲染层所需的 PageState
-func (s State) ToPageState(cfg *config.Config, sysLogs []model.LogEntry) PageState {
+func (s State) ToPageState(cfg *service.Config, sysLogs []model.LogEntry) PageState {
 	return PageState{
 		Config:          cfg,
 		SelectedSetting: s.selectedSetting,
@@ -866,7 +863,7 @@ func settingsTabDisplayWidth(label string) int {
 	return common.DisplayWidth(label) + settingsTabContentPadding + settingsTabHorizontalPadding
 }
 
-func (s State) getEditValue(cfg *config.Config, settingKey string) string {
+func (s State) getEditValue(cfg *service.Config, settingKey string) string {
 	if s.activeTab == 1 {
 		return s.getDraftOverride(settingKey)
 	}
@@ -908,7 +905,7 @@ func (s State) commitCurrentEditDraft() (State, error) {
 	if settingKey != "secret" {
 		val = strings.TrimSpace(val)
 	}
-	if err := profile.ValidateMihomoOverride(settingKey, val); err != nil {
+	if err := service.ValidateMihomoOverride(settingKey, val); err != nil {
 		return s, err
 	}
 	s.setDraftOverride(settingKey, val)
@@ -920,7 +917,7 @@ func (s State) submitMihomoOverrides() (State, tea.Cmd) {
 		return s, nil
 	}
 	for _, k := range MihomoSettingKeys {
-		if err := profile.ValidateMihomoOverride(k, s.getDraftOverride(k)); err != nil {
+		if err := service.ValidateMihomoOverride(k, s.getDraftOverride(k)); err != nil {
 			return s, saveErrorNotice(err)
 		}
 	}
@@ -1038,9 +1035,9 @@ func (s State) RunCoreAction(action string) (State, tea.Cmd) {
 }
 
 // Core Actions
-func UpgradeCoreCmd(client *api.Client, channel string) tea.Cmd {
+func UpgradeCoreCmd(client *service.Client, channel string) tea.Cmd {
 	return func() tea.Msg {
-		if cfg, err := config.Load(); err == nil && cfg.Core.Mode == "managed" {
+		if cfg, err := service.Load(); err == nil && cfg.Core.Mode == "managed" {
 			return messages.CoreActionErrorMsg{Action: i18n.T("menu.core"), Err: fmt.Errorf("%s", i18n.T("core.manage_here"))}
 		}
 
@@ -1051,9 +1048,9 @@ func UpgradeCoreCmd(client *api.Client, channel string) tea.Cmd {
 	}
 }
 
-func RestartCoreCmd(client *api.Client) tea.Cmd {
+func RestartCoreCmd(client *service.Client) tea.Cmd {
 	return func() tea.Msg {
-		if cfg, err := config.Load(); err == nil && cfg.Core.Mode == "managed" {
+		if cfg, err := service.Load(); err == nil && cfg.Core.Mode == "managed" {
 			return messages.CoreActionErrorMsg{Action: i18n.T("menu.core"), Err: fmt.Errorf("%s", i18n.T("core.manage_here"))}
 		}
 
@@ -1064,7 +1061,7 @@ func RestartCoreCmd(client *api.Client) tea.Cmd {
 	}
 }
 
-func ReloadConfigsCmd(client *api.Client) tea.Cmd {
+func ReloadConfigsCmd(client *service.Client) tea.Cmd {
 	return func() tea.Msg {
 		if err := client.ReloadConfigsAPI(); err != nil {
 			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.reload"), Err: err}
@@ -1073,7 +1070,7 @@ func ReloadConfigsCmd(client *api.Client) tea.Cmd {
 	}
 }
 
-func UpdateGeoDataCmd(client *api.Client) tea.Cmd {
+func UpdateGeoDataCmd(client *service.Client) tea.Cmd {
 	return func() tea.Msg {
 		if err := client.UpdateGeoData(); err != nil {
 			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.update_geo"), Err: err}
@@ -1082,7 +1079,7 @@ func UpdateGeoDataCmd(client *api.Client) tea.Cmd {
 	}
 }
 
-func FlushDNSCacheCmd(client *api.Client) tea.Cmd {
+func FlushDNSCacheCmd(client *service.Client) tea.Cmd {
 	return func() tea.Msg {
 		if err := client.FlushDNSCache(); err != nil {
 			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.flush_dns"), Err: err}
@@ -1091,7 +1088,7 @@ func FlushDNSCacheCmd(client *api.Client) tea.Cmd {
 	}
 }
 
-func FlushFakeIPCmd(client *api.Client) tea.Cmd {
+func FlushFakeIPCmd(client *service.Client) tea.Cmd {
 	return func() tea.Msg {
 		if err := client.FlushFakeIP(); err != nil {
 			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.flush_fakeip"), Err: err}
@@ -1109,7 +1106,7 @@ func (s State) ClearActionStates() State {
 	return s
 }
 
-func (s State) HandleMsg(msg tea.Msg, width, height int, cfg *config.Config, sysLogs []model.LogEntry) (State, tea.Cmd) {
+func (s State) HandleMsg(msg tea.Msg, width, height int, cfg *service.Config, sysLogs []model.LogEntry) (State, tea.Cmd) {
 	cmd := s.SysStatus.Update(msg)
 	s = s.SyncSysStatus(width, height, s.Config, sysLogs)
 	return s, cmd
@@ -1117,7 +1114,7 @@ func (s State) HandleMsg(msg tea.Msg, width, height int, cfg *config.Config, sys
 
 // SyncSysStatus updates the SysStatus dimensions and content based on current state.
 // Should be called on resize, new log, or status change when on the Settings page and Mihomo tab.
-func (s State) SyncSysStatus(width, height int, cfg *config.Config, sysLogs []model.LogEntry) State {
+func (s State) SyncSysStatus(width, height int, cfg *service.Config, sysLogs []model.LogEntry) State {
 	if !s.SysStatus.Supported || s.activeTab != 1 {
 		return s
 	}

@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	tea "github.com/charmbracelet/bubbletea"
@@ -41,7 +40,7 @@ func (e *mergeEditor) SetStdout(w io.Writer) { e.stdout = w }
 func (e *mergeEditor) SetStderr(w io.Writer) { e.stderr = w }
 
 func (e *mergeEditor) Run() error {
-	original, err := profile.ReadMerge()
+	original, err := service.ReadMerge()
 	if err != nil {
 		return err
 	}
@@ -72,21 +71,21 @@ func (e *mergeEditor) Run() error {
 	if bytes.Equal(original, updated) {
 		return nil
 	}
-	current, err := profile.ReadMerge()
+	current, err := service.ReadMerge()
 	if err != nil {
 		return err
 	}
 	if !bytes.Equal(current, original) {
 		return errors.New("merge.yaml changed while the editor was open")
 	}
-	before, _ := profile.ReadMihomoOverridesFrom(original)
-	after, err := profile.ReadMihomoOverridesFrom(updated)
+	before, _ := service.ReadMihomoOverridesFrom(original)
+	after, err := service.ReadMihomoOverridesFrom(updated)
 	if err != nil {
 		return err
 	}
-	if err := profile.WriteMerge(updated); err != nil {
+	if err := service.WriteMerge(updated); err != nil {
 		return err
 	}
-	e.cleared = profile.ClearedOverrideKeys(before, after)
+	e.cleared = service.ClearedOverrideKeys(before, after)
 	return nil
 }

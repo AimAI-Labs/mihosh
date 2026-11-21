@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -30,7 +29,7 @@ func (s State) launchSiteTests(timeout int) (State, tea.Cmd) {
 	for _, task := range s.siteBatch.Take() {
 		site := s.siteTests[s.siteTestIndices[task.Index]]
 		ctx, proxyAddr := s.testCtx, s.proxyAddr
-		cmds = append(cmds, messages.CoreRequest(s.client, func(_ *api.Client) tea.Msg {
+		cmds = append(cmds, messages.CoreRequest(s.client, func(_ *service.Client) tea.Msg {
 			result := TestSiteDelay(ctx, proxyAddr, site.Name, site.URL, timeout)().(messages.SiteTestMsg)
 			result.BatchID, result.TaskID = task.BatchID, task.Index
 			return result

@@ -2,11 +2,11 @@ package sub
 
 import (
 	"fmt"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -33,7 +33,7 @@ func renderList(state PageState, grid common.CardGrid) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, list, bar)
 }
 
-func renderSubCard(p profile.Profile, active, updating, selected bool, width, height int) string {
+func renderSubCard(p service.Profile, active, updating, selected bool, width, height int) string {
 	palette := theme.Current()
 	border, titleColor := palette.Border, palette.Bright
 	if selected {
@@ -51,7 +51,7 @@ func renderSubCard(p profile.Profile, active, updating, selected bool, width, he
 
 	kind, source := i18n.T("sub.card.local"), p.Source.Path
 	action := ""
-	if p.Source.Kind == profile.SourceRemote {
+	if p.Source.Kind == service.SourceRemote {
 		kind, source = i18n.T("sub.card.remote"), ""
 		if u, err := url.Parse(p.Source.URL); err == nil {
 			source = u.Hostname()
@@ -69,8 +69,8 @@ func renderSubCard(p profile.Profile, active, updating, selected bool, width, he
 		updated = i18n.Tf("sub.card.updated", relativeTime(p.UpdatedAt))
 		updated += " · " + time.Unix(p.UpdatedAt, 0).Local().Format("2006-01-02 15:04")
 	}
-	if p.Source.Kind == profile.SourceRemote && p.Source.UpdateInterval > 0 {
-		updated += " · ↻ " + profile.FormatUpdateInterval(p.Source.UpdateInterval)
+	if p.Source.Kind == service.SourceRemote && p.Source.UpdateInterval > 0 {
+		updated += " · ↻ " + service.FormatUpdateInterval(p.Source.UpdateInterval)
 	}
 	if updating {
 		updated = i18n.T("sub.updating")
@@ -78,7 +78,7 @@ func renderSubCard(p profile.Profile, active, updating, selected bool, width, he
 
 	inner := max(1, width-4)
 	traffic, expiry, transfer, progress := "", "", "", ""
-	if u := p.Usage; p.Source.Kind == profile.SourceRemote && u != nil {
+	if u := p.Usage; p.Source.Kind == service.SourceRemote && u != nil {
 		var details []string
 		if u.TotalBytes > 0 {
 			ratio := min(1, max(0, float64(u.UsedBytes)/float64(u.TotalBytes)))

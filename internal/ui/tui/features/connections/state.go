@@ -6,7 +6,6 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
@@ -72,7 +71,7 @@ type State struct {
 	connGen   uint64
 	topNCache *topNCache
 
-	client    *api.Client
+	client    *service.Client
 	timeout   int
 	chartData *model.ChartData
 
@@ -85,7 +84,7 @@ type State struct {
 }
 
 // NewState 初始化连接状态
-func NewState(proxyAddr string, siteTests []model.SiteTest, client *api.Client, timeout int, chartData *model.ChartData) State {
+func NewState(proxyAddr string, siteTests []model.SiteTest, client *service.Client, timeout int, chartData *model.ChartData) State {
 	fl := common.NewFilterList()
 	return State{
 		closedConns: make([]model.Connection, common.ClosedConnCap),

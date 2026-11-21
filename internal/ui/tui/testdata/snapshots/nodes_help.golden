@@ -1,0 +1,24 @@
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Nodes │ Conns │ Logs │ Rules │ Sub │ Settings │ Core                  Auto 5s│
+╰────╭────────────────────────────────────────────────────────────────────╮────╯
+╭────│                                                                    │────╮
+│ Rul│  Mihosh Keybindings Help                       ? / Esc / q  Close  │ual │
+╰────│  ────────────────────────────────────────────────────────────────  │────╯
+     │                                                                    │
+  Loa│  Global                         Node Management                    │
+     │    ?           Show/Hide Help     ↑/↓  k/j    Select               │
+     │    Tab /       Switch Page        ←/→  h/l    Group                │
+     │    Shift+Tab                      ↵           Switch               │
+     │    r           Refresh Page       t           Test                 │
+     │    q / Ctrl+C  Quit Program       a           Test All             │
+     │                                   m           Mode                 │
+     │  Latency Colors                   v           Toggle Layout        │
+     │    ● < 100ms                      g           Locate Active        │
+     │    ● 100 - 300ms                              Node                 │
+     │    ● > 300ms                      c           Configure Proxy      │
+     │                                               Chain                │
+     │  ↑↓ / PgUp PgDn / wheel to scroll                                  │
+     │                                                                    │yout
+     ╰────────────────────────────────────────────────────────────────────╯More
+────────────────────────────────────────────────────────────────────────────────
+● -- · --                                             ↑0 B/s  ↓0 B/s │ MEM 0 B

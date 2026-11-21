@@ -2,6 +2,7 @@ package preferences
 
 import (
 	"context"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"os"
 	"os/exec"
 	"regexp"
@@ -10,8 +11,6 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/host"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/logs"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -65,7 +64,7 @@ func (s *SysStatusState) UpdateContent(sysLogs []model.LogEntry) {
 func FetchSysStatusCmd() tea.Cmd {
 	return func() tea.Msg {
 		args := []string{"status", "mihomo", "--no-pager", "-n", "0"}
-		if cfg, err := config.Load(); err == nil {
+		if cfg, err := service.Load(); err == nil {
 			if cfg.Core.Mode != "managed" && cfg.Core.ExternalController != "" {
 				return messages.SysStatusResultMsg{}
 			}
@@ -73,8 +72,8 @@ func FetchSysStatusCmd() tea.Cmd {
 				if cfg.Core.Runtime != "service" {
 					return messages.SysStatusResultMsg{}
 				}
-				if root, err := config.GetConfigDir(); err == nil {
-					args = []string{"--user", "status", host.ServiceName(root), "--no-pager", "-n", "0"}
+				if root, err := service.GetConfigDir(); err == nil {
+					args = []string{"--user", "status", service.ServiceName(root), "--no-pager", "-n", "0"}
 				}
 			}
 		}
@@ -91,15 +90,15 @@ func FetchManagedSysStatusCmd() tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
-		cfg, err := config.Load()
+		cfg, err := service.Load()
 		if err != nil || cfg.Core.Mode != "managed" {
 			return nil
 		}
-		root, err := config.GetConfigDir()
+		root, err := service.GetConfigDir()
 		if err != nil {
 			return nil
 		}
-		unit := host.ServiceName(root) + ".service"
+		unit := service.ServiceName(root) + ".service"
 		out, err := systemctlStatus("--user", "status", unit, "--no-pager", "--full", "--lines=10")
 		return messages.CoreServiceLogMsg{Unit: unit, Output: out, Err: err}
 	}

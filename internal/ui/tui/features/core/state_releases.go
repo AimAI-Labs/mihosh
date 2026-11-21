@@ -5,16 +5,15 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
-	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 type releaseCatalog struct {
-	page             coreinfra.ReleasePage
+	page             service.ReleasePage
 	requested        int
 	loaded           bool
-	lookup           *coreinfra.Release
+	lookup           *service.Release
 	scroll           int
 	store            *releaseStore
 	failed           bool
@@ -39,9 +38,9 @@ func (s State) releaseCount() int {
 	return count
 }
 
-func (s State) releaseAt(index int) (coreinfra.Release, bool) {
+func (s State) releaseAt(index int) (service.Release, bool) {
 	if index < 0 {
-		return coreinfra.Release{}, false
+		return service.Release{}, false
 	}
 	if s.catalog.lookup != nil {
 		if index == 0 {
@@ -54,7 +53,7 @@ func (s State) releaseAt(index int) (coreinfra.Release, bool) {
 		return r, err == nil
 	}
 	if index >= len(s.catalog.page.Releases) {
-		return coreinfra.Release{}, false
+		return service.Release{}, false
 	}
 	return s.catalog.page.Releases[index], true
 }
@@ -79,7 +78,7 @@ func (s State) releaseIndex(tag string) (int, bool) {
 	return 0, false
 }
 
-func (s State) applyReleaseLookup(r coreinfra.Release) State {
+func (s State) applyReleaseLookup(r service.Release) State {
 	if !r.IsStable() {
 		return s
 	}
@@ -111,7 +110,7 @@ func (s State) selectionCount() int {
 	return max(1, len(s.actions()))
 }
 
-func (s State) selectedRelease() (coreinfra.Release, bool) {
+func (s State) selectedRelease() (service.Release, bool) {
 	return s.releaseAt(min(s.selected, s.releaseCount()-1))
 }
 
@@ -153,7 +152,7 @@ func (s State) openTab(tab int) (State, tea.Cmd) {
 	return s, s.Refresh()
 }
 
-func (s State) applyReleasePage(page coreinfra.ReleasePage) State {
+func (s State) applyReleasePage(page service.ReleasePage) State {
 	previous := s.Release.Tag
 	follow, scroll := s.followSelection, s.catalog.scroll
 	anchor, _ := s.releaseAt(scroll)
@@ -254,7 +253,7 @@ func (s State) releaseAction(action string) (State, tea.Cmd) {
 			if len(r.Assets) == 0 {
 				return s, nil
 			}
-			if _, err := r.TrustedDigest(r.Assets[0], coreinfra.PinnedDigests()); err != nil {
+			if _, err := r.TrustedDigest(r.Assets[0], service.PinnedDigests()); err != nil {
 				s.Err = errors.New(i18n.T("core.catalog.unverified"))
 				s.task = "install"
 				return s, nil
