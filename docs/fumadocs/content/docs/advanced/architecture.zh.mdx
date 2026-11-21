@@ -3,33 +3,44 @@ title: 架构设计
 description: 了解 Mihosh 的内部架构
 ---
 
-Mihosh 基于 **Clean Architecture (整洁架构)** 原则设计，确保了代码的高内聚、低耦合以及良好的可测试性。
+Mihosh 采用分层架构设计，并通过自动化架构边界测试（`internal/arch_test.go` / `make arch-check`）在测试阶段强制守卫依赖方向。
 
 ## 整体包结构
 
-项目的请求流转如下：
+项目的依赖与装配流转如下：
 
 ```text
-main.go 
+main.go
   ↓
-internal/cli (命令行入口，Cobra)
+internal/cli (命令行入口，Cobra) & internal/ui (Bubble Tea TUI、主题与样式)
   ↓
-internal/app (应用服务层：ProxyService, ConnectionService 等)
+internal/bootstrap (统一装配根：组装配置、客户端与应用服务)
   ↓
-internal/domain/port (依赖倒置接口：MihomoClient, ConfigRepository)
+internal/app/service (应用服务层：ProxyService, ConnectionService, ConfigService, ProfileService, CoreService, SyncService)
   ↓
-internal/infrastructure (基础设施实现：HTTP/WS 客户端，YAML 配置持久化)
+internal/domain (纯领域层 — 不依赖任何外层包)
+  ├── model  (核心领域模型与内置主题名称目录)
+  ├── rules  (规则规范化、解析、构造与编辑声明)
+  └── port   (按用例裁剪的 Mihomo API 接口：ProxyAPI, ConnectionAPI, RuleAPI, ConfigReloader, RuntimeAPI, MihomoAPI)
+  ↑ (由基础设施层实现)
+internal/infrastructure (基础设施适配器：api, config, core, host, profile, sync)
 ```
 
 ## 关键模块职责
 
-1. **Domain (领域层)**：`internal/domain/model` 定义了核心业务对象（如 `ProxyGroup`, `Connection`），`port` 定义了基础设施必须实现的接口。它不依赖任何其他层。
-2. **App (应用层)**：负责编排业务逻辑，通过调用 `port` 接口获取数据并执行逻辑。
-3. **Infrastructure (基础设施层)**：实现了与外部系统（Mihomo API，文件系统）的交互。
-4. **UI (展示层)**：
-   - `internal/cli`：命令行接口。
-   - `internal/ui/tui`：基于 Bubbletea 框架构建的 TUI 界面。
+1. **Domain (领域层 `internal/domain`)**：
+   - `model`：定义核心业务对象（`Proxy`、`Group`、`Connection`、`Rule`、`MihomoConfig` 与内置主题名目录）。
+   - `rules`：承载规则规范化、键解析、行构造与规则编辑结构的纯函数，供 `config`、`profile` 与 UI 共享。
+   - `port`：定义面向消费者的依赖倒置接口，由 `internal/infrastructure/api.Client` 实现并通过编译期断言校验。
+   - 仅依赖 Go 标准库及同层领域包。
+2. **App (应用层 `internal/app/service`)**：负责业务编排、配置与覆写变更、订阅管理及核心生命周期管理，严格禁止反向依赖 `internal/ui`、`internal/cli` 或 `internal/bootstrap`。
+3. **Bootstrap (装配层 `internal/bootstrap`)**：为 CLI 与 TUI 提供统一的服务装配入口（`NewApp`、`NewAppWithClient`、`NewClient`）。
+4. **Infrastructure (基础设施层 `internal/infrastructure/*`)**：实现外部系统交互，包括 Mihomo HTTP/WebSocket 客户端（`api`）、配置持久化（`config`）、托管内核二进制管理（`core`）、系统服务与网络（`host`）、订阅与快照（`profile`）以及配置同步（`sync`）。
+5. **Presentation (展示层 `internal/cli`、`internal/ui`)**：
+   - `internal/cli`：基于 Cobra 的命令行接口，支持 `--output plain|table|json`。
+   - `internal/ui/tui`：基于 Bubble Tea 的 Feature-Sliced TUI，根包事件路由已按领域拆分为 `update.go`、`update_ws.go`、`update_core_events.go`、`update_config_events.go`、`update_sub_events.go`。
 
-## 数据流转
+## 数据流转与边界守卫
 
-在 TUI 界面中，Mihosh 大量使用 WebSocket 订阅（包括流量、日志、连接和内存）来实现数据的**实时推送**，从而避免了高频的轮询，降低了系统开销。
+- 在 TUI 界面中，Mihosh 大量使用 WebSocket 订阅（流量、日志、连接和内存）实现**实时推送**，避免高频轮询。
+- `internal/arch_test.go` 在每次 `go test ./...` 时自动校验分层边界：`domain` 保持零外层依赖，`app` 零反向依赖 `ui`/`cli`，`infrastructure` 不依赖上层，存量 `ui -> infrastructure` 依赖通过只减不增的棘轮白名单严格受控。
