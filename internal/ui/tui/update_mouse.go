@@ -45,8 +45,8 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	_, mainHeight := m.getPageSize()
-	if msg.Y == noticeRow(mainHeight) {
+	page := m.mainPageLayout()
+	if msg.Y == page.noticeRow() {
 		if isMouseLeftPress(msg) {
 			if m.notice.Message.Text == "" && m.currentPage == layout.PageNodes && !m.nodesState.Testing &&
 				!m.pageInputCapture().Active && notice.HitText(m.visibleNotice().Text, msg.X, m.width) {
@@ -57,29 +57,33 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if m.pageInputCapture().Active {
-		pageX, pageY, pageWidth, pageHeight, ok := m.resolveMainPageMouseHit(msg.X, msg.Y)
+		pageX, pageY, pageWidth, pageHeight, ok := page.resolveMainPageMouseHit(msg.X, msg.Y)
 		if !ok {
 			if m.currentPage == layout.PageCore && isMouseLeftPress(msg) {
-				pageWidth, pageHeight = m.getPageSize()
-				return m.dispatchToPage(messages.PageMouseClickMsg{X: -1, Y: -1, Width: pageWidth, Height: pageHeight})
+				return m.dispatchToPage(messages.PageMouseClickMsg{X: -1, Y: -1, Width: page.width, Height: page.height})
 			}
 			return m, nil
 		}
 		switch {
 		case isMouseLeftPress(msg):
-			if keyMsg, hit := m.resolveInlineHelpClick(pageX, pageY, pageWidth, pageHeight); hit {
+			if keyMsg, hit := page.resolveInlineHelpClick(pageX, pageY); hit {
 				return m.handleGlobalKeys(keyMsg)
+			}
+			if pageY >= pageHeight || (m.currentPage == layout.PageCore && len(page.help) > 0 && pageY == pageHeight-1) {
+				return m, nil
 			}
 			return m.dispatchToPage(messages.PageMouseClickMsg{X: pageX, Y: pageY, Width: pageWidth, Height: pageHeight})
 		case isMouseWheelUp(msg), isMouseWheelDown(msg):
-			return m.dispatchToPage(messages.PageMouseScrollMsg{Up: isMouseWheelUp(msg), X: pageX, Y: pageY, Width: pageWidth, Height: pageHeight})
+			if pageY < pageHeight {
+				return m.dispatchToPage(messages.PageMouseScrollMsg{Up: isMouseWheelUp(msg), X: pageX, Y: pageY, Width: pageWidth, Height: pageHeight})
+			}
 		}
 		return m, nil
 	}
 	switch {
 	case isMouseLeftPress(msg):
 		// 检查是否点击了底栏 (Status Bar)
-		if msg.Y >= pageTop+mainHeight+notice.Height {
+		if msg.Y >= page.statusRow() {
 			if m.hasUpdate && msg.X >= m.width-5 {
 				m.showUpdateDialog = true
 				return m, nil
@@ -110,12 +114,15 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		pageX, pageY, pageWidth, pageHeight, ok := m.resolveMainPageMouseHit(msg.X, msg.Y)
+		pageX, pageY, pageWidth, pageHeight, ok := page.resolveMainPageMouseHit(msg.X, msg.Y)
 		if !ok {
 			return m, nil
 		}
-		if keyMsg, hit := m.resolveInlineHelpClick(pageX, pageY, pageWidth, pageHeight); hit {
+		if keyMsg, hit := page.resolveInlineHelpClick(pageX, pageY); hit {
 			return m.handleGlobalKeys(keyMsg)
+		}
+		if pageY >= pageHeight || (m.currentPage == layout.PageCore && len(page.help) > 0 && pageY == pageHeight-1) {
+			return m, nil
 		}
 		clickMsg := messages.PageMouseClickMsg{
 			X:      pageX,
@@ -145,6 +152,9 @@ func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
 	}
 
 	pageX, pageY, pageWidth, pageHeight, ok := m.resolveMainPageMouseHit(x, y)
+	if ok && pageY >= pageHeight {
+		return m, nil
+	}
 	if !ok {
 		pageX, pageY = -1, -1
 		pageWidth, pageHeight = m.getPageSize()
@@ -161,40 +171,32 @@ func (m Model) handleMouseScroll(up bool, x, y int) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) resolveMainPageMouseHit(x, y int) (pageX, pageY, pageWidth, pageHeight int, ok bool) {
-	pageWidth, pageHeight = m.getPageSize()
+	return m.mainPageLayout().resolveMainPageMouseHit(x, y)
+}
+
+func (p mainPageLayout) resolveMainPageMouseHit(x, y int) (pageX, pageY, pageWidth, pageHeight int, ok bool) {
+	pageWidth, pageHeight = p.width, p.height
 	pageY = y - pageTop
-	if y == noticeRow(pageHeight) {
+	if y == p.noticeRow() {
 		return 0, 0, 0, 0, false
 	}
-	if y > noticeRow(pageHeight) {
+	if y > p.noticeRow() {
 		pageY -= notice.Height
 	}
-	if pageY < 0 || pageY >= pageHeight || x < 0 || x >= pageWidth {
+	if pageY < 0 || y >= p.statusRow() || x < 0 || x >= pageWidth {
 		return 0, 0, 0, 0, false
 	}
 
 	return x, pageY, pageWidth, pageHeight, true
 }
 
-func (m Model) resolveInlineHelpClick(pageX, pageY, pageWidth, pageHeight int) (tea.KeyMsg, bool) {
-	var hints []common.InlineHelpHint
-	switch m.currentPage {
-	case layout.PageNodes:
-		hints = m.nodesState.InlineHelpHints(pageWidth, pageHeight)
-	case layout.PageConnections:
-		hints = m.connsState.InlineHelpHints(m.chartData, pageWidth, pageHeight)
-	case layout.PageLogs:
-		hints = m.logsState.InlineHelpHints(pageWidth, pageHeight)
-	case layout.PageRules:
-		hints = m.rulesState.InlineHelpHints(pageWidth, pageHeight)
-	case layout.PageSub:
-		hints = m.subState.InlineHelpHints(pageWidth, pageHeight)
-	case layout.PageSettings:
-		hints = m.settingsState.InlineHelpHints(pageWidth)
-	case layout.PageCore:
-		hints = m.coreState.InlineHelpHints(pageWidth, pageHeight)
+func (p mainPageLayout) resolveInlineHelpClick(pageX, pageY int) (tea.KeyMsg, bool) {
+	row := pageY - p.height + 1
+	if row < 0 || row >= len(p.help) {
+		return tea.KeyMsg{}, false
 	}
-	hint, ok := common.ResolveInlineHelpHit(hints, pageX, pageY, pageWidth, pageHeight)
+	text, left := p.helpLine(row)
+	hint, ok := common.InlineHintAt(p.help[row], pageX-left, common.DisplayWidth(text))
 	if !ok {
 		return tea.KeyMsg{}, false
 	}

@@ -21,7 +21,7 @@ func (m Model) View() string {
 	}
 
 	// ── 布局参数 ──
-	_, contentHeight := m.getPageSize()
+	page := m.mainPageLayout()
 
 	// ── 顶部导航 ──
 	topNav := layout.RenderTopNav(m.currentPage, m.width, layout.TopNavRefreshStatus{
@@ -32,27 +32,7 @@ func (m Model) View() string {
 	})
 
 	// ── 渲染当前页面内容（固定高度，确保状态栏不崩塌）──
-	var pageContent string
-	switch m.currentPage {
-	case layout.PageNodes:
-		pageContent = m.renderNodesPage()
-	case layout.PageConnections:
-		pageContent = m.renderConnectionsPage()
-	case layout.PageSettings:
-		pageContent = m.renderSettingsPage()
-	case layout.PageLogs:
-		pageContent = m.renderLogsPage()
-	case layout.PageRules:
-		pageContent = m.renderRulesPage()
-	case layout.PageSub:
-		pageContent = m.renderSubPage()
-	case layout.PageCore:
-		pw, ph := m.getPageSize()
-		pageContent = m.coreState.Render(pw, ph)
-	}
-	// 将页面内容约束在精确的 contentHeight 行内：
-	// 内容不足时补空行，内容溢出时截断，确保状态栏始终固定在底部
-	pageContent = clampToHeight(pageContent, contentHeight)
+	pageContent := clampToHeight(m.renderPage(page.width, page.height), page.height)
 
 	// ── 底部状态栏 ──
 	var uploadTotal, downloadTotal int64
@@ -84,7 +64,7 @@ func (m Model) View() string {
 
 	footer := strings.LastIndexByte(pageContent, '\n')
 	fullPage := lipgloss.JoinVertical(lipgloss.Left, topNav, pageContent[:footer],
-		notice.Render(m.visibleNotice(), m.width), pageContent[footer+1:], statusBar)
+		notice.Render(m.visibleNotice(), m.width), page.renderFooter(pageContent[footer+1:]), statusBar)
 
 	// ── 报错弹窗叠加 ──
 	if m.notice.DetailsOpen {

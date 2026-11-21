@@ -270,7 +270,6 @@ func renderSettingsPage(state PageState, width, height int, standalone bool) str
 	}
 
 	if standalone {
-		mainContent = renderSettingsInlineHelp(mainContent, state, width, height)
 		if state.SyncModal.Open {
 			mainContent = buildSyncModal(state, width, height).Overlay(mainContent, true)
 		}
@@ -279,13 +278,10 @@ func renderSettingsPage(state PageState, width, height int, standalone bool) str
 	return mainContent
 }
 
-func (s State) InlineHelpHints(width int) []common.InlineHelpHint {
-	hints := buildSettingsInlineHelpHints(s.ToPageState(s.Config, nil))
-	return common.FitInlineHints(hints, max(1, width-1))
-}
-
-func (s State) InlineHelp(width int) string {
-	return ansi.Truncate(common.FormatInlineHintRow(s.InlineHelpHints(width)), max(1, width-1), "")
+func (s State) InlineHelpHints() []common.InlineHelpHint {
+	return buildSettingsInlineHelpHints(PageState{
+		ActiveTab: s.activeTab, SelectedSetting: s.selectedSetting, EditMode: s.editMode, SyncModal: s.syncModal,
+	})
 }
 
 // overlayVersionAtBottomLeft 将版本信息叠加在页面左下角（状态栏上方一行）。
@@ -390,17 +386,6 @@ func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		{Key: "r", Desc: i18n.T("help.settings.hint_refresh")},
 		{Key: "?", Desc: i18n.T("core.inline.help")},
 	}
-}
-
-// renderSettingsInlineHelp 渲染右下角内联帮助面板并叠加到页面上
-func renderSettingsInlineHelp(page string, state PageState, width, height int) string {
-	hints := common.FitInlineHints(buildSettingsInlineHelpHints(state), max(1, width-1))
-	if len(hints) == 0 {
-		return page
-	}
-
-	body := common.FormatInlineHintRow(hints)
-	return common.OverlayHelpAtBottomRight(page, body, width, height)
 }
 
 // renderSettingItem 渲染单个设置项

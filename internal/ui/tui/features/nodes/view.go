@@ -77,7 +77,6 @@ func RenderNodesPage(state PageState) string {
 
 	mainContent := lipgloss.JoinVertical(lipgloss.Left, modeSwitch, "", bodyArea, searchLine)
 
-	mainContent = renderNodesInlineHelp(mainContent, state)
 	if state.ChainModal.Open {
 		modal := buildChainModal(state)
 		mainContent = dialog.New(modal, state.Width, state.Height).Clipped().Overlay(mainContent, true)

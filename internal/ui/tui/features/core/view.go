@@ -576,6 +576,14 @@ func (s State) viewportOffset(page pageLayout, height int) int {
 }
 
 func (s State) Render(width, height int) string {
+	return s.render(width, height, true)
+}
+
+func (s State) RenderPage(width, height int) string {
+	return s.render(width, height, false)
+}
+
+func (s State) render(width, height int, showHelp bool) string {
 	if width <= 0 || height <= 0 {
 		return ""
 	}
@@ -583,9 +591,9 @@ func (s State) Render(width, height int) string {
 		background := s
 		background.Editing, background.Err = false, nil
 		background.selected, background.scroll = s.formSelection, s.formScroll
-		return s.overlayForm(background.Render(width, height), width, height)
+		return s.overlayForm(background.render(width, height, showHelp), width, height)
 	}
-	footer := s.footer(width, height)
+	footer := s.footer(width, height, showHelp)
 	contentHeight := max(1, height-lipgloss.Height(footer))
 	page := s.layout(width, contentHeight)
 	lines := strings.Split(page.content, "\n")

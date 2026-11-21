@@ -260,15 +260,14 @@ func TestUpdate_InlineHelpMenuClick(t *testing.T) {
 	findLabelX := func(view, label string) (int, int) {
 		t.Helper()
 		lines := strings.Split(ansi.Strip(view), "\n")
-		y := m.height - common.StatusBarHeight - 1
-		if y < 0 || y >= len(lines) {
-			t.Fatalf("invalid bottom hint row %d", y)
+		page := m.mainPageLayout()
+		for y := page.noticeRow() + 1; y < page.statusRow(); y++ {
+			if at := strings.Index(lines[y], label); at >= 0 {
+				return lipgloss.Width(lines[y][:at]) + 1, y
+			}
 		}
-		at := strings.Index(lines[y], label)
-		if at < 0 {
-			t.Fatalf("label %q not found in bottom hint row %q", label, lines[y])
-		}
-		return lipgloss.Width(lines[y][:at]) + 1, y
+		t.Fatalf("label %q not found in bottom hint rows", label)
+		return 0, 0
 	}
 
 	// Click "/ 搜索" on Rules page -> enters filter mode.
@@ -319,14 +318,19 @@ func TestUpdate_TrafficTestAllMenuClick(t *testing.T) {
 	m.connsState = connections.NewState("", sites, nil, 1000, nil)
 
 	label := "S " + i18n.T("help.conns.hint_test_all")
-	y := m.height - common.StatusBarHeight - 1
-	row := strings.Split(ansi.Strip(m.View()), "\n")[y]
-	at := strings.Index(row, label)
+	page := m.mainPageLayout()
+	rows := strings.Split(ansi.Strip(m.View()), "\n")
+	y, at := page.noticeRow()+1, -1
+	for ; y < page.statusRow(); y++ {
+		if at = strings.Index(rows[y], label); at >= 0 {
+			break
+		}
+	}
 	if at < 0 {
-		t.Fatalf("batch test menu item %q is missing from %q", label, row)
+		t.Fatalf("batch test menu item %q is missing", label)
 	}
 	next, cmd := m.Update(tea.MouseMsg{
-		X: lipgloss.Width(row[:at]), Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress,
+		X: lipgloss.Width(rows[y][:at]), Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress,
 	})
 	m = next.(Model)
 	if cmd == nil {

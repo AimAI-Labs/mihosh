@@ -372,9 +372,8 @@ func connectionsByViewMode(state PageState) []model.Connection {
 // 渲染逻辑（InlineHelpHint / FormatInlineHintRow / OverlayHelpAtBottomRight）
 // 共享自 components/common。
 
-// buildConnectionsInlineHelpHints 根据连接页上下文构建内联帮助条目
-func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
-	if state.DNS.open {
+func (s State) InlineHelpHints(width int) []common.InlineHelpHint {
+	if s.dns.open {
 		return []common.InlineHelpHint{
 			{Key: "↵", Desc: i18n.T("conns.dns.hint_query")},
 			{Key: "Tab", Desc: i18n.T("conns.dns.hint_type")},
@@ -382,9 +381,9 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 			{Key: "Esc", Desc: i18n.T("conns.dns.hint_close")},
 		}
 	}
-	if state.Unlock.open {
+	if s.unlock.open {
 		arrows := "↑↓"
-		if unlockColumns(state.Width) > 1 {
+		if unlockColumns(width) > 1 {
 			arrows = "↑↓←→"
 		}
 		return []common.InlineHelpHint{
@@ -394,7 +393,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		}
 	}
 	// 详情模式：左右面板切换 + 滚动 + 关闭
-	if state.DetailMode {
+	if s.connDetailMode {
 		return []common.InlineHelpHint{
 			{Key: "↑/↓", Desc: i18n.T("help.conns_detail.scroll")},
 			{Key: "←/→", Desc: i18n.T("help.conns_detail.switch_panel")},
@@ -403,7 +402,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 	}
 
 	// TopN 弹窗：滚动 + 关闭
-	if state.TopNModalMode {
+	if s.topNModalMode {
 		return []common.InlineHelpHint{
 			{Key: "↑/↓", Desc: i18n.T("help.conns_topn.scroll")},
 			{Key: "Esc/q", Desc: i18n.T("help.conns_topn.close")},
@@ -411,7 +410,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 	}
 
 	// 过滤输入模式：确认 + 取消
-	if state.FilterMode {
+	if s.filterList.FilterMode() {
 		return []common.InlineHelpHint{
 			{Key: "↵", Desc: i18n.T("help.conns_search.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.conns_search.cancel")},
@@ -421,10 +420,10 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 	unlock := common.InlineHelpHint{Key: "U", Desc: i18n.T("conns.unlock.title")}
 	dnsHint := common.InlineHelpHint{Key: "D", Desc: i18n.T("conns.dns.title"), Tone: common.InlineHelpToneInfo}
 	// 按 tab 分流
-	switch state.ViewMode {
+	switch s.connViewMode {
 	case ConnViewTraffic:
 		var hints []common.InlineHelpHint
-		if len(state.SiteTests) > 0 {
+		if len(s.siteTests) > 0 {
 			hints = append(hints,
 				common.InlineHelpHint{Key: "S", Desc: i18n.T("help.conns.hint_test_all"), Tone: common.InlineHelpToneSuccess},
 				common.InlineHelpHint{Key: "s", Desc: i18n.T("help.conns.hint_test"), Tone: common.InlineHelpToneSuccess},
@@ -440,11 +439,11 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 
 	case ConnViewActive:
 		pauseHint := common.InlineHelpHint{Key: "p", Desc: i18n.T("help.conns.hint_pause")}
-		if state.Paused {
+		if s.paused {
 			pauseHint = common.InlineHelpHint{Key: "p", Desc: i18n.T("help.conns.hint_resume"), Tone: common.InlineHelpToneWarning}
 		}
 		closeHint := common.InlineHelpHint{Key: "x/X", Desc: i18n.T("help.conns.hint_close")}
-		if resolvePageQuery(state).HasEffectiveFilter() {
+		if s.currentQuery().HasEffectiveFilter() {
 			closeHint = common.InlineHelpHint{Key: "X", Desc: i18n.T("help.conns.hint_close_matched"), Tone: common.InlineHelpToneDanger}
 		}
 		hints := []common.InlineHelpHint{
@@ -459,7 +458,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 			{Key: "/", Desc: i18n.T("help.conns.hint_search")},
 			{Key: "h", Desc: i18n.T("help.conns.hint_switch")},
 		}
-		if state.InlineFocused {
+		if s.inlineDetailFocused {
 			hints[0] = common.InlineHelpHint{Key: "↑↓", Desc: i18n.T("help.conns_detail.scroll")}
 			hints = append(hints, common.InlineHelpHint{Key: "Esc", Desc: i18n.T("help.conns_search.cancel")})
 		} else {
@@ -469,7 +468,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 
 	case ConnViewHistory:
 		pauseHint := common.InlineHelpHint{Key: "p", Desc: i18n.T("help.conns.hint_pause")}
-		if state.Paused {
+		if s.paused {
 			pauseHint = common.InlineHelpHint{Key: "p", Desc: i18n.T("help.conns.hint_resume"), Tone: common.InlineHelpToneWarning}
 		}
 		hints := []common.InlineHelpHint{
@@ -483,7 +482,7 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 			{Key: "/", Desc: i18n.T("help.conns.hint_search")},
 			{Key: "h", Desc: i18n.T("help.conns.hint_switch")},
 		}
-		if state.InlineFocused {
+		if s.inlineDetailFocused {
 			hints[0] = common.InlineHelpHint{Key: "↑↓", Desc: i18n.T("help.conns_detail.scroll")}
 			hints = append(hints, common.InlineHelpHint{Key: "Esc", Desc: i18n.T("help.conns_search.cancel")})
 		} else {
@@ -493,24 +492,4 @@ func buildConnectionsInlineHelpHints(state PageState) []common.InlineHelpHint {
 	}
 
 	return nil
-}
-
-// InlineHelpHints 返回连接页当前可见的右下角交互菜单条目。
-func (s State) InlineHelpHints(chartData *model.ChartData, width, height int) []common.InlineHelpHint {
-	return common.FitInlineHints(buildConnectionsInlineHelpHints(s.ToPageState(chartData, width, height)), max(1, width-1))
-}
-
-// renderConnectionsInlineHelp 渲染右下角内联帮助面板并叠加到页面上
-func renderConnectionsInlineHelp(page string, state PageState) string {
-	hints := common.FitInlineHints(buildConnectionsInlineHelpHints(state), max(1, state.Width-1))
-	if len(hints) == 0 {
-		return page
-	}
-
-	body := common.FormatInlineHintRow(hints)
-	if state.Height > 0 {
-		rows := strings.Split(page, "\n")
-		page = strings.Join(rows[:min(len(rows), state.Height)], "\n")
-	}
-	return common.OverlayHelpAtBottomRight(page, body, state.Width, state.Height)
 }

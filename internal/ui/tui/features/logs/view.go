@@ -119,7 +119,7 @@ func RenderLogsPage(state PageState) string {
 
 	// 详情模式：渲染日志详情弹窗
 	if state.DetailMode && state.DetailLog != nil {
-		mainContent := OverlayLogDetailPopup(
+		return OverlayLogDetailPopup(
 			base,
 			state.DetailLog,
 			state.DetailParsed,
@@ -129,10 +129,9 @@ func RenderLogsPage(state PageState) string {
 			state.Height,
 			state.DetailScroll,
 		)
-		return renderLogsInlineHelp(mainContent, state)
 	}
 
-	return renderLogsInlineHelp(base, state)
+	return base
 
 }
 
@@ -143,10 +142,9 @@ func RenderLogsPage(state PageState) string {
 // 渲染逻辑（InlineHelpHint / FormatInlineHintRow / OverlayHelpAtBottomRight）
 // 共享自 components/common。
 
-// buildLogsInlineHelpHints 根据日志页上下文构建内联帮助条目
-func buildLogsInlineHelpHints(state PageState) []common.InlineHelpHint {
+func (s State) InlineHelpHints() []common.InlineHelpHint {
 	// 详情模式：滚动 + 关闭
-	if state.DetailMode {
+	if s.detailMode {
 		return []common.InlineHelpHint{
 			{Key: "↑/↓", Desc: i18n.T("help.logs_detail.scroll")},
 			{Key: "Esc/q", Desc: i18n.T("help.logs_detail.close")},
@@ -154,7 +152,7 @@ func buildLogsInlineHelpHints(state PageState) []common.InlineHelpHint {
 	}
 
 	// 过滤输入模式：确认 + 取消 + 删除
-	if state.FilterMode {
+	if s.logFilterMode {
 		return []common.InlineHelpHint{
 			{Key: "↵", Desc: i18n.T("help.logs_search.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.logs_search.cancel")},
@@ -164,7 +162,7 @@ func buildLogsInlineHelpHints(state PageState) []common.InlineHelpHint {
 
 	// 普通模式：核心操作
 	pauseHint := common.InlineHelpHint{Key: "p", Desc: i18n.T("help.logs.hint_pause")}
-	if state.Paused {
+	if s.paused {
 		pauseHint = common.InlineHelpHint{Key: "p", Desc: i18n.T("help.logs.hint_resume"), Tone: common.InlineHelpToneWarning}
 	}
 	return []common.InlineHelpHint{
@@ -177,22 +175,6 @@ func buildLogsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		{Key: "c", Desc: i18n.T("help.logs.hint_clear"), Tone: common.InlineHelpToneDanger},
 		{Key: "?", Desc: i18n.T("core.inline.help")},
 	}
-}
-
-// InlineHelpHints 返回日志页当前可见的右下角交互菜单条目。
-func (s State) InlineHelpHints(width, height int) []common.InlineHelpHint {
-	return common.FitInlineHints(buildLogsInlineHelpHints(s.ToPageState(width, height)), max(1, width-1))
-}
-
-// renderLogsInlineHelp 渲染右下角内联帮助面板并叠加到页面上
-func renderLogsInlineHelp(page string, state PageState) string {
-	hints := common.FitInlineHints(buildLogsInlineHelpHints(state), max(1, state.Width-1))
-	if len(hints) == 0 {
-		return page
-	}
-
-	body := common.FormatInlineHintRow(hints)
-	return common.OverlayHelpAtBottomRight(page, body, state.Width, state.Height)
 }
 
 func logPauseLabel(paused bool, pausedNewCount int) string {

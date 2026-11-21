@@ -79,7 +79,6 @@ func RenderSubPage(state PageState) string {
 		result = renderDeleteConfirmOverlay(result, state, state.Width, state.Height)
 	}
 
-	result = renderInlineHelp(result, state)
 	if state.History.mode != historyClosed {
 		return state.History.dialog(state.Width, state.Height).Overlay(result, true)
 	}
@@ -166,46 +165,24 @@ func relativeTime(ts int64) string {
 // 内联帮助（右下角浮层）
 // ============================================================
 
-func visibleInlineHints(state PageState) []common.InlineHelpHint {
-	if state.File.mode != fileClosed || state.History.mode != historyClosed {
+func (s State) InlineHelpHints(width int) []common.InlineHelpHint {
+	if s.file.mode != fileClosed || s.history.mode != historyClosed {
 		return nil
 	}
-	hints := buildHints(state)
-	if len(hints) == 0 {
-		return nil
-	}
-	return common.FitInlineHints(hints, max(1, state.Width-1))
-}
-
-// InlineHelpHints 返回订阅页当前可见的右下角交互菜单条目。
-func (s State) InlineHelpHints(width, height int) []common.InlineHelpHint {
-	return visibleInlineHints(s.ToPageState(width, height))
-}
-
-func renderInlineHelp(page string, state PageState) string {
-	hints := visibleInlineHints(state)
-	if len(hints) == 0 {
-		return page
-	}
-	body := common.FormatInlineHintRow(hints)
-	return common.OverlayHelpAtBottomRight(page, body, state.Width, state.Height)
-}
-
-func buildHints(state PageState) []common.InlineHelpHint {
-	if state.ShowDeleteConf {
+	if s.showDeleteConf {
 		return []common.InlineHelpHint{
 			{Key: "Enter/y", Desc: i18n.T("help.sub_delete.confirm"), Tone: common.InlineHelpToneDanger},
 			{Key: "Esc/n", Desc: i18n.T("help.sub_delete.cancel")},
 		}
 	}
-	if state.ShowAddForm || state.ShowEditForm {
+	if s.showAddForm || s.showEditForm {
 		return []common.InlineHelpHint{
 			{Key: "↵", Desc: i18n.T("help.sub_add.confirm"), Tone: common.InlineHelpToneSuccess},
 			{Key: "Esc", Desc: i18n.T("help.sub_add.cancel")},
 			{Key: "Tab", Desc: i18n.T("help.sub_add.field")},
 		}
 	}
-	if state.FilterMode {
+	if s.filterMode {
 		return []common.InlineHelpHint{
 			{Key: "↵", Desc: i18n.T("help.sub_search.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.sub_search.cancel")},
@@ -214,7 +191,7 @@ func buildHints(state PageState) []common.InlineHelpHint {
 		}
 	}
 	selection := "↑↓"
-	if !state.ListMode && subCardColumns(state.Width) > 1 {
+	if !s.listMode && subCardColumns(width) > 1 {
 		selection = "↑↓←→"
 	}
 	return []common.InlineHelpHint{

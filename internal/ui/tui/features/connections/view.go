@@ -53,12 +53,11 @@ type PageState struct {
 func RenderConnectionsPage(state PageState) string {
 	// 详情模式优先级最高：渲染沉浸式连接详情（位于模式切换栏下方）
 	if state.DetailMode && state.SelectedConnection != nil {
-		return renderConnectionsInlineHelp(layoutConnectionDetail(state).content, state)
+		return layoutConnectionDetail(state).content
 	}
 
 	if state.TopNModalMode {
-		mainContent := components.RenderTopNModal(state.TopNModalItems, state.Width, state.Height, state.TopNModalScroll)
-		return renderConnectionsInlineHelp(mainContent, state)
+		return components.RenderTopNModal(state.TopNModalItems, state.Width, state.Height, state.TopNModalScroll)
 	}
 
 	var page string
@@ -75,7 +74,7 @@ func RenderConnectionsPage(state PageState) string {
 		popup, _ := state.Unlock.popup(state.Width, state.Height)
 		page = popup.Overlay(page, true)
 	}
-	return renderConnectionsInlineHelp(page, state)
+	return page
 }
 
 // renderTrafficTab 渲染流量监控 tab

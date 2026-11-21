@@ -129,7 +129,7 @@ func RenderRulesPage(state PageState) string {
 		result = picker.Overlay(result, true)
 	}
 
-	return renderRulesInlineHelp(result, state)
+	return result
 }
 
 // ============================================================
@@ -232,20 +232,8 @@ func buildRulesInlineHelpHints(state PageState) []common.InlineHelpHint {
 	}
 }
 
-// InlineHelpHints 返回规则页当前可见的右下角交互菜单条目。
-func (s State) InlineHelpHints(width, height int) []common.InlineHelpHint {
-	return common.FitInlineHints(buildRulesInlineHelpHints(s.ToPageState(width, height)), max(1, width-1))
-}
-
-// renderRulesInlineHelp 渲染右下角内联帮助面板并叠加到页面上
-func renderRulesInlineHelp(page string, state PageState) string {
-	hints := common.FitInlineHints(buildRulesInlineHelpHints(state), max(1, state.Width-1))
-	if len(hints) == 0 {
-		return page
-	}
-
-	body := common.FormatInlineHintRow(hints)
-	return common.OverlayHelpAtBottomRight(page, body, state.Width, state.Height)
+func (s State) InlineHelpHints() []common.InlineHelpHint {
+	return buildRulesInlineHelpHints(s.ToPageState(0, 0))
 }
 
 // RenderRulesHeaderComponent 渲染规则页面头部组件（带边框，包含统计和搜索框）

@@ -177,9 +177,8 @@ func resolveModeBarMouseHit(width, pageX, pageY int) MouseHit {
 // OverlayHelpAtBottomRight）已抽取至 components/common，
 // 各页面共享，避免重复实现。
 
-// buildNodesInlineHelpHints 根据节点页上下文构建内联帮助条目
-func buildNodesInlineHelpHints(state PageState) []common.InlineHelpHint {
-	if state.ChainModal.Open {
+func (s State) InlineHelpHints() []common.InlineHelpHint {
+	if s.ChainModal.Open {
 		return []common.InlineHelpHint{
 			{Key: "↵", Desc: i18n.T("help.nodes_chain.toggle")},
 			{Key: "Tab", Desc: i18n.T("help.nodes_chain.focus")},
@@ -189,7 +188,7 @@ func buildNodesInlineHelpHints(state PageState) []common.InlineHelpHint {
 		}
 	}
 
-	if state.FilterMode {
+	if s.NodeFilterMode {
 		return []common.InlineHelpHint{
 			{Key: "↵", Desc: i18n.T("help.nodes_search.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.nodes_search.cancel")},
@@ -197,7 +196,7 @@ func buildNodesInlineHelpHints(state PageState) []common.InlineHelpHint {
 		}
 	}
 
-	if state.ShowTestDetail {
+	if s.ShowTestDetail {
 		return []common.InlineHelpHint{
 			{Key: "↑/↓", Desc: i18n.T("help.nodes_test_detail.scroll")},
 			{Key: "Home/End", Desc: i18n.T("help.nodes_test_detail.jump")},
@@ -223,32 +222,17 @@ func buildNodesInlineHelpHints(state PageState) []common.InlineHelpHint {
 	}
 }
 
-func nodesInlineHelpMaxWidth(state PageState) int {
-	maxW := max(1, state.Width-1)
-	if !state.ChainModal.Open && !state.ShowTestDetail && !state.FilterMode && state.FilterText == "" && state.ActiveChain.Enabled && len(state.ActiveChain.Nodes) >= 2 {
-		badgeW := common.DisplayWidth(formatActiveChainSummary(state.ActiveChain, max(12, state.Width/3)))
-		if avail := maxW - badgeW - 2; avail >= 20 {
-			return avail
-		}
+func (s State) InlineHelpFirstWidth(width int) int {
+	if s.ChainModal.Open || s.ShowTestDetail || s.NodeFilterMode {
+		return width - 1
 	}
-	return maxW
-}
-
-// InlineHelpHints 返回节点页当前可见的右下角交互菜单条目。
-func (s State) InlineHelpHints(width, height int) []common.InlineHelpHint {
-	state := s.ToPageState(width, height)
-	return common.FitInlineHints(buildNodesInlineHelpHints(state), nodesInlineHelpMaxWidth(state))
-}
-
-// renderNodesInlineHelp 渲染右下角内联帮助面板并叠加到页面上
-func renderNodesInlineHelp(page string, state PageState) string {
-	hints := common.FitInlineHints(buildNodesInlineHelpHints(state), nodesInlineHelpMaxWidth(state))
-	if len(hints) == 0 {
-		return page
+	if s.NodeFilter != "" {
+		return width / 2
 	}
-
-	// 单行精简展示（无边框，紧贴底栏上边）
-	body := common.FormatInlineHintRow(hints)
-
-	return common.OverlayHelpAtBottomRight(page, body, state.Width, state.Height)
+	chain, _ := s.ActiveGroupChain()
+	if chain.Enabled && len(chain.Nodes) >= 2 {
+		badgeW := common.DisplayWidth(formatActiveChainSummary(chain, max(12, width/3)))
+		return max(1, width-badgeW-3)
+	}
+	return width - 1
 }

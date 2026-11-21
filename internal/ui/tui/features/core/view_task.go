@@ -33,7 +33,7 @@ func (s State) cancelDownloadAt(x, y, width, height int) bool {
 	if !s.downloading() || s.cancel == nil || y != height-1 || x < 0 || x >= width || width <= 0 || height <= 0 {
 		return false
 	}
-	footer := strings.Split(ansi.Strip(s.footer(width, height)), "\n")
+	footer := strings.Split(ansi.Strip(s.footer(width, height, true)), "\n")
 	row := footer[len(footer)-1]
 	hint := ansi.Truncate(ansi.Strip(common.FormatInlineHintRow([]common.InlineHelpHint{s.cancelHint()})), max(1, width-1), "")
 	index := strings.LastIndex(row, hint)
@@ -69,20 +69,24 @@ func (s State) progressText(width int) string {
 	return progress
 }
 
-func (s State) InlineHelpHints(width, height int) []common.InlineHelpHint {
-	if s.Editing || width <= 0 || height <= 0 {
+func (s State) InlineHelpHints() []common.InlineHelpHint {
+	if s.Editing {
 		return nil
 	}
-	_, helpWidth := s.footerRender(width, height)
-	return s.inlineHelpHints(helpWidth + 1)
+	return s.inlineHelpHints()
 }
 
-func (s State) footer(width, height int) string {
-	rendered, _ := s.footerRender(width, height)
+func (s State) InlineHelpFirstWidth(width int) int {
+	_, helpWidth := s.footerRender(width, 1, false)
+	return helpWidth
+}
+
+func (s State) footer(width, height int, showHelp bool) string {
+	rendered, _ := s.footerRender(width, height, showHelp)
 	return rendered
 }
 
-func (s State) footerRender(width, height int) (string, int) {
+func (s State) footerRender(width, height int, showHelp bool) (string, int) {
 	t := theme.Current()
 	width = max(1, width-1)
 	body := ""
@@ -134,6 +138,10 @@ func (s State) footerRender(width, height int) (string, int) {
 			control = s.cancelHint()
 		}
 		helpWidth = min(width, max(width/2, lipgloss.Width(common.FormatInlineHintRow([]common.InlineHelpHint{control}))))
+	}
+	if !showHelp {
+		row := lineStyle.Render(ansi.Truncate(notice, width, "…"))
+		return strings.Join(append(lines, row), "\n"), helpWidth
 	}
 	help := s.inlineHelp(helpWidth + 1)
 	leftWidth := max(0, width-lipgloss.Width(help)-2)

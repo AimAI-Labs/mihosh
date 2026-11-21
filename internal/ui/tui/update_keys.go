@@ -165,6 +165,10 @@ func (m Model) dispatchToPage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch m.currentPage {
 	case layout.PageCore:
+		if _, isKey := msg.(tea.KeyMsg); isKey {
+			width, height := m.getPageSize()
+			m.coreState, _ = m.coreState.Update(messages.PageResizeMsg{Width: width, Height: height})
+		}
 		m.coreState, cmd = m.coreState.Update(msg)
 	case layout.PageNodes:
 		m.nodesState, cmd = m.nodesState.Update(msg)

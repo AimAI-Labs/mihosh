@@ -3,7 +3,6 @@ package core
 import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	"runtime"
 )
@@ -24,29 +23,23 @@ func (s State) ReleaseHelpNotes() []string {
 	return append(notes, s.releaseCaption())
 }
 
-func (s State) inlineHelpHints(width int) []common.InlineHelpHint {
+func (s State) inlineHelpHints() []common.InlineHelpHint {
 	if s.tab == 4 && !s.Editing && !s.Busy && s.task == "" && s.Err == nil {
 		if s.serviceFocus && s.hasServiceCard() {
 			hints := []common.InlineHelpHint{
 				{Key: "←→", Desc: i18n.T("core.inline.select")},
 				{Key: "Enter", Desc: i18n.T("core.inline.run")},
 				{Key: "↑↓", Desc: i18n.T("core.inline.scroll")},
-				{Key: "Tab/Esc", Desc: i18n.T("core.tab.mihomo")},
+				{Key: "Tab/Esc", Desc: i18n.T("core.tab.mihomo"), Action: "tab"},
 			}
-			help := common.InlineHelpHint{Key: "?", Desc: i18n.T("core.inline.help")}
-			for len(hints) > 0 && lipgloss.Width(common.FormatInlineHintRow(append(hints, help))) > width-1 {
-				hints = hints[:len(hints)-1]
-			}
-			return append(hints, help)
+			return append(hints, common.InlineHelpHint{Key: "?", Desc: i18n.T("core.inline.help")})
 		}
-		hints := s.editor.InlineHelpHints(width)
+		hints := s.editor.InlineHelpHints()
 		if s.hasServiceCard() && !s.editor.IsEditing() {
 			svcHint := common.InlineHelpHint{Key: "Tab", Desc: i18n.T("core.inline.service")}
 			if len(hints) > 0 {
-				candidate := append(append([]common.InlineHelpHint(nil), hints[:len(hints)-1]...), svcHint, hints[len(hints)-1])
-				if lipgloss.Width(common.FormatInlineHintRow(candidate)) <= width-1 {
-					return candidate
-				}
+				last := hints[len(hints)-1]
+				return append(hints[:len(hints)-1], svcHint, last)
 			}
 		}
 		return hints
@@ -111,12 +104,11 @@ func (s State) inlineHelpHints(width int) []common.InlineHelpHint {
 		hints = []common.InlineHelpHint{{Key: "←→", Desc: i18n.T("core.inline.sections")}, {Key: "↑↓", Desc: i18n.T("core.inline.select")}}
 		help = common.InlineHelpHint{Key: "Enter/Esc", Desc: i18n.T("core.inline.dismiss")}
 	}
-	for len(hints) > 0 && lipgloss.Width(common.FormatInlineHintRow(append(hints, help))) > width-1 {
-		hints = hints[:len(hints)-1]
-	}
 	return append(hints, help)
 }
 
 func (s State) inlineHelp(width int) string {
-	return ansi.Truncate(common.FormatInlineHintRow(s.inlineHelpHints(width)), max(1, width-1), "")
+	width = max(1, width-1)
+	hints := common.FitInlineHints(s.inlineHelpHints(), width)
+	return ansi.Truncate(common.FormatInlineHintRow(hints), width, "")
 }
