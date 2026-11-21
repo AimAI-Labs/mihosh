@@ -193,15 +193,24 @@ func TestGeoFilesPanelKeepsDirectoryAndRestartHintReachable(t *testing.T) {
 	s = s.selectTab(3)
 	page := s.layout(120, 26)
 	lines := strings.Split(ansi.Strip(page.content), "\n")
+	// The directory is wrapped to the panel width, so a long config path spans
+	// several rows. Assert on its label (always the first body row) and on the
+	// header region flattened without panel borders/padding, instead of expecting
+	// the whole path on a single line.
+	flatten := strings.NewReplacer(" ", "", "│", "", "╭", "", "╮", "", "╰", "", "╯", "", "─", "", "\n", "")
+	header := ""
+	for y := page.geoBounds.y + 1; y < page.actions[0].y && y < len(lines); y++ {
+		header += ansi.Cut(lines[y], page.geoBounds.x, page.geoBounds.x+page.geoBounds.width)
+	}
 	directory := i18n.T("core.geo.directory") + ": " + filepath.Join(root, "runtime")
 	if !strings.Contains(lines[page.geoBounds.y], i18n.T("core.geo.files")) ||
-		!strings.Contains(lines[page.geoBounds.y+1], directory) ||
+		!strings.Contains(flatten.Replace(header), flatten.Replace(directory)) ||
 		page.actions[0].y <= page.geoBounds.y+1 {
 		t.Fatal("GEO directory should be above the first selectable file")
 	}
 	s.selected = len(s.geoFiles) - 1
 	view := strings.Split(ansi.Strip(s.Render(80, 22)), "\n")
-	if !strings.Contains(strings.Join(view, "\n"), filepath.Join(root, "runtime")) ||
+	if !strings.Contains(flatten.Replace(strings.Join(view, "\n")), filepath.Join(root, "runtime")) ||
 		!strings.Contains(view[len(view)-1], "z "+i18n.T("core.action.restart")) {
 		t.Fatalf("GEO directory or restart help is unreachable: %q", view)
 	}
