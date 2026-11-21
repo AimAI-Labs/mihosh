@@ -1,10 +1,9 @@
 package rules
 
 import (
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
-
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	domainrules "github.com/AimAI-Labs/mihosh/internal/domain/rules"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -43,7 +42,7 @@ func (s State) handleDeleteConfirmMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		s.showDeleteConfirm = false
 		s.deleteTarget = model.Rule{}
 		s.deleteTargetIndex = 0
-		return s, s.applyRuleEdit("rules.deleted_toast", profile.RuleEdit{
+		return s, s.applyRuleEdit("rules.deleted_toast", domainrules.Edit{
 			Match: originalRuleLine(normalizeRuleType(target.Type), target.Payload, target.Proxy, target.NoResolve),
 		})
 

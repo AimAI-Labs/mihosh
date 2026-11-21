@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/AimAI-Labs/mihosh/internal/bootstrap"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
@@ -30,8 +31,7 @@ var rootCmd = &cobra.Command{
 			cfg = &config.DefaultConfig
 		}
 
-		endpoint := config.ResolveMihomoEndpoint()
-		client := api.NewClient(endpoint, cfg.Timeout)
+		client := bootstrap.NewClient(cfg)
 		m := tui.NewModel(client, cfg.TestURL, cfg.Timeout)
 		defer m.Close()
 
@@ -84,7 +84,7 @@ func executeRootCommand(root *cobra.Command, stderr io.Writer) int {
 // 超时取自 Mihosh 配置（加载失败则回退默认）。供所有 CLI 子命令复用，
 // 避免各处重复 api.NewClient + endpoint 解析。
 func loadClient(cfg *config.Config) *api.Client {
-	return api.NewClient(config.ResolveMihomoEndpoint(), cfg.Timeout)
+	return bootstrap.NewClient(cfg)
 }
 
 func localizeCommands() {

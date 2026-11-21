@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
@@ -57,10 +57,7 @@ func (s State) openHistoryModal() (State, tea.Cmd) {
 		name = p.Name
 		kind = profile.SnapshotRaw
 	}
-	ignore := profile.DefaultFileDiffOptions
-	if cfg, err := config.Load(); err == nil && cfg.FileDiffOptions != nil {
-		ignore = *cfg.FileDiffOptions
-	}
+	ignore := service.LoadFileDiffOptions()
 	req := s.history.request + 1
 	s.history = historyView{
 		mode:    historyList,

@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
@@ -45,7 +45,7 @@ func (e *mergeEditor) Run() error {
 	if err != nil {
 		return err
 	}
-	draft, draftErr := profile.NormalizeLegacyMerge(original, e.activeUID, config.GetMihomoConfigPath)
+	draft, draftErr := service.NormalizeMergeDraft(original, e.activeUID)
 	if draftErr != nil {
 		// Open the original so the user can repair invalid YAML or convert a legacy file manually.
 		draft = original

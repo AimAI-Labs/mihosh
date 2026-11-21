@@ -8,7 +8,11 @@ import (
 )
 
 func TestBuiltinThemesComplete(t *testing.T) {
-	for _, name := range Names() {
+	names := Names()
+	if len(names) != len(builtinThemes) {
+		t.Fatalf("Names() count = %d, builtinThemes count = %d (catalog and palette map diverged)", len(names), len(builtinThemes))
+	}
+	for _, name := range names {
 		th, ok := builtinThemes[name]
 		if !ok {
 			t.Errorf("theme %q in Names() but not in builtinThemes", name)

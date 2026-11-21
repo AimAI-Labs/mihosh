@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 )
@@ -69,13 +70,12 @@ func CurrentName() string { return current.Load().Name }
 
 // IsValid 检查主题名是否有效
 func IsValid(name string) bool {
-	_, ok := builtinThemes[name]
-	return ok
+	return model.IsValidTheme(name)
 }
 
 // Names 返回所有内置主题名（顺序稳定）
 func Names() []string {
-	return []string{"tokyo-night", "catppuccin", "gruvbox", "nord", "dracula", "kanagawa", "solarized-light"}
+	return model.ThemeNames()
 }
 
 func SetBorderStyle(style string) { squareBorders.Store(style == "square") }

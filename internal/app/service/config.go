@@ -8,7 +8,6 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
-	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 )
 
 // ConfigService 配置管理服务
@@ -76,8 +75,8 @@ func (s *ConfigService) SetConfigValue(key, value string) error {
 			}
 			cfg.AutoRefreshInterval = interval
 		case "theme":
-			if !theme.IsValid(value) {
-				return fmt.Errorf("theme 必须是: %s", strings.Join(theme.Names(), ", "))
+			if !model.IsValidTheme(value) {
+				return fmt.Errorf("theme 必须是: %s", strings.Join(model.ThemeNames(), ", "))
 			}
 			cfg.Theme = value
 		case "border_style", "border-style":

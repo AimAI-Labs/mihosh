@@ -92,8 +92,28 @@ func NewMihomoState(configSvc *service.ConfigService, client *api.Client, coreSv
 	if len(coreSvcs) > 0 {
 		s.coreSvc = coreSvcs[0]
 	}
-	s.Config, _ = config.Load()
+	s.reloadConfig()
 	return s
+}
+
+// SetConfig updates the cached application configuration held by the preferences state.
+func (s *State) SetConfig(cfg *config.Config) {
+	s.Config = cfg
+}
+
+func (s *State) reloadConfig() {
+	var (
+		cfg *config.Config
+		err error
+	)
+	if s.configSvc != nil {
+		cfg, err = s.configSvc.LoadConfig()
+	} else {
+		cfg, err = config.Load()
+	}
+	if err == nil && cfg != nil {
+		s.Config = cfg
+	}
 }
 
 func (s State) Refresh() tea.Cmd {
@@ -733,7 +753,7 @@ func (s State) ApplyMihomoOverrides(msg *messages.MihomoOverridesMsg) State {
 		return s
 	}
 	s.overridesReadAt = msg.ReadAt
-	s.Config, _ = config.Load()
+	s.reloadConfig()
 	s.SysStatus.Supported = runtime.GOOS == "linux" && (s.Config == nil || s.Config.Core.Mode != "managed" || s.Config.Core.Runtime == "service")
 	s.mihomoLoaded = true
 	s.mihomoFromFile = true
@@ -766,7 +786,7 @@ func (s State) CompleteMihomoOverridesSave(msg *messages.MihomoOverridesSavedMsg
 }
 
 func (s State) ApplyMihomoConfig(msg *messages.MihomoConfigMsg) State {
-	s.Config, _ = config.Load()
+	s.reloadConfig()
 	s.SysStatus.Supported = runtime.GOOS == "linux" && (s.Config == nil || s.Config.Core.Mode != "managed" || s.Config.Core.Runtime == "service")
 	s.mihomoLoaded = true
 	s.mihomoFromFile = msg.FromFile

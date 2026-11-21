@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 
+	domainrules "github.com/AimAI-Labs/mihosh/internal/domain/rules"
 	"gopkg.in/yaml.v3"
 )
 
@@ -15,11 +15,7 @@ var ErrRuleEditTarget = errors.New("rule was not found in the effective subscrip
 
 // RuleEdit is applied after the standard rule overrides. Match identifies the
 // first matching rule. Index is one-based, with zero retaining an edited rule's position.
-type RuleEdit struct {
-	Match string `yaml:"match,omitempty" json:"match,omitempty"`
-	Rule  string `yaml:"rule,omitempty" json:"rule,omitempty"`
-	Index int    `yaml:"index,omitempty" json:"index,omitempty"`
-}
+type RuleEdit = domainrules.Edit
 
 func ApplyRuleEditToYAML(data []byte, edit RuleEdit) ([]byte, error) {
 	doc, err := parseOverrideDocument(data)
@@ -76,13 +72,5 @@ func applyRuleEdit(root *yaml.Node, edit RuleEdit) error {
 }
 
 func canonicalRule(rule string) string {
-	parts := strings.Split(rule, ",")
-	for i := range parts {
-		parts[i] = strings.TrimSpace(parts[i])
-	}
-	parts[0] = strings.ToUpper(parts[0])
-	if last := len(parts) - 1; last > 0 && strings.EqualFold(parts[last], "no-resolve") {
-		parts[last] = "no-resolve"
-	}
-	return strings.Join(parts, ",")
+	return domainrules.Canonicalize(rule)
 }
