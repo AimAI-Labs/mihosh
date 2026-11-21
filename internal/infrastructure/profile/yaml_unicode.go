@@ -54,13 +54,16 @@ func readableYAMLUnicode(data []byte) []byte {
 					width := unicodeEscapeWidth(data[i+1])
 					if width != 0 && i+2+width <= len(data) {
 						code, err := strconv.ParseUint(string(data[i+2:i+2+width]), 16, 32)
-						r := rune(code)
-						if err == nil && r >= 0xa0 && utf8.ValidRune(r) && unicode.IsGraphic(r) && r != '\u2028' && r != '\u2029' {
-							out.Write(data[copied:i])
-							out.WriteRune(r)
-							copied = i + 2 + width
-							i = copied - 1
-							continue
+						// Bound the value before converting to rune, which is int32.
+						if err == nil && code <= 0x10FFFF {
+							r := rune(code)
+							if r >= 0xa0 && utf8.ValidRune(r) && unicode.IsGraphic(r) && r != '\u2028' && r != '\u2029' {
+								out.Write(data[copied:i])
+								out.WriteRune(r)
+								copied = i + 2 + width
+								i = copied - 1
+								continue
+							}
 						}
 					}
 					i++

@@ -40,7 +40,12 @@ func snapshotDir(kind SnapshotKind, uid string) (string, error) {
 	}
 	switch kind {
 	case SnapshotRaw:
-		if uid == "" || uid == "." || uid == ".." || filepath.Base(uid) != uid {
+		// filepath.IsLocal also anchors the value for CodeQL's path-injection query,
+		// which does not model the equivalent filepath.Base check.
+		if !filepath.IsLocal(uid) {
+			return "", errors.New("invalid profile ID")
+		}
+		if uid == "." || strings.ContainsAny(uid, `/\`) {
 			return "", errors.New("invalid profile ID")
 		}
 		return filepath.Join(root, "history", "raw", uid), nil

@@ -184,6 +184,7 @@ func TestStore_RejectsUnsafeProfileIDs(t *testing.T) {
 		{"parent", "../escape"},
 		{"nested parent", "a/../../escape"},
 		{"separator", "a/b"},
+		{"backslash", "a\\b"},
 		{"absolute", filepath.Join(root, "escape")},
 	}
 	for _, tc := range cases {
