@@ -8,7 +8,6 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
@@ -273,8 +272,7 @@ func renderSettingsPage(state PageState, width, height int, standalone bool) str
 	if standalone {
 		mainContent = renderSettingsInlineHelp(mainContent, state, width, height)
 		if state.SyncModal.Open {
-			modal := buildSyncModal(state, width, height)
-			mainContent = dialog.New(modal, width, height).Clipped().Overlay(mainContent, true)
+			mainContent = buildSyncModal(state, width, height).Overlay(mainContent, true)
 		}
 		return mainContent
 	}
@@ -327,6 +325,9 @@ func overlayVersionAtBottomLeft(page, versionText string, width, height int) str
 
 // buildSettingsInlineHelpHints 根据设置页上下文构建内联帮助条目
 func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
+	if state.SyncModal.Open {
+		return nil
+	}
 	// 编辑模式：根据是否语言项分流
 	if state.EditMode {
 		if state.ActiveTab == 0 && state.SelectedSetting == LanguageSettingIndex() {

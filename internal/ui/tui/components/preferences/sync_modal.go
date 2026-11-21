@@ -274,20 +274,65 @@ func (s State) handleSyncModalClick(pageX, pageY, pageWidth, pageHeight int) (St
 		return s, nil
 	}
 	modal := buildSyncModal(s.ToPageState(s.Config, nil), pageWidth, pageHeight)
-	lines := strings.Split(modal, "\n")
-	overlayH := len(lines)
-	overlayW := 0
-	for _, l := range lines {
-		if w := common.DisplayWidth(l); w > overlayW {
-			overlayW = w
+	left, top, right, bottom := modal.Bounds()
+	if pageY < top || pageY >= bottom || pageX < left || pageX >= right {
+		s.syncModal = SyncModalState{}
+		return s, nil
+	}
+	x, y := pageX-left-2, pageY-top
+	if x < 0 || x >= modal.innerWidth {
+		return s, nil
+	}
+	if row := y - modal.hintTop; row >= 0 && row < len(modal.hints) {
+		if hint, ok := common.InlineHintAt(modal.hints[row], x, modal.innerWidth); ok {
+			key, _ := hint.KeyMsg()
+			return s.handleSyncModalKey(key)
 		}
 	}
-	startRow := max(0, (pageHeight-overlayH)/2)
-	startCol := max(0, (pageWidth-overlayW)/2)
-	if pageY < startRow || pageY >= startRow+overlayH || pageX < startCol || pageX >= startCol+overlayW {
-		s.syncModal = SyncModalState{}
+	row := y - modal.bodyTop
+	m := &s.syncModal
+	switch m.Mode {
+	case syncModeMenu:
+		if row >= 0 && row < modal.menuCount {
+			m.Cursor = modal.menuStart + row
+			return s.handleSyncModalKey(tea.KeyMsg{Type: tea.KeyEnter})
+		}
+	case syncModeExportPath, syncModeImportPath:
+		if row == 1 {
+			m.InputCursor = modalInputCursor(m.InputValue, x-1, m.InputCursor)
+		}
+	case syncModePGConfig:
+		if row >= 0 && row < 4 {
+			field := row / 2
+			value := m.DSNValue
+			if field == 1 {
+				value = m.KeyValue
+			}
+			cursor := -1
+			if field == m.PGField {
+				cursor = m.FormCursor
+			}
+			m.PGField, m.FormCursor = field, len([]rune(value))
+			if row%2 == 1 {
+				m.FormCursor = modalInputCursor(value, x-1, cursor)
+			}
+		}
 	}
 	return s, nil
+}
+
+func modalInputCursor(value string, column, current int) int {
+	runes := []rune(value)
+	for i, r := range runes {
+		if i == current {
+			column--
+		}
+		column -= common.DisplayWidth(string(r))
+		if column < 0 {
+			return i
+		}
+	}
+	return len(runes)
 }
 
 // CompleteSync applies the async completion of a backup/sync action.

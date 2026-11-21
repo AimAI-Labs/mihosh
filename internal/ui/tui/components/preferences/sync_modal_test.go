@@ -2,6 +2,7 @@ package preferences
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
@@ -9,6 +10,8 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/require"
 )
 
@@ -81,4 +84,56 @@ func TestSettingsSyncModalInteractionExportAndPGConfig(t *testing.T) {
 	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	require.False(t, s.syncModal.Open)
 	require.False(t, s.InputCapture().Active)
+}
+
+func TestSettingsSyncModalMouseControls(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	i18n.Init()
+	i18n.SetLanguageOverride("en-US")
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	cfg := config.DefaultConfig
+	require.NoError(t, config.Save(&cfg))
+	initial := State{Config: &cfg}
+	click := func(s State, width, height int, label string) (State, tea.Cmd) {
+		t.Helper()
+		view := ansi.Strip(RenderSettingsPage(s.ToPageState(s.Config, nil), width, height))
+		for y, line := range strings.Split(view, "\n") {
+			if x := strings.Index(line, label); x >= 0 {
+				return s.Update(messages.PageMouseClickMsg{X: lipgloss.Width(line[:x]), Y: y, Width: width, Height: height})
+			}
+		}
+		t.Fatalf("missing control %q in %s", label, view)
+		return s, nil
+	}
+	s, _ := click(initial.OpenSyncModal(), 100, 24, "Export Local Archive")
+	require.Equal(t, syncModeExportPath, s.syncModal.Mode)
+	s.syncModal.InputValue = filepath.Join(t.TempDir(), "mouse-backup.zip")
+	s, cmd := click(s, 100, 24, "Enter Confirm")
+	require.True(t, s.syncModal.Busy)
+	require.NoError(t, cmd().(messages.SyncDoneMsg).Err)
+
+	s, _ = click(initial.OpenSyncModal(), 100, 24, "Import Local Archive")
+	require.Equal(t, syncModeImportPath, s.syncModal.Mode)
+	s, _ = click(s, 100, 24, "Esc Back")
+	require.Equal(t, syncModeMenu, s.syncModal.Mode)
+	for _, label := range []string{"Push to PostgreSQL", "Pull & Restore", "Check PostgreSQL Sync"} {
+		s, cmd = click(initial.OpenSyncModal(), 100, 24, label)
+		require.True(t, s.syncModal.Busy)
+		require.NotNil(t, cmd)
+	}
+
+	s = initial.OpenSyncModal()
+	for range syncMenuItemCount - 1 {
+		s, _ = s.Update(messages.PageMouseScrollMsg{Width: 44, Height: 8})
+	}
+	s, _ = click(s, 44, 8, "Configure PostgreSQL")
+	require.Equal(t, syncModePGConfig, s.syncModal.Mode)
+	s, _ = click(s, 44, 8, "Sync Profile Key")
+	require.Equal(t, 1, s.syncModal.PGField)
+	s.syncModal.KeyValue = "mouse-device"
+	s, _ = click(s, 44, 8, "Enter Save")
+	require.Equal(t, syncModeMenu, s.syncModal.Mode)
+	require.Equal(t, "mouse-device", s.Config.Sync.ProfileKey)
+	s, _ = click(s, 44, 8, "Esc Close")
+	require.False(t, s.syncModal.Open)
 }

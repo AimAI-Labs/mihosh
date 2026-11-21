@@ -6,22 +6,72 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
 
-func buildSyncModal(state PageState, width, height int) string {
+type syncDialog struct {
+	dialog.Dialog
+	innerWidth, bodyTop  int
+	menuStart, menuCount int
+	hintTop              int
+	hints                [][]common.InlineHelpHint
+}
+
+func buildSyncModal(state PageState, width, height int) syncDialog {
 	m := state.SyncModal
-	modalWidth := min(width, max(40, min(92, width-8)))
-	innerWidth := max(24, modalWidth-4)
+	modalWidth := max(24, min(92, max(width-8, min(width, 40))))
+	innerWidth := modalWidth - 4
+	d := syncDialog{innerWidth: innerWidth}
 
 	title := i18n.T("settings.sync.modal_title")
 	subtitle := common.DimStyle().Render(common.TruncateDisplay(i18n.T("settings.sync.modal_subtitle"), innerWidth))
 	separator := common.DimStyle().Render(strings.Repeat("─", innerWidth))
 	pgSummary := common.MutedStyle().Render(formatSyncSummaryLine(state.Config, innerWidth))
 
-	var body string
-	var footer string
+	enter := common.InlineHelpHint{Key: "Enter", Desc: i18n.T("core.dialog.confirm")}
+	back := common.InlineHelpHint{Key: "Esc", Desc: i18n.T("settings.sync.back")}
+	hints := []common.InlineHelpHint{enter, back}
+	bodyHeight := 2
+	switch m.Mode {
+	case syncModeMenu:
+		bodyHeight = syncMenuItemCount
+		enter.Desc = i18n.T("core.inline.run")
+		back.Desc = i18n.T("settings.sync.close")
+		hints = []common.InlineHelpHint{{Key: "↑↓", Desc: i18n.T("core.inline.select")}, enter, back}
+	case syncModePGConfig:
+		bodyHeight = 4
+		hints[0].Desc = i18n.T("core.inline.save")
+	}
+	var status string
+	if m.StatusText != "" {
+		style := lipgloss.NewStyle().Foreground(theme.Resolve(common.TokyoGreen()))
+		if m.StatusErr {
+			style = common.ErrorStyle()
+		} else if m.Busy {
+			style = lipgloss.NewStyle().Foreground(theme.Resolve(common.TokyoCyan()))
+		}
+		status = style.Render(common.TruncateDisplay(m.StatusText, innerWidth))
+	}
+	if !m.Busy {
+		d.hints = common.WrapInlineHints(hints, innerWidth)
+	}
+	available := height - 2 - len(d.hints)
+	if status != "" {
+		available--
+	}
+	var sections []string
+	if available > bodyHeight+1 {
+		sections = append(sections, subtitle)
+	}
+	if available > bodyHeight {
+		sections = append(sections, pgSummary)
+	}
+	if available > bodyHeight+2 {
+		sections = append(sections, separator)
+	}
+	d.bodyTop = 1 + len(sections)
 
 	switch m.Mode {
 	case syncModeMenu:
@@ -39,21 +89,20 @@ func buildSyncModal(state PageState, width, height int) string {
 			Bold(true)
 		normalStyle := lipgloss.NewStyle().Foreground(theme.Resolve(common.TokyoForeground()))
 
-		rows := make([]string, len(items))
-		for i, label := range items {
+		d.menuCount = min(len(items), max(1, available-len(sections)))
+		d.menuStart = max(0, m.Cursor-d.menuCount+1)
+		for i := d.menuStart; i < d.menuStart+d.menuCount; i++ {
 			prefix := "  "
 			if i == m.Cursor {
 				prefix = "▸ "
 			}
-			line := common.TruncateDisplay(fmt.Sprintf("%s%d. %s", prefix, i+1, label), innerWidth)
+			line := common.TruncateDisplay(fmt.Sprintf("%s%d. %s", prefix, i+1, items[i]), innerWidth)
 			if i == m.Cursor {
-				rows[i] = selectedStyle.Render(common.PadString(line, innerWidth))
+				sections = append(sections, selectedStyle.Render(common.PadString(line, innerWidth)))
 			} else {
-				rows[i] = normalStyle.Render(line)
+				sections = append(sections, normalStyle.Render(line))
 			}
 		}
-		body = strings.Join(rows, "\n")
-		footer = i18n.T("settings.sync.footer_menu")
 
 	case syncModeExportPath, syncModeImportPath:
 		labelKey := "settings.sync.export_path_label"
@@ -62,8 +111,7 @@ func buildSyncModal(state PageState, width, height int) string {
 		}
 		label := lipgloss.NewStyle().Foreground(theme.Resolve(common.TokyoCyan())).Bold(true).Render(i18n.T(labelKey))
 		inputBox := renderModalInputLine(m.InputValue, m.InputCursor, innerWidth, true)
-		body = lipgloss.JoinVertical(lipgloss.Left, label, inputBox)
-		footer = i18n.T("settings.sync.footer_input")
+		sections = append(sections, label, inputBox)
 
 	case syncModePGConfig:
 		dsnLabel := i18n.T("settings.sync.dsn_label")
@@ -81,24 +129,20 @@ func buildSyncModal(state PageState, width, height int) string {
 		}
 		f0 := renderModalInputLine(m.DSNValue, m.FormCursor, innerWidth, m.PGField == 0)
 		f1 := renderModalInputLine(m.KeyValue, m.FormCursor, innerWidth, m.PGField == 1)
-		body = lipgloss.JoinVertical(lipgloss.Left, l0, f0, "", l1, f1)
-		footer = i18n.T("settings.sync.footer_pg_config")
+		sections = append(sections, l0, f0, l1, f1)
 	}
 
-	sections := []string{subtitle, pgSummary, separator, body}
-	if m.StatusText != "" {
-		stStyle := lipgloss.NewStyle().Foreground(theme.Resolve(common.TokyoGreen()))
-		if m.StatusErr {
-			stStyle = common.ErrorStyle()
-		} else if m.Busy {
-			stStyle = lipgloss.NewStyle().Foreground(theme.Resolve(common.TokyoCyan()))
-		}
-		sections = append(sections, "", stStyle.Render(common.TruncateDisplay(m.StatusText, innerWidth)))
+	if status != "" {
+		sections = append(sections, status)
 	}
-	sections = append(sections, separator, common.DimStyle().Render(common.TruncateDisplay(footer, innerWidth)))
+	d.hintTop = 1 + len(sections)
+	for _, row := range d.hints {
+		sections = append(sections, common.FormatInlineHintRow(row))
+	}
 
-	content := lipgloss.JoinVertical(lipgloss.Left, sections...)
-	return common.RenderBorderedPanel(title, content, modalWidth, common.TokyoBlue(), common.TokyoForeground())
+	content := common.RenderBorderedPanel(title, strings.Join(sections, "\n"), modalWidth, common.TokyoBlue(), common.TokyoForeground())
+	d.Dialog = dialog.New(content, width, height).Clipped()
+	return d
 }
 
 func renderModalInputLine(val string, cursor, width int, focused bool) string {
