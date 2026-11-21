@@ -14,6 +14,8 @@ mihosh proxy off
 
 `on` and `off` change the current shell's proxy variables. The address follows Mihomo's mixed port. Both uppercase and lowercase proxy variables are supported.
 
+This is a no-privilege fallback when managed system proxy or TUN is unavailable. It affects only programs launched from the shell after the variables are set; it does not change desktop proxy settings or capture all system traffic.
+
 `proxy test` uses the configured Mihomo proxy to query two IP sources. It reports the exit IP, latency and any error per source, along with country, city, ASN and organization when available. IP.SB provides the extra fields. The organization falls back to the ASN holder when needed. ipify returns the IP address. Use `--output json` for machine-readable results with a numeric `asn` and omitted fields when data is unavailable. [IP.SB API](https://ip.sb/api/) · [ipify API](https://www.ipify.org/)
 
 In the TUI, toggle **Shell proxy** under **Core > Runtime & proxy** with `w`. Mihosh installs the initialization call in Bash's `~/.bashrc` or Zsh's `${ZDOTDIR:-$HOME}/.zshrc`. Reopen or reload the shell to apply it. Saving again updates the existing Mihosh block and keeps the rest of the startup file. After moving the executable, save again to update its path.

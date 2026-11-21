@@ -14,6 +14,8 @@ mihosh proxy off
 
 `on` 和 `off` 切换当前 shell 的代理变量。代理地址取自 Mihomo 的 mixed-port，同时支持大小写两组代理环境变量。
 
+当托管系统代理或 TUN 不可用时，这是无需特权的替代方案。它只影响设置变量后从该终端启动的程序，不会修改桌面系统代理，也不会接管全系统流量。
+
 `proxy test` 通过已配置的 Mihomo 代理查询两个 IP 数据源，分别显示出口 IP、延迟和错误，有数据时还显示国家或地区、城市、ASN 和组织。补充信息由 IP.SB 提供，缺少组织时使用 ASN 持有者。ipify 返回出口 IP。`--output json` 供脚本读取，`asn` 为数字，缺少数据的字段会省略。 [IP.SB API](https://ip.sb/api/) · [ipify API](https://www.ipify.org/)
 
 在 TUI 的 **Core → 运行与代理 → 终端代理** 按 `w` 切换偏好。Mihosh 会将初始化命令写入 Bash 的 `~/.bashrc` 或 Zsh 的 `${ZDOTDIR:-$HOME}/.zshrc`。重新打开或刷新 shell 后生效。重复保存会更新已有的 Mihosh 区块，并保留文件中的其他设置。移动可执行文件后可重新保存以更新路径。
