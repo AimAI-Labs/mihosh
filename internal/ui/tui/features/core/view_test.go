@@ -480,8 +480,8 @@ func TestCoreServiceQuickMenuMatchesServiceStateAndWraps(t *testing.T) {
 				actions            string
 			}{
 				{false, false, "install"},
-				{true, false, "start,enable,boot,disable,install,uninstall"},
-				{true, true, "stop,restart,enable,boot,disable,install,uninstall"},
+				{true, false, "start,enable,boot,disable,uninstall"},
+				{true, true, "stop,restart,enable,boot,disable,uninstall"},
 			} {
 				s := State{Status: service.CoreStatus{ServiceUnit: "example.service", ServiceInstalled: status.installed, ServiceRunning: status.running}}
 				card, controls, _ := s.systemdPanel(width, 20)
@@ -490,12 +490,8 @@ func TestCoreServiceQuickMenuMatchesServiceStateAndWraps(t *testing.T) {
 				for _, control := range controls {
 					action := strings.TrimPrefix(control.action, "service:")
 					actions = append(actions, action)
-					label := action
-					if action == "install" && status.installed {
-						label = "reinstall"
-					}
 					cell := ansi.Cut(rows[control.y], control.x, control.x+control.width)
-					if got, want := strings.TrimSpace(cell), i18n.T("core.service.quick."+label); got != want {
+					if got, want := strings.TrimSpace(cell), i18n.T("core.service.quick."+action); got != want {
 						t.Fatalf("%s width %d: hitbox for %s found %q, want %q", language, width, action, got, want)
 					}
 				}

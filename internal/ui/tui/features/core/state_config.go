@@ -26,21 +26,18 @@ func (s State) hasServiceCard() bool {
 }
 
 func (s State) serviceQuickGroups() []serviceQuickGroup {
-	var groups []serviceQuickGroup
-	installation := []string{"install"}
-	if s.Status.ServiceInstalled {
-		lifecycle := []string{"start"}
-		if s.Status.ServiceRunning {
-			lifecycle = []string{"stop", "restart"}
-		}
-		groups = append(groups,
-			serviceQuickGroup{"runtime", lifecycle},
-			serviceQuickGroup{"autostart", []string{"enable", "boot", "disable"}},
-		)
-		installation = append(installation, "uninstall")
+	if !s.Status.ServiceInstalled {
+		return []serviceQuickGroup{{actions: []string{"install"}}}
 	}
-	groups = append(groups, serviceQuickGroup{"manage", installation})
-	return groups
+	lifecycle := []string{"start"}
+	if s.Status.ServiceRunning {
+		lifecycle = []string{"stop", "restart"}
+	}
+	return []serviceQuickGroup{
+		{"runtime", lifecycle},
+		{"autostart", []string{"enable", "boot", "disable"}},
+		{actions: []string{"uninstall"}},
+	}
 }
 
 func (s State) serviceQuickActions() []string {

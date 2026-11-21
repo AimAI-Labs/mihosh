@@ -394,16 +394,15 @@ func (s State) serviceQuickMenu(width int) ([]string, []releaseControl) {
 	x := 0
 	actionIdx := 0
 	for _, section := range groups {
-		title := i18n.T("core.service.group." + section.label)
+		var title string
+		if section.label != "" {
+			title = i18n.T("core.service.group." + section.label)
+		}
 		titleWidth := lipgloss.Width(title)
 		groupWidth := titleWidth
 		labels := make([]string, len(section.actions))
 		for i, action := range section.actions {
-			labelKey := action
-			if action == "install" && s.Status.ServiceInstalled {
-				labelKey = "reinstall"
-			}
-			labels[i] = " " + i18n.T("core.service.quick."+labelKey) + " "
+			labels[i] = " " + i18n.T("core.service.quick."+action) + " "
 			groupWidth += 1 + lipgloss.Width(labels[i])
 		}
 		const gap = "   "
@@ -420,7 +419,7 @@ func (s State) serviceQuickMenu(width int) ([]string, []releaseControl) {
 		for i, action := range section.actions {
 			label := labels[i]
 			btnW := lipgloss.Width(label)
-			if x+1+btnW > width {
+			if x > 0 && x+1+btnW > width {
 				rows = append(rows, line)
 				line, x = "", 0
 			}
