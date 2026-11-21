@@ -116,19 +116,26 @@ mihosh core network-recover --output json
 
 这些命令与 Core 的 `y` / `n` / `c` 共用实现，均支持 `--output plain|table|json`。开关保存期望设置；未运行时不会宣称已改变系统流量。TUN 变更先校验候选配置；运行中会受控重启，失败恢复旧配置与开关。下载代理、终端 `on/off`、系统代理和 TUN 各自独立。
 
-本轮 P2／P3 仅支持 Linux。系统代理使用 GNOME 的 GSettings，需要用户 D-Bus；其他桌面环境会在修改前拒绝。启用代理时先记录原值，关闭或拥有会话退出时，只恢复仍与本应用写入值一致的字段，保留期间用户另行修改的字段。
+这些托管网络操作当前仅支持 Linux。系统代理要求使用**托管 Core**，通过当前登录用户的 D-Bus 会话操作 GNOME GSettings；不支持外部 Core，也不会静默通过 `sudo` 提权。应在桌面用户会话中执行，不要在缺少该用户 D-Bus 环境的 root shell 中执行。其他桌面环境没有受支持的系统代理后端。启用代理时先记录原值，关闭或拥有会话退出时，只恢复仍与本应用写入值一致的字段，保留期间用户另行修改的字段。
 
-TUN 默认关闭。Linux 需要 `/dev/net/tun`、iproute2，且 **Mihosh 协调进程和恢复守护进程**需要 `CAP_NET_ADMIN`；不能只给内核可执行文件授权。对已安装的固定服务入口，可由管理员明确授权：
+TUN 默认关闭。Linux 需要 `/dev/net/tun`、iproute2，且 **Mihosh 协调进程和恢复守护进程**需要 `CAP_NET_ADMIN`；不能只给内核可执行文件授权。对已安装的固定服务入口，可由管理员授予推荐的能力：
 
 ```bash
 sudo setcap cap_net_admin,cap_net_raw+ep "$HOME/.mihosh/bin/mihosh"
+getcap "$HOME/.mihosh/bin/mihosh"
 ```
 
-前台模式应给实际运行的 Mihosh 可执行文件授权；更新或重新复制文件后需重新核对能力。不会静默提权。
+前台模式应给实际运行的 Mihosh 可执行文件授权；更新或重新复制文件后需重新核对能力。如果系统策略不允许 file capabilities，当前实现没有普通用户 TUN 的替代提权路径；此时可使用 [`mihosh activate` 与 `proxy`](./sysproxy) 中的终端代理。不会静默提权。
 
 托管 TUN 使用独立名称、路由表和规则区间，预先检查冲突。采用系统协议栈、自动路由和出口接口检测，不启用额外自动重定向或严格防火墙规则。DNS 不对外监听；保留已有 nameserver，缺少时生成 Cloudflare/阿里 DoH 与引导 DNS。系统 DNS 的接口配置随托管 TUN 一起恢复。
 
 修改前将恢复记录写入 `runtime/network-recovery.json`；TUN 切换还使用 `network-change.json` 恢复中断的配置变更。独立守护进程在拥有进程退出后恢复代理并清理本应用的 TUN 网络；systemd 模式将守护放入单独的临时用户服务单元。恢复失败保留记录供重试；`network-recover` 仅在运行锁证明没有活动拥有者时执行，不接管其他内核或清理其他接口。`core status` 显示运行方式、自动启动、期望的代理/TUN 开关和待恢复状态。
+
+### 平台限制
+
+- **Windows：** 托管 Core 的进程支持存在，但 Mihosh 的 `system-proxy` 和 `tun` 操作仅支持 Linux，不会修改 Windows 系统代理，也不会创建 Windows TUN 设备。请另行配置 Windows 代理或使用 Mihomo 自身的 TUN 能力。
+- **macOS 和其他非 Linux 系统：** Mihosh 没有系统代理或 TUN 主机后端；当前托管 Core 运行时实现仅覆盖 Linux 和 Windows。请使用外部控制器或应用级代理，不要按 Linux 命令启用这些托管操作。
+- **没有 TUN 权限时：** `mihosh activate bash` / `mihosh activate zsh` 配合 `mihosh proxy on` 只修改当前终端的代理环境，是无需特权的替代方案，不会接管全系统流量。
 
 ## 原生验收
 
