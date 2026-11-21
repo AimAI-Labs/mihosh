@@ -49,7 +49,7 @@ func (v *vimPreview) Run() error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 	vimrc := filepath.Join(dir, "onedark-pro.vim")
 	if err := os.WriteFile(vimrc, previewVimrc, 0600); err != nil {
 		return err

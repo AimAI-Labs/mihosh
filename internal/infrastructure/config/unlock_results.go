@@ -77,7 +77,7 @@ func readUnlockResults(path string) unlockResultsCache {
 	if err != nil {
 		return unlockResultsCache{}
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	var cache unlockResultsCache
 	if json.NewDecoder(io.LimitReader(file, 16<<10)).Decode(&cache) != nil {
 		return unlockResultsCache{}

@@ -571,9 +571,10 @@ func (s State) HandleMouseScroll(up bool, pageX, pageY, pageWidth, pageHeight in
 	state := s.ToPageState(pageWidth, pageHeight)
 	hit := ResolveMouseHit(state, pageX, pageY)
 	focus := s.MouseFocus
-	if hit.Target == MouseTargetGroup {
+	switch hit.Target {
+	case MouseTargetGroup:
 		focus = nodesMouseFocusGroup
-	} else if hit.Target == MouseTargetProxy {
+	case MouseTargetProxy:
 		focus = nodesMouseFocusProxy
 	}
 

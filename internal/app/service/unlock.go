@@ -94,7 +94,7 @@ func (c unlockClient) get(endpoint string) unlockResponse {
 	if err != nil {
 		return unlockResponse{}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if err != nil {
 		return unlockResponse{}

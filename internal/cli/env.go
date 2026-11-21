@@ -43,7 +43,9 @@ func newEnvCommand() *cobra.Command {
 				if err != nil {
 					return wrapConfigError(err)
 				}
-				fmt.Fprintln(cmd.ErrOrStderr(), i18n.Tf("core.shell.source_hint", service.ShellProxySourceCommand(startup)))
+				if _, err := fmt.Fprintln(cmd.ErrOrStderr(), i18n.Tf("core.shell.source_hint", service.ShellProxySourceCommand(startup))); err != nil {
+					return err
+				}
 			}
 			root, err := config.GetConfigDir()
 			if err != nil {

@@ -206,10 +206,6 @@ func (s *CoreService) forward(ctx context.Context, action, value string) (bool, 
 	return s.forwardControlRequest(ctx, coreControlRequest{Action: action, Version: value}, nil, nil)
 }
 
-func (s *CoreService) forwardControl(ctx context.Context, action, value string, activation *ActivateResult) (bool, error) {
-	return s.forwardControlRequest(ctx, coreControlRequest{Action: action, Version: value}, activation, nil)
-}
-
 func (s *CoreService) forwardControlRequest(ctx context.Context, request coreControlRequest, activation *ActivateResult, overrideRes *MihomoOverridesSaveResult) (bool, error) {
 	s.mu.Lock()
 	owned := s.process != nil || s.daemon
