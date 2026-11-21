@@ -8,8 +8,6 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	domainrules "github.com/AimAI-Labs/mihosh/internal/domain/rules"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
@@ -24,7 +22,7 @@ func FetchRules(client *api.Client) tea.Cmd {
 		}
 
 		// 从配置文件解析 no-resolve 信息（API 不返回此字段）
-		nrMap := ruleNoResolveFlags()
+		nrMap := service.RuleNoResolveFlags()
 		for i := range rules.Rules {
 			r := &rules.Rules[i]
 			key := normalizeRuleType(r.Type) + "," + r.Payload + "," + r.Proxy
@@ -33,21 +31,6 @@ func FetchRules(client *api.Client) tea.Cmd {
 
 		return messages.RulesMsg(rules.Rules)
 	})
-}
-
-func ruleNoResolveFlags() map[string]bool {
-	path, err := config.GetMihomoConfigPath()
-	if err == nil {
-		return config.ParseRulesNoResolve(path)
-	}
-	if errors.Is(err, config.ErrExternalConfig) {
-		if cfg, loadErr := config.Load(); loadErr == nil && cfg.ActiveSub != "" {
-			if generated, generateErr := profile.GenerateForUID(cfg.ActiveSub, ""); generateErr == nil {
-				return config.ParseRulesNoResolveYAML(generated.Data)
-			}
-		}
-	}
-	return nil
 }
 
 // normalizeRuleType 将 API 返回的规则类型标准化为配置文件格式（大写横杠分隔）。
@@ -59,7 +42,7 @@ func normalizeRuleType(apiType string) string {
 	return filterTypeName(apiType)
 }
 
-func (s State) applyRuleEdit(noticeKey string, edit profile.RuleEdit) tea.Cmd {
+func (s State) applyRuleEdit(noticeKey string, edit domainrules.Edit) tea.Cmd {
 	configSvc := s.configSvc
 	if configSvc == nil {
 		configSvc = service.NewConfigService()
@@ -68,7 +51,7 @@ func (s State) applyRuleEdit(noticeKey string, edit profile.RuleEdit) tea.Cmd {
 		result := configSvc.ApplyRuleEdit(context.Background(), s.coreSvc, s.client, edit)
 		err := result.Err
 		switch {
-		case errors.Is(err, profile.ErrRuleEditTarget):
+		case errors.Is(err, service.ErrRuleEditTarget):
 			err = errors.New(i18n.T("rules.write.not_found"))
 		case errors.Is(err, service.ErrRemoteRuleEditRequiresSubscription):
 			err = errors.New(i18n.T("rules.write.remote_needs_subscription"))

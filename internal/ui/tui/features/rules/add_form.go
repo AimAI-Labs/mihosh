@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -166,7 +166,7 @@ func newFormWithRule(configPath string, rule model.Rule, origIndex int, isEdit b
 	noRes.Prompt = ""
 	fields[addFieldNoResolve] = noRes
 
-	groups, nodes, _ := config.ExtractProxyPolicies(configPath)
+	groups, nodes, _ := service.ExtractProxyPolicies(configPath)
 	if len(groups) == 0 {
 		groups = []string{defaultProxyPolicy, "REJECT"}
 	}

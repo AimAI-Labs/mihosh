@@ -11,7 +11,27 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 )
+
+// LoadUnlockResults loads cached streaming/service unlock check results for the given proxy and controller.
+func LoadUnlockResults(proxyAddr string, client *api.Client) map[string]model.UnlockResult {
+	return config.LoadUnlockResults(unlockResultsScope(proxyAddr, client))
+}
+
+// SaveUnlockResults persists streaming/service unlock check results for the given proxy and controller.
+func SaveUnlockResults(proxyAddr string, client *api.Client, results map[string]model.UnlockResult) error {
+	return config.SaveUnlockResults(unlockResultsScope(proxyAddr, client), results)
+}
+
+func unlockResultsScope(proxyAddr string, client *api.Client) string {
+	var endpoint config.MihomoEndpoint
+	if client != nil {
+		endpoint = client.EndpointSnapshot()
+	}
+	return config.UnlockResultsScope(proxyAddr, endpoint)
+}
 
 const unlockTimeout = 15 * time.Second
 

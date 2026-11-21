@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
@@ -54,10 +54,7 @@ func (s State) openFileMenu() State {
 		return s
 	}
 	uid := s.subs[s.filteredIdx[s.selected]].UID
-	ignore := profile.DefaultFileDiffOptions
-	if cfg, err := config.Load(); err == nil && cfg.FileDiffOptions != nil {
-		ignore = *cfg.FileDiffOptions
-	}
+	ignore := service.LoadFileDiffOptions()
 	s.file = fileView{mode: fileMenu, uid: uid, request: s.file.request + 1, ignore: ignore}
 	return s
 }
@@ -81,20 +78,8 @@ func (s State) recomputeDiff() (State, tea.Cmd) {
 	s.file.request++
 	file := s.file
 	return s, func() tea.Msg {
-		result := messages.SubFileLoadedMsg{Request: file.request}
-		before, err := profile.ReadRawFile(file.uid)
-		if err != nil {
-			result.Err = err
-			return result
-		}
-		generated, err := profile.GenerateSourcePreview(before)
-		if err != nil {
-			result.Err = err
-			return result
-		}
-		result.Err = generated.MergeErr
-		result.Diff = profile.DiffFiles(string(before), string(generated.Data), file.ignore)
-		return result
+		diff, err := service.DiffRawWithPreview(file.uid, file.ignore)
+		return messages.SubFileLoadedMsg{Request: file.request, Diff: diff, Err: err}
 	}
 }
 
@@ -201,10 +186,7 @@ func (s State) clickFile(msg messages.PageMouseClickMsg) (State, tea.Cmd) {
 func (s State) toggleDiffOption(index int) (State, tea.Cmd) {
 	s.file.option = index
 	ignore := s.file.ignore ^ diffOptions[index].flag
-	if err := config.Update(func(cfg *config.Config) error {
-		cfg.FileDiffOptions = &ignore
-		return nil
-	}); err != nil {
+	if err := service.SaveFileDiffOptions(ignore); err != nil {
 		s.file.err = err
 		return s, nil
 	}

@@ -1,11 +1,10 @@
 package rules
 
 import (
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	domainrules "github.com/AimAI-Labs/mihosh/internal/domain/rules"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
-
-	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -61,7 +60,7 @@ func (s State) handleFormMode(msg tea.KeyMsg, isEdit bool) (State, tea.Cmd) {
 			s.addForm = addForm{}
 			s.editOriginIndex = 0
 			original := submit.editOrigin
-			return s, s.applyRuleEdit("rules.edit_toast", profile.RuleEdit{
+			return s, s.applyRuleEdit("rules.edit_toast", domainrules.Edit{
 				Match: originalRuleLine(original.ruleType, original.payload, original.proxy, original.noResolve),
 				Rule:  buildRuleLine(submit.currentType(), submit.fields[addFieldPayload].Value(), submit.currentProxy(), submit.noResolve),
 				Index: submit.resolveIndex(),
@@ -69,7 +68,7 @@ func (s State) handleFormMode(msg tea.KeyMsg, isEdit bool) (State, tea.Cmd) {
 		}
 		s.showAddForm = false
 		s.addForm = newAddForm(s.configPath)
-		return s, s.applyRuleEdit("rules.added_toast", profile.RuleEdit{
+		return s, s.applyRuleEdit("rules.added_toast", domainrules.Edit{
 			Rule:  buildRuleLine(submit.currentType(), submit.fields[addFieldPayload].Value(), submit.currentProxy(), submit.noResolve),
 			Index: submit.resolveIndex(),
 		})

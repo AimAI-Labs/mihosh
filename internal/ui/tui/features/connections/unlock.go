@@ -6,7 +6,6 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -37,7 +36,7 @@ type unlockState struct {
 
 func (s *State) openUnlock() {
 	if len(s.unlock.items) == 0 {
-		results := config.LoadUnlockResults(s.unlockScope())
+		results := service.LoadUnlockResults(s.proxyAddr, s.client)
 		for _, name := range service.UnlockServiceNames() {
 			s.unlock.items = append(s.unlock.items, unlockItem{name: name, result: results[name]})
 		}
@@ -166,25 +165,17 @@ func (s State) completeUnlock(msg messages.UnlockTestMsg) (State, tea.Cmd) {
 	item.checking, item.result = false, msg.Result
 	if !s.unlock.batch.Active() {
 		s.unlock.cancelChecks()
-		scope := s.unlockScope()
+		proxyAddr, client := s.proxyAddr, s.client
 		snapshot := make(map[string]model.UnlockResult, len(s.unlock.items))
 		for _, item := range s.unlock.items {
 			snapshot[item.name] = item.result
 		}
 		return s, func() tea.Msg {
-			if err := config.SaveUnlockResults(scope, snapshot); err != nil {
+			if err := service.SaveUnlockResults(proxyAddr, client, snapshot); err != nil {
 				return messages.NoticeMsg{Text: i18n.T("conns.unlock.cache_failed"), Detail: err.Error(), Level: messages.NoticeWarning}
 			}
 			return nil
 		}
 	}
 	return s.launchUnlock()
-}
-
-func (s State) unlockScope() string {
-	var endpoint config.MihomoEndpoint
-	if s.client != nil {
-		endpoint = s.client.EndpointSnapshot()
-	}
-	return config.UnlockResultsScope(s.proxyAddr, endpoint)
 }
