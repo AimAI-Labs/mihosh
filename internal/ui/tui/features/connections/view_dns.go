@@ -9,8 +9,9 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
-	"github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 type dnsTypeHit struct {
@@ -23,9 +24,9 @@ type dnsPopupLayout struct {
 }
 
 func (d dnsQueryView) popup(width, height int) (dialog.Dialog, dnsPopupLayout) {
-	panelWidth := max(36, min(96, width-4))
-	innerWidth := max(20, panelWidth-4)
-	viewportHeight := max(10, height-2)
+	panelWidth := max(24, min(96, width-4))
+	innerWidth := panelWidth - 4
+	viewportHeight := max(1, height-1)
 
 	t := theme.Current()
 	titleStyle := lipgloss.NewStyle().Foreground(theme.Resolve(t.Bright)).Bold(true)
@@ -96,38 +97,18 @@ func (d dnsQueryView) popup(width, height int) (dialog.Dialog, dnsPopupLayout) {
 		if d.resp.HasFakeIP() {
 			summary += "  " + warnBadge.Render(" "+i18n.T("conns.dns.fakeip_hit")+" ")
 		}
-		resultLines = append(resultLines, summary, "")
+		resultLines = append(resultLines, strings.Split(ansi.Wrap(summary, innerWidth, ""), "\n")...)
+		resultLines = append(resultLines, "")
 		if len(d.resp.Answer) == 0 {
 			resultLines = append(resultLines, dimStyle.Render(i18n.T("conns.dns.no_answers")))
 		} else {
-			header := fmt.Sprintf("%-24s %-6s %-6s %s",
-				i18n.T("conns.dns.col_name"),
-				i18n.T("conns.dns.col_type"),
-				i18n.T("conns.dns.col_ttl"),
-				i18n.T("conns.dns.col_data"),
-			)
-			resultLines = append(resultLines, primaryStyle.Render(common.TruncateDisplay(header, innerWidth)))
-			for _, ans := range d.resp.Answer {
-				typeName := model.DNSRecordTypeName(ans.Type)
-				tag := model.ClassifyDNSIP(ans.Data)
-				nameCol := common.TruncateDisplay(ans.Name, 24)
-				row := fmt.Sprintf("%-24s %-6s %-6s %s", nameCol, typeName, fmt.Sprintf("%ds", ans.TTL), ans.Data)
-				if tag != "" {
-					badge := " [" + tag + "]"
-					if tag == "fake-ip" {
-						row += " " + warnBadge.Render(" Fake-IP ")
-					} else {
-						row += errStyle.Render(badge)
-					}
-				}
-				resultLines = append(resultLines, common.TruncateDisplay(row, innerWidth))
-			}
+			resultLines = append(resultLines, dnsAnswerRows(d.resp.Answer, innerWidth, primaryStyle, warnBadge, errStyle)...)
 		}
 	default:
 		resultLines = append(resultLines, dimStyle.Render(i18n.T("conns.dns.empty_hint")))
 	}
 
-	maxResultLines := max(4, viewportHeight-len(body)-3)
+	maxResultLines := max(1, viewportHeight-len(body)-2)
 	scroll := d.scroll
 	maxScroll := max(0, len(resultLines)-maxResultLines)
 	if scroll > maxScroll {
@@ -141,6 +122,52 @@ func (d dnsQueryView) popup(width, height int) (dialog.Dialog, dnsPopupLayout) {
 
 	panel := common.RenderCard(panelWidth, t.Primary, body)
 	return dialog.New(panel, width, viewportHeight).Clipped(), dnsPopupLayout{typeHits: typeHits}
+}
+
+func dnsAnswerRows(answers []model.DNSAnswer, width int, headerStyle, fakeIPStyle, tagStyle lipgloss.Style) []string {
+	nameLabel, typeLabel := i18n.T("conns.dns.col_name"), i18n.T("conns.dns.col_type")
+	ttlLabel, dataLabel := i18n.T("conns.dns.col_ttl"), i18n.T("conns.dns.col_data")
+	nameWidth, typeWidth, ttlWidth := lipgloss.Width(nameLabel), lipgloss.Width(typeLabel), lipgloss.Width(ttlLabel)
+	for _, answer := range answers {
+		nameWidth = max(nameWidth, lipgloss.Width(answer.Name))
+		typeWidth = max(typeWidth, lipgloss.Width(model.DNSRecordTypeName(answer.Type)))
+		ttlWidth = max(ttlWidth, lipgloss.Width(fmt.Sprintf("%ds", answer.TTL)))
+	}
+	nameWidth = min(nameWidth, width/3)
+	prefixWidth := nameWidth + typeWidth + ttlWidth + 6
+	compact := width-prefixWidth < 16
+	prefix := func(name, recordType, ttl string) string {
+		return common.PadString(ansi.Truncate(name, nameWidth, "…"), nameWidth) + "  " +
+			common.PadString(recordType, typeWidth) + "  " + common.PadString(ttl, ttlWidth) + "  "
+	}
+	var rows []string
+	if !compact {
+		rows = append(rows, headerStyle.Render(prefix(nameLabel, typeLabel, ttlLabel)+dataLabel))
+	}
+	for _, answer := range answers {
+		recordType := model.DNSRecordTypeName(answer.Type)
+		ttl := fmt.Sprintf("%ds", answer.TTL)
+		data := answer.Data
+		switch tag := model.ClassifyDNSIP(data); tag {
+		case "fake-ip":
+			data += " " + fakeIPStyle.Render(" Fake-IP ")
+		case "":
+		default:
+			data += " " + tagStyle.Render("["+tag+"]")
+		}
+		left := prefix(answer.Name, recordType, ttl)
+		if compact {
+			rows = append(rows, strings.Split(ansi.Wrap(answer.Name, width, ""), "\n")...)
+			rows = append(rows, ansi.Truncate("  "+recordType+"  "+ttl, width, "…"))
+			left = "  "
+		}
+		indent := lipgloss.Width(left)
+		for _, value := range strings.Split(ansi.Wrap(data, width-indent, ""), "\n") {
+			rows = append(rows, left+value)
+			left = strings.Repeat(" ", indent)
+		}
+	}
+	return rows
 }
 
 func (s State) clickDNS(pageX, pageY, pageWidth, pageHeight int) (State, tea.Cmd) {

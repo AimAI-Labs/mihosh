@@ -8,6 +8,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
+	"github.com/mattn/go-runewidth"
 )
 
 func TestRenderDNSQueryResultFormats(t *testing.T) {
@@ -49,5 +50,28 @@ func TestRenderDNSQueryResultFormats(t *testing.T) {
 	}
 	if !strings.Contains(plainBuf.String(), "[Fake-IP]") || !strings.Contains(plainBuf.String(), "93.184.216.34") {
 		t.Fatalf("unexpected plain output:\n%s", plainBuf.String())
+	}
+}
+
+func TestDNSTableAlignsLocalizedColumns(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("zh-CN")
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	resp := &model.DNSQueryResponse{Answer: []model.DNSAnswer{
+		{Name: "节点.example.", Type: 1, TTL: 1, Data: "192.0.2.1"},
+		{Name: "other.example.", Type: 28, TTL: 1200, Data: "2001:db8::1"},
+	}}
+	var buf bytes.Buffer
+	if err := renderDNSQueryResult(&buf, "example.com", "A", resp, outputFormatTable); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(buf.String(), "\n")
+	dataX := runewidth.StringWidth(lines[1][:strings.Index(lines[1], i18n.T("conns.dns.col_data"))])
+	for i, answer := range resp.Answer {
+		line := lines[i+2]
+		at := strings.Index(line, answer.Data)
+		if at < 0 || runewidth.StringWidth(line[:at]) != dataX {
+			t.Fatalf("DNS result is not aligned with its heading: %q", lines)
+		}
 	}
 }

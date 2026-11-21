@@ -12,6 +12,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -83,5 +84,38 @@ func TestDNSQueryModalPrefillsSelectedHostQueriesAndDetectsFakeIP(t *testing.T) 
 	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	if s.dns.open || s.InputCapture().Active {
 		t.Fatal("expected Esc to close DNS modal")
+	}
+}
+
+func TestDNSAnswerColumnsAlignAndLongDataWraps(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	ipv6 := "2001:db8:ffff:ffff:ffff:ffff:ffff:ffff"
+	answers := []model.DNSAnswer{
+		{Name: "节点.example.", Type: 1, TTL: 30, Data: "198.18.0.42"},
+		{Name: "other.example.", Type: 28, TTL: 120000, Data: ipv6},
+	}
+	style := lipgloss.NewStyle()
+	for _, language := range []string{"en-US", "zh-CN"} {
+		i18n.SetLanguageOverride(language)
+		rows := dnsAnswerRows(answers, 88, style, style, style)
+		dataX := lipgloss.Width(rows[0][:strings.Index(rows[0], i18n.T("conns.dns.col_data"))])
+		for i, answer := range answers {
+			row := rows[i+1]
+			at := strings.Index(row, answer.Data)
+			if at < 0 || lipgloss.Width(row[:at]) != dataX {
+				t.Fatalf("%s: answer is not aligned with DATA: %q", language, rows)
+			}
+		}
+		rows = dnsAnswerRows(answers, 25, style, style, style)
+		for _, row := range rows {
+			if lipgloss.Width(row) > 25 {
+				t.Fatalf("%s: narrow result overflowed: %q", language, row)
+			}
+		}
+		show := strings.Join(strings.Fields(strings.Join(rows, "\n")), "")
+		if !strings.Contains(show, ipv6) || !strings.Contains(show, "Fake-IP") {
+			t.Fatalf("%s: narrow result lost data or classification: %q", language, rows)
+		}
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
+	"github.com/mattn/go-runewidth"
 	"github.com/spf13/cobra"
 )
 
@@ -38,8 +39,8 @@ func newDNSCommand() *cobra.Command {
 	var recordType string
 	var outputRaw string
 	queryCmd := &cobra.Command{
-		Use:   "query <domain>",
-		Args:  cobra.ExactArgs(1),
+		Use:     "query <domain>",
+		Args:    cobra.ExactArgs(1),
 		Example: "  mihosh dns query example.com\n  mihosh dns query example.com --type AAAA --output table\n  mihosh dns query example.com --type A --output json",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			format, err := parseOutputFormat(outputRaw)
@@ -121,22 +122,35 @@ func renderDNSQueryResult(w io.Writer, domain, recordType string, resp *model.DN
 			_, _ = fmt.Fprintln(w, i18n.T("conns.dns.no_answers"))
 			return nil
 		}
-		tw := newTabWriter(w)
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+		rows := [][5]string{{
 			i18n.T("conns.dns.col_name"),
 			i18n.T("conns.dns.col_type"),
 			i18n.T("conns.dns.col_ttl"),
 			i18n.T("conns.dns.col_data"),
 			i18n.T("conns.dns.col_tag"),
-		)
+		}}
 		for _, a := range payload.Answers {
 			tag := a.Tag
 			if tag == "" {
 				tag = "-"
 			}
-			_, _ = fmt.Fprintf(tw, "%s\t%s\t%ds\t%s\t%s\n", a.Name, a.TypeName, a.TTL, a.Data, tag)
+			rows = append(rows, [5]string{a.Name, a.TypeName, fmt.Sprintf("%ds", a.TTL), a.Data, tag})
 		}
-		return tw.Flush()
+		var widths [4]int
+		for _, row := range rows {
+			for i := range widths {
+				widths[i] = max(widths[i], runewidth.StringWidth(row[i]))
+			}
+		}
+		for _, row := range rows {
+			for i := range widths {
+				row[i] = padDisplayRight(row[i], widths[i])
+			}
+			if _, err := fmt.Fprintln(w, strings.Join(row[:], "  ")); err != nil {
+				return err
+			}
+		}
+		return nil
 	case outputFormatPlain:
 		header := fmt.Sprintf("%s (%s) %s", payload.Domain, payload.RecordType, payload.StatusName)
 		if payload.HasFakeIP {
