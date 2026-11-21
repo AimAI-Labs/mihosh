@@ -26,40 +26,40 @@ type State struct {
 	pendingServiceFocus bool
 	serviceActionIdx    int
 	svc                 *service.CoreService
-	Status            service.CoreStatus
-	Release           coreinfra.Release
-	Progress          coreinfra.Progress
-	Err               error
-	Busy              bool
-	Editing           bool
-	form              string
-	formErr           error
-	args              []string
-	fields            []textinput.Model
-	focus             int
-	choice            int
-	formSelection     int
-	formScroll        int
-	dialogScroll      int
-	formFollowFocus   bool
-	viewWidth         int
-	viewHeight        int
-	scroll            int
-	tab               int
-	selected          int
-	followSelection   bool
-	connected         bool
-	externalVersion   string
-	connectionChecked bool
-	task              string
-	cancel            context.CancelFunc
-	updates           chan coreinfra.Progress
-	generation        uint64
-	catalog           releaseCatalog
-	geoFiles          []service.GeoDataFile
-	geoErr            error
-	shellPath         string
-	editor            preferences.State
+	Status              service.CoreStatus
+	Release             coreinfra.Release
+	Progress            coreinfra.Progress
+	Err                 error
+	Busy                bool
+	Editing             bool
+	form                string
+	formErr             error
+	args                []string
+	fields              []textinput.Model
+	focus               int
+	choice              int
+	formSelection       int
+	formScroll          int
+	dialogScroll        int
+	formFollowFocus     bool
+	viewWidth           int
+	viewHeight          int
+	scroll              int
+	tab                 int
+	selected            int
+	followSelection     bool
+	connected           bool
+	externalVersion     string
+	connectionChecked   bool
+	task                string
+	cancel              context.CancelFunc
+	updates             chan coreinfra.Progress
+	generation          uint64
+	catalog             releaseCatalog
+	geoFiles            []service.GeoDataFile
+	geoErr              error
+	shellPath           string
+	editor              preferences.State
 }
 
 func NewState(svc *service.CoreService, configSvc *service.ConfigService, client *api.Client) State {

@@ -87,11 +87,11 @@ func (f addForm) fieldCount() int {
 	return addFieldLocalN
 }
 
-func (f addForm) isNameField() bool    { return f.fieldCursor == addFieldName }
-func (f addForm) isKindField() bool    { return f.fieldCursor == addFieldKind }
-func (f addForm) isSrcField() bool     { return f.fieldCursor == addFieldSrc }
-func (f addForm) isProxyField() bool   { return f.kindRemote && f.fieldCursor == addFieldProxy }
-func (f addForm) isUAField() bool      { return f.kindRemote && f.fieldCursor == addFieldUA }
+func (f addForm) isNameField() bool     { return f.fieldCursor == addFieldName }
+func (f addForm) isKindField() bool     { return f.fieldCursor == addFieldKind }
+func (f addForm) isSrcField() bool      { return f.fieldCursor == addFieldSrc }
+func (f addForm) isProxyField() bool    { return f.kindRemote && f.fieldCursor == addFieldProxy }
+func (f addForm) isUAField() bool       { return f.kindRemote && f.fieldCursor == addFieldUA }
 func (f addForm) isSkipTLSField() bool  { return f.kindRemote && f.fieldCursor == addFieldSkipTLS }
 func (f addForm) isIntervalField() bool { return f.kindRemote && f.fieldCursor == addFieldInterval }
 
