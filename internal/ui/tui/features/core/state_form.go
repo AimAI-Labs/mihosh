@@ -101,10 +101,11 @@ func (s State) editForm(kind string) (State, tea.Cmd) {
 
 func isChoiceForm(kind string) bool {
 	switch kind {
-	case "configure", "recover", "geo-update", "basic-config", "stop", "restart", "api:restart", "api:update_geo":
+	case "configure", "recover", "geo-update", "basic-config", "stop", "restart":
 		return true
+	default:
+		return strings.HasPrefix(kind, "api:")
 	}
-	return false
 }
 
 func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {

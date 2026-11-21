@@ -150,11 +150,11 @@ func (s State) choose(action string) (State, tea.Cmd) {
 		return s.toggleSwitch(action)
 	case "service":
 		return s.openServiceStatus()
-	case "network", "version", "import", "external", "details", "configure", "recover", "basic-config", "stop", "restart", "api:restart", "api:update_geo":
+	case "network", "version", "import", "external", "details", "configure", "recover", "basic-config", "stop", "restart":
 		return s.editForm(action)
 	default:
-		if id, ok := strings.CutPrefix(action, "api:"); ok {
-			return s.runCoreAPIAction(id)
+		if strings.HasPrefix(action, "api:") {
+			return s.editForm(action)
 		}
 		return s.begin(action)
 	}

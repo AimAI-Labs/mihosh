@@ -411,3 +411,37 @@ func TestStopAndRestartShortcutsRequireConfirmation(t *testing.T) {
 		})
 	}
 }
+
+func TestMaintenanceAPIActionsRequireConfirmation(t *testing.T) {
+	i18n.Init()
+	for _, mode := range []string{"managed", "external"} {
+		initial := State{tab: 2, connected: true, Status: service.CoreStatus{Mode: mode}}
+		for index, item := range initial.actions() {
+			id, ok := strings.CutPrefix(item.action, "api:")
+			if !ok {
+				continue
+			}
+			t.Run(mode+"/"+id, func(t *testing.T) {
+				s := initial
+				s.selected = index
+				s, cmd := s.Update(coreKey("enter"))
+				if !s.Editing || s.form != item.action || cmd != nil {
+					t.Fatal("maintenance action did not wait for confirmation")
+				}
+				desc := i18n.T("core.desc." + id)
+				if strings.HasPrefix(desc, "core.desc.") || !strings.Contains(ansi.Strip(s.choiceLayout(120).content), desc) {
+					t.Fatalf("missing localized confirmation for %s", id)
+				}
+				s, cmd = s.Update(coreKey("esc"))
+				if s.Editing || cmd != nil || s.selected != index {
+					t.Fatal("cancelling did not return to the selected action")
+				}
+				s, _ = s.Update(coreKey("enter"))
+				s, cmd = s.Update(coreKey("enter"))
+				if s.Editing || cmd == nil {
+					t.Fatal("confirming did not queue the API action")
+				}
+			})
+		}
+	}
+}
