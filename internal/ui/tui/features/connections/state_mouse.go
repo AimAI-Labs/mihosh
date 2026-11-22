@@ -17,6 +17,9 @@ func (s State) HandleMouseLeft(
 	if s.unlock.open {
 		return s.clickUnlock(pageX, pageY, pageWidth, pageHeight)
 	}
+	if s.currentIP.modalOpen {
+		return s.clickCurrentIPModal(pageX, pageY, pageWidth, pageHeight)
+	}
 	chartData := s.chartData
 	timeout := s.timeout
 
@@ -106,6 +109,12 @@ func (s State) HandleMouseLeft(
 	case MouseTargetIPRefresh:
 		return s.RefreshCurrentIP()
 
+	case MouseTargetIPDetail:
+		s.currentIP.width = pageWidth
+		s.currentIP.height = pageHeight
+		s.openCurrentIPModal()
+		return s, nil
+
 	case MouseTargetViewActive:
 		s.setConnViewMode(ConnViewActive)
 		return s, nil
@@ -184,6 +193,9 @@ func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight in
 		}
 		s.unlock.move(delta)
 		return s, nil
+	}
+	if s.currentIP.modalOpen {
+		return s.scrollCurrentIPModal(up, mainWidth, mainHeight), nil
 	}
 	if s.connDetailMode {
 		layout := layoutConnectionDetail(s.ToPageState(s.chartData, mainWidth, mainHeight))

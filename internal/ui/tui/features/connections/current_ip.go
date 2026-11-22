@@ -5,8 +5,10 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -16,15 +18,19 @@ const (
 )
 
 type currentIPState struct {
-	info      *model.IPInfo
-	loading   bool
-	err       string
-	masked    bool
-	countdown int
-	fetched   bool
-	dirty     bool
-	requestID uint64
-	cancel    context.CancelFunc
+	info        *model.IPInfo
+	loading     bool
+	err         string
+	masked      bool
+	countdown   int
+	fetched     bool
+	dirty       bool
+	requestID   uint64
+	cancel      context.CancelFunc
+	modalOpen   bool
+	modalScroll int
+	width       int
+	height      int
 }
 
 func (c *currentIPState) cancelFetch() {
@@ -147,4 +153,79 @@ func (s State) currentIPBarState() components.CurrentIPBarState {
 		Masked:    s.currentIP.masked,
 		Countdown: s.currentIP.countdown,
 	}
+}
+
+// CurrentIPModalOpen reports whether the current IP info popup dialog is active.
+func (s State) CurrentIPModalOpen() bool {
+	return s.currentIP.modalOpen
+}
+
+func (s *State) openCurrentIPModal() {
+	s.currentIP.modalOpen = true
+	s.currentIP.modalScroll = 0
+}
+
+func (s *State) closeCurrentIPModal() {
+	s.currentIP.modalOpen = false
+	s.currentIP.modalScroll = 0
+}
+
+func (s State) handleCurrentIPModalKey(msg tea.KeyMsg) (State, tea.Cmd) {
+	switch {
+	case key.Matches(msg, common.Keys.Escape), key.Matches(msg, common.Keys.Enter), msg.String() == "q", msg.String() == "I":
+		s.closeCurrentIPModal()
+		return s, nil
+	case msg.String() == "i":
+		return s.ToggleCurrentIPMask(), nil
+	case msg.String() == "r":
+		return s.RefreshCurrentIP()
+	case key.Matches(msg, common.Keys.Up):
+		return s.scrollCurrentIPModal(true, s.currentIP.width, s.currentIP.height), nil
+	case key.Matches(msg, common.Keys.Down):
+		return s.scrollCurrentIPModal(false, s.currentIP.width, s.currentIP.height), nil
+	}
+	return s, nil
+}
+
+func (s State) clickCurrentIPModal(pageX, pageY, pageWidth, pageHeight int) (State, tea.Cmd) {
+	s.currentIP.width = pageWidth
+	s.currentIP.height = pageHeight
+	layout := components.LayoutCurrentIPModal(s.currentIPBarState(), pageWidth, pageHeight, s.currentIP.modalScroll)
+	left, top, right, bottom := layout.Dialog.Bounds()
+	if pageX < left || pageX >= right || pageY < top || pageY >= bottom {
+		s.closeCurrentIPModal()
+		return s, nil
+	}
+	localX, localY := pageX-left, pageY-top
+	if layout.RefreshX >= 0 && localY == layout.RefreshY &&
+		localX >= layout.RefreshX && localX < layout.RefreshX+layout.RefreshWidth {
+		return s.RefreshCurrentIP()
+	}
+	if layout.MaskX >= 0 && localY == layout.MaskY &&
+		localX >= layout.MaskX && localX < layout.MaskX+layout.MaskWidth {
+		return s.ToggleCurrentIPMask(), nil
+	}
+	return s, nil
+}
+
+func (s State) scrollCurrentIPModal(up bool, pageWidth, pageHeight int) State {
+	if pageWidth > 0 && pageHeight > 0 {
+		s.currentIP.width = pageWidth
+		s.currentIP.height = pageHeight
+	}
+	if up {
+		if s.currentIP.modalScroll > 0 {
+			s.currentIP.modalScroll--
+		}
+		return s
+	}
+	if s.currentIP.width > 0 && s.currentIP.height > 0 {
+		layout := components.LayoutCurrentIPModal(s.currentIPBarState(), s.currentIP.width, s.currentIP.height, s.currentIP.modalScroll)
+		if s.currentIP.modalScroll < layout.MaxScroll {
+			s.currentIP.modalScroll++
+		}
+		return s
+	}
+	s.currentIP.modalScroll++
+	return s
 }

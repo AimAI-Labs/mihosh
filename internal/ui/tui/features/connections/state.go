@@ -242,38 +242,40 @@ func (s State) ToPageState(chartData *model.ChartData, width, height int) PageSt
 	}
 
 	return PageState{
-		Connections:        s.visibleConnections(),
-		Width:              width,
-		Height:             height,
-		SelectedIndex:      s.filterList.Cursor,
-		ScrollTop:          s.filterList.ScrollTop,
-		FilterText:         s.filterList.FilterValue(),
-		FilterInput:        s.filterList.FilterView(),
-		FilterMode:         s.filterList.FilterMode(),
-		DetailMode:         s.connDetailMode,
-		SelectedConnection: s.connDetailSnapshot,
-		IPInfo:             s.connIPInfo,
-		DetailLeftScroll:   s.connDetailLeftPanel.ScrollTop,
-		DetailRightScroll:  s.connDetailRightPanel.ScrollTop,
-		DetailFocusPanel:   s.connDetailFocusPanel,
-		ChartData:          chartData,
-		ViewMode:           s.connViewMode,
-		ClosedConnections:  s.visibleClosedConnections(),
-		SiteTests:          s.siteTests,
-		SelectedSiteTest:   s.selectedSiteTest,
-		TopNItems:          topNItems,
-		TopNModalMode:      s.topNModalMode,
-		TopNModalItems:     topNModalItems,
-		TopNModalScroll:    s.topNModalPanel.ScrollTop,
-		InlineMode:         s.inlineDetailMode,
-		InlineFocused:      s.inlineDetailFocused,
-		InlineScroll:       s.inlineDetailPanel.ScrollTop,
-		Paused:             s.paused,
-		PausedUpdates:      s.pausedUpdates,
-		Query:              s.currentQuery(),
-		Unlock:             s.unlock.unlockView,
-		DNS:                s.dns,
-		CurrentIP:          s.currentIPBarState(),
+		Connections:          s.visibleConnections(),
+		Width:                width,
+		Height:               height,
+		SelectedIndex:        s.filterList.Cursor,
+		ScrollTop:            s.filterList.ScrollTop,
+		FilterText:           s.filterList.FilterValue(),
+		FilterInput:          s.filterList.FilterView(),
+		FilterMode:           s.filterList.FilterMode(),
+		DetailMode:           s.connDetailMode,
+		SelectedConnection:   s.connDetailSnapshot,
+		IPInfo:               s.connIPInfo,
+		DetailLeftScroll:     s.connDetailLeftPanel.ScrollTop,
+		DetailRightScroll:    s.connDetailRightPanel.ScrollTop,
+		DetailFocusPanel:     s.connDetailFocusPanel,
+		ChartData:            chartData,
+		ViewMode:             s.connViewMode,
+		ClosedConnections:    s.visibleClosedConnections(),
+		SiteTests:            s.siteTests,
+		SelectedSiteTest:     s.selectedSiteTest,
+		TopNItems:            topNItems,
+		TopNModalMode:        s.topNModalMode,
+		TopNModalItems:       topNModalItems,
+		TopNModalScroll:      s.topNModalPanel.ScrollTop,
+		InlineMode:           s.inlineDetailMode,
+		InlineFocused:        s.inlineDetailFocused,
+		InlineScroll:         s.inlineDetailPanel.ScrollTop,
+		Paused:               s.paused,
+		PausedUpdates:        s.pausedUpdates,
+		Query:                s.currentQuery(),
+		Unlock:               s.unlock.unlockView,
+		DNS:                  s.dns,
+		CurrentIP:            s.currentIPBarState(),
+		CurrentIPModalOpen:   s.currentIP.modalOpen,
+		CurrentIPModalScroll: s.currentIP.modalScroll,
 	}
 }
 
@@ -307,6 +309,8 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		return s.tickCurrentIP()
 	case messages.PageResizeMsg:
 		s.unlock.width = msg.Width
+		s.currentIP.width = msg.Width
+		s.currentIP.height = msg.Height
 		return s, nil
 	case messages.PageMouseScrollMsg:
 		return s.HandleMouseScroll(msg.Up, msg.X, msg.Y, msg.Width, msg.Height)
@@ -318,6 +322,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		}
 		if s.unlock.open {
 			return s.handleUnlockKey(msg)
+		}
+		if s.currentIP.modalOpen {
+			return s.handleCurrentIPModalKey(msg)
 		}
 		// 继续处理 KeyMsg
 		if s.connDetailMode {
@@ -383,11 +390,13 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			return s, nil
 		}
 
-		// 流量监控 tab：响应站点测速、选择和 IP 隐显切换
+		// 流量监控 tab：响应站点测速、选择和 IP 隐显/弹窗切换
 		if s.connViewMode == ConnViewTraffic {
 			switch {
 			case msg.String() == "i":
 				s = s.ToggleCurrentIPMask()
+			case msg.String() == "I":
+				s.openCurrentIPModal()
 			case msg.String() == "s":
 				return s.triggerSiteTestByIndex(s.selectedSiteTest, s.timeout)
 			case msg.String() == "S":
@@ -605,7 +614,7 @@ func (s State) findConnectionByName(name string) *model.Connection {
 // InputCapture declares which input belongs to the current page mode.
 func (s State) InputCapture() common.InputCapture {
 	return common.InputCapture{
-		Active:    s.FilterMode() || s.connDetailMode || s.topNModalMode || s.unlock.open || s.dns.open,
+		Active:    s.FilterMode() || s.connDetailMode || s.topNModalMode || s.unlock.open || s.dns.open || s.currentIP.modalOpen,
 		Help:      s.dns.open,
 		Interrupt: s.FilterMode() || s.dns.open,
 	}
