@@ -193,6 +193,13 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 			m.publishNotice(i18n.Tf("conns.close_matched_done", msg.Closed), messages.NoticeSuccess)
 		}
 
+	case messages.PlaceholderTickMsg:
+		if !m.coreUnavailable() {
+			return m, nil
+		}
+		m.placeholderState = m.placeholderState.Advance()
+		return m, placeholderTick()
+
 	case messages.ConnTickMsg:
 		if m.currentPage == layout.PageConnections {
 			var cmd tea.Cmd

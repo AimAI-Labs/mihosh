@@ -44,7 +44,7 @@ func (m Model) applyCoreEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 			if !msg.KeepPage {
 				m.currentPage = layout.PageCore
 			}
-			return m, nil, true
+			return m, m.placeholderTickCmd(), true
 		}
 		var stream tea.Cmd
 		if !m.wsStarted {

@@ -122,18 +122,18 @@ func (m *Model) onPageChange() tea.Cmd {
 		m.connsState, ipCmd = m.connsState.EnsureCurrentIP()
 		if cmd != nil {
 			m.connsState = m.connsState.ResetPrevConnIDs()
-			return tea.Batch(cmd, ipCmd, connTick())
+			cmd = tea.Batch(cmd, connTick())
+		} else if ipCmd != nil {
+			cmd = connTick()
 		}
-		if ipCmd != nil {
-			return tea.Batch(ipCmd, connTick())
-		}
+		cmd = tea.Batch(cmd, ipCmd)
 	case layout.PageLogs:
-		return logsTick()
+		cmd = tea.Batch(cmd, logsTick())
 	case layout.PageSub:
 		width, height := m.getPageSize()
 		m.subState, _ = m.subState.Update(messages.PageResizeMsg{Width: width, Height: height})
 	}
-	return cmd
+	return tea.Batch(cmd, m.placeholderTickCmd())
 }
 
 func (m *Model) refreshMenu() tea.Cmd {
@@ -189,6 +189,10 @@ func (m *Model) onAppQuit() {
 
 // refreshCurrentPage 刷新当前页面
 func (m *Model) refreshCurrentPage() tea.Cmd {
+	if m.coreUnavailable() {
+		// 占位屏上刷新即重新检测内核，连接成功后占位屏会自动消失。
+		return tea.Batch(m.checkCoreConnection(true), m.placeholderTickCmd())
+	}
 	switch m.currentPage {
 	case layout.PageCore:
 		var cmd tea.Cmd

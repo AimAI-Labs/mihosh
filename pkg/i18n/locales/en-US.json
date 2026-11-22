@@ -1031,6 +1031,10 @@
   "guide.btn_edit": "Open Core",
   "guide.btn_retry": "[r] Retry",
   "guide.btn_close": "[Esc] Dismiss",
+
+  "placeholder.title": "Mihomo core not connected",
+  "placeholder.reason": "Nodes, connections, logs, rules and subscriptions all read data from the core, so they are unavailable while it stays disconnected.",
+  "placeholder.hint": "Start or connect the core on the Core page, then press r to re-check; this page recovers automatically once connected.",
   "menu.core": "Core",
   "title.core": "Core",
   "core.heading": "Mihomo Core",

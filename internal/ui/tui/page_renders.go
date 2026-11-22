@@ -6,6 +6,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/notice"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/placeholder"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/logs"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
@@ -28,23 +29,25 @@ func (m *Model) mainPageLayout() mainPageLayout {
 	height := max(m.height-pageTop-notice.Height-common.StatusBarHeight, common.MinContentHeight)
 	firstWidth := width - 1
 	var hints []common.InlineHelpHint
-	switch m.currentPage {
-	case layout.PageNodes:
-		hints = m.nodesState.InlineHelpHints()
-		firstWidth = m.nodesState.InlineHelpFirstWidth(width)
-	case layout.PageConnections:
-		hints = m.connsState.InlineHelpHints(width)
-	case layout.PageLogs:
-		hints = m.logsState.InlineHelpHints()
-	case layout.PageRules:
-		hints = m.rulesState.InlineHelpHints()
-	case layout.PageSub:
-		hints = m.subState.InlineHelpHints(width)
-	case layout.PageSettings:
-		hints = m.settingsState.InlineHelpHints()
-	case layout.PageCore:
-		hints = m.coreState.InlineHelpHints()
-		firstWidth = m.coreState.InlineHelpFirstWidth(width)
+	if !m.coreUnavailable() {
+		switch m.currentPage {
+		case layout.PageNodes:
+			hints = m.nodesState.InlineHelpHints()
+			firstWidth = m.nodesState.InlineHelpFirstWidth(width)
+		case layout.PageConnections:
+			hints = m.connsState.InlineHelpHints(width)
+		case layout.PageLogs:
+			hints = m.logsState.InlineHelpHints()
+		case layout.PageRules:
+			hints = m.rulesState.InlineHelpHints()
+		case layout.PageSub:
+			hints = m.subState.InlineHelpHints(width)
+		case layout.PageSettings:
+			hints = m.settingsState.InlineHelpHints()
+		case layout.PageCore:
+			hints = m.coreState.InlineHelpHints()
+			firstWidth = m.coreState.InlineHelpFirstWidth(width)
+		}
 	}
 	rows := wrapPageHelp(hints, width-1, firstWidth)
 	if len(rows) > height-common.MinContentHeight+1 {
@@ -98,6 +101,9 @@ func (m *Model) getPageSize() (pageWidth, pageHeight int) {
 }
 
 func (m *Model) renderPage(width, height int) string {
+	if m.coreUnavailable() {
+		return placeholder.Render(width, height, m.placeholderState.Frame())
+	}
 	switch m.currentPage {
 	case layout.PageNodes:
 		return nodes.RenderNodesPage(m.nodesState.ToPageState(width, height))
