@@ -1,66 +1,84 @@
-# AGENTS.md
+# AGENTS.md — Mihosh
 
-> Mihosh (基于 Go 1.25 的 Mihomo TUI/CLI 客户端)
-> 第一原则 (Fact-Based)：行动前必须阅读当前实际代码与测试，绝不依赖过期文档或臆测。
+> Mihosh 是基于 Go 1.25 的 Mihomo TUI/CLI 管理工具。
+> **首要原则：代码与测试是事实来源。** 执行任务前检查当前工作树及相关实现；文档和本文件中的路径、符号、数值可能随版本变化，不得以记忆代替验证。
 
-## 0. 项目规约
-- 规则一：先想清楚再动手。不许偷偷做假设，歧义必问，提倡最简方案。
-- 规则二：简洁至上。不写投机性功能，不做过度抽象。
-- 规则三：精准手术式修改。只动必须动的地方，遵循现有风格。
+## 1. 工作原则与优先级
 
-## 1. 技术栈与常用命令
-- **栈**: Go 1.25.0, Bubble Tea v1.3, Bubbles, Lipgloss, cobra, viper, gorilla/websocket, ntcharts, bubblezone, selfupdate.
-- **环境**：执行命令前必须判断系统类型（Windows或Linux），使用兼容的命令执行。（win必须使用pwsh.exe前缀执行命令）
-- **构建**：项目使用了mise工具。
-- **构建/测试资源控制（尤其 Linux）**：执行前必须检查可用内存、CPU 负载及已有构建/测试进程；高负载检查默认串行，避免构建、测试和类型检查同时运行。根据实际资源限制并发、worker 数量及进程内存，并确认限制对子进程生效；内存不足或 CPU 持续过载时先停止并调整。完成或中断后清理本次启动的进程，并恢复验证期间临时修改的文件。
-- **命令**: 
-  > win下禁止使用类似`2>nul`命令，以防生成nul等保留设备名的文件
-  - `mise exec go -- go test ./...` (涉及渲染及逻辑时必须跑测试，不依赖真实服务端环境)
-  - `mise exec go -- go build -o mihosh .`（强制，构建后会自动杀死进程并重新运行）
-- **构建后**：
-  - win：执行`.\deploy.ps1`
-  - linux：打包对应的可执行的mihosh文件，使用rsync上传到测试机的家目录下
+1. **先理解后修改（Think Before Coding）**：明确目标、受影响模块、现有实现与完成标准。区分已验证事实和推断；仅当歧义会改变行为、破坏兼容性或引入风险时提问，其他细节按现有约定作最小合理决策并说明。
+2. **最小可行实现（Simplicity First）**：优先复用现有代码，不增加投机性功能、无关依赖、层次或通用框架；避免为了小改动扩大设计。
+3. **精准修改（Surgical Changes）**：只更改任务所需的文件与行为；不顺手格式化、重命名或重构无关代码；保留现有公开接口与用户体验，除非任务明确要求改变。
+4. **以验证为完成标准（Goal-Driven Execution）**：先确定成功条件，再进行有针对性的测试；无法执行的检查须说明原因，不得将未经执行的测试描述为已通过。
+5. **遵守工作树边界**：先检查 `git status`；保留所有既有未提交改动。不要覆盖他人的变更、修改无关文件或在失败时使用破坏性 Git 命令。
 
-## 2. 架构约定
-- **CLI (`internal/cli`)**: 新增命令须支持 `--output plain|table|json`，以便脚本化。
-- **TUI (`internal/ui/tui`)**: Feature-Sliced 结构；更新拆分为 `update.go`(路由分发)、`update_keys.go`(键盘)、`update_mouse.go`(鼠标)、`update_ws.go`(WebSocket 状态)。
-- **主题 (`internal/ui/theme`)**: 多主题引擎（tokyo-night / catppuccin / gruvbox / nord / dracula）；颜色统一通过 `theme.Current()` 获取，禁止硬编码色值。
-- **服务 (`internal/app/service`)**: 业务逻辑与 API 调用封装（ProxyService / ConnectionService / ConfigService / ProfileService / IPResolver / Updater）。
-- **订阅 (`internal/infrastructure/profile`)**: 订阅的拉取、转换、合并、备份逻辑；`profile.Profile` 为订阅元数据结构。
-- **配置 (`internal/infrastructure/config/types.go`)**: `language` 切换需刷新 i18n/快捷键；连接信息由 mihomo 配置文件解析；Mihomo 配置修改后会热重载。
-- **国际化 (`pkg/i18n/locales/*.json`)**: 修改 UI 文案必须同时更新 `zh-CN` 与 `en-US`。
+## 2. 项目结构与边界
 
-## 3. TUI 状态与通信规范 (严格遵守)
-- **主 Model (`tui/model.go`)**: **仅限**存放基础设施、全局路由(PageType/PageCount)、共享数据(`ChartData`)、全局错误与 WS 生命周期。
-- **页面 State (`features/<page>/state.go`)**: **绝对禁止**将页面局部状态放入主 Model。各页面状态严格封装于自身目录。复杂页面已拆分为 `state_mouse.go`、`state_filter.go`、`state_form.go` 等子文件。
-- **消息定义 (`tui/messages/events.go`)**: 所有 TUI 消息必须集中在此文件定义，载荷极简。跨页通信必须依赖 `tea.Msg`，禁止直接篡改内部字段。
-- **渲染交互**:
-  - 布局尺寸：宽窄屏通过 `width` 参数动态计算面板比例（≥100 列宽屏双面板 43%/57%，＜100 列窄屏垂直堆叠，卡片除外）。
-  - 鼠标坐标：新增鼠标交互优先复用 `resolveMainPageMouseHit`（位于 `update_mouse.go`）。
-  - 弹窗拦截：弹窗（如详情）激活时应拦截底层按键，退出时需清理状态。
+- **工具链**：以 `mise.toml` 和 `go.mod` 为准（当前为 Go 1.25.0）。主要使用 Bubble Tea、Bubbles、Lip Gloss、Cobra、Viper 和 Gorilla WebSocket；不要在规则中硬编码依赖版本。
+- **CLI — `internal/cli/`**：负责命令解析与交互；具有查询/展示结果的命令应遵循现有 `--output plain|table|json` 惯例。纯动作命令无需为了统一而制造无意义的输出模式。
+- **领域 — `internal/domain/model/`**：存放共享领域模型，避免引入 UI 或基础设施依赖。
+- **服务 — `internal/app/service/`**：承载业务编排；优先复用现有服务，而不是在 CLI/TUI 中直接复制业务逻辑。
+- **基础设施 — `internal/infrastructure/`**：API、配置、订阅及核心交互的具体实现；修改前确认现有错误处理、备份与恢复机制。
+- **TUI — `internal/ui/tui/`**：负责 Bubble Tea 状态、消息与渲染；**主题 — `internal/ui/theme/`**：统一语义颜色与主题切换。
+- **国际化 — `pkg/i18n/locales/`**：修改用户可见文案时同步检查 `zh-CN` 与 `en-US` 翻译、键名及占位符。
+- 涉及视觉或布局规则时参考 `DESIGN.md`，但应先与当前实现核对；架构和文件位置以代码为准。
 
-## 4. 并发、容量与生命周期
-- **并发控制**: 批量网络操作**必须**限制并发。复用 `model.TestConcurrency = 20` 并结合 `WaitGroup`/`Mutex`/Semaphore 汇总结果。禁止创建无上限的 goroutine。
-- **定长缓存 (Ring Buffer)**: 历史数据（连接、日志、图表点）**必须**使用 Ring Buffer，如 `LogsCap=1000`。禁止使用无界切片导致内存泄漏。
-- **WebSocket (`infrastructure/api/websocket.go`)**: 必须复用现有的 `WSClient.Start` 和 `connectStream[T]` 泛型封装。禁止自行实现断线重连或重新挂载流。
+## 3. TUI 状态与交互约束
 
+- **主 Model（`internal/ui/tui/model.go`）**：仅维护基础设施、全局路由/布局、共享数据、全局通知、WebSocket 生命周期以及各页面状态的持有与协调。**禁止将页面私有字段直接扩张到主 Model。**
+- **页面状态（`features/<page>/`）**：局部状态及对应处理逻辑留在页面模块；遵循现有 `state.go`、`commands.go`、`view.go` 及拆分文件的职责。
+- **消息（`messages/events.go`）**：跨模块共享的 TUI 消息优先集中定义；通过 `tea.Msg` / `tea.Cmd` 驱动状态变化。不得直接修改其他页面的内部状态；保留当前已有的局部消息约定。
+- **更新与副作用**：遵循 `update.go`、`update_keys.go`、`update_mouse.go`、`update_ws.go` 的实际分工；耗时 I/O 放在命令/服务中，不在 `View` 或同步 `Update` 路径中阻塞渲染。
+- **响应式布局**：按终端实际可用宽高计算；节点页既有宽窄屏分界约为 100 列，宽屏双面板约 43%/57%、窄屏堆叠，修改时核对当前实现与 `DESIGN.md`，勿把该比例强加到所有页面。
+- **鼠标与弹窗**：新增交互优先复用现有坐标命中逻辑（如 `resolveMainPageMouseHit`）；弹窗打开时阻断底层事件，关闭时清除临时状态；考虑键盘/鼠标一致性。
+- **主题**：使用 `theme.Current()` 提供的语义颜色，不在功能组件硬编码色值；可用主题以 `theme.Names()` 和当前实现为准。
+- **终端兼容**：宽度计算应考虑 CJK、Unicode 和窄终端；修改渲染逻辑时覆盖宽/窄屏、截断、滚动、空数据与弹窗边界。
 
-## 5. 固定工作流
-- **自动提交**：每完成一个任务，都在本地进行原子化提交
+## 4. 网络、并发与数据生命周期
+
+- **WebSocket**：优先复用 `internal/infrastructure/api/websocket.go` 的 `WSClient.Start`、`connectStream[T]` 以及现有端点更新、取消、重连和代际校验机制；不得另起独立的重连循环或重复挂载流。
+- **并发**：批量网络操作必须有并发上限、取消/超时和结果收敛。先查找并复用当前测速或批处理的并发控制，不假定存在某个固定常量（例如 `model.TestConcurrency`），禁止无界启动 goroutine。
+- **有界存储**：连接、日志、测速和图表等持续增长的数据必须维持容量上限；优先使用现有 Ring Buffer 或等价有界结构，不允许无界积累。
+- **配置与订阅**：遵守当前的解析、写入、备份、回滚及热重载/重启语义；不要假设所有配置修改都能热重载，特别关注写入成功但应用失败的状态。
+- **资源与安全**：正确停止 goroutine、ticker、订阅请求和 WebSocket；避免泄露 Mihomo API Secret、带凭据的订阅 URL、Token、代理连接元数据及用户配置。
+
+## 5. 命令、测试与资源控制
+
+- **系统与 Shell**：先识别 Windows/Linux 和当前 Shell。Windows 优先使用 PowerShell；如果已经在 PowerShell 中，不重复套 `pwsh.exe`；从其他 Shell 调用 PowerShell 时可显式使用 `pwsh.exe -NoProfile -Command`。避免混用 CMD 重定向语法（如 `2>nul`）。
+- **工具链**：优先使用 `mise` 提供的 Go；若 `mise` 不可用，只能在确认本机 Go 版本符合 `go.mod` 后使用原生 `go` 命令，并说明降级情况。
+- **按改动范围由轻到重验证**（以下命令以 `mise` 可用为前提）：
+  - 格式：检查改动 Go 文件的 `gofmt` 输出；仅格式化确实修改过的文件。
+  - 定向测试：`mise exec go -- go test ./internal/ui/tui/...`（TUI 任务示例；其他任务替换为受影响包）。
+  - 全量测试：`mise exec go -- go test ./...`（涉及 TUI、业务逻辑或公共接口时必须执行，资源不足应明确报告）。
+  - 静态检查：`mise exec go -- go vet ./...`。
+  - 依赖完整性：依赖相关改动时运行 `mise exec go -- go mod verify`；无依赖改动时可在最终完整验证中执行。
+  - 构建：Linux 使用 `mise exec go -- go build -o mihosh .`；Windows 使用 `mise exec go -- go build -o mihosh.exe .`。**构建不意味着自动重启或部署。**
+- **与 CI 对齐**：CI 检查格式、模块、vet、测试及构建；不要默认执行 `make check`，因为当前 `Makefile` 的 `fmt` 目标会修改源文件。
+- **资源限制**：全量或高负载检查前查看可用内存、CPU 和现存任务；资源紧张时串行执行，必要时使用 `go test -p 1 ./...`。限制并发并确认对子进程有效；只清理**本次任务启动**的进程或临时文件，绝不终止用户既有进程。
+- **运行与部署**：仅当任务要求部署/联调、目标环境已确认且操作获授权时执行。Windows 的 `deploy.ps1` 只有在文件确实存在并经检查后才能调用；Linux 的 `rsync` 上传必须确认测试机、目标路径及覆盖范围。**禁止将编译成功等同于允许杀进程、重启或上传。**
+- **无真实 Mihomo 服务时**：优先跑纯逻辑、模拟 API、渲染和状态测试；需真实服务的集成测试明确列出前置条件，不伪造通过结果。
+
+## 6. Agent 工具使用
+
+- **CodeGraph**：仅当根目录存在 `.codegraph/` 且索引可用时，定位符号/调用链优先使用MCP工具 `codegraph_explore` 或 `codegraph explore`；索引缺失、过期或结论有疑问时，回退到实际源码搜索与阅读。不得自行创建索引，除非任务要求。
+- **RTK**：Linux 环境若已安装 `rtk`，且支持当前命令，可依 `RTK.md` 压缩普通只读命令输出；若命令不受支持、需要完整日志或排障，直接使用原始命令。不要让输出压缩掩盖报错。
+- **Context7**：仅在确实需要验证第三方库 API、版本差异或文档时使用 `npx ctx7`（用法见 https://context7.com/docs/clients/cli）；网络或工具不可用时继续依靠本地源码和依赖定义，避免无必要的在线安装。
+
+## 7. 固定任务工作流与 Git
+
+1. **检查**：读取 `git status`、相关源码与测试，确认任务边界和现有修改。
+2. **设计**：用最小方案确定修改位置、成功标准及必要的测试；复杂任务先简述方案，简单任务直接实施。
+3. **实现**：遵循既有架构，避免无关改动；如修复缺陷，尽量补充可以复现问题的回归测试。
+4. **验证**：执行适用的定向测试、静态检查、全量测试及构建；记录实际命令、结果和未执行项，不因失败而随意删除测试。
+5. **检查差异**：审阅 `git diff`、`git status`，排除敏感数据、无关文件、生成产物和用户原有修改。
+6. **本地原子提交**：任务完成且必要检查通过后，按现有要求自动生成**英文、描述准确**的本地提交；只暂存本任务文件，禁止 `git add -A` 意外收入其他改动。任务无法完成或验证失败时不自动提交，并说明原因。不得未经授权执行 `push`、创建 PR、切换/重写分支或破坏性 Git 操作。
+7. **交付报告**：简要说明修改内容、已运行的验证命令与结果、剩余风险、部署是否执行，以及提交 ID（若已提交）。
+
 - **英文提交与 PR 文案**：git commit message、PR 标题与正文**一律使用英文**（代码注释与界面文案仍遵循既有中文规范）。
 - **分支规范（`main` vs `dev`）**：`main` 为稳定发布分支（承载正式版标签 `vX.Y.Z`、`install.sh` 与 `Formula/mihosh.rb`，仅从已验收的 `dev` 同步）；`dev` 为开发分支（承载日常提交、功能/修复 PR、Dependabot 更新与预发布标签 `vX.Y.Z-*`）。
 
-## 6. 第三方工具
-- **噪声简化**：若当前开发环境为linux，使用rtk，@RTK.md
-- **文档搜索**：使用`npx ctx7`，具体用法详见：https://context7.com/docs/clients/cli
+## 8. 不可突破的边界
 
-<!-- CODEGRAPH_START -->
-## CodeGraph
-
-In repositories indexed by CodeGraph (a `.codegraph/` directory exists at the repo root), reach for it BEFORE grep/find or reading files when you need to understand or locate code:
-
-- **MCP tool** (when available): `codegraph_explore` answers most code questions in one call — the relevant symbols' verbatim source plus the call paths between them, including dynamic-dispatch hops grep can't follow. Name a file or symbol in the query to read its current line-numbered source. If it's listed but deferred, load it by name via tool search.
-- **Shell** (always works): `codegraph explore "<symbol names or question>"` prints the same output.
-
-If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is the user's decision.
-<!-- CODEGRAPH_END -->
+- 未经明确授权，不修改用户的真实 Mihomo 配置、系统代理、服务运行状态、远程服务器或生产环境；对实际网络行为有影响的测试必须说明范围。
+- 不在代码、日志、截图、测试夹具或提交中暴露密钥、订阅凭据和私人连接信息；必要时脱敏。
+- 不因指令中的固定路径、工具或常量已过期而伪造实现；先核实并采用当前代码的等价机制。
+- 不把“已构建”“已测试”“已部署”“已提交”混为一谈；每项只报告实际发生的动作。
