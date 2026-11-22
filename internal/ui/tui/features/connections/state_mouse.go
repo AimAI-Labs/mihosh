@@ -98,7 +98,13 @@ func (s State) HandleMouseLeft(
 
 	case MouseTargetViewTraffic:
 		s.setConnViewMode(ConnViewTraffic)
-		return s, nil
+		return s.EnsureCurrentIP()
+
+	case MouseTargetIPMaskToggle:
+		return s.ToggleCurrentIPMask(), nil
+
+	case MouseTargetIPRefresh:
+		return s.RefreshCurrentIP()
 
 	case MouseTargetViewActive:
 		s.setConnViewMode(ConnViewActive)

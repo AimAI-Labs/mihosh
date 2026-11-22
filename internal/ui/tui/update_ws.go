@@ -83,13 +83,22 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case messages.GroupsMsg:
+		prevProxy, _, _ := m.nodesState.GetActiveProxyAndDelay()
 		m.nodesState = m.nodesState.ApplyGroups(msg.Groups, msg.OrderedNames)
+		nextProxy, _, _ := m.nodesState.GetActiveProxyAndDelay()
+		if prevProxy != "" && nextProxy != "" && nextProxy != prevProxy {
+			m.connsState = m.connsState.MarkCurrentIPStale()
+		}
 
 	case messages.ProxiesMsg:
 		m.nodesState = m.nodesState.ApplyProxies(msg)
 
 	case messages.ConfigModeMsg:
+		prevMode := m.nodesState.Mode
 		m.nodesState = m.nodesState.ApplyConfigMode(msg.Mode)
+		if prevMode != "" && msg.Mode != "" && prevMode != msg.Mode {
+			m.connsState = m.connsState.MarkCurrentIPStale()
+		}
 
 	case messages.ConnectionsMsg:
 		m.connsState = m.connsState.ApplyConnections(msg.Resp)
@@ -165,6 +174,11 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 			m.connsState = m.connsState.ApplyIPInfo(msg.Info)
 		}
 
+	case messages.CurrentIPInfoMsg:
+		var cmd tea.Cmd
+		m.connsState, cmd = m.connsState.Update(msg)
+		return m, cmd
+
 	case messages.ConnectionClosedMsg:
 		m.connsState = m.connsState.ApplyConnectionClosed()
 
@@ -181,7 +195,9 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 
 	case messages.ConnTickMsg:
 		if m.currentPage == layout.PageConnections {
-			return m, connTick()
+			var cmd tea.Cmd
+			m.connsState, cmd = m.connsState.Update(msg)
+			return m, tea.Batch(connTick(), cmd)
 		}
 
 	case messages.LogsTickMsg:
@@ -220,6 +236,12 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 		m.autoRefreshSyncedTTL = autoRefreshSyncedTicks
 		if msg.Changed {
 			m.publishNotice(i18n.T("status.auto_refreshed"), messages.NoticeInfo)
+			m.connsState = m.connsState.MarkCurrentIPStale()
+			if m.currentPage == layout.PageConnections {
+				var cmd tea.Cmd
+				m.connsState, cmd = m.connsState.EnsureCurrentIP()
+				return m, cmd
+			}
 		}
 
 	case messages.ErrMsg:
