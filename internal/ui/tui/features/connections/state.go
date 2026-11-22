@@ -75,12 +75,14 @@ type State struct {
 	timeout   int
 	chartData *model.ChartData
 
-	siteBatch       service.TestBatch
-	siteTestIndices []int
-	testCtx         context.Context
-	testCancel      context.CancelFunc
-	unlock          unlockState
-	dns             dnsQueryView
+	siteBatch        service.TestBatch
+	siteTestIndices  []int
+	testCtx          context.Context
+	testCancel       context.CancelFunc
+	unlock           unlockState
+	dns              dnsQueryView
+	currentIP        currentIPState
+	currentIPFetcher func(context.Context, string) (*model.IPInfo, error)
 }
 
 // NewState 初始化连接状态
@@ -215,6 +217,7 @@ func (s *State) appendClosed(conn model.Connection) {
 // CancelTest 取消当前正在进行的测试
 func (s *State) CancelTest() {
 	s.unlock.cancelChecks()
+	s.currentIP.cancelFetch()
 	if s.testCancel != nil {
 		s.testCancel()
 		s.testCancel = nil
@@ -270,6 +273,7 @@ func (s State) ToPageState(chartData *model.ChartData, width, height int) PageSt
 		Query:              s.currentQuery(),
 		Unlock:             s.unlock.unlockView,
 		DNS:                s.dns,
+		CurrentIP:          s.currentIPBarState(),
 	}
 }
 
@@ -281,10 +285,12 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			s.CancelTest()
 			next := NewState(msg.ProxyURL, model.DefaultSiteTests(), s.client, s.timeout, s.chartData)
 			next.unlock.width = s.unlock.width
+			next.currentIPFetcher = s.currentIPFetcher
 			return next, nil
 		}
 		if msg.Invalidate || msg.ProxyURL != s.proxyAddr {
 			s.CancelTest()
+			s.currentIP.invalidate()
 			for i := range s.unlock.items {
 				s.unlock.items[i].result = model.UnlockResult{}
 			}
@@ -295,6 +301,10 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		return s.completeUnlock(msg)
 	case messages.DNSQueryResultMsg:
 		return s.applyDNSQueryResult(msg)
+	case messages.CurrentIPInfoMsg:
+		return s.ApplyCurrentIPInfo(msg), nil
+	case messages.ConnTickMsg:
+		return s.tickCurrentIP()
 	case messages.PageResizeMsg:
 		s.unlock.width = msg.Width
 		return s, nil
@@ -367,12 +377,17 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		if msg.String() == "h" {
 			s.CancelTest()
 			s.setConnViewMode((s.connViewMode + 1) % 3)
+			if s.connViewMode == ConnViewTraffic {
+				return s.EnsureCurrentIP()
+			}
 			return s, nil
 		}
 
-		// 流量监控 tab：仅响应站点测速和选择
+		// 流量监控 tab：响应站点测速、选择和 IP 隐显切换
 		if s.connViewMode == ConnViewTraffic {
 			switch {
+			case msg.String() == "i":
+				s = s.ToggleCurrentIPMask()
 			case msg.String() == "s":
 				return s.triggerSiteTestByIndex(s.selectedSiteTest, s.timeout)
 			case msg.String() == "S":

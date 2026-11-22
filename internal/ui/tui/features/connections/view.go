@@ -47,6 +47,7 @@ type PageState struct {
 	Query           ConnQuery
 	Unlock          unlockView
 	DNS             dnsQueryView
+	CurrentIP       components.CurrentIPBarState
 }
 
 // RenderConnectionsPage 渲染连接监控页面
@@ -63,7 +64,8 @@ func RenderConnectionsPage(state PageState) string {
 	var page string
 	if state.ViewMode == ConnViewTraffic {
 		modeSwitch := RenderConnModeSwitchComponent(state.ViewMode, state.Width, state.InlineMode, state.Paused, state.PausedUpdates)
-		page = renderTrafficTab(state, []string{modeSwitch, ""})
+		ipBar := components.RenderCurrentIPBar(state.CurrentIP, state.Width)
+		page = renderTrafficTab(state, []string{modeSwitch, ipBar})
 	} else {
 		page = renderConnectionListTab(state)
 	}

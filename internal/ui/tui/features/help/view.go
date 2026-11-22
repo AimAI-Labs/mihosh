@@ -272,6 +272,7 @@ func buildConnectionsSections(ctx HelpContext) []section {
 				{"←/→", i18n.T("help.conns_traffic.select_site")},
 				{"s", i18n.T("help.conns_traffic.test_site")},
 				{"S", i18n.T("help.conns_traffic.test_all")},
+				{"i", i18n.T("help.conns_traffic.toggle_ip")},
 				{"U", i18n.T("conns.unlock.title")},
 				{"D", i18n.T("conns.dns.title")},
 			},

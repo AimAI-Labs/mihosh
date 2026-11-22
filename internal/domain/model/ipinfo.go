@@ -9,7 +9,8 @@ type IPInfo struct {
 	Country        string `json:"country"`
 	CountryCode    string `json:"country_code"` // ip.sb
 	CountryCodeApi string `json:"countryCode"`  // ip-api.com
-	RegionName     string `json:"regionName"`
+	Region         string `json:"region"`       // ip.sb / ipwho.is / ipapi.co
+	RegionName     string `json:"regionName"`   // ip-api.com
 	City           string `json:"city"`
 
 	// 网络资产信息 (ip.sb 使用 ASN int, ip-api 使用 AS string)
