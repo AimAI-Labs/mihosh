@@ -1,8 +1,8 @@
 package tui
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	tea "github.com/charmbracelet/bubbletea"
@@ -18,7 +18,7 @@ const (
 
 // updateCoreTarget owns endpoint synchronization and invalidation for every entry point.
 // Page-local cleanup stays behind CoreTargetChangedMsg; existing WS streams reconnect themselves.
-func (m *Model) updateCoreTarget(endpoint config.MihomoEndpoint, update coreTargetUpdate) tea.Cmd {
+func (m *Model) updateCoreTarget(endpoint service.MihomoEndpoint, update coreTargetUpdate) tea.Cmd {
 	reset := false
 	if m.client != nil {
 		old := m.client.EndpointSnapshot()
@@ -37,8 +37,8 @@ func (m *Model) updateCoreTarget(endpoint config.MihomoEndpoint, update coreTarg
 			m.wsClient.UpdateEndpoint(endpoint.ExternalController, endpoint.Secret)
 		}
 	}
-	path, _ := config.GetMihomoConfigPathForWrite()
-	changed := messages.CoreTargetChangedMsg{Reset: reset, Invalidate: reset || update != coreTargetSync, ConfigPath: path, ProxyURL: config.MixedPortToProxyURL(endpoint.MixedPort)}
+	path, _ := service.GetMihomoConfigPathForWrite()
+	changed := messages.CoreTargetChangedMsg{Reset: reset, Invalidate: reset || update != coreTargetSync, ConfigPath: path, ProxyURL: service.MixedPortToProxyURL(endpoint.MixedPort)}
 	m.rulesState, _ = m.rulesState.Update(changed)
 	m.connsState, _ = m.connsState.Update(changed)
 	m.nodesState, _ = m.nodesState.Update(changed)
@@ -57,7 +57,7 @@ func (m *Model) updateCoreTarget(endpoint config.MihomoEndpoint, update coreTarg
 }
 
 func (m *Model) syncAppliedCore(restarted, pendingRestart bool) tea.Cmd {
-	endpoint := config.ResolveMihomoEndpoint()
+	endpoint := service.ResolveMihomoEndpoint()
 	if restarted {
 		return m.updateCoreTarget(endpoint, coreTargetReconnect)
 	}
@@ -73,9 +73,9 @@ func (m *Model) coreOperationCompleted(action string) tea.Cmd {
 	m.reloadStoredConfig()
 	switch action {
 	case "stop", "service-stop", "service-uninstall":
-		return m.updateCoreTarget(config.ResolveMihomoEndpoint(), coreTargetStopped)
+		return m.updateCoreTarget(service.ResolveMihomoEndpoint(), coreTargetStopped)
 	case "configure", "basic-config", "start", "setup", "connect", "external", "ports", "activate", "rollback", "restart", "upgrade", "profile", "service-install", "service-start", "service-restart", "tun":
-		return m.updateCoreTarget(config.ResolveMihomoEndpoint(), coreTargetReconnect)
+		return m.updateCoreTarget(service.ResolveMihomoEndpoint(), coreTargetReconnect)
 	default:
 		return nil
 	}

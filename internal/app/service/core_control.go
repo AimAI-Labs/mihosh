@@ -287,7 +287,7 @@ func (s *CoreService) sendControlRequest(ctx context.Context, request coreContro
 	}
 	return nil
 }
-func (s *CoreService) Wait(ctx context.Context) error {
+func (s *CoreService) waitRuntime(ctx context.Context) error {
 	for {
 		s.mu.Lock()
 		process := s.process
@@ -318,7 +318,7 @@ func (s *CoreService) Wait(ctx context.Context) error {
 	}
 }
 
-func (s *CoreService) Events() <-chan string { return s.ownerEvents }
+func (s *CoreService) runtimeEvents() <-chan string { return s.ownerEvents }
 
 func (s *CoreService) notifyOwner(action string) {
 	select {

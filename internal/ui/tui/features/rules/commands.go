@@ -7,15 +7,14 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	domainrules "github.com/AimAI-Labs/mihosh/internal/domain/rules"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 // FetchRules 获取规则列表，并从配置文件合并 no-resolve 标记。
-func FetchRules(client *api.Client) tea.Cmd {
-	return messages.CoreRequest(client, func(client *api.Client) tea.Msg {
+func FetchRules(client *service.Client) tea.Cmd {
+	return messages.CoreRequest(client, func(client *service.Client) tea.Msg {
 		rules, err := client.GetRules()
 		if err != nil {
 			return messages.ErrMsg{Err: err}

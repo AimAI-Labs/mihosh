@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -19,7 +18,7 @@ import (
 func FetchSubs(svc *service.ProfileService) tea.Cmd {
 	return func() tea.Msg {
 		if svc == nil {
-			return messages.SubsLoadedMsg{Subs: []profile.Profile{}, Active: ""}
+			return messages.SubsLoadedMsg{Subs: []service.Profile{}, Active: ""}
 		}
 		subs, active, err := svc.ListProfiles()
 		if err != nil {
@@ -42,7 +41,7 @@ func RefreshSubs(svc *service.ProfileService) tea.Cmd {
 }
 
 // AddSubCmd 新增订阅。
-func AddSubCmd(svc *service.ProfileService, name string, src profile.SubSource) tea.Cmd {
+func AddSubCmd(svc *service.ProfileService, name string, src service.SubSource) tea.Cmd {
 	return func() tea.Msg {
 		if svc == nil {
 			return messages.SubAddErrorMsg{Err: errNoService}
@@ -56,7 +55,7 @@ func AddSubCmd(svc *service.ProfileService, name string, src profile.SubSource) 
 }
 
 // EditSubCmd 编辑订阅元数据（名称 + 来源）。
-func EditSubCmd(svc *service.ProfileService, uid, name string, src profile.SubSource) tea.Cmd {
+func EditSubCmd(svc *service.ProfileService, uid, name string, src service.SubSource) tea.Cmd {
 	return func() tea.Msg {
 		if svc == nil {
 			return messages.SubEditErrorMsg{UID: uid, Err: errNoService}

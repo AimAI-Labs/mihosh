@@ -39,8 +39,12 @@ internal/infrastructure (基础设施适配器：api, config, core, host, profil
 5. **Presentation (展示层 `internal/cli`、`internal/ui`)**：
    - `internal/cli`：基于 Cobra 的命令行接口，支持 `--output plain|table|json`。
    - `internal/ui/tui`：基于 Bubble Tea 的 Feature-Sliced TUI，根包事件路由已按领域拆分为 `update.go`、`update_ws.go`、`update_core_events.go`、`update_config_events.go`、`update_sub_events.go`。
+   - TUI 包通过 `internal/app/service` 的契约与方法访问 API、配置、订阅、内核、主机和同步能力，不再直接导入基础设施包。
+
+`CoreService` 保留兼容 facade，同时通过 `Runtime`、`ReleaseManager`、`Configuration` 和 `Network` 暴露四个聚焦能力。四个能力共享 facade 的生命周期和锁所有权。
 
 ## 数据流转与边界守卫
 
 - 在 TUI 界面中，Mihosh 大量使用 WebSocket 订阅（流量、日志、连接和内存）实现**实时推送**，避免高频轮询。
-- `internal/arch_test.go` 在每次 `go test ./...` 时自动校验分层边界：`domain` 保持零外层依赖，`app` 零反向依赖 `ui`/`cli`，`infrastructure` 不依赖上层，存量 `ui -> infrastructure` 依赖通过只减不增的棘轮白名单严格受控。
+- `internal/arch_test.go` 在每次 `go test ./...` 时自动校验分层边界：`domain` 保持零外层依赖，`app` 零反向依赖 `ui`/`cli`，`infrastructure` 不依赖上层，任何 `ui -> infrastructure` 依赖都会使测试失败。
+- `internal/ui/tui/snapshot_test.go` 使用提交到仓库的 golden 快照覆盖节点、帮助和核心页面的确定性渲染。

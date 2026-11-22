@@ -10,18 +10,16 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 // checkInitialConnectionCmd 发起初始 Mihomo API 健康检测
-func checkInitialConnectionCmd(client *api.Client) tea.Cmd {
+func checkInitialConnectionCmd(client *service.Client) tea.Cmd {
 	return func() tea.Msg {
 		if _, err := client.GetVersion(); err != nil {
-			endpoint := config.ResolveMihomoEndpoint()
+			endpoint := service.ResolveMihomoEndpoint()
 			secretMasked := ""
 			if endpoint.Secret != "" {
 				secretMasked = "******"
@@ -65,7 +63,7 @@ func (m Model) Init() tea.Cmd {
 			return messages.UpdateCheckedMsg{Info: info}
 		},
 		tea.Sequence(func() tea.Msg {
-			if err := config.PreserveSubscriptionUsage(); err != nil {
+			if err := service.PreserveSubscriptionUsage(); err != nil {
 				return messages.ErrMsg{Err: err}
 			}
 			return nil
@@ -190,7 +188,7 @@ func (m *Model) refreshCurrentPage() tea.Cmd {
 	case layout.PageCore:
 		var cmd tea.Cmd
 		m.coreState, cmd = m.coreState.RefreshCurrent()
-		check := m.updateCoreTarget(config.ResolveMihomoEndpoint(), coreTargetSync)
+		check := m.updateCoreTarget(service.ResolveMihomoEndpoint(), coreTargetSync)
 		if check == nil {
 			check = m.checkCoreConnection(false)
 		}

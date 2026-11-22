@@ -2,10 +2,10 @@ package preferences
 
 import (
 	"fmt"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -63,7 +63,7 @@ func GetSettingDesc(key string) string {
 
 // PageState 设置页面状态
 type PageState struct {
-	Config          *config.Config
+	Config          *service.Config
 	SelectedSetting int
 	EditMode        bool
 	EditValue       string

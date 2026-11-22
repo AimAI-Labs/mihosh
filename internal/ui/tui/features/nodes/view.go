@@ -2,10 +2,10 @@ package nodes
 
 import (
 	"fmt"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -37,7 +37,7 @@ type PageState struct {
 	FilterText       string // 节点搜索关键词
 	FilterMode       bool   // 是否处于搜索输入模式
 	FilterEngine     FilterEngine
-	ActiveChain      profile.ProxyChain
+	ActiveChain      service.ProxyChain
 	ChainModal       ChainModalState
 }
 

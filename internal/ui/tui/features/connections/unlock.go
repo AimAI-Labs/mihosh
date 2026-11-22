@@ -5,7 +5,6 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -148,7 +147,7 @@ func (s State) launchUnlock() (State, tea.Cmd) {
 	for _, task := range s.unlock.batch.Take() {
 		index := s.unlock.indices[task.Index]
 		ctx, proxy := s.unlock.ctx, s.proxyAddr
-		cmds = append(cmds, messages.CoreRequest(s.client, func(_ *api.Client) tea.Msg {
+		cmds = append(cmds, messages.CoreRequest(s.client, func(_ *service.Client) tea.Msg {
 			return messages.UnlockTestMsg{
 				BatchID: task.BatchID, TaskID: task.Index, Result: service.CheckUnlock(ctx, proxy, index),
 			}

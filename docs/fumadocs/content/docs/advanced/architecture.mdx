@@ -39,8 +39,12 @@ internal/infrastructure (Adapters: api, config, core, host, profile, sync)
 5. **Presentation (`internal/cli`, `internal/ui`)**:
    - `internal/cli`: Cobra command-line interface supporting `--output plain|table|json`.
    - `internal/ui/tui`: Feature-sliced Bubble Tea TUI with modular event routing (`update.go`, `update_ws.go`, `update_core_events.go`, `update_config_events.go`, `update_sub_events.go`).
+   - TUI packages consume API, configuration, profile, core, host, and sync contracts through `internal/app/service` aliases and methods. They have no direct infrastructure imports.
+
+`CoreService` retains its compatibility facade while exposing four focused capabilities through `Runtime`, `ReleaseManager`, `Configuration`, and `Network`. These capabilities share the facade's lifecycle and lock ownership.
 
 ## Data Flow & Boundary Enforcement
 
 - In the TUI, Mihosh utilizes WebSocket subscriptions (traffic, logs, connections, and memory) for **real-time pushes**, avoiding high-frequency polling and reducing overhead.
-- `internal/arch_test.go` verifies layer boundaries on every `go test ./...` run: `domain` stays isolated, `app` never imports `ui`/`cli`, `infrastructure` never imports `app`/`ui`/`cli`, and remaining legacy `ui -> infrastructure` edges are tracked in a strictly shrinking ratchet allowlist.
+- `internal/arch_test.go` verifies layer boundaries on every `go test ./...` run: `domain` stays isolated, `app` never imports `ui`/`cli`, `infrastructure` never imports `app`/`ui`/`cli`, and every `ui -> infrastructure` edge fails the test.
+- `internal/ui/tui/snapshot_test.go` covers deterministic nodes, help, and core page renders with checked-in golden snapshots.

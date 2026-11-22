@@ -10,9 +10,9 @@ package sub
 // 提交时来源值自动判断类型（http(s):// → remote，其余 → local）。
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"strings"
 
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/bubbles/key"
@@ -159,7 +159,7 @@ func (f addForm) validate() (bool, string) {
 	if src == "" {
 		return false, "sub.add_err_src"
 	}
-	if f.kindExplicit && (profile.ParseSourceKind(src) == profile.SourceRemote) != f.kindRemote {
+	if f.kindExplicit && (service.ParseSourceKind(src) == service.SourceRemote) != f.kindRemote {
 		return false, "sub.add_err_kind"
 	}
 	return true, ""
@@ -190,17 +190,17 @@ func (f addForm) copyButton(fieldWidth int) string {
 }
 
 // buildSource keeps automatic detection until the user explicitly selects a type.
-func (f addForm) buildSource() profile.SubSource {
+func (f addForm) buildSource() service.SubSource {
 	val := strings.TrimSpace(f.srcField.Value())
-	kind := profile.ParseSourceKind(val)
+	kind := service.ParseSourceKind(val)
 	if f.kindExplicit {
-		kind = profile.SourceLocal
+		kind = service.SourceLocal
 		if f.kindRemote {
-			kind = profile.SourceRemote
+			kind = service.SourceRemote
 		}
 	}
-	src := profile.SubSource{Kind: kind}
-	if kind == profile.SourceRemote {
+	src := service.SubSource{Kind: kind}
+	if kind == service.SourceRemote {
 		src.URL = val
 		src.UseProxy = f.useProxy
 		src.UserAgent = strings.TrimSpace(f.uaField.Value())
@@ -370,7 +370,7 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 		} else if form.isSrcField() {
 			form.srcField, c = form.srcField.Update(msg)
 			if !form.kindExplicit {
-				form.kindRemote = profile.ParseSourceKind(strings.TrimSpace(form.srcField.Value())) == profile.SourceRemote
+				form.kindRemote = service.ParseSourceKind(strings.TrimSpace(form.srcField.Value())) == service.SourceRemote
 			}
 		} else if form.isUAField() {
 			form.uaField, c = form.uaField.Update(msg)

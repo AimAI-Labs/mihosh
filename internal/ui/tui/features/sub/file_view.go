@@ -6,7 +6,6 @@ import (
 	"unicode"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
@@ -28,12 +27,12 @@ var fileOptions = []string{"sub.file.source", "sub.file.activated", "sub.file.di
 
 var diffOptions = []struct {
 	key  string
-	flag profile.FileDiffOptions
+	flag service.FileDiffOptions
 }{
-	{"sub.file.diff_indent", profile.DiffIgnoreIndent},
-	{"sub.file.diff_whitespace", profile.DiffIgnoreWhitespace},
-	{"sub.file.diff_format", profile.DiffIgnoreFormatCharacters},
-	{"sub.file.diff_punctuation", profile.DiffIgnorePunctuation},
+	{"sub.file.diff_indent", service.DiffIgnoreIndent},
+	{"sub.file.diff_whitespace", service.DiffIgnoreWhitespace},
+	{"sub.file.diff_format", service.DiffIgnoreFormatCharacters},
+	{"sub.file.diff_punctuation", service.DiffIgnorePunctuation},
 }
 
 type fileView struct {
@@ -42,11 +41,11 @@ type fileView struct {
 	request               uint64
 	selected, top, column int
 	loading               bool
-	diff                  []profile.FileDiffRow
+	diff                  []service.FileDiffRow
 	err                   error
 	optionsOpen           bool
 	option                int
-	ignore                profile.FileDiffOptions
+	ignore                service.FileDiffOptions
 }
 
 func (s State) openFileMenu() State {
@@ -235,7 +234,7 @@ func (f fileView) dialog(width, height int) dialog.Dialog {
 		body = strings.Join(items, "\n")
 		if f.err != nil {
 			message := terminalFileText([]byte(f.err.Error()))
-			if errors.Is(f.err, profile.ErrRawNotFound) {
+			if errors.Is(f.err, service.ErrRawNotFound) {
 				message = i18n.T("sub.err.raw_not_found")
 			}
 			body += "\n" + ansi.Wrap(message, w-4, "")
@@ -255,7 +254,7 @@ func (f fileView) renderFile(inner, pageWidth, height int) string {
 		return i18n.T("sub.file.loading")
 	}
 	if f.err != nil && len(f.diff) == 0 {
-		if errors.Is(f.err, profile.ErrRawNotFound) {
+		if errors.Is(f.err, service.ErrRawNotFound) {
 			return i18n.T("sub.err.raw_not_found")
 		}
 		return terminalFileText([]byte(f.err.Error()))
@@ -273,7 +272,7 @@ func (f fileView) renderFile(inner, pageWidth, height int) string {
 	return renderDiffPane(rows, true, f.column, inner) + "\n" + renderDiffPane(rows, false, f.column, inner)
 }
 
-func renderDiffPane(rows []profile.FileDiffRow, before bool, column, width int) string {
+func renderDiffPane(rows []service.FileDiffRow, before bool, column, width int) string {
 	label, color := "sub.file.activated", common.Success()
 	if before {
 		label, color = "sub.file.source", common.Danger()

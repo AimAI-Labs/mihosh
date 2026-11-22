@@ -1,9 +1,9 @@
 package tui
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"time"
 
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/preferences"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
@@ -21,7 +21,7 @@ func (m Model) applyCoreEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 		if msg.Action == "stop" {
 			update = coreTargetStopped
 		}
-		cmd := m.updateCoreTarget(config.ResolveMihomoEndpoint(), update)
+		cmd := m.updateCoreTarget(service.ResolveMihomoEndpoint(), update)
 		return m, tea.Batch(m.listenCoreOwner(), m.coreState.Refresh(), cmd), true
 
 	case messages.ManagedCoreStartedMsg:
@@ -29,7 +29,7 @@ func (m Model) applyCoreEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 			return m, nil, true
 		}
 		m.reloadStoredConfig()
-		return m, m.updateCoreTarget(config.ResolveMihomoEndpoint(), coreTargetReconnect), true
+		return m, m.updateCoreTarget(service.ResolveMihomoEndpoint(), coreTargetReconnect), true
 
 	case messages.CoreConnectionMsg:
 		if msg.Epoch != m.connectionEpoch {
@@ -75,7 +75,7 @@ func (m Model) applyCoreEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 			m.syncProcessLogs()
 			if statusMsg.Status.Mode == "managed" && !statusMsg.Status.Running && m.connectionReady {
 				m.reloadStoredConfig()
-				return m, tea.Batch(cmd, m.updateCoreTarget(config.ResolveMihomoEndpoint(), coreTargetStopped)), true
+				return m, tea.Batch(cmd, m.updateCoreTarget(service.ResolveMihomoEndpoint(), coreTargetStopped)), true
 			}
 		}
 		return m, cmd, true

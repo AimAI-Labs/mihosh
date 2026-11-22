@@ -2,8 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
@@ -21,7 +21,7 @@ func reloadConfigCmd(client interface {
 	ReloadConfig(path string) error
 }) tea.Cmd {
 	return func() tea.Msg {
-		path, err := config.GetMihomoConfigPath()
+		path, err := service.GetMihomoConfigPath()
 		if err != nil {
 			return messages.ConfigReloadedMsg{Err: err}
 		}
@@ -42,7 +42,7 @@ func (m Model) applyConfigEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 		}
 		m.clearErrorNotice()
 		if msg.Reloaded {
-			if cfg, err := config.Load(); err == nil && cfg != nil {
+			if cfg, err := service.Load(); err == nil && cfg != nil {
 				m.config = cfg
 				m.settingsState.SetConfig(cfg)
 				if cfg.Theme != "" {
@@ -177,7 +177,7 @@ func (m Model) applyConfigEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 		// 并把 mixed-port 派生的代理地址同步到 connections。
 		m.coreState, _ = m.coreState.Update(msg)
 		if msg.Config != nil {
-			cmd := m.updateCoreTarget(config.MihomoEndpoint{ExternalController: msg.Config.ExternalController, Secret: msg.Config.Secret, MixedPort: msg.Config.MixedPort}, coreTargetSync)
+			cmd := m.updateCoreTarget(service.MihomoEndpoint{ExternalController: msg.Config.ExternalController, Secret: msg.Config.Secret, MixedPort: msg.Config.MixedPort}, coreTargetSync)
 			return m, cmd, true
 		}
 		return m, nil, true
@@ -191,7 +191,7 @@ func (m Model) applyConfigEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 			m.publishError(msg.Err)
 		} else {
 			// YAML 写入成功：即使 reload 失败也刷新端点（修改 external-controller 后旧端口不可达是预期行为）
-			endpoint := config.ResolveMihomoEndpoint()
+			endpoint := service.ResolveMihomoEndpoint()
 			targetCmd = m.updateCoreTarget(endpoint, coreTargetSync)
 			m.clearErrorNotice()
 			if msg.Err != nil {

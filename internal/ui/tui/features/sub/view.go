@@ -8,10 +8,10 @@ package sub
 //   3. 可选叠加：添加表单 / merge 编辑器 / 删除确认
 
 import (
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"strings"
 	"time"
 
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
@@ -28,7 +28,7 @@ const (
 
 // PageState 订阅页渲染状态。
 type PageState struct {
-	Subs        []profile.Profile
+	Subs        []service.Profile
 	FilteredIdx []int
 	ActiveUID   string
 	FilterText  string
@@ -318,7 +318,7 @@ func formBodyLayout(form addForm, width, height int) (lines []string, spans []fo
 		appendField(addFieldSkipTLS, renderFieldRow(i18n.T("sub.add_field_skip_tls"), renderBoolToggle(form.skipTLS), form.isSkipTLSField(), innerWidth))
 		intervalLabel := i18n.T("sub.interval_off")
 		if form.updateInterval > 0 {
-			intervalLabel = profile.FormatUpdateInterval(form.updateInterval)
+			intervalLabel = service.FormatUpdateInterval(form.updateInterval)
 		}
 		intervalVal := "◀ " + lipgloss.NewStyle().Foreground(common.TokyoCyan()).Bold(true).Render(intervalLabel) + " ▶"
 		appendField(addFieldInterval, renderFieldRow(i18n.T("sub.add_field_interval"), intervalVal, form.isIntervalField(), innerWidth))

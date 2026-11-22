@@ -2,9 +2,9 @@ package core
 
 import (
 	"fmt"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"strings"
 
-	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
@@ -19,7 +19,7 @@ type releaseControl struct {
 	action string
 }
 
-func (s State) releaseBadge(r coreinfra.Release) string {
+func (s State) releaseBadge(r service.Release) string {
 	if s.Status.Mode == "managed" && s.Status.Version == r.Version() {
 		return i18n.T("core.catalog.current")
 	}
@@ -32,7 +32,7 @@ func (s State) releaseBadge(r coreinfra.Release) string {
 	return i18n.T("core.catalog.stable")
 }
 
-func (s State) releaseColor(r coreinfra.Release) lipgloss.Color {
+func (s State) releaseColor(r service.Release) lipgloss.Color {
 	t := theme.Current()
 	if s.Status.Mode == "managed" && s.Status.Version == r.Version() {
 		return t.Success
@@ -46,7 +46,7 @@ func (s State) releaseColor(r coreinfra.Release) lipgloss.Color {
 	return t.Foreground
 }
 
-func releaseMetadata(r coreinfra.Release) (string, string) {
+func releaseMetadata(r service.Release) (string, string) {
 	date := i18n.T("core.catalog.date_unknown")
 	if !r.PublishedAt.IsZero() {
 		date = r.PublishedAt.Format("2006-01-02")
@@ -58,7 +58,7 @@ func releaseMetadata(r coreinfra.Release) (string, string) {
 	return date, size
 }
 
-func releaseInfo(r coreinfra.Release) string {
+func releaseInfo(r service.Release) string {
 	date, size := releaseMetadata(r)
 	return date + " · " + size
 }
@@ -100,7 +100,7 @@ func (s State) releaseColumns(start, end, width int) releaseColumns {
 	return c
 }
 
-func (s State) releaseRow(r coreinfra.Release, marker string, c releaseColumns, width int) string {
+func (s State) releaseRow(r service.Release, marker string, c releaseColumns, width int) string {
 	date, size := releaseMetadata(r)
 	row := marker + common.PadString(ansi.Truncate(r.Version(), c.version, "…"), c.version) + "  " +
 		common.PadString("["+s.releaseBadge(r)+"]", c.status)

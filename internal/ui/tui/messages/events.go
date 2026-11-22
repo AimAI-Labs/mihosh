@@ -4,11 +4,8 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
-	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 )
 
 // ========= Global Lifecycle & API Messages =========
@@ -187,7 +184,7 @@ type TrafficWSMsg struct {
 }
 
 type ConnectionsWSMsg struct {
-	Data api.ConnectionsData
+	Data service.ConnectionsData
 }
 
 type LogsWSMsg struct {
@@ -251,7 +248,7 @@ type NoticeExpiredMsg struct{ ID uint64 }
 
 // SubsLoadedMsg 订阅列表已从配置加载。
 type SubsLoadedMsg struct {
-	Subs   []profile.Profile // 当前订阅元数据列表
+	Subs   []service.Profile // 当前订阅元数据列表
 	Active string            // 当前激活订阅 UID（空=未激活）
 }
 
@@ -281,22 +278,22 @@ type SubAutoUpdateTickMsg time.Time
 // SubHistoryLoadedMsg 订阅或覆写历史快照列表加载完成。
 type SubHistoryLoadedMsg struct {
 	Request   uint64
-	Kind      profile.SnapshotKind
+	Kind      service.SnapshotKind
 	UID       string
-	Snapshots []profile.Snapshot
+	Snapshots []service.Snapshot
 	Err       error
 }
 
 // SubHistoryDiffMsg 历史快照与当前文件的差异结果。
 type SubHistoryDiffMsg struct {
 	Request uint64
-	Rows    []profile.FileDiffRow
+	Rows    []service.FileDiffRow
 	Err     error
 }
 
 // SubRollbackDoneMsg 历史快照回滚结果。
 type SubRollbackDoneMsg struct {
-	Kind         profile.SnapshotKind
+	Kind         service.SnapshotKind
 	UID          string
 	SnapshotID   string
 	MergeErr     error
@@ -385,13 +382,13 @@ func (m SubEditErrorMsg) Error() string { return m.Err.Error() }
 // LocalSubImportedMsg 首次启动时自动导入本地 mihomo 配置为本地订阅完成。
 // Profile 非空表示导入成功；Err 非 nil 表示导入失败（非致命，静默忽略）。
 type LocalSubImportedMsg struct {
-	Profile *profile.Profile
+	Profile *service.Profile
 	Err     error
 }
 
 type SubFileLoadedMsg struct {
 	Request uint64
-	Diff    []profile.FileDiffRow
+	Diff    []service.FileDiffRow
 	Err     error
 }
 
@@ -445,7 +442,7 @@ type PageMouseScrollMsg struct {
 
 // Core operations are delivered globally even when the user changes pages.
 type CoreStatusMsg struct {
-	Status coreinfra.Status
+	Status service.Status
 	Err    error
 }
 type CoreServiceLogMsg struct {
@@ -461,8 +458,8 @@ type CoreOperationMsg struct {
 	ID        uint64
 	Action    string
 	ShellPath string
-	Release   *coreinfra.Release
-	Releases  *coreinfra.ReleasePage
+	Release   *service.Release
+	Releases  *service.ReleasePage
 	Err       error
 }
 type CoreProgressTickMsg struct{ ID uint64 }

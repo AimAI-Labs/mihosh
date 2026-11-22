@@ -5,18 +5,17 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func FetchMihomoConfig(svc *service.ConfigService, client *api.Client) tea.Cmd {
-	return messages.CoreRequest(client, func(_ *api.Client) tea.Msg {
+func FetchMihomoConfig(svc *service.ConfigService, client *service.Client) tea.Cmd {
+	return messages.CoreRequest(client, func(_ *service.Client) tea.Msg {
 		return messages.MihomoConfigMsg{Config: svc.ReadMihomoConfig(), FromFile: true}
 	})
 }
 
-func SaveMihomoConfigField(svc *service.ConfigService, client *api.Client, key string, value interface{}) tea.Cmd {
+func SaveMihomoConfigField(svc *service.ConfigService, client *service.Client, key string, value interface{}) tea.Cmd {
 	// A completed file write must refresh the resolved endpoint even when reload fails.
 	return func() tea.Msg {
 		result := svc.SaveMihomoConfigField(client, key, value)
@@ -37,7 +36,7 @@ func FetchMihomoOverrides(svc *service.ConfigService) tea.Cmd {
 }
 
 // ApplyMihomoOverrides persists the five overrides to merge.yaml and applies them to the active core.
-func ApplyMihomoOverrides(svc *service.ConfigService, coreSvc *service.CoreService, client *api.Client, overrides map[string]string) tea.Cmd {
+func ApplyMihomoOverrides(svc *service.ConfigService, coreSvc *service.CoreService, client *service.Client, overrides map[string]string) tea.Cmd {
 	if svc == nil {
 		svc = service.NewConfigService()
 	}

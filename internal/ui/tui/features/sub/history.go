@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
@@ -27,17 +26,17 @@ const (
 
 type historyView struct {
 	mode      historyMode
-	kind      profile.SnapshotKind
+	kind      service.SnapshotKind
 	uid       string
 	subName   string
 	request   uint64
 	loading   bool
-	snapshots []profile.Snapshot
+	snapshots []service.Snapshot
 	selected  int
-	diff      []profile.FileDiffRow
+	diff      []service.FileDiffRow
 	top       int
 	err       error
-	ignore    profile.FileDiffOptions
+	ignore    service.FileDiffOptions
 }
 
 type historyDialog struct {
@@ -50,12 +49,12 @@ type historyDialog struct {
 
 func (s State) openHistoryModal() (State, tea.Cmd) {
 	var uid, name string
-	kind := profile.SnapshotMerge
+	kind := service.SnapshotMerge
 	if len(s.filteredIdx) > 0 && s.selected >= 0 && s.selected < len(s.filteredIdx) {
 		p := s.subs[s.filteredIdx[s.selected]]
 		uid = p.UID
 		name = p.Name
-		kind = profile.SnapshotRaw
+		kind = service.SnapshotRaw
 	}
 	ignore := service.LoadFileDiffOptions()
 	req := s.history.request + 1
@@ -79,10 +78,10 @@ func (s State) loadHistoryListCmd() tea.Cmd {
 			return messages.SubHistoryLoadedMsg{Request: h.request, Kind: h.kind, UID: h.uid, Err: errNoService}
 		}
 		var (
-			snaps []profile.Snapshot
+			snaps []service.Snapshot
 			err   error
 		)
-		if h.kind == profile.SnapshotRaw {
+		if h.kind == service.SnapshotRaw {
 			snaps, err = svc.ListRawSnapshots(h.uid)
 		} else {
 			snaps, err = svc.ListMergeSnapshots()
@@ -157,10 +156,10 @@ func (s State) handleHistoryKey(msg tea.KeyMsg) (State, tea.Cmd) {
 		return s, nil
 	case "tab", "left", "right":
 		if s.history.mode == historyList {
-			if s.history.kind == profile.SnapshotRaw {
-				return s.selectHistoryKind(profile.SnapshotMerge)
+			if s.history.kind == service.SnapshotRaw {
+				return s.selectHistoryKind(service.SnapshotMerge)
 			}
-			return s.selectHistoryKind(profile.SnapshotRaw)
+			return s.selectHistoryKind(service.SnapshotRaw)
 		}
 	case "up", "k":
 		if s.history.mode == historyList {
@@ -196,9 +195,9 @@ func (s State) handleHistoryKey(msg tea.KeyMsg) (State, tea.Cmd) {
 	return s, nil
 }
 
-func (s State) selectHistoryKind(kind profile.SnapshotKind) (State, tea.Cmd) {
+func (s State) selectHistoryKind(kind service.SnapshotKind) (State, tea.Cmd) {
 	h := &s.history
-	if h.kind == kind || (kind == profile.SnapshotRaw && h.uid == "") {
+	if h.kind == kind || (kind == service.SnapshotRaw && h.uid == "") {
 		return s, nil
 	}
 	h.kind = kind
@@ -217,10 +216,10 @@ func (s State) clickHistory(msg messages.PageMouseClickMsg) (State, tea.Cmd) {
 	x, y := msg.X-left-2, msg.Y-top
 	if y == 1 && s.history.mode == historyList && x >= 0 {
 		if x < d.rawWidth {
-			return s.selectHistoryKind(profile.SnapshotRaw)
+			return s.selectHistoryKind(service.SnapshotRaw)
 		}
 		if x >= d.rawWidth+2 && x < d.rawWidth+2+d.mergeWidth {
-			return s.selectHistoryKind(profile.SnapshotMerge)
+			return s.selectHistoryKind(service.SnapshotMerge)
 		}
 	}
 	if row := y - 3; s.history.mode == historyList && row >= 0 && row < d.listEnd-d.listStart && x >= 0 && x < d.innerWidth {
@@ -313,7 +312,7 @@ func (h historyView) dialog(width, height int) historyDialog {
 		d.rawWidth, d.mergeWidth = lipgloss.Width(rawTabLabel), lipgloss.Width(mergeTabLabel)
 
 		var tabsLine string
-		if h.kind == profile.SnapshotRaw {
+		if h.kind == service.SnapshotRaw {
 			tabsLine = activeTab.Render(rawTabLabel) + "  " + inactiveTab.Render(mergeTabLabel)
 		} else {
 			rawStyle := inactiveTab

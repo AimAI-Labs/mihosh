@@ -3,7 +3,6 @@ package rules
 import (
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/bubbles/key"
@@ -57,13 +56,13 @@ type State struct {
 
 	ColorAdjustLight float64 // 0.2-0.4 建议明度增加比例
 	ColorAdjustDark  float64 // 0.15-0.25 建议明度降低比例
-	client           *api.Client
+	client           *service.Client
 	configSvc        *service.ConfigService
 	coreSvc          *service.CoreService
 }
 
 // NewState 初始化规则状态
-func NewState(client *api.Client, configSvc *service.ConfigService, coreSvc *service.CoreService) State {
+func NewState(client *service.Client, configSvc *service.ConfigService, coreSvc *service.CoreService) State {
 	return State{client: client, configSvc: configSvc, coreSvc: coreSvc}
 }
 

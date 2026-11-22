@@ -4,19 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func FetchConnections(client *api.Client) tea.Cmd {
-	return messages.CoreRequest(client, func(client *api.Client) tea.Msg {
+func FetchConnections(client *service.Client) tea.Cmd {
+	return messages.CoreRequest(client, func(client *service.Client) tea.Msg {
 		conns, err := client.GetConnections()
 		if err != nil {
 			return messages.ErrMsg{Err: err}
@@ -26,7 +26,7 @@ func FetchConnections(client *api.Client) tea.Cmd {
 }
 
 // CloseConnection 关闭单个连接
-func CloseConnection(client *api.Client, id string) tea.Cmd {
+func CloseConnection(client *service.Client, id string) tea.Cmd {
 	return func() tea.Msg {
 		if err := client.CloseConnection(id); err != nil {
 			return messages.ErrMsg{Err: err}
@@ -36,7 +36,7 @@ func CloseConnection(client *api.Client, id string) tea.Cmd {
 }
 
 // CloseAllConnections 关闭所有连接
-func CloseAllConnections(client *api.Client) tea.Cmd {
+func CloseAllConnections(client *service.Client) tea.Cmd {
 	return func() tea.Msg {
 		if err := client.CloseAllConnections(); err != nil {
 			return messages.ErrMsg{Err: err}
@@ -46,7 +46,7 @@ func CloseAllConnections(client *api.Client) tea.Cmd {
 }
 
 // CloseConnectionsByIDs 按活跃连接 ID 批量关闭筛选命中的连接（限制并发为 model.TestConcurrency）
-func CloseConnectionsByIDs(client *api.Client, ids []string) tea.Cmd {
+func CloseConnectionsByIDs(client *service.Client, ids []string) tea.Cmd {
 	unique := make([]string, 0, len(ids))
 	seen := make(map[string]struct{}, len(ids))
 	for _, id := range ids {
@@ -99,7 +99,7 @@ func FetchIPInfo(ip string) tea.Cmd {
 		}
 
 		client := &http.Client{Timeout: 5 * time.Second}
-		apiURL := fmt.Sprintf("https://api.ip.sb/geoip/%s", ip)
+		apiURL := fmt.Sprintf("https://service.ip.sb/geoip/%s", ip)
 
 		req, err := http.NewRequest("GET", apiURL, nil)
 		if err != nil {
@@ -175,8 +175,8 @@ func hasScheme(addr string) bool {
 		(len(addr) >= 9 && addr[:9] == "socks5://")
 }
 
-// ConvertToConnectionsResponse 将 api.ConnectionsData 转换为 model.ConnectionsResponse
-func ConvertToConnectionsResponse(data api.ConnectionsData) *model.ConnectionsResponse {
+// ConvertToConnectionsResponse 将 service.ConnectionsData 转换为 model.ConnectionsResponse
+func ConvertToConnectionsResponse(data service.ConnectionsData) *model.ConnectionsResponse {
 	connections := make([]model.Connection, len(data.Connections))
 	for i, conn := range data.Connections {
 		connections[i] = model.Connection{

@@ -5,11 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"os"
 	"path/filepath"
 	"strconv"
-
-	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 )
 
 const releaseCacheSize = 64
@@ -24,7 +23,7 @@ type releaseStore struct {
 	cache  [releaseCacheSize]struct {
 		index   int
 		valid   bool
-		release coreinfra.Release
+		release service.Release
 	}
 }
 
@@ -43,7 +42,7 @@ func (c *releaseStore) close() {
 		c.cache = [releaseCacheSize]struct {
 			index   int
 			valid   bool
-			release coreinfra.Release
+			release service.Release
 		}{}
 	}
 }
@@ -64,9 +63,9 @@ func (c *releaseStore) find(tag string) (int, bool) {
 	return index, err == nil && index >= 0 && index < c.count
 }
 
-func (c *releaseStore) at(index int) (coreinfra.Release, error) {
+func (c *releaseStore) at(index int) (service.Release, error) {
 	if c.closed || index < 0 || index >= c.count {
-		return coreinfra.Release{}, errors.New("release record unavailable")
+		return service.Release{}, errors.New("release record unavailable")
 	}
 	slot := &c.cache[index%releaseCacheSize]
 	if slot.valid && slot.index == index {
@@ -74,17 +73,17 @@ func (c *releaseStore) at(index int) (coreinfra.Release, error) {
 	}
 	data, err := os.ReadFile(filepath.Join(c.root, strconv.Itoa(index)+".json"))
 	if err != nil {
-		return coreinfra.Release{}, err
+		return service.Release{}, err
 	}
-	var r coreinfra.Release
+	var r service.Release
 	if err := json.Unmarshal(data, &r); err != nil {
-		return coreinfra.Release{}, err
+		return service.Release{}, err
 	}
 	slot.index, slot.valid, slot.release = index, true, r
 	return r, nil
 }
 
-func (c *releaseStore) put(index int, r coreinfra.Release) error {
+func (c *releaseStore) put(index int, r service.Release) error {
 	if c.closed {
 		return errors.New("release catalogue is closed")
 	}
@@ -107,7 +106,7 @@ func (c *releaseStore) put(index int, r coreinfra.Release) error {
 	return nil
 }
 
-func (c *releaseStore) append(releases []coreinfra.Release) error {
+func (c *releaseStore) append(releases []service.Release) error {
 	for _, r := range releases {
 		if index, found := c.find(r.Tag); found {
 			if err := c.put(index, r); err != nil {

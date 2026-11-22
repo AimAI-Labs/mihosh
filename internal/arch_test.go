@@ -13,52 +13,8 @@ import (
 
 const modulePrefix = "github.com/AimAI-Labs/mihosh/"
 
-// allowedUIInfraImports is a strictly shrinking migration ratchet for legacy
-// ui -> infrastructure edges. New UI packages or new infrastructure imports
-// must go through internal/app/service and internal/domain/{model,rules,port}.
-var allowedUIInfraImports = map[string]map[string]bool{
-	"internal/ui/tui": {
-		"internal/infrastructure/api":    true,
-		"internal/infrastructure/config": true,
-	},
-	"internal/ui/tui/components/preferences": {
-		"internal/infrastructure/api":     true,
-		"internal/infrastructure/config":  true,
-		"internal/infrastructure/host":    true,
-		"internal/infrastructure/profile": true,
-		"internal/infrastructure/sync":    true,
-	},
-	"internal/ui/tui/features/connections": {
-		"internal/infrastructure/api": true,
-	},
-	"internal/ui/tui/features/core": {
-		"internal/infrastructure/api":    true,
-		"internal/infrastructure/config": true,
-		"internal/infrastructure/core":   true,
-	},
-	"internal/ui/tui/features/nodes": {
-		"internal/infrastructure/api":     true,
-		"internal/infrastructure/profile": true,
-	},
-	"internal/ui/tui/features/rules": {
-		"internal/infrastructure/api": true,
-	},
-	"internal/ui/tui/features/settings": {
-		"internal/infrastructure/api": true,
-	},
-	"internal/ui/tui/features/sub": {
-		"internal/infrastructure/profile": true,
-	},
-	"internal/ui/tui/messages": {
-		"internal/infrastructure/api":     true,
-		"internal/infrastructure/core":    true,
-		"internal/infrastructure/profile": true,
-	},
-}
-
 func TestArchitectureBoundaries(t *testing.T) {
 	pkgImports := collectInternalImports(t)
-	seenAllowedUIInfra := make(map[string]map[string]bool)
 
 	var violations []string
 
@@ -97,24 +53,8 @@ func TestArchitectureBoundaries(t *testing.T) {
 					violations = append(violations, pkg+" -> "+imp+" (ui must not depend on cli)")
 				}
 				if hasLayerPrefix(imp, "internal/infrastructure") {
-					if allowedUIInfraImports[pkg][imp] {
-						if seenAllowedUIInfra[pkg] == nil {
-							seenAllowedUIInfra[pkg] = make(map[string]bool)
-						}
-						seenAllowedUIInfra[pkg][imp] = true
-					} else {
-						violations = append(violations, pkg+" -> "+imp+" (new ui -> infrastructure edge is forbidden; route via internal/app/service)")
-					}
+					violations = append(violations, pkg+" -> "+imp+" (ui must depend on internal/app/service or internal/domain contracts)")
 				}
-			}
-		}
-	}
-
-	// Enforce the ratchet: remove allowlist entries once they are no longer imported.
-	for pkg, allowed := range allowedUIInfraImports {
-		for imp := range allowed {
-			if !seenAllowedUIInfra[pkg][imp] {
-				violations = append(violations, "stale allowlist entry: "+pkg+" -> "+imp+" (remove it from allowedUIInfraImports)")
 			}
 		}
 	}
