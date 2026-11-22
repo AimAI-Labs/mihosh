@@ -209,9 +209,12 @@ func buildCurrentIPSegments(
 
 	ipText := firstNonEmpty(info.IP, info.Query, "-")
 	var ipRendered string
+	var eyeIconWidth int
 	if masked {
+		eyeIconWidth = lipgloss.Width("◎")
 		ipRendered = mutedStyle.Render(maskedIPPlaceholder + " ◎")
 	} else {
+		eyeIconWidth = lipgloss.Width("◉")
 		ipRendered = ipStyle.Render(ipText) + mutedStyle.Render(" ◉")
 	}
 
@@ -310,9 +313,9 @@ func buildCurrentIPSegments(
 				b.WriteString(sep)
 				used += sepW
 			}
-			if seg.isIP {
-				ipStartX = baseX + used
-				ipEndX = ipStartX + segW
+			if seg.isIP && eyeIconWidth > 0 {
+				ipStartX = baseX + used + segW - eyeIconWidth
+				ipEndX = baseX + used + segW
 			}
 			b.WriteString(seg.rendered)
 			used += segW
@@ -321,13 +324,9 @@ func buildCurrentIPSegments(
 		}
 
 		// If the very first segment (IP) exceeds ultra-narrow width, truncate it directly.
+		// The trailing eye icon is clipped away, so clicking the bar opens the full IP dialog instead.
 		if count == 0 {
 			truncated := common.TruncateDisplay(seg.rendered, avail-used)
-			truncW := lipgloss.Width(truncated)
-			if seg.isIP && truncW > 0 {
-				ipStartX = baseX + used
-				ipEndX = ipStartX + truncW
-			}
 			b.WriteString(truncated)
 			break
 		}

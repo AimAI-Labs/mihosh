@@ -38,6 +38,7 @@ const (
 	MouseTargetPauseToggle
 	MouseTargetIPMaskToggle
 	MouseTargetIPRefresh
+	MouseTargetIPDetail
 )
 
 // MouseHit 是 connections 页面鼠标命中结果
@@ -96,12 +97,15 @@ func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 
 	if state.ViewMode == ConnViewTraffic {
 		if pageY == connectionsModeSwitchHeight {
-			ipLayout := components.LayoutCurrentIPBar(state.CurrentIP, state.Width)
-			if ipLayout.IPStartX >= 0 && pageX >= ipLayout.IPStartX && pageX < ipLayout.IPEndX {
-				return MouseHit{Target: MouseTargetIPMaskToggle, Index: -1}
-			}
-			if ipLayout.RefreshStart >= 0 && pageX >= ipLayout.RefreshStart && pageX < ipLayout.RefreshEnd {
-				return MouseHit{Target: MouseTargetIPRefresh, Index: -1}
+			if pageX >= 0 && pageX < state.Width {
+				ipLayout := components.LayoutCurrentIPBar(state.CurrentIP, state.Width)
+				if ipLayout.IPStartX >= 0 && pageX >= ipLayout.IPStartX && pageX < ipLayout.IPEndX {
+					return MouseHit{Target: MouseTargetIPMaskToggle, Index: -1}
+				}
+				if ipLayout.RefreshStart >= 0 && pageX >= ipLayout.RefreshStart && pageX < ipLayout.RefreshEnd {
+					return MouseHit{Target: MouseTargetIPRefresh, Index: -1}
+				}
+				return MouseHit{Target: MouseTargetIPDetail, Index: -1}
 			}
 			return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}
 		}
@@ -404,6 +408,13 @@ func (s State) InlineHelpHints(width int) []common.InlineHelpHint {
 			{Key: "Esc", Desc: i18n.T("conns.unlock.close")},
 		}
 	}
+	if s.currentIP.modalOpen {
+		return []common.InlineHelpHint{
+			{Key: "i", Desc: i18n.T("help.conns.hint_ip_mask")},
+			{Key: "r", Desc: i18n.T("help.conns.hint_refresh")},
+			{Key: "Esc/q", Desc: i18n.T("help.conns_detail.close")},
+		}
+	}
 	// 详情模式：左右面板切换 + 滚动 + 关闭
 	if s.connDetailMode {
 		return []common.InlineHelpHint{
@@ -444,6 +455,7 @@ func (s State) InlineHelpHints(width int) []common.InlineHelpHint {
 		}
 		return append(hints,
 			common.InlineHelpHint{Key: "i", Desc: i18n.T("help.conns.hint_ip_mask")},
+			common.InlineHelpHint{Key: "I", Desc: i18n.T("help.conns.hint_ip_detail"), Tone: common.InlineHelpToneInfo},
 			common.InlineHelpHint{Key: "h", Desc: i18n.T("help.conns.hint_switch")},
 			common.InlineHelpHint{Key: "?", Desc: i18n.T("core.inline.help")},
 			dnsHint,

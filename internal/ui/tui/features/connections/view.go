@@ -35,19 +35,21 @@ type PageState struct {
 	SiteTests        []model.SiteTest // 网站测试数据
 	SelectedSiteTest int              // 选中的网站索引
 	// Top N 排行榜
-	TopNItems       []components.TopNItem
-	TopNModalMode   bool
-	TopNModalItems  []components.TopNItem
-	TopNModalScroll int
-	InlineMode      bool // 是否开启内联详情模式
-	InlineFocused   bool // 内联详情是否获取焦点
-	InlineScroll    int  // 内联详情滚动偏移
-	Paused          bool // 是否暂停实时刷新
-	PausedUpdates   int  // 暂停期间收到的后台更新次数
-	Query           ConnQuery
-	Unlock          unlockView
-	DNS             dnsQueryView
-	CurrentIP       components.CurrentIPBarState
+	TopNItems            []components.TopNItem
+	TopNModalMode        bool
+	TopNModalItems       []components.TopNItem
+	TopNModalScroll      int
+	InlineMode           bool // 是否开启内联详情模式
+	InlineFocused        bool // 内联详情是否获取焦点
+	InlineScroll         int  // 内联详情滚动偏移
+	Paused               bool // 是否暂停实时刷新
+	PausedUpdates        int  // 暂停期间收到的后台更新次数
+	Query                ConnQuery
+	Unlock               unlockView
+	DNS                  dnsQueryView
+	CurrentIP            components.CurrentIPBarState
+	CurrentIPModalOpen   bool
+	CurrentIPModalScroll int
 }
 
 // RenderConnectionsPage 渲染连接监控页面
@@ -75,6 +77,9 @@ func RenderConnectionsPage(state PageState) string {
 	} else if state.Unlock.open {
 		popup, _ := state.Unlock.popup(state.Width, state.Height)
 		page = popup.Overlay(page, true)
+	} else if state.CurrentIPModalOpen {
+		modal := components.LayoutCurrentIPModal(state.CurrentIP, state.Width, state.Height, state.CurrentIPModalScroll)
+		page = modal.Dialog.Overlay(page, true)
 	}
 	return page
 }

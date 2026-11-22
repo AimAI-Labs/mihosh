@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
@@ -157,4 +158,109 @@ func TestCurrentIPErrorSetsRetryCountdown(t *testing.T) {
 	require.Nil(t, s.currentIP.info)
 	require.Contains(t, s.currentIP.err, "dial tcp timeout")
 	require.Equal(t, currentIPRetryInterval, s.currentIP.countdown)
+}
+
+func TestClickCurrentIPBarOpensModalAndSupportsInteractions(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("zh-CN")
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+
+	chart := model.NewChartData(60)
+	chart.AddSpeedData(1024, 2048)
+
+	fetchCount := 0
+	s := NewState("http://127.0.0.1:7890", model.DefaultSiteTests(), nil, 1000, chart).
+		SetCurrentIPFetcher(func(_ context.Context, _ string) (*model.IPInfo, error) {
+			fetchCount++
+			return &model.IPInfo{
+				IP:           "203.0.113.42",
+				Country:      "Japan",
+				CountryCode:  "JP",
+				City:         "Tokyo",
+				RegionName:   "Tokyo",
+				ASN:          2514,
+				AS:           "AS2514",
+				ISP:          "NTT Communications",
+				Organization: "NTT PC Communications, Inc.",
+				Timezone:     "Asia/Tokyo",
+				Latitude:     35.68,
+				Longitude:    139.68,
+			}, nil
+		})
+
+	s, cmd := s.EnsureCurrentIP()
+	require.NotNil(t, cmd)
+	s, _ = s.Update(cmd())
+
+	const width, height = 52, 26
+	// Narrow single-line bar clips organization/timezone/coordinates.
+	narrowBar := strings.Split(ansi.Strip(RenderConnectionsPage(s.ToPageState(chart, width, height))), "\n")[connectionsModeSwitchHeight]
+	require.NotContains(t, narrowBar, "Asia/Tokyo")
+	require.NotContains(t, narrowBar, "35.68, 139.68")
+
+	// Clicking the IP row (outside eye icon & refresh button) opens the IP info modal.
+	detailX, detailY, ok := findConnMousePoint(s, width, height, MouseTargetIPDetail, -1)
+	require.True(t, ok)
+	require.Equal(t, connectionsModeSwitchHeight, detailY)
+
+	s, cmd = s.HandleMouseLeft(detailX, detailY, width, height)
+	require.Nil(t, cmd)
+	require.True(t, s.CurrentIPModalOpen())
+	require.True(t, s.InputCapture().Active)
+
+	// Modal overlay displays the complete fields that were clipped in the bar.
+	modalView := ansi.Strip(RenderConnectionsPage(s.ToPageState(chart, width, height)))
+	require.Contains(t, modalView, "IP 信息")
+	require.Contains(t, modalView, "NTT PC Communications, Inc.")
+	require.Contains(t, modalView, "Asia/Tokyo")
+	require.Contains(t, modalView, "JP, 35.68, 139.68")
+
+	// Clicking IP inside modal toggles masking while keeping modal open.
+	layout := components.LayoutCurrentIPModal(s.currentIPBarState(), width, height, s.currentIP.modalScroll)
+	left, top, _, _ := layout.Dialog.Bounds()
+	require.GreaterOrEqual(t, layout.MaskX, 0)
+	s, cmd = s.HandleMouseLeft(left+layout.MaskX, top+layout.MaskY, width, height)
+	require.Nil(t, cmd)
+	require.True(t, s.CurrentIPModalOpen())
+	require.True(t, s.currentIP.masked)
+
+	// Pressing 'i' inside modal unmasks IP.
+	s, cmd = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+	require.Nil(t, cmd)
+	require.False(t, s.currentIP.masked)
+
+	// Clicking refresh button inside modal triggers refresh while keeping modal open.
+	layout = components.LayoutCurrentIPModal(s.currentIPBarState(), width, height, s.currentIP.modalScroll)
+	left, top, _, _ = layout.Dialog.Bounds()
+	require.GreaterOrEqual(t, layout.RefreshX, 0)
+	s, cmd = s.HandleMouseLeft(left+layout.RefreshX, top+layout.RefreshY, width, height)
+	require.NotNil(t, cmd)
+	require.True(t, s.CurrentIPModalOpen())
+	s, _ = s.Update(cmd())
+	require.Equal(t, 2, fetchCount)
+
+	// Clicking neutral area inside modal keeps it open.
+	s, cmd = s.HandleMouseLeft(left+1, top+1, width, height)
+	require.Nil(t, cmd)
+	require.True(t, s.CurrentIPModalOpen())
+
+	// Clicking outside modal closes it.
+	s, cmd = s.HandleMouseLeft(0, 0, width, height)
+	require.Nil(t, cmd)
+	require.False(t, s.CurrentIPModalOpen())
+	require.False(t, s.InputCapture().Active)
+
+	// Pressing 'I' opens modal; pressing 'r' refreshes; pressing 'Esc' closes it.
+	s, cmd = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'I'}})
+	require.Nil(t, cmd)
+	require.True(t, s.CurrentIPModalOpen())
+
+	s, cmd = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	require.NotNil(t, cmd)
+	s, _ = s.Update(cmd())
+	require.Equal(t, 3, fetchCount)
+
+	s, cmd = s.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	require.Nil(t, cmd)
+	require.False(t, s.CurrentIPModalOpen())
 }

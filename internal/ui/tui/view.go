@@ -103,6 +103,7 @@ func (m *Model) buildHelpContext() help.HelpContext {
 		ConnViewMode:       m.connsState.ViewMode(),
 		ConnDetail:         m.connsState.DetailMode(),
 		ConnTopN:           m.connsState.TopNModalMode(),
+		ConnIPModal:        m.connsState.CurrentIPModalOpen(),
 		ConnFilter:         m.connsState.FilterMode(),
 		NodesTestDetail:    m.nodesState.ShowTestDetail,
 		NodesFilterMode:    m.nodesState.NodeFilterMode,

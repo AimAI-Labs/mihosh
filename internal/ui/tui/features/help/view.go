@@ -42,6 +42,7 @@ type HelpContext struct {
 	ConnViewMode int  // ConnViewTraffic / ConnViewActive / ConnViewHistory
 	ConnDetail   bool // 连接详情弹窗
 	ConnTopN     bool // TopN 弹窗
+	ConnIPModal  bool // 当前出口 IP 信息弹窗
 	ConnFilter   bool // 过滤输入
 
 	// 节点页子状态
@@ -252,6 +253,18 @@ func buildConnectionsSections(ctx HelpContext) []section {
 		}}
 	}
 
+	if ctx.ConnIPModal {
+		return []section{{
+			title: i18n.T("help.section.conns_ip"),
+			bindings: []keybinding{
+				{"i", i18n.T("help.conns_ip.toggle_mask")},
+				{"r", i18n.T("help.conns_ip.refresh")},
+				{"↑/↓  k/j", i18n.T("help.conns_ip.scroll")},
+				{"Esc / q / ↵", i18n.T("help.conns_ip.close")},
+			},
+		}}
+	}
+
 	if ctx.ConnFilter {
 		return []section{{
 			title: i18n.T("help.section.conns_search"),
@@ -273,6 +286,7 @@ func buildConnectionsSections(ctx HelpContext) []section {
 				{"s", i18n.T("help.conns_traffic.test_site")},
 				{"S", i18n.T("help.conns_traffic.test_all")},
 				{"i", i18n.T("help.conns_traffic.toggle_ip")},
+				{"I", i18n.T("help.conns_traffic.ip_detail")},
 				{"U", i18n.T("conns.unlock.title")},
 				{"D", i18n.T("conns.dns.title")},
 			},

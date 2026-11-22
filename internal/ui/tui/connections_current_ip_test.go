@@ -164,3 +164,86 @@ func TestConnectionsTrafficTabCurrentIPFlow(t *testing.T) {
 	require.Contains(t, ansi.Strip(m.View()), "198.51.100.7")
 	require.Contains(t, ansi.Strip(m.View()), "[SG] Singapore")
 }
+
+func TestConnectionsTrafficTabClickCurrentIPRowOpensDialogOnNarrowTerminal(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	i18n.Init()
+	i18n.SetLanguageOverride("zh-CN")
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+
+	chart := model.NewChartData(60)
+	chart.AddSpeedData(1024, 2048)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"connections":[]}`))
+	}))
+	defer srv.Close()
+	client := api.NewClient(config.MihomoEndpoint{ExternalController: srv.URL}, 1000)
+
+	m := Model{
+		client:      client,
+		width:       54,
+		height:      26,
+		currentPage: layout.PageConnections,
+		chartData:   chart,
+		connsState: connections.NewState("http://127.0.0.1:7890", model.DefaultSiteTests(), client, 1000, chart).
+			SetCurrentIPFetcher(func(_ context.Context, _ string) (*model.IPInfo, error) {
+				return &model.IPInfo{
+					IP:           "203.0.113.42",
+					Country:      "Japan",
+					CountryCode:  "JP",
+					City:         "Tokyo",
+					RegionName:   "Tokyo",
+					ASN:          2514,
+					AS:           "AS2514",
+					ISP:          "Unknown",
+					Organization: "NTT PC Communications, Inc.",
+					Timezone:     "Asia/Tokyo",
+					Latitude:     35.68,
+					Longitude:    139.68,
+				}, nil
+			}),
+	}
+
+	var ipCmd tea.Cmd
+	m.connsState, ipCmd = m.connsState.EnsureCurrentIP()
+	require.NotNil(t, ipCmd)
+	next, _ := m.Update(ipCmd())
+	m = next.(Model)
+
+	view := ansi.Strip(m.View())
+	lines := strings.Split(view, "\n")
+	ipRow := -1
+	for i, line := range lines {
+		if strings.Contains(line, "203.0.113.42") {
+			ipRow = i
+			break
+		}
+	}
+	require.Greater(t, ipRow, 0, "expected single-line IP bar in rendered narrow view")
+	require.NotContains(t, lines[ipRow], "Asia/Tokyo", "narrow bar should clip secondary IP fields")
+
+	// Left-click the IP row to open the full IP information dialog.
+	clickX := strings.Index(lines[ipRow], "203.0.113.42")
+	require.GreaterOrEqual(t, clickX, 0)
+	next, _ = m.Update(tea.MouseMsg{
+		X:      clickX,
+		Y:      ipRow,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+	m = next.(Model)
+	require.True(t, m.connsState.CurrentIPModalOpen())
+
+	dialogView := ansi.Strip(m.View())
+	require.Contains(t, dialogView, "IP 信息")
+	require.Contains(t, dialogView, "NTT PC Communications, Inc.")
+	require.Contains(t, dialogView, "Asia/Tokyo")
+	require.Contains(t, dialogView, "JP, 35.68, 139.68")
+
+	// Esc closes the dialog cleanly.
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = next.(Model)
+	require.False(t, m.connsState.CurrentIPModalOpen())
+}
