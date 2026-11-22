@@ -1025,6 +1025,10 @@
   "guide.btn_edit": "进入 Core",
   "guide.btn_retry": "[r] 重新连接",
   "guide.btn_close": "[Esc] 暂不配置",
+
+  "placeholder.title": "未连接 Mihomo 内核",
+  "placeholder.reason": "节点、连接、日志、规则与订阅都需要内核提供数据，内核未连接时这些页面无法使用。",
+  "placeholder.hint": "请到 Core 页启动或连接内核，然后按 r 重新检测；连接成功后本页会自动恢复。",
   "menu.core": "Core",
   "title.core": "内核管理",
   "core.heading": "Mihomo 内核管理",

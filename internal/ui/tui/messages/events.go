@@ -65,6 +65,9 @@ type ShowGuideModalMsg struct {
 
 type HideGuideModalMsg struct{}
 
+// PlaceholderTickMsg 推进内核未连接占位屏的像素动画。
+type PlaceholderTickMsg struct{}
+
 // ========= Node / Proxy Testing Messages =========
 
 type TestDoneMsg struct {

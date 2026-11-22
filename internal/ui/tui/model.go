@@ -17,6 +17,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/notice"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/placeholder"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/bootstrap"
@@ -61,6 +62,9 @@ type Model struct {
 	chartData *model.ChartData
 
 	notice notice.State
+
+	// 内核未连接占位屏的像素动画帧
+	placeholderState placeholder.State
 
 	// WebSocket
 	connectionEpoch    uint64

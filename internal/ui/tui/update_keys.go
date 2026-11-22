@@ -162,6 +162,12 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // dispatchToPage 将消息分发到当前页面子状态
 func (m Model) dispatchToPage(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// 占位屏期间页面内容不可用，只保留布局尺寸消息，避免操作落在不可见的页面上。
+	if m.coreUnavailable() {
+		if _, resize := msg.(messages.PageResizeMsg); !resize {
+			return m, nil
+		}
+	}
 	var cmd tea.Cmd
 	switch m.currentPage {
 	case layout.PageCore:
