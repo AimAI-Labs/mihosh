@@ -36,6 +36,8 @@ const (
 	MouseTargetInlineToggle
 	MouseTargetInlineDetail
 	MouseTargetPauseToggle
+	MouseTargetIPMaskToggle
+	MouseTargetIPRefresh
 )
 
 // MouseHit 是 connections 页面鼠标命中结果
@@ -93,6 +95,16 @@ func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 	line := connectionsModeSwitchHeight + 1 // 模式切换(3) + 空行(1)
 
 	if state.ViewMode == ConnViewTraffic {
+		if pageY == connectionsModeSwitchHeight {
+			ipLayout := components.LayoutCurrentIPBar(state.CurrentIP, state.Width)
+			if ipLayout.IPStartX >= 0 && pageX >= ipLayout.IPStartX && pageX < ipLayout.IPEndX {
+				return MouseHit{Target: MouseTargetIPMaskToggle, Index: -1}
+			}
+			if ipLayout.RefreshStart >= 0 && pageX >= ipLayout.RefreshStart && pageX < ipLayout.RefreshEnd {
+				return MouseHit{Target: MouseTargetIPRefresh, Index: -1}
+			}
+			return MouseHit{Target: ConnectionsMouseTargetNone, Index: -1}
+		}
 		if state.ChartData != nil {
 			chartsSection := components.RenderChartsSection(state.ChartData, state.Width, calcMaxChartHeight(state))
 			if chartsSection != "" {
@@ -431,6 +443,7 @@ func (s State) InlineHelpHints(width int) []common.InlineHelpHint {
 			)
 		}
 		return append(hints,
+			common.InlineHelpHint{Key: "i", Desc: i18n.T("help.conns.hint_ip_mask")},
 			common.InlineHelpHint{Key: "h", Desc: i18n.T("help.conns.hint_switch")},
 			common.InlineHelpHint{Key: "?", Desc: i18n.T("core.inline.help")},
 			dnsHint,

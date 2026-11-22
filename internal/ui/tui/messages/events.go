@@ -108,6 +108,12 @@ type IPInfoMsg struct {
 	Err  error
 }
 
+type CurrentIPInfoMsg struct {
+	RequestID uint64
+	Info      *model.IPInfo
+	Err       error
+}
+
 type SiteTestMsg struct {
 	Name    string
 	Delay   int
