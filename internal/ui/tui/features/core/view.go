@@ -387,35 +387,29 @@ func (s State) serviceQuickStyle(action string, focused bool) lipgloss.Style {
 
 func (s State) serviceQuickMenu(width int) ([]string, []releaseControl) {
 	groups := s.serviceQuickGroups()
-	muted := common.DimStyle()
+	separator := lipgloss.NewStyle().Foreground(theme.Resolve(common.Gray())).Render("│")
 	var rows []string
 	var controls []releaseControl
 	var line string
 	x := 0
 	actionIdx := 0
-	for _, section := range groups {
-		var title string
-		if section.label != "" {
-			title = i18n.T("core.service.group." + section.label)
-		}
-		titleWidth := lipgloss.Width(title)
-		groupWidth := titleWidth
+	for gi, section := range groups {
+		groupWidth := 0
 		labels := make([]string, len(section.actions))
 		for i, action := range section.actions {
 			labels[i] = " " + i18n.T("core.service.quick."+action) + " "
 			groupWidth += 1 + lipgloss.Width(labels[i])
 		}
-		const gap = "   "
-		if x > 0 && x+len(gap)+groupWidth > width {
-			rows = append(rows, line)
-			line, x = "", 0
+		if gi > 0 {
+			if x > 0 && x+3+groupWidth > width {
+				rows = append(rows, line)
+				line, x = "", 0
+			}
+			if x > 0 {
+				line += " " + separator + " "
+				x += 3
+			}
 		}
-		if x > 0 {
-			line += gap
-			x += len(gap)
-		}
-		line += muted.Render(title)
-		x += titleWidth
 		for i, action := range section.actions {
 			label := labels[i]
 			btnW := lipgloss.Width(label)
@@ -445,7 +439,8 @@ func (s State) serviceQuickMenu(width int) ([]string, []releaseControl) {
 func (s State) systemdPanel(width, availHeight int) (string, []releaseControl, int) {
 	innerW := max(1, width-4)
 	menuRows, controls := s.serviceQuickMenu(innerW)
-	menuRows = append(menuRows, "")
+	divider := lipgloss.NewStyle().Foreground(theme.Resolve(common.Border())).Render(strings.Repeat("─", innerW))
+	menuRows = append(menuRows, divider)
 	logHeight := max(3, availHeight-2-len(menuRows))
 	body := s.Status.ServiceUnit + "\n" + i18n.T("core.service.status_loading")
 	if s.serviceLog.Unit == s.Status.ServiceUnit {

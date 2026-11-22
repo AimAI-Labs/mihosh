@@ -1115,8 +1115,6 @@
   "core.service.quick.disable": "关闭自动启动",
   "core.service.quick.install": "安装后台服务",
   "core.service.quick.uninstall": "卸载后台服务",
-  "core.service.group.runtime": "运行",
-  "core.service.group.autostart": "自动启动",
   "core.tab.daily": "日常使用",
   "core.tab.downloads": "下载管理",
   "core.tab.versions": "版本管理",
