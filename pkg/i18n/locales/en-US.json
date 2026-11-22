@@ -1109,8 +1109,6 @@
   "core.service.quick.disable": "Disable autostart",
   "core.service.quick.install": "Install service",
   "core.service.quick.uninstall": "Uninstall service",
-  "core.service.group.runtime": "Runtime",
-  "core.service.group.autostart": "Autostart",
   "core.tab.daily": "Everyday",
   "core.tab.downloads": "Downloads",
   "core.tab.versions": "Versions",

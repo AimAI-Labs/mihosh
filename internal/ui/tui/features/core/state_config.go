@@ -17,7 +17,6 @@ func isCoreTabKey(key string) bool {
 func (s State) IsMihomoPage() bool { return s.tab == 4 }
 
 type serviceQuickGroup struct {
-	label   string
 	actions []string
 }
 
@@ -34,8 +33,8 @@ func (s State) serviceQuickGroups() []serviceQuickGroup {
 		lifecycle = []string{"stop", "restart"}
 	}
 	return []serviceQuickGroup{
-		{"runtime", lifecycle},
-		{"autostart", []string{"enable", "boot", "disable"}},
+		{actions: lifecycle},
+		{actions: []string{"enable", "boot", "disable"}},
 		{actions: []string{"uninstall"}},
 	}
 }
