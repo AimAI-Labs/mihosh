@@ -43,6 +43,9 @@ func (n *DesktopNetwork) ReadProxy(ctx context.Context) (ProxySettings, error) {
 		schema, name := settingKey(key)
 		value, err := n.Run(ctx, "gsettings", "get", schema, name)
 		if err != nil {
+			if errors.Is(err, exec.ErrNotFound) {
+				return nil, errors.New("GNOME system proxy requires gsettings (GNOME desktop); on headless or non-GNOME Linux, use terminal proxy (mihosh proxy on/off) or TUN instead")
+			}
 			return nil, fmt.Errorf("GNOME proxy settings unavailable: %w", err)
 		}
 		settings[key] = Setting{Data: []byte(strings.TrimSpace(string(value))), Exists: true}
@@ -87,6 +90,9 @@ func (n *DesktopNetwork) WriteProxy(ctx context.Context, settings ProxySettings)
 	for _, key := range keys {
 		schema, name := settingKey(key)
 		if _, err := n.Run(ctx, "gsettings", "set", schema, name, string(settings[key].Data)); err != nil {
+			if errors.Is(err, exec.ErrNotFound) {
+				return errors.New("GNOME system proxy requires gsettings (GNOME desktop); on headless or non-GNOME Linux, use terminal proxy (mihosh proxy on/off) or TUN instead")
+			}
 			return err
 		}
 	}

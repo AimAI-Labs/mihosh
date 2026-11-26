@@ -66,6 +66,13 @@ func (m Model) applyCoreEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 		var cmd tea.Cmd
 		m.coreState, cmd = m.coreState.Update(msg)
 		if result, ok := msg.(messages.CoreOperationMsg); ok {
+			if n, ok := m.coreState.OperationNotice(result); ok {
+				if n.Level != messages.NoticeError {
+					m.clearErrorNotice()
+				}
+				m.notice.Publish(n)
+			}
+			m.coreState = m.coreState.ClearTaskNotice()
 			var targetCmd tea.Cmd
 			if result.Err == nil {
 				targetCmd = m.coreOperationCompleted(result.Action)
@@ -73,11 +80,16 @@ func (m Model) applyCoreEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 			m.syncProcessLogs()
 			return m, tea.Batch(cmd, targetCmd), true
 		}
-		if statusMsg, ok := msg.(messages.CoreStatusMsg); ok && statusMsg.Err == nil {
-			m.syncProcessLogs()
-			if statusMsg.Status.Mode == "managed" && !statusMsg.Status.Running && m.connectionReady {
-				resolve := m.requestCoreTarget(coreTargetStopped, coreTargetOptions{})
-				return m, tea.Batch(cmd, resolve), true
+		if statusMsg, ok := msg.(messages.CoreStatusMsg); ok {
+			if statusMsg.Err != nil {
+				m.publishError(statusMsg.Err)
+				m.coreState = m.coreState.ClearTaskNotice()
+			} else {
+				m.syncProcessLogs()
+				if statusMsg.Status.Mode == "managed" && !statusMsg.Status.Running && m.connectionReady {
+					resolve := m.requestCoreTarget(coreTargetStopped, coreTargetOptions{})
+					return m, tea.Batch(cmd, resolve), true
+				}
 			}
 		}
 		return m, cmd, true

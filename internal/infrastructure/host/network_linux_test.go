@@ -3,6 +3,8 @@ package host
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"os/exec"
 	"strconv"
 	"strings"
 	"testing"
@@ -33,6 +35,18 @@ func TestHeadlessProxyFailsBeforeExecutingSettings(t *testing.T) {
 	n := &DesktopNetwork{Run: func(context.Context, string, ...string) ([]byte, error) { t.Fatal("no desktop bus"); return nil, nil }}
 	_, err := n.ReadProxy(context.Background())
 	require.ErrorContains(t, err, "D-Bus")
+}
+func TestMissingGSettingsExplainsHeadlessFallback(t *testing.T) {
+	t.Setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/isolated/test")
+	n := &DesktopNetwork{Run: func(context.Context, string, ...string) ([]byte, error) {
+		return nil, fmt.Errorf("gsettings failed: %w", &exec.Error{Name: "gsettings", Err: exec.ErrNotFound})
+	}}
+	_, err := n.ReadProxy(context.Background())
+	require.ErrorContains(t, err, "requires gsettings")
+	require.ErrorContains(t, err, "mihosh proxy on/off")
+	require.NotContains(t, err.Error(), "executable file not found")
+	err = n.WriteProxy(context.Background(), n.ProxyTarget(7890))
+	require.ErrorContains(t, err, "requires gsettings")
 }
 func TestTUNCleanupOnlyDeletesReservedPriorities(t *testing.T) {
 	identity := TUNIdentity(t.TempDir())

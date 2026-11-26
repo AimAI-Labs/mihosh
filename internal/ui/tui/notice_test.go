@@ -170,3 +170,41 @@ func TestMouseCanClickEarlierWrappedHelpRow(t *testing.T) {
 	}
 	t.Fatal("search hint did not appear above the last footer row")
 }
+
+func TestCoreOperationErrorsRenderInGlobalNoticeRowWithDetails(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("zh-CN")
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+
+	m := Model{width: 90, height: 24, currentPage: layout.PageCore}
+	longErr := errors.New("GNOME system proxy requires gsettings (GNOME desktop); on headless or non-GNOME Linux, use terminal proxy (mihosh proxy on/off) or TUN instead")
+	next, _ := m.Update(messages.CoreOperationMsg{ID: m.coreState.OperationID(), Action: "system-proxy", Err: longErr})
+	m = next.(Model)
+
+	want := i18n.T("core.action.system-proxy") + " · " + longErr.Error()
+	assertNoticeRow(t, m, want)
+	if m.notice.Message.Level != messages.NoticeError {
+		t.Fatalf("expected error notice level, got %v", m.notice.Message.Level)
+	}
+	rows := strings.Split(ansi.Strip(m.View()), "\n")
+	helpRow := rows[m.mainPageLayout().noticeRow()+1]
+	if strings.Contains(helpRow, "GNOME") || strings.Contains(helpRow, i18n.T("core.action.system-proxy")) {
+		t.Fatalf("core error leaked onto inline help row: %q", helpRow)
+	}
+	aboveNotice := strings.Join(rows[:m.mainPageLayout().noticeRow()], "\n")
+	if strings.Contains(aboveNotice, "gsettings") || strings.Contains(aboveNotice, "mihosh proxy on/off") {
+		t.Fatalf("core error leaked above global notice row: %q", aboveNotice)
+	}
+
+	next, _ = m.Update(tea.MouseMsg{X: 2, Y: m.mainPageLayout().noticeRow(), Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	m = next.(Model)
+	if !m.notice.DetailsOpen || !strings.Contains(ansi.Strip(m.View()), "mihosh proxy on/off") {
+		t.Fatal("clicking the core error notice did not open full error details")
+	}
+
+	next, cmd := m.Update(messages.CoreOperationMsg{ID: m.coreState.OperationID(), Action: "system-proxy", Err: nil})
+	m = next.(Model)
+	if cmd == nil || m.notice.Message.Level != messages.NoticeSuccess {
+		t.Fatalf("subsequent success did not replace previous error notice: %+v", m.notice.Message)
+	}
+}
