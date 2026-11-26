@@ -1298,5 +1298,7 @@
   "core.task.close": "Enter / Esc Close",
   "core.tab.mihomo": "Mihomo config",
   "core.action.mihomo": "Mihomo configuration",
-  "core.desc.mihomo": "Manage the controller, secret, proxy port, LAN access and log level in one place."
+  "core.desc.mihomo": "Manage the controller, secret, proxy port, LAN access and log level in one place.",
+  "update.release_page": "Release page",
+  "update.manual_install": "No verified automatic update is available. Install from the release page. [Esc] Close"
 }

@@ -203,17 +203,21 @@ func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo,
 	} else {
 		verStr := fmt.Sprintf("%s  →  %s", info.CurrentVersion, info.Version)
 		body = lipgloss.NewStyle().Foreground(common.TokyoCyan()).Bold(true).Render(verStr) + "\n\n"
-		body += lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render("Changelog: "+info.ReleaseURL) + "\n\n"
+		body += lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render(i18n.T("update.release_page")+"\n"+info.ReleaseURL) + "\n\n"
+		if info.DownloadURL == "" {
+			body += i18n.T("update.manual_install")
+		} else {
 
-		leftBtn := lipgloss.NewStyle().Foreground(common.TokyoGreen()).Render("[Enter] 立即更新")
-		rightBtn := lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render("[Esc] 稍后更新")
+			leftBtn := lipgloss.NewStyle().Foreground(common.TokyoGreen()).Render("[Enter] 立即更新")
+			rightBtn := lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render("[Esc] 稍后更新")
 
-		halfWidth := contentWidth / 2
-		leftHalf := lipgloss.NewStyle().Width(halfWidth).Align(lipgloss.Right).Render(leftBtn + "  ")
-		rightHalf := lipgloss.NewStyle().Width(contentWidth - halfWidth).Align(lipgloss.Left).Render("  " + rightBtn)
-		buttons := lipgloss.JoinHorizontal(lipgloss.Top, leftHalf, rightHalf)
+			halfWidth := contentWidth / 2
+			leftHalf := lipgloss.NewStyle().Width(halfWidth).Align(lipgloss.Right).Render(leftBtn + "  ")
+			rightHalf := lipgloss.NewStyle().Width(contentWidth - halfWidth).Align(lipgloss.Left).Render("  " + rightBtn)
+			buttons := lipgloss.JoinHorizontal(lipgloss.Top, leftHalf, rightHalf)
 
-		body += buttons
+			body += buttons
+		}
 	}
 	wrappedBody := lipgloss.NewStyle().Width(contentWidth).Render(body)
 	bodyLines := strings.Split(wrappedBody, "\n")

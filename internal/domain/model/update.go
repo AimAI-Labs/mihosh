@@ -6,4 +6,5 @@ type UpdateInfo struct {
 	Version        string
 	ReleaseURL     string
 	DownloadURL    string
+	DownloadSHA256 string
 }

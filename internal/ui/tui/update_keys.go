@@ -103,12 +103,12 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.updateError = nil
 			return m, nil
 		case "enter":
-			if !m.isUpdating && m.updateInfo != nil {
+			if !m.isUpdating && m.updateInfo != nil && m.updateInfo.DownloadURL != "" {
 				m.isUpdating = true
 				m.updateError = nil
-				url := m.updateInfo.DownloadURL
+				info := *m.updateInfo
 				return m, func() tea.Msg {
-					err := service.DownloadAndApplyUpdate(url)
+					err := service.DownloadAndApplyUpdate(info)
 					return messages.UpdateAppliedMsg{Err: err}
 				}
 			}

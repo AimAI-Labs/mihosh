@@ -1298,5 +1298,7 @@
   "core.task.close": "Enter / Esc 关闭",
   "core.tab.mihomo": "Mihomo 配置",
   "core.action.mihomo": "Mihomo 配置",
-  "core.desc.mihomo": "统一配置管理接口、密钥、代理端口、局域网访问和日志等级。"
+  "core.desc.mihomo": "统一配置管理接口、密钥、代理端口、局域网访问和日志等级。",
+  "update.release_page": "发布页面",
+  "update.manual_install": "此版本没有可验证的自动更新包，请从发布页面手动安装。 [Esc] 关闭"
 }
