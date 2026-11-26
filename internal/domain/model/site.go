@@ -51,12 +51,12 @@ func DefaultSiteTests() []SiteTest {
 		{
 			Name: "ChatGPT",
 			URL:  "https://api.openai.com",
-			Icon: "\uf544",
+			Icon: "✿",
 		},
 		{
 			Name: "Claude",
 			URL:  "https://api.anthropic.com",
-			Icon: "\uf544",
+			Icon: "✶",
 		},
 		{
 			Name: "jsDelivr",
