@@ -13,6 +13,8 @@ description: Troubleshooting and Frequently Asked Questions
 | **Theme Not Applied** | Check if the configured `theme` name is spelled correctly (Supported: `tokyo-night`, `catppuccin`, `gruvbox`, `nord`, `dracula`). |
 | **Garbled UI or Misaligned Tables** | Your terminal font might not support special characters. It is highly recommended to use a **Nerd Font**, or ensure your font supports CJK monospace characters well. |
 | **Auto-refresh Not Working** | Check `auto_refresh_interval` in config. Setting it to `0` disables auto-refresh. |
+| **Linux TUN Fails (`CAP_NET_ADMIN`)** | Grant Linux capabilities to the Mihosh executable itself (not only `mihomo`): `sudo setcap cap_net_admin,cap_net_raw+ep /path/to/mihosh` (or `"$HOME/.mihosh/bin/mihosh"` in background service mode). Re-run `setcap` after replacing or upgrading the binary. See [`mihosh core`](/docs/commands/core#system-proxy-tun-and-recovery). |
+| **System Proxy Unavailable (`gsettings`)** | Linux system proxy integration uses GNOME `gsettings`. On headless servers or non-GNOME desktops without `gsettings`, use shell proxy (`mihosh activate` / `mihosh proxy on`) or TUN instead. |
 
 ## Quick Diagnostics
 

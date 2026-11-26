@@ -13,6 +13,8 @@ description: 排障与常见问题解答
 | **主题不生效** | 确认配置的 `theme` 名称是否拼写正确（支持：`tokyo-night`, `catppuccin`, `gruvbox`, `nord`, `dracula`）。 |
 | **界面乱码、表格对齐问题** | 你的终端字体可能不支持特殊字符。强烈推荐使用 **Nerd Font**，或确保使用的字体对 CJK (中日韩) 等宽字符支持良好。 |
 | **自动刷新不工作** | 检查配置中的 `auto_refresh_interval`，设为 `0` 会禁用自动刷新。 |
+| **Linux 开启 TUN 提示缺少 `CAP_NET_ADMIN`** | 需要给 **Mihosh 可执行文件本身**（而不是仅给 `mihomo`）授予能力：`sudo setcap cap_net_admin,cap_net_raw+ep /path/to/mihosh`（后台服务模式为 `"$HOME/.mihosh/bin/mihosh"`）。替换或升级二进制后需重新授权，详见 [`mihosh core`](/docs/commands/core#系统代理tun-与恢复)。 |
+| **Linux 开启系统代理报错 `gsettings`** | Linux 系统代理依赖 GNOME 桌面的 `gsettings`。在无桌面服务器或非 GNOME 环境下，请改用终端代理（`mihosh activate` / `mihosh proxy on`）或 TUN 接管。 |
 
 ## 快速排查
 

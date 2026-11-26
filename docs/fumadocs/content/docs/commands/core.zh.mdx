@@ -122,14 +122,19 @@ mihosh core network-recover --output json
 
 这些托管网络操作当前仅支持 Linux。系统代理要求使用**托管 Core**，通过当前登录用户的 D-Bus 会话操作 GNOME GSettings；不支持外部 Core，也不会静默通过 `sudo` 提权。应在桌面用户会话中执行，不要在缺少该用户 D-Bus 环境的 root shell 中执行。其他桌面环境没有受支持的系统代理后端。启用代理时先记录原值，关闭或拥有会话退出时，只恢复仍与本应用写入值一致的字段，保留期间用户另行修改的字段。
 
-TUN 默认关闭。Linux 需要 `/dev/net/tun`、iproute2，且 **Mihosh 协调进程和恢复守护进程**需要 `CAP_NET_ADMIN`；不能只给内核可执行文件授权。对已安装的固定服务入口，可由管理员授予推荐的能力：
+TUN 默认关闭。Linux 需要 `/dev/net/tun`、`iproute2`，且需要给 **Mihosh 可执行文件本身**授予 `CAP_NET_ADMIN`（用于向子进程 `mihomo` 传递能力、运行恢复守护进程以及退出时清理 TUN 路由和网卡），不能只给 `mihomo` 内核文件授权。按实际运行方式对对应的 Mihosh 文件授权：
 
 ```bash
+# 后台服务模式（已安装的固定服务入口）
 sudo setcap cap_net_admin,cap_net_raw+ep "$HOME/.mihosh/bin/mihosh"
 getcap "$HOME/.mihosh/bin/mihosh"
+
+# 前台 / 直接运行模式（若不在 PATH 中，替换为实际二进制路径，如 /home/<user>/mihosh）
+sudo setcap cap_net_admin,cap_net_raw+ep "$(readlink -f "$(command -v mihosh)")"
+getcap "$(readlink -f "$(command -v mihosh)")"
 ```
 
-前台模式应给实际运行的 Mihosh 可执行文件授权；更新或重新复制文件后需重新核对能力。如果系统策略不允许 file capabilities，当前实现没有普通用户 TUN 的替代提权路径；此时可使用 [`mihosh activate` 与 `proxy`](./sysproxy) 中的终端代理。不会静默提权。
+覆盖、升级或重新复制 Mihosh 二进制文件会清除 Linux 文件能力（file capabilities），每次更新或重新安装后台服务后都需重新执行 `setcap` 并用 `getcap` 核对。如果系统策略不允许 file capabilities，当前实现没有普通用户 TUN 的替代提权路径；此时可使用 [`mihosh activate` 与 `proxy`](./sysproxy) 中的终端代理。不会静默提权。
 
 托管 TUN 使用独立名称、路由表和规则区间，预先检查冲突。采用系统协议栈、自动路由和出口接口检测，不启用额外自动重定向或严格防火墙规则。DNS 不对外监听；保留已有 nameserver，缺少时生成 Cloudflare/阿里 DoH 与引导 DNS。系统 DNS 的接口配置随托管 TUN 一起恢复。
 

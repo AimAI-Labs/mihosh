@@ -122,14 +122,19 @@ These commands share Core's `y` / `n` / `c` actions and support `--output plain|
 
 These managed network actions target Linux only. System proxy requires a **managed** Core and uses GNOME GSettings with the logged-in user's D-Bus session; it does not support an external Core or silently elevate with `sudo`. Run it from the desktop user's session, not a root shell without that user's D-Bus environment. Other desktop backends are not supported by this integration. Prior values are saved and restored only for fields still matching Mihosh's applied values, preserving intervening user changes.
 
-Linux TUN requires `/dev/net/tun`, iproute2 and `CAP_NET_ADMIN` on **the Mihosh coordinator and recovery guard**, not only on the kernel executable. An administrator can explicitly grant the recommended capabilities to the installed stable service entry:
+Linux TUN requires `/dev/net/tun`, `iproute2`, and `CAP_NET_ADMIN` on **Mihosh itself** (to pass capabilities to `mihomo`, run the recovery guard, and clean up TUN routes/interfaces on exit), not only on the `mihomo` kernel binary. Grant the recommended file capabilities to the Mihosh binary you actually run:
 
 ```bash
+# Background service mode (installed stable service entry)
 sudo setcap cap_net_admin,cap_net_raw+ep "$HOME/.mihosh/bin/mihosh"
 getcap "$HOME/.mihosh/bin/mihosh"
+
+# Foreground / direct binary mode (replace with the actual path if not in PATH)
+sudo setcap cap_net_admin,cap_net_raw+ep "$(readlink -f "$(command -v mihosh)")"
+getcap "$(readlink -f "$(command -v mihosh)")"
 ```
 
-For foreground use, grant them to the actual Mihosh executable. Recheck capabilities after updates or copying binaries. If file capabilities are unavailable, Mihosh has no ordinary-user TUN escalation path; use the shell proxy described in [`mihosh activate` and `proxy`](./sysproxy) instead. No silent elevation occurs.
+Replacing, upgrading, or copying the Mihosh executable clears Linux file capabilities, so re-run `setcap` and verify with `getcap` after every update or service reinstall. If file capabilities are unavailable, Mihosh has no ordinary-user TUN escalation path; use the shell proxy described in [`mihosh activate` and `proxy`](./sysproxy) instead. No silent elevation occurs.
 
 Managed TUN reserves its own interface name, routing table and rule range after checking collisions. It uses the system stack, automatic routing/interface detection, and no additional auto-redirect or strict firewall rules. DNS has no external listener; existing nameservers are retained, or Cloudflare/Alibaba DoH and bootstrap DNS are generated. Interface DNS state is restored with the owned TUN resources.
 
