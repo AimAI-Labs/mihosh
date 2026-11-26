@@ -16,6 +16,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -38,9 +39,10 @@ var ErrMihomoPathMissing = errors.New("未找到 mihomo 配置文件路径")
 
 // ProfileService 订阅管理服务。
 type ProfileService struct {
-	core   *CoreService
-	client *api.Client // 仅为 ReloadConfig
-	mu     sync.Mutex  // Activate 流程串行化
+	core    *CoreService
+	client  *api.Client
+	mu      sync.Mutex // Activate 流程串行化
+	applied *confirmedProfileApply
 }
 
 // NewProfileService 创建订阅管理服务。
@@ -339,21 +341,28 @@ func (s *ProfileService) SaveMerge(content []byte) error {
 
 // ActivateResult 激活流程的结果。
 type ActivateResult struct {
-	BackupName   string // 产生的备份文件名（首次生成时为空）
-	MergeErr     error  // merge.yaml 解析错误（非致命，已降级忽略覆写）
-	Restarted    bool   // external-controller 或 secret 变更后已重启内核
-	NeedsRestart bool   // 外部/远程内核需要手动重启才能应用控制器地址或密钥变更
-	Remote       bool   // 仅通过远程控制器内存重载应用（未写入远端磁盘）
+	BackupName    string // 产生的备份文件名（首次生成时为空）
+	MergeErr      error  // merge.yaml 解析错误（非致命，已降级忽略覆写）
+	Restarted     bool   // external-controller 或 secret 变更后已重启内核
+	NeedsRestart  bool   // 外部/远程内核需要手动重启才能应用控制器地址或密钥变更
+	Remote        bool   // 仅通过远程控制器内存重载应用（未写入远端磁盘）
+	ConfigWritten bool   // 本地目标已包含生成的配置
+	CoreApplied   bool   // 内核确认重载，或已用新配置启动
+	ActiveSaved   bool   // 激活 UID 已持久化
 }
 
-// Activate 激活订阅：生成 → 备份 → 写入 mihomo 配置 → 热重载。
-//
-// 返回 ActivateResult（含备份名与可能的 merge 降级错误）。
-// 任一致命步骤失败（生成/备份/写入/重载）返回 error，此时 ActivateResult 零值。
-//
-// 失败回滚策略（与现有 rules 功能一致）：
-//   - 写入成功但重载失败时不回滚文件，由调用方提示「配置已写入但重载失败」；
-//   - 重载成功后同步把 active_sub 更新为 uid。
+type profileApplyTarget struct {
+	path       string
+	digest     [sha256.Size]byte
+	generation uint64
+}
+
+type confirmedProfileApply struct {
+	target profileApplyTarget
+	result ActivateResult
+}
+
+// Activate 激活订阅。若某一步失败，结果报告已完成的步骤供调用方提示及重试。
 func (s *ProfileService) Activate(uid string) (ActivateResult, error) {
 	return s.activate(uid, nil)
 }
@@ -396,97 +405,105 @@ func (s *ProfileService) activate(uid string, cleared []string) (ActivateResult,
 		return runtime.ApplyProfileCleared(context.Background(), uid, false, cleared)
 	}
 
-	// 1. 解析 mihomo 配置路径（提前获取用于保留字段）
-	mihomoPath, err := config.GetMihomoConfigPath()
-	if errors.Is(err, config.ErrExternalConfig) {
-		generated, genErr := profile.GenerateForUID(uid, "")
-		if genErr != nil {
-			return ActivateResult{}, genErr
-		}
-		if s.client == nil {
-			return ActivateResult{}, errors.New("未配置 mihomo 客户端，无法重载核心")
-		}
-		if reloadErr := s.client.ReloadConfigPayload(generated.Data); reloadErr != nil {
-			return ActivateResult{}, fmt.Errorf("核心重载失败: %w", reloadErr)
-		}
-		if err := s.SetActiveSub(uid); err != nil {
-			_ = err
-		}
-		needsRestart := false
-		if cfgErr == nil {
-			if overrides, oerr := profile.ReadMihomoOverrides(); oerr == nil {
-				needsRestart = identityRequestedForRemote(overrides, cfg.Core.ExternalController, cfg.Core.ExternalSecret)
-			}
-		}
-		return ActivateResult{MergeErr: generated.MergeErr, Remote: true, NeedsRestart: needsRestart}, nil
+	if cfgErr != nil {
+		return ActivateResult{}, cfgErr
 	}
-	if err != nil {
+	return s.activateExternal(p, cfg, cleared)
+}
+
+func (s *ProfileService) activateExternal(p profile.Profile, cfg *config.Config, cleared []string) (ActivateResult, error) {
+	path, err := config.GetMihomoConfigPath()
+	remote := errors.Is(err, config.ErrExternalConfig)
+	if err != nil && !remote {
 		return ActivateResult{}, ErrMihomoPathMissing
 	}
-
-	// 2. 生成（merge 损坏时降级；显式 merge.yaml 覆写优先于现有文件）
-	generated, err := profile.GenerateForUIDWithCleared(uid, mihomoPath, cleared, false)
+	generated, err := profile.GenerateForUIDWithCleared(p.UID, path, cleared, false)
 	if err != nil {
 		return ActivateResult{}, err
 	}
-	data := generated.Data
-
-	// 3. 配置未变更时跳过写盘与重载。
-	// yaml.v3 序列化确定性保证：相同 raw+merge 生成字节一致。
-	// 跳过可避免重复触发 mihomo ApplyConfig 重建 proxies/rules/providers
-	// （其固有内存峰值是用户感知"切换订阅内存升高"的直接来源）。
-	existing, rerr := os.ReadFile(mihomoPath)
-	identityChanged := rerr == nil && localControllerIdentityChanged(existing, data, s.client)
-	if rerr == nil && bytes.Equal(existing, data) {
-		// 仅同步激活 UID 后返回（BackupName 为空表示未产生新备份）。
-		if err := s.SetActiveSub(uid); err != nil {
-			_ = err
+	result := ActivateResult{MergeErr: generated.MergeErr, Remote: remote}
+	var client *api.Client
+	var generation uint64
+	if s.client != nil {
+		client = s.client.Snapshot()
+		generation = client.Generation()
+	}
+	target := profileApplyTarget{path: path, digest: sha256.Sum256(generated.Data), generation: generation}
+	identityChanged := false
+	unchanged := remote
+	if remote {
+		if overrides, err := profile.ReadMihomoOverrides(); err == nil {
+			result.NeedsRestart = identityRequestedForRemote(overrides, cfg.Core.ExternalController, cfg.Core.ExternalSecret)
 		}
-		return ActivateResult{MergeErr: generated.MergeErr, NeedsRestart: identityChanged}, nil
-	}
-
-	// 4. 备份现有 config.yaml
-	backupName, err := profile.BackupConfig(mihomoPath)
-	if err != nil {
-		return ActivateResult{}, fmt.Errorf("备份配置失败: %w", err)
-	}
-
-	// 5. 原子写入最终配置
-	if err := profile.WriteFinal(mihomoPath, data); err != nil {
-		return ActivateResult{}, fmt.Errorf("写入最终配置失败: %w", err)
-	}
-
-	// 6. 热重载或重启核心
-	if s.client == nil {
-		return ActivateResult{}, errors.New("未配置 mihomo 客户端，无法重载核心")
-	}
-	restarted, needsRestart := false, false
-	if identityChanged {
-		if config.RestartMihomoService() == nil {
-			restarted = true
-		} else {
-			if err := s.client.ReloadConfig(mihomoPath); err != nil {
-				return ActivateResult{}, fmt.Errorf("核心重载失败（配置已写入）: %w", err)
+	} else {
+		existing, readErr := os.ReadFile(path)
+		identityChanged = readErr == nil && localControllerIdentityChanged(existing, generated.Data, client)
+		unchanged = readErr == nil && bytes.Equal(existing, generated.Data)
+		if !unchanged {
+			s.applied = nil
+			backup, err := profile.BackupConfig(path)
+			if err != nil {
+				return result, fmt.Errorf("备份配置失败: %w", err)
 			}
-			needsRestart = true
+			result.BackupName = backup
+			if err := profile.WriteFinal(path, generated.Data); err != nil {
+				return result, fmt.Errorf("写入最终配置失败: %w", err)
+			}
 		}
-	} else if err := s.client.ReloadConfig(mihomoPath); err != nil {
-		// 重载失败：文件已写入，不回滚。返回错误供调用方提示。
-		return ActivateResult{}, fmt.Errorf("核心重载失败（配置已写入）: %w", err)
+		result.ConfigWritten = true
 	}
-
-	// 7. 更新激活 UID
-	if err := s.SetActiveSub(uid); err != nil {
-		// 元数据更新失败不致命（核心已重载），仅返回结果。
-		_ = err
+	if client == nil {
+		return result, errors.New(i18n.T("sub.err.activation_no_client"))
 	}
-
-	return ActivateResult{
-		BackupName:   backupName,
-		MergeErr:     generated.MergeErr,
-		Restarted:    restarted,
-		NeedsRestart: needsRestart,
-	}, nil
+	if unchanged && s.applied != nil && s.applied.target == target {
+		result.Restarted = s.applied.result.Restarted && !s.applied.result.ActiveSaved
+		result.NeedsRestart = s.applied.result.NeedsRestart
+	} else {
+		s.applied = nil
+		var reloadErr error
+		switch {
+		case remote:
+			reloadErr = client.ReloadConfigPayload(generated.Data)
+		case identityChanged && config.RestartMihomoService() == nil:
+			result.Restarted = true
+		default:
+			reloadErr = client.ReloadConfig(path)
+			result.NeedsRestart = identityChanged && reloadErr == nil
+		}
+		if reloadErr != nil {
+			key := "sub.err.activation_reload"
+			if result.ConfigWritten {
+				key = "sub.err.activation_reload_written"
+			}
+			return result, fmt.Errorf("%s: %w", i18n.T(key), reloadErr)
+		}
+	}
+	result.CoreApplied = true
+	if s.client.Generation() != generation {
+		return result, errors.New(i18n.T("sub.err.activation_target_changed"))
+	}
+	s.applied = &confirmedProfileApply{target: target, result: result}
+	if err := config.Update(func(latest *config.Config) error {
+		for _, current := range latest.Subs {
+			if current.UID == p.UID {
+				if !current.Source.SameOrigin(p.Source) {
+					return errors.New(i18n.T("sub.err.source_changed"))
+				}
+				latest.ActiveSub = p.UID
+				return nil
+			}
+		}
+		return ErrSubNotFound
+	}); err != nil {
+		return result, fmt.Errorf("%s: %w", i18n.T("sub.err.activation_metadata"), err)
+	}
+	result.ActiveSaved = true
+	if remote {
+		s.applied = nil
+	} else {
+		s.applied.result.ActiveSaved = true
+	}
+	return result, nil
 }
 
 // ===== 内部辅助 =====

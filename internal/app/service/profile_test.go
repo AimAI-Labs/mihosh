@@ -8,8 +8,10 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -279,51 +281,94 @@ func TestProfileService_ActivateMissingRaw(t *testing.T) {
 	assert.ErrorIs(t, err, profile.ErrRawNotFound)
 }
 
-// TestProfileService_ActivateSkipsUnchangedConfig 验证：当生成的最终配置与 mihomo
-// 当前配置文件字节相同时，Activate 跳过写盘+备份+重载（client==nil 也不会报错）。
-//
-// 这是"跳过相同配置重载"优化的核心保障——避免重复触发 mihomo ApplyConfig
-// 重建 proxies/rules/providers 导致的内存峰值。
-func TestProfileService_ActivateSkipsUnchangedConfig(t *testing.T) {
-	// 单一临时 HOME，同时容纳 mihosh 配置（.mihosh）与 mihomo 配置（.config/mihomo）。
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("USERPROFILE", home)
-	t.Setenv("APPDATA", "") // 防 Windows 下搜到真实系统的 mihomo 目录
-	t.Setenv("HOMEDRIVE", "")
-	t.Setenv("HOMEPATH", "")
-	isolateMihomoDiscovery(t)
-	viper.Reset()
-	t.Cleanup(viper.Reset)
-
-	// 预置 mihosh 配置文件，使 config.Load 可用。
-	mihoshDir := filepath.Join(home, ".mihosh")
-	require.NoError(t, os.MkdirAll(mihoshDir, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(mihoshDir, "config.yaml"),
-		[]byte("test_url: http://example.com\n"), 0644))
-
-	s := NewProfileService(nil)
-
-	// 添加订阅并写入一份本地 raw.yaml。
-	p, err := s.AddProfile("跳过测试", profile.SubSource{Kind: profile.SourceLocal, Path: "/p/a.yaml"})
+func TestProfileServiceRetriesReloadUntilConfirmed(t *testing.T) {
+	s := newIsolatedService(t)
+	var reloads atomic.Int32
+	attachProfileController(t, s, func(w http.ResponseWriter, r *http.Request) {
+		if reloads.Add(1) == 1 {
+			http.Error(w, "temporary reload failure", http.StatusBadGateway)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	p, err := s.AddProfile("reload test", profile.SubSource{Kind: profile.SourceLocal, Path: "/p/a.yaml"})
 	require.NoError(t, err)
 	require.NoError(t, profile.WriteRaw(p.UID, []byte("mode: rule\nproxies: []\n")))
 
-	// 预先算出 Activate 将生成的字节，写入 mihomo 配置目录（模拟"上次已成功激活"）。
-	mihomoDir := filepath.Join(home, ".config", "mihomo")
-	require.NoError(t, os.MkdirAll(mihomoDir, 0755))
-	mihomoPath := filepath.Join(mihomoDir, "config.yaml")
-	generated, err := profile.GenerateForUID(p.UID, "")
+	first, err := s.Activate(p.UID)
+	require.ErrorContains(t, err, i18n.T("sub.err.activation_reload_written"))
+	require.True(t, first.ConfigWritten)
+	require.False(t, first.CoreApplied)
+	require.False(t, first.ActiveSaved)
+	cfg, err := config.Load()
 	require.NoError(t, err)
-	expected := generated.Data
-	require.NotEmpty(t, expected)
-	require.NoError(t, os.WriteFile(mihomoPath, expected, 0644))
+	require.Empty(t, cfg.ActiveSub)
 
-	// client==nil：若未跳过，会在重载阶段报"未配置 mihomo 客户端"。
-	// 跳过时应直接返回成功且 BackupName 为空。
-	res, err := s.Activate(p.UID)
+	second, err := s.Activate(p.UID)
 	require.NoError(t, err)
-	assert.Empty(t, res.BackupName, "配置未变更时应跳过备份，BackupName 为空")
+	require.True(t, second.CoreApplied)
+	require.True(t, second.ActiveSaved)
+	require.Empty(t, second.BackupName, "retry must not rewrite identical config bytes")
+	require.Equal(t, int32(2), reloads.Load())
+
+	third, err := s.Activate(p.UID)
+	require.NoError(t, err)
+	require.True(t, third.ActiveSaved)
+	require.Equal(t, int32(2), reloads.Load(), "confirmed configuration can skip another reload")
+}
+
+func TestProfileServiceRetriesOnlyFailedRemoteMetadata(t *testing.T) {
+	s := newIsolatedService(t)
+	p, err := s.AddProfile("metadata test", profile.SubSource{Kind: profile.SourceLocal, Path: "/p/a.yaml"})
+	require.NoError(t, err)
+	require.NoError(t, profile.WriteRaw(p.UID, []byte("mode: rule\nproxies: []\n")))
+	root, err := config.GetConfigDir()
+	require.NoError(t, err)
+	metadata := filepath.Join(root, "config.yaml")
+	var reloads atomic.Int32
+	endpoint := attachProfileController(t, s, func(w http.ResponseWriter, r *http.Request) {
+		if reloads.Add(1) == 1 {
+			if err := os.WriteFile(metadata, []byte("invalid: [\n"), 0600); err != nil {
+				t.Error(err)
+			}
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	require.NoError(t, config.Update(func(cfg *config.Config) error {
+		cfg.Core.ExternalController = endpoint
+		return nil
+	}))
+	original, err := os.ReadFile(metadata)
+	require.NoError(t, err)
+
+	first, err := s.Activate(p.UID)
+	require.ErrorContains(t, err, i18n.T("sub.err.activation_metadata"))
+	require.True(t, first.Remote)
+	require.True(t, first.CoreApplied)
+	require.False(t, first.ActiveSaved)
+	require.False(t, first.ConfigWritten)
+	require.NoError(t, os.WriteFile(metadata, original, 0600))
+
+	second, err := s.Activate(p.UID)
+	require.NoError(t, err)
+	require.True(t, second.ActiveSaved)
+	require.Equal(t, int32(1), reloads.Load())
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	require.Equal(t, p.UID, cfg.ActiveSub)
+}
+
+func attachProfileController(t *testing.T, s *ProfileService, handler http.HandlerFunc) string {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut || r.URL.Path != "/configs" {
+			t.Errorf("unexpected controller request %s %s", r.Method, r.URL)
+		}
+		handler(w, r)
+	}))
+	t.Cleanup(server.Close)
+	s.client = api.NewClient(config.MihomoEndpoint{ExternalController: server.URL}, 2000)
+	return server.URL
 }
 
 // TestProfileService_ActivateRewritesWhenConfigChanged 验证：当生成的配置与
@@ -360,7 +405,7 @@ func TestProfileService_ActivateRewritesWhenConfigChanged(t *testing.T) {
 	// 配置不同 → 不跳过 → 走到重载阶段 → client==nil 报错。
 	_, err = s.Activate(p.UID)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "未配置 mihomo 客户端")
+	assert.Contains(t, err.Error(), i18n.T("sub.err.activation_no_client"))
 }
 
 // TestProfileService_ActivatePreservesManagedFields 验证：当订阅 S 与 merge M 都未提供
@@ -409,7 +454,7 @@ func TestProfileService_ActivatePreservesManagedFields(t *testing.T) {
 	// client==nil：会在写入后进入重载阶段报错，但足以验证最终 O 已被正确写回。
 	_, err = s.Activate(p.UID)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "未配置 mihomo 客户端")
+	assert.Contains(t, err.Error(), i18n.T("sub.err.activation_no_client"))
 
 	written, err := os.ReadFile(mihomoPath)
 	require.NoError(t, err)
@@ -465,7 +510,7 @@ func TestProfileService_ActivateManagedFieldsOverrideSubscription(t *testing.T) 
 
 	_, err = s.Activate(p.UID)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "未配置 mihomo 客户端")
+	assert.Contains(t, err.Error(), i18n.T("sub.err.activation_no_client"))
 
 	written, err := os.ReadFile(mihomoPath)
 	require.NoError(t, err)

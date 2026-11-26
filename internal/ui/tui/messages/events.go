@@ -313,7 +313,7 @@ type SubRollbackDoneMsg struct {
 }
 
 // SubActivatedMsg 激活订阅流程结束。
-// Err != nil 表示生成/备份/写入/重载中某步失败（配置可能已写入，见 ProfileService.Activate）。
+// Err != nil 表示激活流程中某步失败。CoreApplied 表示内核已完成重载。
 // MergeErr != nil 表示 merge.yaml 语法错误（已降级忽略覆写，非致命）。
 type SubActivatedMsg struct {
 	UID          string
@@ -323,6 +323,7 @@ type SubActivatedMsg struct {
 	Restarted    bool
 	NeedsRestart bool
 	Remote       bool
+	CoreApplied  bool
 }
 
 // SubAddDoneMsg 订阅已新增（调用方负责刷新列表）。

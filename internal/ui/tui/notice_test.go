@@ -5,14 +5,36 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/sub"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
+
+func TestActivationMetadataFailureNoticeKeepsRetryAvailable(t *testing.T) {
+	i18n.Init()
+	m := Model{currentPage: layout.PageSub, subState: sub.NewState(nil)}
+	updated, _ := m.Update(messages.SubsLoadedMsg{Subs: []service.Profile{{UID: "pending", Name: "Pending"}}})
+	m = updated.(Model)
+	detail := i18n.T("sub.err.activation_metadata") + ": write timeout"
+	updated, _ = m.Update(messages.SubActivatedMsg{UID: "pending", Err: errors.New(detail), CoreApplied: true})
+	m = updated.(Model)
+	if m.notice.Message.Text != detail || m.notice.Message.Level != messages.NoticeError || m.subState.ActiveUID() != "" {
+		t.Fatalf("activation error or pending state lost: %+v", m.notice.Message)
+	}
+	_, retry := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if retry == nil {
+		t.Fatal("activation shortcut did not retry")
+	}
+	if attempt, ok := retry().(messages.SubActivatedMsg); !ok || attempt.UID != "pending" {
+		t.Fatal("retry did not target the pending subscription")
+	}
+}
 
 func TestGlobalNoticeRendersAboveInlineHelpAndHandlesDetails(t *testing.T) {
 	i18n.Init()

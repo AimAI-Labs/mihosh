@@ -133,16 +133,15 @@ func ActivateSubCmd(svc *service.ProfileService, uid string) tea.Cmd {
 			return messages.SubActivatedMsg{UID: uid, Err: errNoService}
 		}
 		res, err := svc.Activate(uid)
-		if err != nil {
-			return messages.SubActivatedMsg{UID: uid, Err: err}
-		}
 		return messages.SubActivatedMsg{
 			UID:          uid,
+			Err:          err,
 			BackupName:   res.BackupName,
 			MergeErr:     res.MergeErr,
 			Restarted:    res.Restarted,
 			NeedsRestart: res.NeedsRestart,
 			Remote:       res.Remote,
+			CoreApplied:  res.CoreApplied,
 		}
 	}
 }

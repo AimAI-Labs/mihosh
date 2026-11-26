@@ -276,7 +276,7 @@ func TestProfileActivationKeepsMergeWarning(t *testing.T) {
 			path, err := config.GetMihomoConfigPath()
 			require.NoError(t, err)
 			if mode == "external" {
-				// An unchanged external target exercises successful activation without a controller.
+				// The unchanged target still requires a confirmed reload on first activation.
 				raw, err := profile.ReadRaw(uid)
 				require.NoError(t, err)
 				data, err := profile.GenerateYAMLWithPreserve(raw, nil, path)
@@ -290,7 +290,9 @@ func TestProfileActivationKeepsMergeWarning(t *testing.T) {
 			if mode == "managed" {
 				result, err = svc.ApplyProfile(context.Background(), uid, false)
 			} else {
-				result, err = NewProfileService(nil).Activate(uid)
+				external := NewProfileService(nil)
+				attachProfileController(t, external, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+				result, err = external.Activate(uid)
 			}
 			require.NoError(t, err)
 			require.Error(t, result.MergeErr)

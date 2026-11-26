@@ -434,7 +434,10 @@ func (s *CoreService) applyProfile(ctx context.Context, uid string, startIfStopp
 		if err = s.replaceCore(ctx, change); err != nil {
 			return ActivateResult{}, err
 		}
-		return ActivateResult{BackupName: backup, MergeErr: generated.MergeErr, Restarted: true}, nil
+		return ActivateResult{
+			BackupName: backup, MergeErr: generated.MergeErr, Restarted: true,
+			ConfigWritten: true, CoreApplied: true, ActiveSaved: true,
+		}, nil
 	}
 	record, _ := json.Marshal(recovery)
 	if err = privateWrite(journal, record); err != nil {
@@ -495,7 +498,10 @@ func (s *CoreService) applyProfile(ctx context.Context, uid string, startIfStopp
 	if err = os.Remove(journal); err != nil {
 		return rollback(err)
 	}
-	return ActivateResult{BackupName: backup, MergeErr: generated.MergeErr}, nil
+	return ActivateResult{
+		BackupName: backup, MergeErr: generated.MergeErr,
+		ConfigWritten: true, CoreApplied: running || started, ActiveSaved: true,
+	}, nil
 }
 
 // ImportProfile reuses the subscription store while keeping first-time configuration

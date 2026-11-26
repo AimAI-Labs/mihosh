@@ -14,6 +14,7 @@ import (
 
 func TestActivateRemoteRetriesUnfetchedSubscriptionAndKeepsCachedActivationOffline(t *testing.T) {
 	s := newIsolatedService(t)
+	attachProfileController(t, s, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	const raw = "mode: rule\nproxies: []\n"
 	var status, requests atomic.Int32
 	status.Store(http.StatusBadGateway)

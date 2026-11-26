@@ -84,7 +84,11 @@ func (m Model) applySubEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 
 	case messages.SubActivatedMsg:
 		if msg.Err != nil {
-			m.publishError(msg.Err)
+			detail := msg.Err.Error()
+			m.notice.Publish(messages.NoticeMsg{Text: detail, Detail: detail, Level: messages.NoticeError})
+			if msg.CoreApplied && m.connectionReady && !msg.Restarted {
+				return m, m.refreshOnConnect(), true
+			}
 			return m, nil, true
 		}
 		cmd := m.finishSubConfigApply(msg.MergeErr, msg.Restarted, msg.NeedsRestart, msg.Remote,
