@@ -25,10 +25,23 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Test
+      - name: Build native update fixture
+        run: go build -o "$RUNNER_TEMP/mihosh" .
+
+      - name: Test Linux
+        if: runner.os == 'Linux'
+        run: MIHOSH_UPDATE_TEST_BINARY="$RUNNER_TEMP/mihosh" go test ./...
+
+      # Managed core runtime coverage runs on Linux. Exercise the portable
+      # client, updater and configuration paths on macOS itself.
+      - name: Test macOS
+        if: runner.os == 'macOS'
         run: |
-          go build -o "$RUNNER_TEMP/mihosh" .
-          MIHOSH_UPDATE_TEST_BINARY="$RUNNER_TEMP/mihosh" go test ./...
+          export MIHOSH_UPDATE_TEST_BINARY="$RUNNER_TEMP/mihosh"
+          go test ./internal ./internal/bootstrap ./internal/infrastructure/{api,config,profile,sync} ./internal/ui/tui/features/logs ./pkg/...
+          go test ./internal/app/service -run 'Test(UpdateSelectsExactVerifiedReleaseAsset|ApplyReleaseUpdate|RestoreBundle|SyncService|ProfileServiceRetries|ActivateRemote|ActivateRefreshesChangedSource|ActivateLoadsChangedLocalSource|BatchStopsClaiming|OversizedRemoteSubscription)'
+          go test ./internal/cli -run '^TestSyncCLI'
+          go test ./internal/ui/tui -run 'Test(ActivationMetadataFailureNotice|TargetChangeInvalidates|SlowControllerDiscovery|QueuedWebSocketMessage|WebSocketLogBurst|WSInbox)'
 
   build:
     needs: test
