@@ -41,7 +41,7 @@ internal/infrastructure (基础设施适配器：api, config, core, host, profil
    - `internal/ui/tui`：基于 Bubble Tea 的 Feature-Sliced TUI，根包事件路由已按领域拆分为 `update.go`、`update_ws.go`、`update_core_events.go`、`update_config_events.go`、`update_sub_events.go`。
    - TUI 包通过 `internal/app/service` 的契约与方法访问 API、配置、订阅、内核、主机和同步能力，不再直接导入基础设施包。
 
-`CoreService` 保留兼容 facade，同时通过 `Runtime`、`ReleaseManager`、`Configuration` 和 `Network` 暴露四个聚焦能力。四个能力共享 facade 的生命周期和锁所有权。
+`CoreService` 负责托管内核的生命周期与锁。CLI 和 TUI 直接调用其方法。实现按运行、发布、配置和网络职责组织在各自的文件中。
 
 ## 数据流转与边界守卫
 

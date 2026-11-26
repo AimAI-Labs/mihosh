@@ -18,7 +18,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/host"
 )
 
-func (s *CoreService) startRuntime(ctx context.Context) error {
+func (s *CoreService) Start(ctx context.Context) error {
 	if s.usesService() {
 		s.processLogs.Store(false)
 		return s.ServiceAction(ctx, "start")
@@ -325,10 +325,10 @@ func (s *CoreService) stopLocked() error {
 	}
 	return recoveryErr
 }
-func (s *CoreService) stopRuntime() error {
+func (s *CoreService) Stop() error {
 	return s.StopContext(context.Background())
 }
-func (s *CoreService) stopRuntimeContext(ctx context.Context) error {
+func (s *CoreService) StopContext(ctx context.Context) error {
 	if s.usesService() {
 		return s.ServiceAction(ctx, "stop")
 	}
@@ -342,7 +342,7 @@ func (s *CoreService) stopRuntimeContext(ctx context.Context) error {
 	s.failure = nil
 	return s.stopLocked()
 }
-func (s *CoreService) restartRuntime(ctx context.Context) error {
+func (s *CoreService) Restart(ctx context.Context) error {
 	if s.usesService() {
 		return s.ServiceAction(ctx, "restart")
 	}

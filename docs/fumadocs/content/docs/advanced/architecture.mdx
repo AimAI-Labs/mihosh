@@ -41,7 +41,7 @@ internal/infrastructure (Adapters: api, config, core, host, profile, sync)
    - `internal/ui/tui`: Feature-sliced Bubble Tea TUI with modular event routing (`update.go`, `update_ws.go`, `update_core_events.go`, `update_config_events.go`, `update_sub_events.go`).
    - TUI packages consume API, configuration, profile, core, host, and sync contracts through `internal/app/service` aliases and methods. They have no direct infrastructure imports.
 
-`CoreService` retains its compatibility facade while exposing four focused capabilities through `Runtime`, `ReleaseManager`, `Configuration`, and `Network`. These capabilities share the facade's lifecycle and lock ownership.
+`CoreService` owns the managed core lifecycle and locks. CLI and TUI call its methods directly. Implementations are grouped by responsibility across runtime, release, configuration and network files.
 
 ## Data Flow & Boundary Enforcement
 

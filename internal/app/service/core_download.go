@@ -32,7 +32,7 @@ func coreFetcher(cfg *config.Config, notify func(coreinfra.Progress)) *coreinfra
 	f.Notify = notify
 	return f
 }
-func (s *CoreService) release(ctx context.Context, tag string, notify func(coreinfra.Progress)) (coreinfra.Release, error) {
+func (s *CoreService) Release(ctx context.Context, tag string, notify func(coreinfra.Progress)) (coreinfra.Release, error) {
 	cfg, err := loadCoreConfig()
 	if err != nil {
 		return coreinfra.Release{}, err
@@ -78,12 +78,12 @@ type cachedReleasePage struct {
 
 // Releases queries one page without installing, activating or changing the runtime.
 // Cached pages are served from disk within releasePageCacheTTL to avoid redundant requests.
-func (s *CoreService) listReleases(ctx context.Context, page int, notify func(coreinfra.Progress)) (coreinfra.ReleasePage, error) {
+func (s *CoreService) Releases(ctx context.Context, page int, notify func(coreinfra.Progress)) (coreinfra.ReleasePage, error) {
 	return s.releases(ctx, page, notify, false)
 }
 
 // RefreshReleases bypasses the cached release catalog and fetches a fresh page from upstream.
-func (s *CoreService) refreshReleases(ctx context.Context, page int, notify func(coreinfra.Progress)) (coreinfra.ReleasePage, error) {
+func (s *CoreService) RefreshReleases(ctx context.Context, page int, notify func(coreinfra.Progress)) (coreinfra.ReleasePage, error) {
 	return s.releases(ctx, page, notify, true)
 }
 
@@ -219,7 +219,7 @@ func clearLaterCachedReleasePages(goos, goarch string) {
 		}
 	}
 }
-func (s *CoreService) installRelease(ctx context.Context, r coreinfra.Release, notify func(coreinfra.Progress)) error {
+func (s *CoreService) Install(ctx context.Context, r coreinfra.Release, notify func(coreinfra.Progress)) error {
 	if !s.mu.TryLock() {
 		return errors.New("another core operation is active")
 	}
@@ -249,7 +249,7 @@ func (s *CoreService) installRelease(ctx context.Context, r coreinfra.Release, n
 		return nil
 	})
 }
-func (s *CoreService) importRelease(ctx context.Context, source, tag, digest string) error {
+func (s *CoreService) Import(ctx context.Context, source, tag, digest string) error {
 	if !s.mu.TryLock() {
 		return errors.New("another core operation is active")
 	}
@@ -270,7 +270,7 @@ func (s *CoreService) importRelease(ctx context.Context, source, tag, digest str
 }
 
 // CachedRelease is explicitly marked as cached; it is never reported as latest.
-func (s *CoreService) cachedRelease() coreinfra.Release {
+func (s *CoreService) CachedRelease() coreinfra.Release {
 	fallback := coreinfra.PinnedRelease()
 	root, err := config.GetConfigDir()
 	if err != nil {
@@ -308,7 +308,7 @@ func managedDownloadProxy(cfg *config.Config) string {
 	return ""
 }
 
-func (s *CoreService) upgrade(ctx context.Context, notify func(coreinfra.Progress)) error {
+func (s *CoreService) Upgrade(ctx context.Context, notify func(coreinfra.Progress)) error {
 	release, err := s.Release(ctx, "latest", notify)
 	if err != nil {
 		return err

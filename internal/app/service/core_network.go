@@ -210,7 +210,7 @@ func (s *CoreService) refreshNetworkTUN(ctx context.Context, root string) error 
 		}
 	}
 }
-func (s *CoreService) setSystemProxy(ctx context.Context, enabled bool) error {
+func (s *CoreService) SetSystemProxy(ctx context.Context, enabled bool) error {
 	if runtime.GOOS != "linux" {
 		return errors.New("system proxy integration requires Linux/GNOME")
 	}
@@ -340,7 +340,7 @@ func recoverNetworkChange(root string) error {
 	}
 	return os.Remove(path)
 }
-func (s *CoreService) setTUN(ctx context.Context, enabled bool) error {
+func (s *CoreService) SetTUN(ctx context.Context, enabled bool) error {
 	if runtime.GOOS != "linux" {
 		return errors.New("managed TUN requires Linux")
 	}
@@ -494,7 +494,7 @@ func startNetworkGuard(root string, service bool) error {
 		}
 	}
 }
-func (s *CoreService) guardNetwork(ctx context.Context) error {
+func (s *CoreService) GuardNetwork(ctx context.Context) error {
 	root, err := config.GetConfigDir()
 	if err != nil {
 		return err

@@ -15,7 +15,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func (s *CoreService) configure() error {
+func (s *CoreService) Configure() error {
 	if !s.mu.TryLock() {
 		return errors.New("another core operation is active")
 	}
@@ -89,7 +89,7 @@ func prepareMissingManagedConfig(path string) (bool, error) {
 	})
 }
 
-func (s *CoreService) saveNetwork(proxy string, accelerators []coreinfra.Accelerator, timeoutSeconds ...int) error {
+func (s *CoreService) SaveNetwork(proxy string, accelerators []coreinfra.Accelerator, timeoutSeconds ...int) error {
 	// Fetchers snapshot these preferences; saving affects the next download.
 	// Validate settings before persisting. No network request is performed.
 	f := coreinfra.NewFetcher()
@@ -113,7 +113,7 @@ func (s *CoreService) saveNetwork(proxy string, accelerators []coreinfra.Acceler
 		return nil
 	})
 }
-func (s *CoreService) useExternal() error {
+func (s *CoreService) UseExternal() error {
 	if !s.mu.TryLock() {
 		return errors.New("another core operation is active")
 	}
@@ -139,7 +139,7 @@ func (s *CoreService) useExternal() error {
 		return nil
 	})
 }
-func (s *CoreService) connectExternal(address, secret string, mixedPort int) error {
+func (s *CoreService) ConnectExternal(address, secret string, mixedPort int) error {
 	address = strings.TrimSpace(address)
 	normalized := address
 	if !strings.Contains(normalized, "://") {
@@ -180,7 +180,7 @@ func (s *CoreService) connectExternal(address, secret string, mixedPort int) err
 	}
 	return nil
 }
-func (s *CoreService) setPorts(controllerPort, mixedPort int) error {
+func (s *CoreService) SetPorts(controllerPort, mixedPort int) error {
 	if controllerPort < 1 || controllerPort > 65535 || mixedPort < 1 || mixedPort > 65535 || controllerPort == mixedPort {
 		return errors.New("choose different controller/proxy ports between 1 and 65535")
 	}

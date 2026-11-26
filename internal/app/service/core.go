@@ -21,10 +21,6 @@ import (
 // CoreService serializes mutations and owns only the child it started.
 // One instance is shared by all Core page commands for the TUI's lifetime.
 type CoreService struct {
-	runtimeDomain  *coreRuntimeDomain
-	releaseDomain  *coreReleaseDomain
-	configDomain   *coreConfigDomain
-	networkDomain  *coreNetworkDomain
 	daemon         bool
 	services       host.Services
 	network        host.Network
@@ -54,10 +50,6 @@ type CoreStatus = coreinfra.Status
 func NewCoreService() *CoreService {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &CoreService{lifetime: ctx, shutdown: cancel, ownerEvents: make(chan string, 1), network: host.NewNetwork()}
-	s.runtimeDomain = &coreRuntimeDomain{owner: s}
-	s.releaseDomain = &coreReleaseDomain{owner: s}
-	s.configDomain = &coreConfigDomain{owner: s}
-	s.networkDomain = &coreNetworkDomain{owner: s}
 	s.startGuard = func(root string) error { return startNetworkGuard(root, s.daemon) }
 	return s
 }
