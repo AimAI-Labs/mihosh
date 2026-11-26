@@ -464,16 +464,16 @@ func (s State) handleEditFormUpdate(msg tea.KeyMsg) (State, tea.Cmd) {
 	return s, cmd
 }
 
-// HandleMouseScroll 鼠标滚轮。
+// HandleMouseScroll 鼠标滚轮（按单一项顺次切换选中，卡片网格自动滚动到可见位置）。
 func (s State) HandleMouseScroll(up bool) State {
 	if s.Querying() {
 		return s
 	}
-	step := s.layoutColumns()
+	delta := 1
 	if up {
-		step = -step
+		delta = -1
 	}
-	s.moveSelection(step)
+	s.moveSelection(delta)
 	return s
 }
 

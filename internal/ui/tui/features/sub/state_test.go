@@ -171,6 +171,42 @@ func TestSubscriptionKeyboardMovesAcrossThreeColumns(t *testing.T) {
 	}
 }
 
+func TestSubscriptionMouseScrollStepsOneCardAtATime(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		width     int
+		rowStride int
+	}{
+		{name: "two-column", width: 100, rowStride: 2},
+		{name: "three-column", width: 150, rowStride: 3},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Height 14 gives available=9, so exactly 1 card row is visible at a time.
+			const height = 14
+			s := State{}.ApplySubs(make([]profile.Profile, 6), "")
+
+			for want := 1; want < 6; want++ {
+				s, _ = s.Update(messages.PageMouseScrollMsg{Up: false, Width: tc.width, Height: height})
+				require.Equal(t, want, s.selected)
+				require.Equal(t, (want/tc.rowStride)*tc.rowStride, s.scrollTop)
+			}
+			// Clamp at the last item.
+			s, _ = s.Update(messages.PageMouseScrollMsg{Up: false, Width: tc.width, Height: height})
+			require.Equal(t, 5, s.selected)
+
+			for want := 4; want >= 0; want-- {
+				s, _ = s.Update(messages.PageMouseScrollMsg{Up: true, Width: tc.width, Height: height})
+				require.Equal(t, want, s.selected)
+				require.Equal(t, (want/tc.rowStride)*tc.rowStride, s.scrollTop)
+			}
+			// Clamp at the first item.
+			s, _ = s.Update(messages.PageMouseScrollMsg{Up: true, Width: tc.width, Height: height})
+			require.Equal(t, 0, s.selected)
+			require.Equal(t, 0, s.scrollTop)
+		})
+	}
+}
+
 func TestActivateSelected_NoSelection(t *testing.T) {
 	s := State{}.ApplySubs([]profile.Profile{}, "")
 	_, cmd := s.activateSelected()
