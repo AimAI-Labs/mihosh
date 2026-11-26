@@ -265,7 +265,12 @@ func (s *SyncService) RestoreBundle(bundle syncinfra.Bundle, source, profileKey 
 				if mergedSub.Source.Kind == profile.SourceLocal && !filepath.IsAbs(mergedSub.Source.Path) && filepath.IsAbs(local.Source.Path) {
 					mergedSub.Source.Path = local.Source.Path
 				}
-				if mergedSub.Usage == nil && local.Usage != nil {
+				if !mergedSub.Source.SameOrigin(local.Source) {
+					if err := profile.BindLegacyRawSource(local); err != nil {
+						return config.ProfileFiles{}, err
+					}
+					mergedSub.UpdatedAt = 0
+				} else if mergedSub.Usage == nil && local.Usage != nil {
 					u := *local.Usage
 					mergedSub.Usage = &u
 				}

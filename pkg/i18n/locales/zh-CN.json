@@ -917,6 +917,7 @@
   "sub.card.expired": "已到期 %s",
   "sub.card.remaining": "剩余 %s",
   "sub.err.source_changed": "更新期间订阅来源已更改，请重新更新。",
+  "sub.err.snapshot_source_changed": "此快照属于另一订阅来源，请选择当前来源的快照。",
   "sub.err.activation_no_client": "尚未配置 Mihomo 控制器，请配置后重试激活。",
   "sub.err.activation_reload": "Mihomo 重载失败，请重试激活",
   "sub.err.activation_reload_written": "配置已写入，Mihomo 重载失败，请重试激活",

@@ -84,6 +84,10 @@ func ReadRaw(uid string) (*yaml.Node, error) {
 	if err != nil {
 		return nil, err
 	}
+	return decodeRaw(data)
+}
+
+func decodeRaw(data []byte) (*yaml.Node, error) {
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return nil, fmt.Errorf("解析订阅原始配置失败: %w", err)
@@ -96,6 +100,10 @@ func ReadRawFile(uid string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	return readRawAt(path)
+}
+
+func readRawAt(path string) ([]byte, error) {
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return nil, ErrRawNotFound
@@ -108,12 +116,44 @@ func ReadRawFile(uid string) ([]byte, error) {
 
 // WriteRaw 原子写入 raw.yaml（覆盖前自动保留历史快照）。
 func WriteRaw(uid string, data []byte) error {
+	return writeRaw(uid, data, "")
+}
+
+func writeRaw(uid string, data []byte, origin string) error {
 	p, err := RawPath(uid)
 	if err != nil {
 		return err
 	}
-	if prev, rErr := os.ReadFile(p); rErr == nil && len(trimSpaceBytes(prev)) > 0 && !bytes.Equal(prev, data) {
-		_, _ = SaveRawSnapshot(uid, prev, DefaultSnapshotRetention)
+	previous, err := os.ReadFile(p)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	var previousOrigin string
+	if err == nil {
+		previousOrigin, err = readRawOrigin(p, previous)
+		if err != nil {
+			return err
+		}
+		if previousOrigin == "" {
+			previousOrigin = origin
+		}
+		if origin == "" {
+			origin = previousOrigin
+		}
+		if len(trimSpaceBytes(previous)) > 0 && !bytes.Equal(previous, data) {
+			_, _ = saveSnapshot(SnapshotRaw, uid, previous, DefaultSnapshotRetention, previousOrigin)
+		}
+	}
+	if origin != "" {
+		bindings := []rawSourceBinding{rawBinding(origin, data)}
+		if previousOrigin != "" && !bytes.Equal(previous, data) {
+			// A failure or interruption before publishing raw.yaml leaves the old
+			// content associated with its old source and still usable offline.
+			bindings = append(bindings, rawBinding(previousOrigin, previous))
+		}
+		if err := writeRawBindings(p, bindings...); err != nil {
+			return err
+		}
 	}
 	return atomicWrite(p, data, 0600)
 }

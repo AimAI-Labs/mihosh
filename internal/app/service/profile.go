@@ -29,6 +29,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
+	"gopkg.in/yaml.v3"
 )
 
 // ErrSubNotFound 表示给定 UID 的订阅不存在。
@@ -152,21 +153,15 @@ func (s *ProfileService) RenameProfile(uid, newName string) error {
 	if newName == "" {
 		return errors.New("订阅名称不能为空")
 	}
-	return s.mutateProfile(uid, func(p *profile.Profile) {
+	return s.mutateProfile(uid, func(p *profile.Profile) error {
 		p.Name = newName
+		return nil
 	})
 }
 
 // EditProfile 编辑订阅元数据（名称 + 来源），就地校验并持久化。
 // 校验逻辑与 AddProfile 对齐：名称非空、来源非空，并按内容规范化 Kind。
 func (s *ProfileService) EditProfile(uid, name string, src profile.SubSource) error {
-	exists, err := s.uidExists(uid)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return ErrSubNotFound
-	}
 	name = trimSpace(name)
 	if name == "" {
 		return errors.New("订阅名称不能为空")
@@ -187,12 +182,17 @@ func (s *ProfileService) EditProfile(uid, name string, src profile.SubSource) er
 	} else if src.UpdateInterval < 0 {
 		src.UpdateInterval = 0
 	}
-	return s.mutateProfile(uid, func(p *profile.Profile) {
+	return s.mutateProfile(uid, func(p *profile.Profile) error {
 		p.Name = name
 		if !p.Source.SameOrigin(src) {
+			if err := profile.BindLegacyRawSource(*p); err != nil {
+				return err
+			}
+			p.UpdatedAt = 0
 			p.Usage = nil
 		}
 		p.Source = src
+		return nil
 	})
 }
 
@@ -223,6 +223,10 @@ func (s *ProfileService) FetchProfileContext(ctx context.Context, uid string) er
 	if err != nil {
 		return err
 	}
+	return fetchProfile(ctx, p)
+}
+
+func fetchProfile(ctx context.Context, p profile.Profile) error {
 	var opts profile.DownloadOptions
 	if p.Source.UseProxy {
 		opts.ProxyURL = config.MixedPortToProxyURL(config.ResolveMihomoEndpoint().MixedPort)
@@ -234,7 +238,7 @@ func (s *ProfileService) FetchProfileContext(ctx context.Context, uid string) er
 	return config.Update(func(cfg *config.Config) error {
 		for i := range cfg.Subs {
 			current := &cfg.Subs[i]
-			if current.UID != uid {
+			if current.UID != p.UID {
 				continue
 			}
 			if !current.Source.SameOrigin(p.Source) {
@@ -243,7 +247,7 @@ func (s *ProfileService) FetchProfileContext(ctx context.Context, uid string) er
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			if err := profile.WriteRaw(uid, raw); err != nil {
+			if err := profile.WriteRawForSource(p, raw); err != nil {
 				return err
 			}
 			current.UpdatedAt = time.Now().Unix()
@@ -254,6 +258,17 @@ func (s *ProfileService) FetchProfileContext(ctx context.Context, uid string) er
 		}
 		return ErrSubNotFound
 	})
+}
+
+func snapshotForActivation(ctx context.Context, p profile.Profile) (*yaml.Node, error) {
+	raw, err := profile.ReadRawForProfile(p)
+	if errors.Is(err, profile.ErrStaleRaw) || p.Source.Kind == profile.SourceRemote && errors.Is(err, profile.ErrRawNotFound) {
+		if err := fetchProfile(ctx, p); err != nil {
+			return nil, err
+		}
+		return profile.ReadRawForProfile(p)
+	}
+	return raw, err
 }
 
 // BatchUpdateResult summarizes a concurrent batch update of remote subscriptions.
@@ -380,21 +395,6 @@ func (s *ProfileService) activate(uid string, cleared []string) (ActivateResult,
 	if err != nil {
 		return ActivateResult{}, err
 	}
-	if p.Source.Kind == profile.SourceRemote {
-		rawPath, err := profile.RawPath(uid)
-		if err != nil {
-			return ActivateResult{}, err
-		}
-		if _, err := os.Stat(rawPath); os.IsNotExist(err) {
-			ctx := context.Background()
-			if s.core != nil {
-				ctx = s.core.lifetime
-			}
-			if err := s.FetchProfileContext(ctx, uid); err != nil {
-				return ActivateResult{}, err
-			}
-		}
-	}
 	cfg, cfgErr := config.Load()
 	if cfgErr == nil && cfg.Core.Mode == "managed" {
 		if s.core != nil {
@@ -417,7 +417,15 @@ func (s *ProfileService) activateExternal(p profile.Profile, cfg *config.Config,
 	if err != nil && !remote {
 		return ActivateResult{}, ErrMihomoPathMissing
 	}
-	generated, err := profile.GenerateForUIDWithCleared(p.UID, path, cleared, false)
+	ctx := context.Background()
+	if s.core != nil {
+		ctx = s.core.lifetime
+	}
+	raw, err := snapshotForActivation(ctx, p)
+	if err != nil {
+		return ActivateResult{}, err
+	}
+	generated, err := profile.GenerateFromSnapshot(raw, path, cleared, false)
 	if err != nil {
 		return ActivateResult{}, err
 	}
@@ -483,18 +491,7 @@ func (s *ProfileService) activateExternal(p profile.Profile, cfg *config.Config,
 		return result, errors.New(i18n.T("sub.err.activation_target_changed"))
 	}
 	s.applied = &confirmedProfileApply{target: target, result: result}
-	if err := config.Update(func(latest *config.Config) error {
-		for _, current := range latest.Subs {
-			if current.UID == p.UID {
-				if !current.Source.SameOrigin(p.Source) {
-					return errors.New(i18n.T("sub.err.source_changed"))
-				}
-				latest.ActiveSub = p.UID
-				return nil
-			}
-		}
-		return ErrSubNotFound
-	}); err != nil {
+	if err := config.Update(func(latest *config.Config) error { return setActiveProfile(latest, p) }); err != nil {
 		return result, fmt.Errorf("%s: %w", i18n.T("sub.err.activation_metadata"), err)
 	}
 	result.ActiveSaved = true
@@ -551,23 +548,20 @@ func (s *ProfileService) AutoImportLocalSub() (*profile.Profile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("生成订阅 ID 失败: %w", err)
 	}
-	if _, err := profile.RawPath(uid); err != nil {
+	rawPath, err := profile.RawPath(uid)
+	if err != nil {
 		return nil, err
 	}
-
-	// 写入 raw.yaml
-	if err := profile.WriteRaw(uid, data); err != nil {
-		_ = profile.DeleteProfileDir(uid)
-		return nil, fmt.Errorf("写入本地订阅配置失败: %w", err)
-	}
-
 	// 构建 Profile 元数据（Source.Path 指向复制后的 raw.yaml，而非原始 mihomo 配置路径）
-	rawPath, _ := profile.RawPath(uid)
 	p := profile.Profile{
 		UID:       uid,
 		Name:      i18nLocalSubName,
 		Source:    profile.SubSource{Kind: profile.SourceLocal, Path: rawPath},
 		UpdatedAt: time.Now().Unix(),
+	}
+	if err := profile.WriteRawForSource(p, data); err != nil {
+		_ = profile.DeleteProfileDir(uid)
+		return nil, fmt.Errorf("写入本地订阅配置失败: %w", err)
 	}
 
 	// 持久化元数据
@@ -592,12 +586,30 @@ func (s *ProfileService) findProfile(uid string) (profile.Profile, error) {
 	} else if err != nil {
 		return profile.Profile{}, err
 	}
+	return profileByUID(cfg, uid)
+}
+
+func profileByUID(cfg *config.Config, uid string) (profile.Profile, error) {
 	for _, p := range cfg.Subs {
 		if p.UID == uid {
 			return p, nil
 		}
 	}
 	return profile.Profile{}, ErrSubNotFound
+}
+
+func setActiveProfile(cfg *config.Config, p profile.Profile) error {
+	if p.UID != "" {
+		current, err := profileByUID(cfg, p.UID)
+		if err != nil {
+			return err
+		}
+		if !current.Source.SameOrigin(p.Source) {
+			return errors.New(i18n.T("sub.err.source_changed"))
+		}
+	}
+	cfg.ActiveSub = p.UID
+	return nil
 }
 
 // uidExists 判断 UID 是否存在。
@@ -613,14 +625,14 @@ func (s *ProfileService) uidExists(uid string) (bool, error) {
 }
 
 // mutateProfile 修改单个订阅元数据后持久化。
-func (s *ProfileService) mutateProfile(uid string, fn func(*profile.Profile)) error {
-	return s.persistMutation(func(cfg *config.Config) {
+func (s *ProfileService) mutateProfile(uid string, fn func(*profile.Profile) error) error {
+	return config.Update(func(cfg *config.Config) error {
 		for i := range cfg.Subs {
 			if cfg.Subs[i].UID == uid {
-				fn(&cfg.Subs[i])
-				return
+				return fn(&cfg.Subs[i])
 			}
 		}
+		return ErrSubNotFound
 	})
 }
 

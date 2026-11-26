@@ -274,16 +274,7 @@ func GenerateForUID(uid, managedPath string) (GeneratedConfig, error) {
 	if err != nil {
 		return GeneratedConfig{}, err
 	}
-	return generateFromRaw(raw, managedPath, nil, false)
-}
-
-// GenerateForUIDWithCleared 在 GenerateForUID 基础上处理被从 merge.yaml 清空的字段。
-func GenerateForUIDWithCleared(uid, managedPath string, cleared []string, managed bool) (GeneratedConfig, error) {
-	raw, err := ReadRaw(uid)
-	if err != nil {
-		return GeneratedConfig{}, err
-	}
-	return generateFromRaw(raw, managedPath, cleared, managed)
+	return GenerateFromSnapshot(raw, managedPath, nil, false)
 }
 
 // GenerateSourcePreview merges the exact source bytes shown in the file viewer.
@@ -292,12 +283,13 @@ func GenerateSourcePreview(source []byte) (GeneratedConfig, error) {
 	if err := yaml.Unmarshal(source, &raw); err != nil {
 		return GeneratedConfig{}, err
 	}
-	generated, err := generateFromRaw(&raw, "", nil, false)
+	generated, err := GenerateFromSnapshot(&raw, "", nil, false)
 	generated.Data = readableYAMLUnicode(generated.Data)
 	return generated, err
 }
 
-func generateFromRaw(raw *yaml.Node, managedPath string, cleared []string, managed bool) (GeneratedConfig, error) {
+// GenerateFromSnapshot applies overrides to the snapshot selected by the caller.
+func GenerateFromSnapshot(raw *yaml.Node, managedPath string, cleared []string, managed bool) (GeneratedConfig, error) {
 	merge, mergeErr := ReadMergeNode()
 	if mergeErr != nil {
 		merge = nil // 降级：忽略覆写

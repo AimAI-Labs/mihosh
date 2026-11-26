@@ -47,7 +47,7 @@ func FetchContext(ctx context.Context, p Profile) error {
 	if err != nil {
 		return err
 	}
-	return WriteRaw(p.UID, raw)
+	return WriteRawForSource(p, raw)
 }
 
 // DownloadOptions carries runtime transport context resolved by the caller

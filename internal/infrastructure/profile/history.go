@@ -65,15 +65,15 @@ func validateSnapshotID(id string) error {
 
 // SaveRawSnapshot archives a pre-update snapshot of a subscription's raw.yaml, keeping at most maxKeep entries.
 func SaveRawSnapshot(uid string, data []byte, maxKeep int) (Snapshot, error) {
-	return saveSnapshot(SnapshotRaw, uid, data, maxKeep)
+	return saveSnapshot(SnapshotRaw, uid, data, maxKeep, "")
 }
 
 // SaveMergeSnapshot archives a pre-edit snapshot of global merge.yaml, keeping at most maxKeep entries.
 func SaveMergeSnapshot(data []byte, maxKeep int) (Snapshot, error) {
-	return saveSnapshot(SnapshotMerge, "", data, maxKeep)
+	return saveSnapshot(SnapshotMerge, "", data, maxKeep, "")
 }
 
-func saveSnapshot(kind SnapshotKind, uid string, data []byte, maxKeep int) (Snapshot, error) {
+func saveSnapshot(kind SnapshotKind, uid string, data []byte, maxKeep int, origin string) (Snapshot, error) {
 	if len(trimSpaceBytes(data)) == 0 {
 		return Snapshot{}, nil
 	}
@@ -96,7 +96,8 @@ func saveSnapshot(kind SnapshotKind, uid string, data []byte, maxKeep int) (Snap
 		// Latest snapshot already has identical content; avoid redundant duplicates.
 		if prevData, rErr := ReadSnapshot(kind, uid, existing[0].ID); rErr == nil {
 			prevSum := sha256.Sum256(prevData)
-			if prevSum == sum {
+			prevOrigin, err := readRawOrigin(filepath.Join(dir, existing[0].ID), prevData)
+			if prevSum == sum && err == nil && prevOrigin == origin {
 				return existing[0], nil
 			}
 		}
@@ -105,7 +106,13 @@ func saveSnapshot(kind SnapshotKind, uid string, data []byte, maxKeep int) (Snap
 	now := time.Now().UTC()
 	id := fmt.Sprintf("%s-%s.yaml", now.Format("20060102-150405.000000000"), sumHex[:8])
 	path := filepath.Join(dir, id)
+	if origin != "" {
+		if err := writeRawBindings(path, rawBinding(origin, data)); err != nil {
+			return Snapshot{}, err
+		}
+	}
 	if err := atomicWrite(path, data, 0600); err != nil {
+		_ = os.Remove(path + ".source.json")
 		return Snapshot{}, err
 	}
 
@@ -139,7 +146,10 @@ func pruneSnapshots(dir string, maxKeep int) error {
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(names)))
 	for i := maxKeep; i < len(names); i++ {
-		_ = os.Remove(filepath.Join(dir, names[i]))
+		path := filepath.Join(dir, names[i])
+		if err := os.Remove(path); err == nil {
+			_ = os.Remove(path + ".source.json")
+		}
 	}
 	return nil
 }

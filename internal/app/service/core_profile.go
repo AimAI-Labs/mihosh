@@ -344,6 +344,7 @@ func (s *CoreService) applyProfile(ctx context.Context, uid string, startIfStopp
 		return ActivateResult{}, err
 	}
 	var generated profile.GeneratedConfig
+	var selected profile.Profile
 	if basic {
 		data, e := managedBaseConfig()
 		if e != nil {
@@ -354,10 +355,21 @@ func (s *CoreService) applyProfile(ctx context.Context, uid string, startIfStopp
 			generated.Data, err = profile.GenerateYAMLWithPreserve(&base, nil, path)
 		}
 	} else {
-		generated, err = profile.GenerateForUIDWithCleared(uid, path, cleared, true)
+		selected, err = profileByUID(cfg, uid)
+		if err != nil {
+			return ActivateResult{}, err
+		}
+		raw, readErr := snapshotForActivation(ctx, selected)
+		if readErr != nil {
+			return ActivateResult{}, readErr
+		}
+		generated, err = profile.GenerateFromSnapshot(raw, path, cleared, true)
 	}
 	if err != nil {
 		return ActivateResult{}, err
+	}
+	updateActiveSub := func() error {
+		return config.Update(func(latest *config.Config) error { return setActiveProfile(latest, selected) })
 	}
 	data, err := sanitizeManagedInbound(generated.Data)
 	if err != nil {
@@ -409,21 +421,6 @@ func (s *CoreService) applyProfile(ctx context.Context, uid string, startIfStopp
 	journal := filepath.Join(root, "runtime", "profile-recovery.json")
 	running := s.process != nil
 	if running && controllerIdentityChanged(old, data) {
-		updateActiveSub := func() error {
-			return config.Update(func(latest *config.Config) error {
-				if basic {
-					latest.ActiveSub = ""
-					return nil
-				}
-				for _, p := range latest.Subs {
-					if p.UID == uid {
-						latest.ActiveSub = uid
-						return nil
-					}
-				}
-				return ErrSubNotFound
-			})
-		}
 		change := &managedConfigReplacement{
 			root:      root,
 			path:      path,
@@ -480,19 +477,7 @@ func (s *CoreService) applyProfile(ctx context.Context, uid string, startIfStopp
 		}
 		started = true
 	}
-	if err = config.Update(func(latest *config.Config) error {
-		if basic {
-			latest.ActiveSub = ""
-			return nil
-		}
-		for _, p := range latest.Subs {
-			if p.UID == uid {
-				latest.ActiveSub = uid
-				return nil
-			}
-		}
-		return ErrSubNotFound
-	}); err != nil {
+	if err = updateActiveSub(); err != nil {
 		return rollback(err)
 	}
 	if err = os.Remove(journal); err != nil {

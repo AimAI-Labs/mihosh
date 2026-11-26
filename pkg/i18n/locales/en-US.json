@@ -917,6 +917,7 @@
   "sub.card.expired": "Expired %s",
   "sub.card.remaining": "%s left",
   "sub.err.source_changed": "Subscription source changed during the update. Update it again.",
+  "sub.err.snapshot_source_changed": "This snapshot belongs to a different subscription source. Select a snapshot from the current source.",
   "sub.err.activation_no_client": "No Mihomo controller is configured for the reload. Configure it and retry activation.",
   "sub.err.activation_reload": "Mihomo reload failed. Retry activation",
   "sub.err.activation_reload_written": "Configuration written, but Mihomo reload failed. Retry activation",

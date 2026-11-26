@@ -1,9 +1,12 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
 
 // ListRawSnapshots returns saved historical snapshots of a subscription's raw.yaml (newest first).
@@ -43,17 +46,22 @@ func (s *ProfileService) DiffSnapshotWithCurrent(kind profile.SnapshotKind, uid,
 // RollbackSnapshot restores a historical raw.yaml or merge.yaml snapshot and re-applies
 // the active subscription configuration when affected.
 func (s *ProfileService) RollbackSnapshot(kind profile.SnapshotKind, uid, snapshotID string) (*ActivateResult, error) {
-	data, err := profile.ReadSnapshot(kind, uid, snapshotID)
-	if err != nil {
-		return nil, err
-	}
 	_, activeUID, err := s.ListProfiles()
 	if err != nil {
 		return nil, err
 	}
 	switch kind {
 	case profile.SnapshotRaw:
-		if err := profile.WriteRaw(uid, data); err != nil {
+		if err := config.Update(func(cfg *config.Config) error {
+			p, err := profileByUID(cfg, uid)
+			if err != nil {
+				return err
+			}
+			return profile.RestoreRawSnapshot(p, snapshotID)
+		}); err != nil {
+			if errors.Is(err, profile.ErrStaleRaw) {
+				return nil, errors.New(i18n.T("sub.err.snapshot_source_changed"))
+			}
 			return nil, err
 		}
 		if activeUID != "" && activeUID == uid {
@@ -65,6 +73,10 @@ func (s *ProfileService) RollbackSnapshot(kind profile.SnapshotKind, uid, snapsh
 		}
 		return &ActivateResult{}, nil
 	case profile.SnapshotMerge:
+		data, err := profile.ReadSnapshot(kind, uid, snapshotID)
+		if err != nil {
+			return nil, err
+		}
 		before, _ := profile.ReadMerge()
 		beforeOverrides, _ := profile.ReadMihomoOverridesFrom(before)
 		afterOverrides, _ := profile.ReadMihomoOverridesFrom(data)
