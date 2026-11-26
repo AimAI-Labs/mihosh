@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/preferences"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/sub"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
@@ -143,8 +142,7 @@ func (m Model) applySubEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 		}
 		cmds := []tea.Cmd{sub.FetchSubs(m.profileSvc), preferences.FetchMihomoOverrides(m.configSvc)}
 		if msg.Restarted {
-			m.reloadStoredConfig()
-			cmds = append(cmds, m.updateCoreTarget(service.ResolveMihomoEndpoint(), coreTargetReconnect))
+			cmds = append(cmds, m.requestCoreTarget(coreTargetReconnect, coreTargetOptions{}))
 		} else if m.connectionReady {
 			cmds = append(cmds, m.refreshOnConnect())
 		}
@@ -201,9 +199,11 @@ func (m *Model) finishSubConfigApply(mergeErr error, restarted, needsRestart, re
 		m.publishNotice(i18n.T(successKey), messages.NoticeSuccess)
 	}
 	if !remote {
-		if cmd := m.syncAppliedCore(restarted, needsRestart); cmd != nil {
+		cmd := m.syncAppliedCore(restarted, needsRestart, true)
+		if restarted {
 			return tea.Batch(cmd, sub.FetchSubs(m.profileSvc), m.coreState.Refresh())
 		}
+		return cmd
 	}
 	return m.refreshOnConnect()
 }

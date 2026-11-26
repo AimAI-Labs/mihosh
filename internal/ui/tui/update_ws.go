@@ -318,6 +318,10 @@ func (m *Model) reloadStoredConfig() {
 	if err != nil {
 		return
 	}
+	m.applyStoredConfig(cfg)
+}
+
+func (m *Model) applyStoredConfig(cfg *service.Config) {
 	previousLanguage := ""
 	previousTheme := ""
 	if m.config != nil {

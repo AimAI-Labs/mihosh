@@ -11,7 +11,8 @@ import (
 
 func FetchMihomoConfig(svc *service.ConfigService, client *service.Client) tea.Cmd {
 	return messages.CoreRequest(client, func(_ *service.Client) tea.Msg {
-		return messages.MihomoConfigMsg{Config: svc.ReadMihomoConfig(), FromFile: true}
+		cfg, target := svc.ReadMihomoConfig()
+		return messages.MihomoConfigMsg{Config: cfg, Target: &target, FromFile: true}
 	})
 }
 

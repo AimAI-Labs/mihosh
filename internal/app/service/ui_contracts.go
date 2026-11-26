@@ -24,6 +24,7 @@ type (
 	Config           = config.Config
 	MihomoCoreConfig = config.CoreConfig
 	MihomoEndpoint   = config.MihomoEndpoint
+	MihomoTarget     = config.MihomoTarget
 
 	Accelerator = coreinfra.Accelerator
 	Asset       = coreinfra.Asset
@@ -70,11 +71,7 @@ func GetConfigDir() (string, error) { return config.GetConfigDir() }
 
 func GetMihomoConfigPath() (string, error) { return config.GetMihomoConfigPath() }
 
-func GetMihomoConfigPathForWrite() (string, error) { return config.GetMihomoConfigPathForWrite() }
-
 func ManagedMihomoConfigPath() (string, error) { return config.ManagedMihomoConfigPath() }
-
-func ResolveMihomoEndpoint() MihomoEndpoint { return config.ResolveMihomoEndpoint() }
 
 func MixedPortToProxyURL(port int) string { return config.MixedPortToProxyURL(port) }
 

@@ -3,11 +3,19 @@ package tui
 import (
 	"testing"
 
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/bootstrap"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 )
 
+func newTestModel(client *service.Client, testURL string, timeout int) Model {
+	app := bootstrap.NewAppWithClient(client)
+	app.Config.TestURL, app.Config.Timeout = testURL, timeout
+	return NewModel(app)
+}
+
 func TestModelShowAndHideGuideModal(t *testing.T) {
-	m := NewModel(nil, "http://www.gstatic.com/generate_204", 5000)
+	m := newTestModel(nil, "http://www.gstatic.com/generate_204", 5000)
 	if m.guideState.Active {
 		t.Errorf("expected initial guideState.Active to be false")
 	}

@@ -29,6 +29,7 @@ type ConfigModeMsg struct {
 
 type MihomoConfigMsg struct {
 	Config   *model.MihomoConfig
+	Target   *service.MihomoTarget
 	Err      error
 	FromFile bool // API 不可达时从 YAML 文件降级读取
 }
@@ -488,6 +489,12 @@ type CoreConnectionMsg struct {
 }
 
 type ManagedCoreStartedMsg struct{ Epoch uint64 }
+
+type CoreTargetResolvedMsg struct {
+	Request uint64
+	Target  service.MihomoTarget
+	Config  *service.Config
+}
 
 type CoreTargetChangedMsg struct {
 	Reset      bool

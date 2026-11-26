@@ -1,11 +1,64 @@
 package bootstrap
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/require"
 )
+
+func TestNewAppBindsHTTPAndWebSocketToSameConfiguredTarget(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	const secret = "shared-fixture-token"
+	upgrader := websocket.Upgrader{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/version" {
+			if r.Header.Get("Authorization") != "Bearer "+secret {
+				t.Error("HTTP client sent the wrong token")
+			}
+			_, _ = w.Write([]byte(`{"version":"same-controller"}`))
+			return
+		}
+		if r.URL.Query().Get("token") != secret {
+			t.Error("WebSocket client sent the wrong token")
+		}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		if r.URL.Path == "/memory" {
+			_ = conn.WriteJSON(api.MemoryData{Inuse: 818})
+		}
+		_, _, _ = conn.ReadMessage()
+	}))
+	defer server.Close()
+	cfg := config.DefaultConfig
+	cfg.Core.Mode = "external"
+	cfg.Core.ExternalController, cfg.Core.ExternalSecret = server.URL, secret
+	require.NoError(t, config.Save(&cfg))
+	app := NewApp()
+	defer app.Close()
+	require.Equal(t, server.URL, app.Target.Endpoint.ExternalController)
+	require.Empty(t, app.Target.ConfigPath)
+	version, err := app.Client.GetVersion()
+	require.NoError(t, err)
+	require.Equal(t, "same-controller", version.Version)
+	memory := make(chan api.MemoryData, 1)
+	app.WSClient.SetMemoryHandler(func(data api.MemoryData) { memory <- data })
+	require.NoError(t, app.WSClient.Start(t.Context()))
+	select {
+	case data := <-memory:
+		require.Equal(t, int64(818), data.Inuse)
+	case <-time.After(2 * time.Second):
+		t.Fatal("WebSocket did not reach the same configured controller")
+	}
+}
 
 func TestNewAppWiresAllServicesAndHandlesMissingConfig(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())

@@ -151,7 +151,7 @@ func TestStartupConnectTriggersAutoRefreshAndLoadsInitialData(t *testing.T) {
 	defer server.Close()
 
 	client := api.NewClient(config.MihomoEndpoint{ExternalController: server.URL}, 1000)
-	m := NewModel(client, "", 1000)
+	m := newTestModel(client, "", 1000)
 	t.Cleanup(m.Close)
 
 	require.False(t, m.connectionChecked)

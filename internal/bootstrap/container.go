@@ -11,7 +11,7 @@ import (
 type App struct {
 	Config     *config.Config
 	ConfigErr  error
-	Endpoint   config.MihomoEndpoint
+	Target     config.MihomoTarget
 	Client     *api.Client
 	WSClient   *api.WSClient
 	ConfigSvc  *service.ConfigService
@@ -23,39 +23,43 @@ type App struct {
 
 // NewApp wires a complete runtime container with a freshly resolved Mihomo API client.
 func NewApp() *App {
-	cfg, err := config.Load()
-	if err != nil || cfg == nil {
-		defaultCfg := config.DefaultConfig
-		cfg = &defaultCfg
-	}
-	endpoint := config.ResolveMihomoEndpoint()
-	return newApp(cfg, err, endpoint, api.NewClient(endpoint, cfg.Timeout))
+	cfg, err, target := DiscoverTarget()
+	return newApp(cfg, err, target, api.NewClient(target.Endpoint, clientTimeout(cfg)))
 }
 
 // NewAppWithClient wires a complete runtime container bound to the caller-provided client
 // (preserving a nil client for offline or unit-test callers).
 func NewAppWithClient(client *api.Client) *App {
+	cfg, err, target := DiscoverTarget()
+	if client != nil {
+		current := client.EndpointSnapshot()
+		target.Endpoint.ExternalController, target.Endpoint.Secret = current.ExternalController, current.Secret
+	}
+	return newApp(cfg, err, target, client)
+}
+
+// DiscoverTarget is shared by the initial composition and runtime controller discovery.
+func DiscoverTarget() (*config.Config, error, config.MihomoTarget) {
 	cfg, err := config.Load()
 	if err != nil || cfg == nil {
 		defaultCfg := config.DefaultConfig
 		cfg = &defaultCfg
 	}
-	endpoint := config.ResolveMihomoEndpoint()
-	return newApp(cfg, err, endpoint, client)
+	return cfg, err, config.ResolveMihomoTarget(cfg)
 }
 
-func newApp(cfg *config.Config, cfgErr error, endpoint config.MihomoEndpoint, client *api.Client) *App {
+func newApp(cfg *config.Config, cfgErr error, target config.MihomoTarget, client *api.Client) *App {
 	configSvc := service.NewConfigService()
 	connSvc := service.NewConnectionService(client)
 	coreSvc := service.NewCoreService()
 	profileSvc := service.NewProfileService(client, coreSvc)
-	wsClient := api.NewWSClient(endpoint.ExternalController, endpoint.Secret)
+	wsClient := api.NewWSClient(target.Endpoint.ExternalController, target.Endpoint.Secret)
 	ipResolver := service.NewIPResolver()
 
 	return &App{
 		Config:     cfg,
 		ConfigErr:  cfgErr,
-		Endpoint:   endpoint,
+		Target:     target,
 		Client:     client,
 		WSClient:   wsClient,
 		ConfigSvc:  configSvc,
@@ -68,11 +72,17 @@ func newApp(cfg *config.Config, cfgErr error, endpoint config.MihomoEndpoint, cl
 
 // NewClient creates a Mihomo HTTP API client from the resolved endpoint and config timeout.
 func NewClient(cfg *config.Config) *api.Client {
-	timeout := config.DefaultConfig.Timeout
-	if cfg != nil && cfg.Timeout > 0 {
-		timeout = cfg.Timeout
+	if cfg == nil {
+		cfg, _ = config.Load()
 	}
-	return api.NewClient(config.ResolveMihomoEndpoint(), timeout)
+	return api.NewClient(config.ResolveMihomoTarget(cfg).Endpoint, clientTimeout(cfg))
+}
+
+func clientTimeout(cfg *config.Config) int {
+	if cfg != nil && cfg.Timeout > 0 {
+		return cfg.Timeout
+	}
+	return config.DefaultConfig.Timeout
 }
 
 // ProxyService returns a ProxyService bound to this container's API client.
@@ -82,7 +92,13 @@ func (a *App) ProxyService(testURL string, timeout int) *service.ProxyService {
 
 // Close releases resources owned by the wired services.
 func (a *App) Close() {
-	if a != nil && a.CoreSvc != nil {
+	if a == nil {
+		return
+	}
+	if a.WSClient != nil {
+		a.WSClient.Stop()
+	}
+	if a.CoreSvc != nil {
 		a.CoreSvc.Close()
 	}
 }

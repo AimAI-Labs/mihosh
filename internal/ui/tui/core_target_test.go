@@ -7,8 +7,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
+	"time"
 
+	"github.com/AimAI-Labs/mihosh/internal/bootstrap"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
@@ -25,12 +28,13 @@ func targetTestModel(t *testing.T) (Model, string) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	cfg := config.DefaultConfig
 	cfg.Core.Mode = "managed"
+	cfg.Timeout = 50
 	require.NoError(t, config.Save(&cfg))
 	path, err := config.ManagedMihomoConfigPath()
 	require.NoError(t, err)
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
 	require.NoError(t, os.WriteFile(path, []byte("external-controller: 127.0.0.1:9090\nsecret: old\nmixed-port: 7890\n"), 0600))
-	m := NewModel(api.NewClient(config.ResolveMihomoEndpoint(), 50), "", 50)
+	m := NewModel(bootstrap.NewApp())
 	t.Cleanup(m.Close)
 	m.currentPage = layout.PageSub
 	m.connectionEpoch = 7
@@ -41,12 +45,21 @@ func targetTestModel(t *testing.T) (Model, string) {
 	return m, path
 }
 
+func resolvedTestTarget(t *testing.T, m Model) (Model, tea.Cmd) {
+	t.Helper()
+	require.NotNil(t, m.targetPending)
+	cfg, err, target := bootstrap.DiscoverTarget()
+	require.NoError(t, err)
+	next, cmd := m.Update(messages.CoreTargetResolvedMsg{Request: m.targetRequest, Target: target, Config: cfg})
+	return next.(Model), cmd
+}
+
 func TestTargetChangeInvalidatesOldHealthAndPageData(t *testing.T) {
 	for _, entry := range []struct {
 		name string
 		msg  tea.Msg
 	}{
-		{"settings-loaded", messages.MihomoConfigMsg{Config: &model.MihomoConfig{ExternalController: "127.0.0.1:9091", Secret: "new", MixedPort: 7891}}},
+		{"settings-loaded", messages.MihomoConfigMsg{Target: &config.MihomoTarget{Endpoint: config.MihomoEndpoint{ExternalController: "127.0.0.1:9091", Secret: "new", MixedPort: 7891}}}},
 		{"settings-saved", messages.MihomoConfigSavedMsg{WriteOK: true}},
 		{"settings-reload-failed", messages.MihomoConfigSavedMsg{WriteOK: true, Err: errors.New("old endpoint closed")}},
 		{"override-restarted", messages.MihomoOverridesSavedMsg{WriteOK: true, Applied: true, Restarted: true}},
@@ -64,6 +77,11 @@ func TestTargetChangeInvalidatesOldHealthAndPageData(t *testing.T) {
 			require.NoError(t, os.WriteFile(path, []byte("external-controller: 127.0.0.1:9091\nsecret: new\nmixed-port: 7891\n"), 0600))
 			updated, cmd := m.Update(entry.msg)
 			next := updated.(Model)
+			if entry.name != "settings-loaded" {
+				require.Equal(t, m.connectionEpoch, next.connectionEpoch, "clients should update only after discovery")
+				require.NotNil(t, cmd)
+				next, cmd = resolvedTestTarget(t, next)
+			}
 			require.Greater(t, next.connectionEpoch, m.connectionEpoch)
 			require.NotNil(t, cmd)
 			require.False(t, next.connectionReady)
@@ -104,8 +122,12 @@ func TestOverrideResultsKeepLiveTargetUntilManualRefresh(t *testing.T) {
 			m, path := targetTestModel(t)
 			wsGeneration := m.wsClient.Generation()
 			require.NoError(t, os.WriteFile(path, []byte("external-controller: 127.0.0.1:9091\nsecret: new\nmixed-port: 7891\n"), 0600))
-			updated, _ := m.Update(entry.msg)
+			updated, cmd := m.Update(entry.msg)
 			next := updated.(Model)
+			if entry.pending {
+				require.NotNil(t, cmd)
+				next, _ = resolvedTestTarget(t, next)
+			}
 			require.Equal(t, m.connectionEpoch, next.connectionEpoch)
 			require.Equal(t, wsGeneration, next.wsClient.Generation())
 			require.Equal(t, "old", next.client.EndpointSnapshot().Secret)
@@ -120,6 +142,8 @@ func TestOverrideResultsKeepLiveTargetUntilManualRefresh(t *testing.T) {
 				next.currentPage = layout.PageCore
 				refreshed, cmd := next.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
 				after := refreshed.(Model)
+				require.NotNil(t, cmd)
+				after, cmd = resolvedTestTarget(t, after)
 				require.NotNil(t, cmd)
 				require.Greater(t, after.connectionEpoch, next.connectionEpoch)
 				require.Greater(t, after.wsClient.Generation(), wsGeneration)
@@ -173,7 +197,7 @@ func TestMergeEditorAppliesActiveSubscriptionToRemoteCore(t *testing.T) {
 	cfg := config.DefaultConfig
 	cfg.Core.Mode, cfg.Core.ExternalController = "external", server.Listener.Addr().String()
 	require.NoError(t, config.Save(&cfg))
-	m := NewModel(api.NewClient(config.ResolveMihomoEndpoint(), 500), "", 500)
+	m := newTestModel(api.NewClient(config.ResolveMihomoEndpoint(), 500), "", 500)
 	t.Cleanup(m.Close)
 	subscription, err := m.profileSvc.AddProfile("local", profile.SubSource{Kind: profile.SourceLocal, Path: "unused"})
 	require.NoError(t, err)
@@ -223,7 +247,7 @@ func mergeEditSideEffects(t *testing.T, cmd tea.Cmd) tea.BatchMsg {
 func TestUnchangedSettingsDoNotInvalidateTarget(t *testing.T) {
 	m, _ := targetTestModel(t)
 	generation := m.wsClient.Generation()
-	updated, cmd := m.Update(messages.MihomoConfigMsg{Config: &model.MihomoConfig{ExternalController: "127.0.0.1:9090", Secret: "old", MixedPort: 7891}})
+	updated, cmd := m.Update(messages.MihomoConfigMsg{Target: &config.MihomoTarget{Endpoint: config.MihomoEndpoint{ExternalController: "127.0.0.1:9090", Secret: "old", MixedPort: 7891}}})
 	next := updated.(Model)
 	require.Equal(t, m.connectionEpoch, next.connectionEpoch)
 	require.Equal(t, generation, next.wsClient.Generation())
@@ -251,8 +275,9 @@ func TestRejectedTargetChangesLeaveConnectionAlone(t *testing.T) {
 
 func TestStoppedOwnerRejectsQueuedHealthyResult(t *testing.T) {
 	m, _ := targetTestModel(t)
-	updated, _ := m.Update(messages.CoreOwnerChangedMsg{Action: "stop"})
-	next := updated.(Model)
+	updated, pending := m.Update(messages.CoreOwnerChangedMsg{Action: "stop"})
+	require.NotNil(t, pending)
+	next, _ := resolvedTestTarget(t, updated.(Model))
 	require.Greater(t, next.connectionEpoch, m.connectionEpoch)
 	require.True(t, next.connectionChecked)
 	require.False(t, next.connectionReady)
@@ -266,6 +291,10 @@ func TestManagedStartupBindsCredentialsCreatedByFallback(t *testing.T) {
 	oldWS := m.wsClient.Generation()
 	require.NoError(t, os.WriteFile(path, []byte("external-controller: 127.0.0.1:9090\nsecret: fallback\nmixed-port: 7890\n"), 0600))
 	updated, cmd := m.Update(messages.ManagedCoreStartedMsg{Epoch: m.connectionEpoch})
+	require.NotNil(t, cmd)
+	resolved, ok := cmd().(messages.CoreTargetResolvedMsg)
+	require.True(t, ok)
+	updated, cmd = updated.Update(resolved)
 	next := updated.(Model)
 	require.Equal(t, "fallback", next.client.EndpointSnapshot().Secret)
 	require.Greater(t, next.wsClient.Generation(), oldWS)
@@ -286,9 +315,64 @@ func TestStoppedManagedStatusClearsReadyConnection(t *testing.T) {
 	status.Mode = "managed"
 	status.Running = false
 	updated, cmd = updated.(Model).Update(messages.CoreStatusMsg{Status: status})
-	next := updated.(Model)
+	require.NotNil(t, cmd)
+	next, cmd := resolvedTestTarget(t, updated.(Model))
 	require.Greater(t, next.connectionEpoch, m.connectionEpoch)
 	require.True(t, next.connectionChecked)
 	require.False(t, next.connectionReady)
 	require.Nil(t, cmd)
+}
+
+func TestSlowControllerDiscoveryLeavesInputResponsiveAndCannotWinLate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process discovery is used on Unix")
+	}
+	m, oldPath := targetTestModel(t)
+	shim := t.TempDir()
+	started, released := filepath.Join(shim, "started"), filepath.Join(shim, "release")
+	t.Setenv("PATH", shim+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("MIHOSH_DISCOVERY_TEST_START", started)
+	t.Setenv("MIHOSH_DISCOVERY_TEST_RELEASE", released)
+	t.Setenv("MIHOSH_DISCOVERY_TEST_CONFIG", oldPath)
+	t.Cleanup(func() { _ = os.WriteFile(released, nil, 0600) })
+	require.NoError(t, os.WriteFile(filepath.Join(shim, "systemctl"), []byte("#!/bin/sh\nexit 1\n"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(shim, "ps"), []byte(`#!/bin/sh
+: > "$MIHOSH_DISCOVERY_TEST_START"
+while [ ! -f "$MIHOSH_DISCOVERY_TEST_RELEASE" ]; do sleep 0.01; done
+printf '123 mihomo -f %s\n' "$MIHOSH_DISCOVERY_TEST_CONFIG"
+`), 0755))
+	require.NoError(t, config.Update(func(cfg *config.Config) error { cfg.Core.Mode = "external"; return nil }))
+
+	updated, discover := m.Update(messages.ManagedCoreStartedMsg{Epoch: m.connectionEpoch})
+	pending := updated.(Model)
+	require.NotNil(t, pending.targetPending)
+	older := make(chan tea.Msg, 1)
+	go func() { older <- discover() }()
+	require.Eventually(t, func() bool { _, err := os.Stat(started); return err == nil }, time.Second, 2*time.Millisecond)
+	updated, _ = pending.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	pending = updated.(Model)
+	require.True(t, pending.showHelp)
+	require.Equal(t, "old", pending.client.EndpointSnapshot().Secret)
+
+	require.NoError(t, config.Update(func(cfg *config.Config) error {
+		cfg.Core.ExternalController = "127.0.0.1:9191"
+		cfg.Core.ExternalSecret = "new"
+		return nil
+	}))
+	updated, discover = pending.Update(messages.ManagedCoreStartedMsg{Epoch: pending.connectionEpoch})
+	newer := discover()
+	updated, _ = updated.Update(newer)
+	current := updated.(Model)
+	require.Equal(t, "new", current.client.EndpointSnapshot().Secret)
+	require.Greater(t, current.wsClient.Generation(), uint64(0))
+	require.NoError(t, os.WriteFile(released, nil, 0600))
+	select {
+	case result := <-older:
+		updated, cmd := current.Update(result)
+		require.Nil(t, cmd)
+		require.Equal(t, "new", updated.(Model).client.EndpointSnapshot().Secret)
+		require.Equal(t, current.connectionEpoch, updated.(Model).connectionEpoch)
+	case <-time.After(2 * time.Second):
+		t.Fatal("old discovery did not return after release")
+	}
 }

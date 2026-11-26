@@ -93,27 +93,17 @@ func (s *ConfigService) SetConfigValue(key, value string) error {
 }
 
 // ReadMihomoConfig reads the managed fields from disk, retaining endpoint/default fallbacks.
-func (s *ConfigService) ReadMihomoConfig() *model.MihomoConfig {
-	endpoint := config.ResolveMihomoEndpoint()
-	mihomoCfg := &model.MihomoConfig{
+func (s *ConfigService) ReadMihomoConfig() (*model.MihomoConfig, MihomoTarget) {
+	cfg, _ := config.Load()
+	target := config.ResolveMihomoTarget(cfg)
+	endpoint := target.Endpoint
+	return &model.MihomoConfig{
 		ExternalController: endpoint.ExternalController,
 		Secret:             endpoint.Secret,
 		MixedPort:          endpoint.MixedPort,
-	}
-
-	// 从 YAML 读取 allow-lan / log-level（ResolveMihomoEndpoint 未解析的字段）
-	if path, err := config.GetMihomoConfigPath(); err == nil {
-		if data, err := config.ReadMihomoYAML(path); err == nil {
-			if v, ok := data["allow-lan"].(bool); ok {
-				mihomoCfg.AllowLan = v
-			}
-			if v, ok := data["log-level"].(string); ok {
-				mihomoCfg.LogLevel = v
-			}
-		}
-	}
-
-	return mihomoCfg
+		AllowLan:           target.AllowLan,
+		LogLevel:           target.LogLevel,
+	}, target
 }
 
 // SaveMihomoConfigField writes YAML, then hot-reloads via API before any service restart fallback.

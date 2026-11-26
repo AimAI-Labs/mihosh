@@ -16,6 +16,14 @@ type MihomoEndpoint struct {
 	MixedPort          int
 }
 
+// MihomoTarget describes one discovered controller and its local editing path.
+type MihomoTarget struct {
+	Endpoint   MihomoEndpoint
+	ConfigPath string
+	AllowLan   bool
+	LogLevel   string
+}
+
 // DefaultMihomoEndpoint 内置默认（自动发现失败时回退）。
 var DefaultMihomoEndpoint = MihomoEndpoint{
 	ExternalController: "127.0.0.1:9090",
@@ -26,32 +34,44 @@ var DefaultMihomoEndpoint = MihomoEndpoint{
 // 发现或解析失败时返回 DefaultMihomoEndpoint（不返回 error，保证启动零门槛）。
 // secret 统一在此收敛 fallback 逻辑：API 可能省略 secret，从 YAML 读取补全。
 func ResolveMihomoEndpoint() MihomoEndpoint {
-	if cfg, err := Load(); err == nil && cfg.Core.Mode != "managed" && cfg.Core.ExternalController != "" {
+	cfg, _ := Load()
+	return ResolveMihomoTarget(cfg).Endpoint
+}
+
+// ResolveMihomoTarget uses the caller's app configuration and reads the discovered
+// Mihomo file once, so the endpoint and local editing path describe the same target.
+func ResolveMihomoTarget(cfg *Config) MihomoTarget {
+	target := MihomoTarget{Endpoint: DefaultMihomoEndpoint}
+	if cfg != nil && cfg.Core.Mode != "managed" && cfg.Core.ExternalController != "" {
 		port := cfg.Core.ExternalMixedPort
 		if port <= 0 {
 			port = DefaultMihomoEndpoint.MixedPort
 		}
-		return MihomoEndpoint{ExternalController: cfg.Core.ExternalController, Secret: cfg.Core.ExternalSecret, MixedPort: port}
+		target.Endpoint = MihomoEndpoint{ExternalController: cfg.Core.ExternalController, Secret: cfg.Core.ExternalSecret, MixedPort: port}
+		return target
 	}
-	path, err := GetMihomoConfigPath()
+	path, err := resolveMihomoConfigPath(cfg)
 	if err != nil {
-		return DefaultMihomoEndpoint
+		target.ConfigPath, _ = GetDefaultMihomoConfigPath()
+		return target
 	}
+	target.ConfigPath = path
 
 	data, err := ReadMihomoYAML(path)
 	if err != nil {
-		return DefaultMihomoEndpoint
+		return target
 	}
 
-	endpoint := DefaultMihomoEndpoint
 	if v, ok := data["external-controller"].(string); ok && v != "" {
-		endpoint.ExternalController = v
+		target.Endpoint.ExternalController = v
 	}
 	if v, ok := data["secret"].(string); ok {
-		endpoint.Secret = v
+		target.Endpoint.Secret = v
 	}
-	endpoint.MixedPort = resolveMixedPort(data, endpoint.MixedPort)
-	return endpoint
+	target.Endpoint.MixedPort = resolveMixedPort(data, target.Endpoint.MixedPort)
+	target.AllowLan, _ = data["allow-lan"].(bool)
+	target.LogLevel, _ = data["log-level"].(string)
+	return target
 }
 
 // resolveMixedPort 从 YAML map 解析 mixed-port，兼容 int/int64/float64 等 YAML 解析类型。

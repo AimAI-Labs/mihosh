@@ -25,16 +25,6 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 )
 
-// newRulesState 构造规则页面初始状态，并注入当前 Mihomo 配置文件路径。
-// 路径解析失败时静默留空（用户尝试添加规则时会得到明确错误）。
-func newRulesState(client *service.Client, configSvc *service.ConfigService, coreSvc *service.CoreService) rules.State {
-	s := rules.NewState(client, configSvc, coreSvc)
-	if path, err := service.GetMihomoConfigPathForWrite(); err == nil {
-		s = s.SetConfigPath(path)
-	}
-	return s
-}
-
 // Model TUI 主模型（仅保留全局共享状态）
 type Model struct {
 	// 基础设施
@@ -71,6 +61,8 @@ type Model struct {
 	connectionChecked  bool
 	connectionChecking bool
 	connectionReady    bool
+	targetRequest      uint64
+	targetPending      *coreTargetRequest
 	wsStarted          bool
 	wsClient           *service.WSClient
 	wsInbox            *wsInbox
@@ -100,10 +92,10 @@ type Model struct {
 }
 
 // NewModel 创建新的 TUI 模型
-func NewModel(client *service.Client, testURL string, timeout int) Model {
+func NewModel(app *bootstrap.App) Model {
 	common.InitKeyBindings()
-	app := bootstrap.NewAppWithClient(client)
 	cfg := app.Config
+	client, testURL, timeout := app.Client, cfg.TestURL, cfg.Timeout
 
 	// 启动时根据配置初始化主题
 	if cfg.Theme != "" {
@@ -137,9 +129,9 @@ func NewModel(client *service.Client, testURL string, timeout int) Model {
 		wsCancel:             wsCancel,
 		ipResolver:           app.IPResolver,
 		nodesState:           nodes.NewState(client, testURL, timeout).SetServices(app.ConfigSvc, app.CoreSvc),
-		connsState:           connections.NewState(service.MixedPortToProxyURL(app.Endpoint.MixedPort), model.DefaultSiteTests(), client, timeout, chartData),
+		connsState:           connections.NewState(service.MixedPortToProxyURL(app.Target.Endpoint.MixedPort), model.DefaultSiteTests(), client, timeout, chartData),
 		logsState:            logs.NewState(app.IPResolver),
-		rulesState:           newRulesState(client, app.ConfigSvc, app.CoreSvc),
+		rulesState:           rules.NewState(client, app.ConfigSvc, app.CoreSvc).SetConfigPath(app.Target.ConfigPath),
 		subState:             sub.NewState(app.ProfileSvc),
 		settingsState:        settings.NewState(app.ConfigSvc, client),
 		autoRefreshRemaining: cfg.AutoRefreshInterval,

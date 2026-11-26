@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -8,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -24,13 +26,21 @@ func (errConfigNotFound) Error() string { return i18n.T("config.loader.err_not_f
 var ErrConfigNotFound = errConfigNotFound{}
 
 var systemctlStatusRunner = func() ([]byte, error) {
-	return exec.Command("systemctl", "status", "mihomo").CombinedOutput()
+	return runMihomoDiscovery("systemctl", "status", "mihomo")
 }
 
 // processListRunner 列出系统进程（pid + 完整命令行），用于发现手动启动的 mihomo。
 // -eww 保证长命令行不被终端宽度截断。
 var processListRunner = func() ([]byte, error) {
-	return exec.Command("ps", "-eww", "-o", "pid=,args=").Output()
+	return runMihomoDiscovery("ps", "-eww", "-o", "pid=,args=")
+}
+
+func runMihomoDiscovery(name string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.WaitDelay = 200 * time.Millisecond
+	return cmd.CombinedOutput()
 }
 
 // GetConfigDir 获取配置目录
@@ -53,7 +63,12 @@ func GetConfigDir() (string, error) {
 // Linux 下优先从 systemctl status 解析 -d 参数（运行时实际生效的配置），
 // 再降级搜索已知目录；其他平台直接搜索已知目录。
 func GetMihomoConfigPath() (string, error) {
-	if cfg, err := Load(); err == nil {
+	cfg, _ := Load()
+	return resolveMihomoConfigPath(cfg)
+}
+
+func resolveMihomoConfigPath(cfg *Config) (string, error) {
+	if cfg != nil {
 		if cfg.Core.Mode == "managed" {
 			return ManagedMihomoConfigPath()
 		}

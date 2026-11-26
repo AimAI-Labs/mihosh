@@ -82,15 +82,14 @@ func (m Model) applyConfigEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 			noticeText = i18n.Tf("nodes.chain.applied_toast", msg.Group, msg.ExitNode)
 		}
 		m.publishNotice(noticeText, overrideNoticeLevel(msg.Applied, msg.NeedsRestart))
+		var targetCmd tea.Cmd
 		if !msg.Remote && (msg.Restarted || msg.EndpointChanged) {
-			if cmd := m.syncAppliedCore(msg.Restarted, msg.NeedsRestart && msg.Applied); cmd != nil {
-				return m, cmd, true
-			}
+			targetCmd = m.syncAppliedCore(msg.Restarted, msg.NeedsRestart && msg.Applied, false)
 		}
-		if msg.Applied && m.client != nil {
-			return m, tea.Batch(nodes.FetchGroups(m.client), nodes.FetchProxies(m.client)), true
+		if msg.Applied && !msg.Restarted && m.client != nil {
+			return m, tea.Batch(targetCmd, nodes.FetchGroups(m.client), nodes.FetchProxies(m.client)), true
 		}
-		return m, nil, true
+		return m, targetCmd, true
 
 	case messages.RuleEditAppliedMsg:
 		if msg.Err != nil {
@@ -107,15 +106,14 @@ func (m Model) applyConfigEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 			notice = "rules.write.saved"
 		}
 		m.publishNotice(i18n.T(notice), overrideNoticeLevel(msg.Applied, msg.NeedsRestart))
+		var targetCmd tea.Cmd
 		if !msg.Remote && (msg.Restarted || msg.EndpointChanged) {
-			if cmd := m.syncAppliedCore(msg.Restarted, msg.NeedsRestart && msg.Applied); cmd != nil {
-				return m, cmd, true
-			}
+			targetCmd = m.syncAppliedCore(msg.Restarted, msg.NeedsRestart && msg.Applied, false)
 		}
-		if msg.Applied && m.client != nil {
-			return m, rules.FetchRules(m.client), true
+		if msg.Applied && !msg.Restarted && m.client != nil {
+			return m, tea.Batch(targetCmd, rules.FetchRules(m.client)), true
 		}
-		return m, nil, true
+		return m, targetCmd, true
 
 	case messages.ConfigReloadedMsg:
 		if msg.Err != nil {
@@ -164,7 +162,7 @@ func (m Model) applyConfigEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 		m.publishNotice(i18n.T(mihomoOverrideNotice(msg)), overrideNoticeLevel(msg.Applied, msg.NeedsRestart))
 		var targetCmd tea.Cmd
 		if !msg.Remote && (msg.Restarted || msg.EndpointChanged || msg.NeedsRestart && !msg.Applied) {
-			targetCmd = m.syncAppliedCore(msg.Restarted, msg.NeedsRestart && msg.Applied)
+			targetCmd = m.syncAppliedCore(msg.Restarted, msg.NeedsRestart && msg.Applied, msg.Applied && m.connectionReady)
 		}
 		if targetCmd == nil && msg.Applied && m.connectionReady {
 			return m, m.refreshOnConnect(), true
@@ -172,35 +170,26 @@ func (m Model) applyConfigEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 		return m, tea.Batch(targetCmd, m.coreState.Refresh()), true
 
 	case messages.MihomoConfigMsg:
-		// Mihomo 标签页配置加载完成（成功或失败）。
-		// 同步热刷新 client/wsClient 端点（external-controller/secret 变更），
-		// 并把 mixed-port 派生的代理地址同步到 connections。
 		m.coreState, _ = m.coreState.Update(msg)
-		if msg.Config != nil {
-			cmd := m.updateCoreTarget(service.MihomoEndpoint{ExternalController: msg.Config.ExternalController, Secret: msg.Config.Secret, MixedPort: msg.Config.MixedPort}, coreTargetSync)
+		if msg.Target != nil && m.targetPending == nil {
+			cmd := m.updateCoreTarget(*msg.Target, coreTargetSync)
 			return m, cmd, true
 		}
 		return m, nil, true
 
 	case messages.MihomoConfigSavedMsg:
-		var targetCmd tea.Cmd
-		// Mihomo 配置项已保存（写 YAML + 热重载）：toast 提示 + 重新拉取运行时配置。
-		// external-controller/secret/mixed-port 变更后重新解析 endpoint 热刷新 client/wsClient。
 		if msg.Err != nil && !msg.WriteOK {
-			// YAML 写入就失败了（如路径不存在），显示硬错误
 			m.publishError(msg.Err)
-		} else {
-			// YAML 写入成功：即使 reload 失败也刷新端点（修改 external-controller 后旧端口不可达是预期行为）
-			endpoint := service.ResolveMihomoEndpoint()
-			targetCmd = m.updateCoreTarget(endpoint, coreTargetSync)
-			m.clearErrorNotice()
-			if msg.Err != nil {
-				m.publishNotice(i18n.T("settings.toast.mihomo_save_reload_warn"), messages.NoticeWarning)
-			} else {
-				m.publishNotice(i18n.T("settings.toast.mihomo_save_success"), messages.NoticeSuccess)
-			}
+			return m, tea.Batch(m.fetchNodes(), preferences.FetchMihomoConfig(m.configSvc, m.client)), true
 		}
-		return m, tea.Batch(targetCmd, m.fetchNodes(), preferences.FetchMihomoConfig(m.configSvc, m.client)), true
+		m.clearErrorNotice()
+		if msg.Err != nil {
+			m.publishNotice(i18n.T("settings.toast.mihomo_save_reload_warn"), messages.NoticeWarning)
+		} else {
+			m.publishNotice(i18n.T("settings.toast.mihomo_save_success"), messages.NoticeSuccess)
+		}
+		cmd := m.requestCoreTarget(coreTargetSync, coreTargetOptions{refreshConfig: true})
+		return m, cmd, true
 
 	case messages.ThemeChangedMsg:
 		// 主题已切换，触发重绘（View 会读取新主题色）

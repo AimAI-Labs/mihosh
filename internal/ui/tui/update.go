@@ -17,9 +17,12 @@ import (
 
 // checkInitialConnectionCmd 发起初始 Mihomo API 健康检测
 func checkInitialConnectionCmd(client *service.Client) tea.Cmd {
-	return func() tea.Msg {
+	if client == nil {
+		return nil
+	}
+	return messages.CoreRequest(client, func(client *service.Client) tea.Msg {
 		if _, err := client.GetVersion(); err != nil {
-			endpoint := service.ResolveMihomoEndpoint()
+			endpoint := client.EndpointSnapshot()
 			secretMasked := ""
 			if endpoint.Secret != "" {
 				secretMasked = "******"
@@ -31,7 +34,7 @@ func checkInitialConnectionCmd(client *service.Client) tea.Cmd {
 			}
 		}
 		return messages.HideGuideModalMsg{}
-	}
+	})
 }
 
 // Init 初始化
@@ -194,11 +197,7 @@ func (m *Model) refreshCurrentPage() tea.Cmd {
 	case layout.PageCore:
 		var cmd tea.Cmd
 		m.coreState, cmd = m.coreState.RefreshCurrent()
-		check := m.updateCoreTarget(service.ResolveMihomoEndpoint(), coreTargetSync)
-		if check == nil {
-			check = m.checkCoreConnection(false)
-		}
-		return tea.Batch(cmd, check)
+		return tea.Batch(cmd, m.requestCoreTarget(coreTargetSync, coreTargetOptions{probe: true}))
 	case layout.PageConnections:
 		cmd := m.refreshMenu()
 		if m.connsState.ViewMode() == connections.ConnViewTraffic {

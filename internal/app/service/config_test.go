@@ -36,9 +36,12 @@ func managedConfigFile(t *testing.T, contents string) string {
 
 func TestConfigReadUsesFileValues(t *testing.T) {
 	managedConfigFile(t, "external-controller: 127.0.0.1:9191\nsecret: from-file\nmixed-port: 7891\nallow-lan: true\nlog-level: debug\n")
-	result := NewConfigService().ReadMihomoConfig()
+	result, target := NewConfigService().ReadMihomoConfig()
 	if result.ExternalController != "127.0.0.1:9191" || result.Secret != "from-file" || result.MixedPort != 7891 || !result.AllowLan || result.LogLevel != "debug" {
 		t.Fatalf("unexpected file configuration: %+v", result)
+	}
+	if target.Endpoint.ExternalController != result.ExternalController || target.ConfigPath == "" {
+		t.Fatalf("configuration and target are inconsistent: %+v", target)
 	}
 }
 
@@ -47,7 +50,7 @@ func TestConfigReadRetainsDefaultFallback(t *testing.T) {
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-	result := NewConfigService().ReadMihomoConfig()
+	result, _ := NewConfigService().ReadMihomoConfig()
 	if result == nil || result.ExternalController != config.DefaultMihomoEndpoint.ExternalController || result.MixedPort != config.DefaultMihomoEndpoint.MixedPort {
 		t.Fatalf("default fallback changed: %+v", result)
 	}

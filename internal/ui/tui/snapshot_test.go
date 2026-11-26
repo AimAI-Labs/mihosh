@@ -21,7 +21,7 @@ func TestTUISnapshotNodesAndHelp(t *testing.T) {
 	t.Cleanup(func() { i18n.SetLanguageOverride("") })
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 
-	m := NewModel(nil, "http://127.0.0.1:1", 100)
+	m := newTestModel(nil, "http://127.0.0.1:1", 100)
 	t.Cleanup(m.Close)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	m = updated.(Model)
@@ -39,7 +39,7 @@ func TestTUISnapshotCorePage(t *testing.T) {
 	t.Cleanup(func() { i18n.SetLanguageOverride("") })
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 
-	m := NewModel(nil, "http://127.0.0.1:1", 100)
+	m := newTestModel(nil, "http://127.0.0.1:1", 100)
 	t.Cleanup(m.Close)
 	m.currentPage = layout.PageCore
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})

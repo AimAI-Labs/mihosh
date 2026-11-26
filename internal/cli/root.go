@@ -24,15 +24,12 @@ var rootCmd = &cobra.Command{
 		// 默认行为：启动TUI界面。
 		// 配置缺失（含首次启动）直接用默认值继续，不在启动期写文件；
 		// 连接信息由 mihomo 配置文件自动发现。
-		cfg, err := config.Load()
-		if err == nil {
-			i18n.SetLanguageOverride(cfg.Language)
-		} else {
-			cfg = &config.DefaultConfig
+		app := bootstrap.NewApp()
+		if app.ConfigErr == nil {
+			i18n.SetLanguageOverride(app.Config.Language)
 		}
 
-		client := bootstrap.NewClient(cfg)
-		m := tui.NewModel(client, cfg.TestURL, cfg.Timeout)
+		m := tui.NewModel(app)
 		defer m.Close()
 
 		p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithoutCatchPanics())

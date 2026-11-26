@@ -38,9 +38,9 @@ func TestLateHTTPCompletionsCannotAffectCurrentTarget(t *testing.T) {
 				if action != "restart" {
 					endpoint.ExternalController = "new-controller"
 				}
-				m.updateCoreTarget(endpoint, coreTargetReconnect)
+				m.updateCoreTarget(config.MihomoTarget{Endpoint: endpoint}, coreTargetReconnect)
 				if action == "switch-back" {
-					m.updateCoreTarget(old, coreTargetReconnect)
+					m.updateCoreTarget(config.MihomoTarget{Endpoint: old}, coreTargetReconnect)
 				}
 				generation := m.client.Generation()
 				updated, follow := m.Update(cmd())
@@ -187,10 +187,10 @@ func TestBatchResultsKeepTargetOwnershipAcrossReconnects(t *testing.T) {
 			if action == "switch" || action == "switch-back" {
 				endpoint.ExternalController = b.URL
 			}
-			m.updateCoreTarget(endpoint, update)
+			m.updateCoreTarget(config.MihomoTarget{Endpoint: endpoint}, update)
 			if action == "switch-back" {
 				endpoint.ExternalController = a.URL
-				m.updateCoreTarget(endpoint, coreTargetReconnect)
+				m.updateCoreTarget(config.MihomoTarget{Endpoint: endpoint}, coreTargetReconnect)
 			}
 			for _, command := range []tea.Cmd{nodeCmd, siteCmd} {
 				result := command()

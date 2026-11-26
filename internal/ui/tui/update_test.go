@@ -30,7 +30,7 @@ func TestUpdate_GlobalMessages(t *testing.T) {
 	}
 	client := api.NewClient(endpoint, 2000)
 
-	m := NewModel(client, "http://www.gstatic.com/generate_204", 2000)
+	m := newTestModel(client, "http://www.gstatic.com/generate_204", 2000)
 
 	// Test WindowSizeMsg
 	msg := tea.WindowSizeMsg{Width: 100, Height: 50}
@@ -67,7 +67,7 @@ func TestUpdate_GlobalMessages(t *testing.T) {
 func TestUpdate_MouseMessages(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	client := api.NewClient(config.MihomoEndpoint{}, 2000)
-	m := NewModel(client, "http://www.gstatic.com/generate_204", 2000)
+	m := newTestModel(client, "http://www.gstatic.com/generate_204", 2000)
 	m.currentPage = layout.PageNodes // Navigation starts here, independently of first-run routing.
 	m.width = 100
 	m.height = 50
@@ -109,7 +109,7 @@ func TestUpdate_MouseMessages(t *testing.T) {
 func TestUpdate_KeyMessages(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	client := api.NewClient(config.MihomoEndpoint{}, 2000)
-	m := NewModel(client, "", 2000)
+	m := newTestModel(client, "", 2000)
 	m.currentPage = layout.PageNodes // Navigation starts here, independently of first-run routing.
 
 	// Help popup intercepts keys
@@ -144,7 +144,7 @@ func TestUpdate_KeyMessages(t *testing.T) {
 
 func TestUpdate_DataMessages(t *testing.T) {
 	client := api.NewClient(config.MihomoEndpoint{}, 2000)
-	m := NewModel(client, "", 2000)
+	m := newTestModel(client, "", 2000)
 	var newM tea.Model
 
 	// Test GroupsMsg
@@ -205,7 +205,7 @@ func TestModelCompactFootprintAndBoundedRingBuffers(t *testing.T) {
 		t.Fatalf("Model value size = %d bytes, want < %d bytes", sz, 64<<10)
 	}
 
-	m := NewModel(nil, "", 2000)
+	m := newTestModel(nil, "", 2000)
 	defer m.Close()
 
 	// Logs ring buffer caps at common.LogsCap and retains newest entry.
@@ -251,7 +251,7 @@ func TestUpdate_InlineHelpMenuClick(t *testing.T) {
 	t.Cleanup(func() { i18n.SetLanguageOverride("") })
 
 	client := api.NewClient(config.MihomoEndpoint{}, 2000)
-	m := NewModel(client, "", 2000)
+	m := newTestModel(client, "", 2000)
 	defer m.Close()
 	m.width = 120
 	m.height = 30
@@ -305,7 +305,7 @@ func TestUpdate_TrafficTestAllMenuClick(t *testing.T) {
 	}))
 	defer server.Close()
 
-	m := NewModel(api.NewClient(config.MihomoEndpoint{}, 1000), "", 1000)
+	m := newTestModel(api.NewClient(config.MihomoEndpoint{}, 1000), "", 1000)
 	defer func() {
 		m.connsState.CancelTest()
 		m.Close()

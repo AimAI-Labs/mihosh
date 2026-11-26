@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
@@ -15,21 +14,24 @@ import (
 
 func (m Model) applyCoreEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
+	case messages.CoreTargetResolvedMsg:
+		cmd := m.applyResolvedCoreTarget(msg)
+		return m, cmd, true
+
 	case messages.CoreOwnerChangedMsg:
-		m.reloadStoredConfig()
 		update := coreTargetReconnect
 		if msg.Action == "stop" {
 			update = coreTargetStopped
 		}
-		cmd := m.updateCoreTarget(service.ResolveMihomoEndpoint(), update)
+		cmd := m.requestCoreTarget(update, coreTargetOptions{})
 		return m, tea.Batch(m.listenCoreOwner(), m.coreState.Refresh(), cmd), true
 
 	case messages.ManagedCoreStartedMsg:
 		if msg.Epoch != m.connectionEpoch {
 			return m, nil, true
 		}
-		m.reloadStoredConfig()
-		return m, m.updateCoreTarget(service.ResolveMihomoEndpoint(), coreTargetReconnect), true
+		cmd := m.requestCoreTarget(coreTargetReconnect, coreTargetOptions{})
+		return m, cmd, true
 
 	case messages.CoreConnectionMsg:
 		if msg.Epoch != m.connectionEpoch {
@@ -74,8 +76,8 @@ func (m Model) applyCoreEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 		if statusMsg, ok := msg.(messages.CoreStatusMsg); ok && statusMsg.Err == nil {
 			m.syncProcessLogs()
 			if statusMsg.Status.Mode == "managed" && !statusMsg.Status.Running && m.connectionReady {
-				m.reloadStoredConfig()
-				return m, tea.Batch(cmd, m.updateCoreTarget(service.ResolveMihomoEndpoint(), coreTargetStopped)), true
+				resolve := m.requestCoreTarget(coreTargetStopped, coreTargetOptions{})
+				return m, tea.Batch(cmd, resolve), true
 			}
 		}
 		return m, cmd, true
