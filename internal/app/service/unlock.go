@@ -166,11 +166,19 @@ func (r unlockResponse) field(key string) string {
 }
 
 func (r unlockResponse) fieldValue(key string) string {
-	_, tail, ok := strings.Cut(r.body, strconv.Quote(key))
-	if !ok {
-		return ""
+	quoted := strconv.Quote(key)
+	rest := r.body
+	for {
+		_, tail, ok := strings.Cut(rest, quoted)
+		if !ok {
+			return ""
+		}
+		trimmed := strings.TrimSpace(tail)
+		if after, hasColon := strings.CutPrefix(trimmed, ":"); hasColon {
+			return strings.TrimSpace(after)
+		}
+		rest = tail
 	}
-	return strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(tail), ":"))
 }
 
 func (r unlockResponse) traceRegion() string {

@@ -247,3 +247,49 @@ func TestSyncServicePostgresPushStatusPull(t *testing.T) {
 	require.Equal(t, "nord", cfgB.Theme)
 	require.NotEmpty(t, cfgB.Sync.LastSyncAt)
 }
+
+func TestSyncStatusMatchesUnredactedRemoteAndValidatesBundle(t *testing.T) {
+	store := newMemorySyncStore()
+	svc := &SyncService{
+		openStore: func(context.Context, string) (syncinfra.Store, error) {
+			return store, nil
+		},
+	}
+
+	deviceA := t.TempDir()
+	seedSyncDevice(t, deviceA)
+
+	// Push unredacted snapshot; Status must compare against unredacted local bundle.
+	pushed, err := svc.Push(context.Background(), "", "", false)
+	require.NoError(t, err)
+	require.False(t, pushed.Redacted)
+
+	st, err := svc.Status(context.Background(), "", "")
+	require.NoError(t, err)
+	require.Equal(t, "in_sync", st.State)
+
+	// RestoreBundle must reject path-traversal UIDs and invalid preference enums.
+	badUIDBundle, err := svc.CollectLocalBundle(true)
+	require.NoError(t, err)
+	badUIDBundle.Config.Subs[0].UID = "../escape"
+	_, err = svc.RestoreBundle(badUIDBundle, "test", "")
+	require.ErrorContains(t, err, "invalid subscription UID")
+
+	badThemeBundle, err := svc.CollectLocalBundle(true)
+	require.NoError(t, err)
+	badThemeBundle.Config.Preferences.Theme = "nonexistent-theme"
+	_, err = svc.RestoreBundle(badThemeBundle, "test", "")
+	require.ErrorContains(t, err, "invalid theme")
+
+	// Restoring a bundle without merge/rule-edits/chain-edits clears stale local overlays.
+	cleanBundle, err := svc.CollectLocalBundle(true)
+	require.NoError(t, err)
+	cleanBundle.MergeYAML = nil
+	cleanBundle.RuleEdits = nil
+	cleanBundle.ChainEdits = nil
+	_, err = svc.RestoreBundle(cleanBundle, "test", "")
+	require.NoError(t, err)
+	mergePath, _ := profile.MergePath()
+	_, statErr := os.Stat(mergePath)
+	require.True(t, os.IsNotExist(statErr), "omitted merge.yaml should be removed on restore")
+}

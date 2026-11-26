@@ -119,3 +119,19 @@ func TestApplyReleaseUpdatePreservesRunnableTargetOnFailure(t *testing.T) {
 		})
 	}
 }
+
+func TestIsTrustedUpdateURL(t *testing.T) {
+	if !isTrustedUpdateURL(releaseBase + "download/v2.0.0/mihosh-linux-amd64.tar.gz") {
+		t.Fatal("expected official release download URL to be trusted")
+	}
+	for _, bad := range []string{
+		"",
+		"http://github.com/AimAI-Labs/mihosh/releases/download/v2/mihosh.tar.gz",
+		"https://evil.example/AimAI-Labs/mihosh/releases/download/v2/mihosh.tar.gz",
+		releaseBase + "tag/v2.0.0",
+	} {
+		if isTrustedUpdateURL(bad) {
+			t.Fatalf("expected %q to be rejected", bad)
+		}
+	}
+}

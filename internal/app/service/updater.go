@@ -58,7 +58,7 @@ func CheckUpdate(currentVersion string) (*model.UpdateInfo, error) {
 	}
 
 	var release githubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&release); err != nil {
 		return nil, fmt.Errorf("decode json failed: %w", err)
 	}
 
@@ -122,10 +122,21 @@ func decodeUpdateDigest(digest string) []byte {
 	return decoded
 }
 
+func isTrustedUpdateURL(raw string) bool {
+	if !strings.HasPrefix(raw, releaseBase+"download/") {
+		return false
+	}
+	u, err := url.Parse(raw)
+	return err == nil && u.Scheme == "https" && u.Host == "github.com" && u.User == nil
+}
+
 // DownloadAndApplyUpdate verifies the release archive before replacing the running executable.
 func DownloadAndApplyUpdate(info model.UpdateInfo) error {
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		return errors.New("automatic updates are unavailable on this platform")
+	}
+	if !isTrustedUpdateURL(info.DownloadURL) {
+		return errors.New("untrusted update download URL")
 	}
 	target, err := os.Executable()
 	if err != nil {

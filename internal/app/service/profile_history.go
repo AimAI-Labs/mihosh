@@ -77,7 +77,14 @@ func (s *ProfileService) RollbackSnapshot(kind profile.SnapshotKind, uid, snapsh
 		if err != nil {
 			return nil, err
 		}
-		before, _ := profile.ReadMerge()
+		mergePath, err := profile.MergePath()
+		if err != nil {
+			return nil, err
+		}
+		before, beforeExisted, err := readOptionalFile(mergePath)
+		if err != nil {
+			return nil, err
+		}
 		beforeOverrides, _ := profile.ReadMihomoOverridesFrom(before)
 		afterOverrides, _ := profile.ReadMihomoOverridesFrom(data)
 		cleared := profile.ClearedOverrideKeys(beforeOverrides, afterOverrides)
@@ -87,7 +94,8 @@ func (s *ProfileService) RollbackSnapshot(kind profile.SnapshotKind, uid, snapsh
 		if activeUID != "" {
 			res, applyErr := s.ApplyActiveMerge(activeUID, cleared)
 			if applyErr != nil {
-				return &res, applyErr
+				restoreErr := restoreMergeFile(mergePath, beforeExisted, before)
+				return &res, errors.Join(applyErr, restoreErr)
 			}
 			return &res, nil
 		}

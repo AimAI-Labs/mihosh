@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"os/exec"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 )
+
+const ipResolverCmdTimeout = 3 * time.Second
 
 // IPResolver 内网IP解析器（带缓存）
 type IPResolver struct {
@@ -38,20 +41,49 @@ func (r *IPResolver) Resolve(ip string) *model.ResolvedIP {
 	}
 
 	r.mu.Lock()
-	defer r.mu.Unlock()
+	expired := time.Since(r.cacheTime) >= r.cacheTTL
+	dockerChecked, dockerOK := r.dockerChecked, r.dockerOK
+	tsChecked, tsOK := r.tsChecked, r.tsOK
+	if !expired {
+		if resolved, ok := r.cache[ip]; ok {
+			r.mu.Unlock()
+			return resolved
+		}
+		r.mu.Unlock()
+		return r.guessBySubnet(ip, dockerOK, tsOK)
+	}
+	r.mu.Unlock()
 
-	// 缓存过期则刷新
-	if time.Since(r.cacheTime) >= r.cacheTTL {
-		r.refreshCache()
+	// Run external CLI probes outside r.mu with a strict timeout so a hung daemon never deadlocks callers.
+	if !dockerChecked {
+		_, err := exec.LookPath("docker")
+		dockerOK = err == nil
+		dockerChecked = true
+	}
+	if !tsChecked {
+		_, err := exec.LookPath("tailscale")
+		tsOK = err == nil
+		tsChecked = true
+	}
+	nextCache := make(map[string]*model.ResolvedIP)
+	if dockerOK {
+		collectDockerIPs(nextCache)
+	}
+	if tsOK {
+		collectTailscaleIPs(nextCache)
 	}
 
-	// 查缓存
-	if resolved, ok := r.cache[ip]; ok {
+	r.mu.Lock()
+	r.dockerChecked, r.dockerOK = dockerChecked, dockerOK
+	r.tsChecked, r.tsOK = tsChecked, tsOK
+	r.cache = nextCache
+	r.cacheTime = time.Now()
+	resolved, ok := r.cache[ip]
+	r.mu.Unlock()
+	if ok {
 		return resolved
 	}
-
-	// 缓存中未找到，按网段推测
-	return r.guessBySubnet(ip)
+	return r.guessBySubnet(ip, dockerOK, tsOK)
 }
 
 // IsPrivateIP 判断是否为内网IP
@@ -68,26 +100,12 @@ func isCGNAT(ip net.IP) bool {
 	return cgnat != nil && cgnat.Contains(ip)
 }
 
-func (r *IPResolver) refreshCache() {
-	r.cache = make(map[string]*model.ResolvedIP)
-	r.cacheTime = time.Now()
-	r.refreshDocker()
-	r.refreshTailscale()
-}
-
 // ── Docker 解析 ──
 
-func (r *IPResolver) refreshDocker() {
-	if !r.dockerChecked {
-		_, err := exec.LookPath("docker")
-		r.dockerOK = err == nil
-		r.dockerChecked = true
-	}
-	if !r.dockerOK {
-		return
-	}
-
-	out, err := exec.Command("docker", "ps", "-q").Output()
+func collectDockerIPs(cache map[string]*model.ResolvedIP) {
+	ctx, cancel := context.WithTimeout(context.Background(), ipResolverCmdTimeout)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "docker", "ps", "-q").Output()
 	if err != nil {
 		return
 	}
@@ -100,7 +118,9 @@ func (r *IPResolver) refreshDocker() {
 	// 一次 inspect 所有容器：Name|Image|IP1,IP2,...
 	args := append([]string{"inspect", "--format",
 		"{{.Name}}|{{.Config.Image}}|{{range .NetworkSettings.Networks}}{{.IPAddress}},{{end}}"}, ids...)
-	out, err = exec.Command("docker", args...).Output()
+	inspectCtx, inspectCancel := context.WithTimeout(context.Background(), ipResolverCmdTimeout)
+	defer inspectCancel()
+	out, err = exec.CommandContext(inspectCtx, "docker", args...).Output()
 	if err != nil {
 		return
 	}
@@ -120,7 +140,7 @@ func (r *IPResolver) refreshDocker() {
 		for _, ip := range ips {
 			ip = strings.TrimSpace(ip)
 			if ip != "" {
-				r.cache[ip] = &model.ResolvedIP{
+				cache[ip] = &model.ResolvedIP{
 					IP:          ip,
 					IsPrivate:   true,
 					NetworkType: "docker",
@@ -134,17 +154,10 @@ func (r *IPResolver) refreshDocker() {
 
 // ── Tailscale 解析 ──
 
-func (r *IPResolver) refreshTailscale() {
-	if !r.tsChecked {
-		_, err := exec.LookPath("tailscale")
-		r.tsOK = err == nil
-		r.tsChecked = true
-	}
-	if !r.tsOK {
-		return
-	}
-
-	out, err := exec.Command("tailscale", "status", "--json").Output()
+func collectTailscaleIPs(cache map[string]*model.ResolvedIP) {
+	ctx, cancel := context.WithTimeout(context.Background(), ipResolverCmdTimeout)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "tailscale", "status", "--json").Output()
 	if err != nil {
 		return
 	}
@@ -156,7 +169,7 @@ func (r *IPResolver) refreshTailscale() {
 
 	// 添加自身
 	for _, ip := range status.Self.TailscaleIPs {
-		r.cache[ip] = &model.ResolvedIP{
+		cache[ip] = &model.ResolvedIP{
 			IP:          ip,
 			IsPrivate:   true,
 			NetworkType: "tailscale",
@@ -168,7 +181,7 @@ func (r *IPResolver) refreshTailscale() {
 	// 添加 peers
 	for _, peer := range status.Peer {
 		for _, ip := range peer.TailscaleIPs {
-			r.cache[ip] = &model.ResolvedIP{
+			cache[ip] = &model.ResolvedIP{
 				IP:          ip,
 				IsPrivate:   true,
 				NetworkType: "tailscale",
@@ -195,17 +208,17 @@ type tailscaleStatus struct {
 
 // ── 网段推测（降级） ──
 
-func (r *IPResolver) guessBySubnet(ip string) *model.ResolvedIP {
+func (r *IPResolver) guessBySubnet(ip string, dockerOK, tsOK bool) *model.ResolvedIP {
 	netIP := net.ParseIP(ip)
 	if netIP == nil {
-		return &model.ResolvedIP{IP: ip, IsPrivate: true, NetworkType: "unknown", AppName: "(未知来源)"}
+		return &model.ResolvedIP{IP: ip, IsPrivate: true, NetworkType: "unknown", AppName: "(unknown)"}
 	}
 
 	result := &model.ResolvedIP{IP: ip, IsPrivate: true}
 
 	if netIP.IsLoopback() {
 		result.NetworkType = "local"
-		result.AppName = "本机"
+		result.AppName = "localhost"
 		return result
 	}
 
@@ -213,10 +226,10 @@ func (r *IPResolver) guessBySubnet(ip string) *model.ResolvedIP {
 	_, docker172, _ := net.ParseCIDR("172.16.0.0/12")
 	if docker172 != nil && docker172.Contains(netIP) {
 		result.NetworkType = "docker"
-		if !r.dockerOK {
-			result.AppName = "(CLI未安装)"
+		if !dockerOK {
+			result.AppName = "(CLI unavailable)"
 		} else {
-			result.AppName = "(未知容器)"
+			result.AppName = "(unknown container)"
 		}
 		return result
 	}
@@ -224,10 +237,10 @@ func (r *IPResolver) guessBySubnet(ip string) *model.ResolvedIP {
 	// Tailscale CGNAT: 100.64.0.0/10
 	if isCGNAT(netIP) {
 		result.NetworkType = "tailscale"
-		if !r.tsOK {
-			result.AppName = "(CLI未安装)"
+		if !tsOK {
+			result.AppName = "(CLI unavailable)"
 		} else {
-			result.AppName = "(未知设备)"
+			result.AppName = "(unknown peer)"
 		}
 		return result
 	}
@@ -236,12 +249,12 @@ func (r *IPResolver) guessBySubnet(ip string) *model.ResolvedIP {
 	_, ten, _ := net.ParseCIDR("10.0.0.0/8")
 	if ten != nil && ten.Contains(netIP) {
 		result.NetworkType = "lan"
-		result.AppName = "(10.x 内网设备)"
+		result.AppName = "(10.x LAN)"
 		return result
 	}
 
 	// 192.168.0.0/16 或其他
 	result.NetworkType = "lan"
-	result.AppName = "(局域网设备)"
+	result.AppName = "(LAN)"
 	return result
 }

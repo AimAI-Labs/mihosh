@@ -286,6 +286,9 @@ type BatchUpdateResult struct {
 // BatchUpdateRemoteProfiles fetches the specified remote profiles reusing FetchProfileContext
 // with bounded concurrency.
 func (s *ProfileService) BatchUpdateRemoteProfiles(ctx context.Context, uids []string) BatchUpdateResult {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	res := BatchUpdateResult{Total: len(uids)}
 	if len(uids) == 0 {
 		return res

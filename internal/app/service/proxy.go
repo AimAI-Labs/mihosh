@@ -1,7 +1,8 @@
 package service
 
 import (
-	"encoding/json"
+	"context"
+	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/domain/port"
@@ -50,40 +51,11 @@ func (s *ProxyService) TestGroupDelay(group string) error {
 
 // GetIPInfo 获取当前出口 IP 信息
 func (s *ProxyService) GetIPInfo(proxyAddr string) (*model.IPInfo, error) {
-	httpClient, err := s.client.NewHTTPClientWithProxy(proxyAddr)
-	if err != nil {
-		return nil, err
+	ctx := context.Background()
+	if s.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(s.timeout)*time.Millisecond)
+		defer cancel()
 	}
-
-	// 使用 ip-api.com 获取详细信息
-	// fields=61439 包含：status, message, country, countryCode, region, regionName, city, zip, lat, lon, timezone, isp, org, as, query
-	resp, err := httpClient.Get(model.IPApiURL)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	var info model.IPInfo
-	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
-		return nil, err
-	}
-
-	// 字段校准：将 ip-api.com 的字段映射到通用字段名
-	if info.IP == "" && info.Query != "" {
-		info.IP = info.Query
-	}
-	if info.CountryCode == "" && info.CountryCodeApi != "" {
-		info.CountryCode = info.CountryCodeApi
-	}
-	if info.Organization == "" && info.Org != "" {
-		info.Organization = info.Org
-	}
-	if info.Latitude == 0 && info.Lat != 0 {
-		info.Latitude = info.Lat
-	}
-	if info.Longitude == 0 && info.Lon != 0 {
-		info.Longitude = info.Lon
-	}
-
-	return &info, nil
+	return FetchCurrentIPInfo(ctx, proxyAddr)
 }

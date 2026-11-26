@@ -14,9 +14,11 @@ const (
 	restoreJournal    = "pending.json"
 )
 
-// ProfileFiles contains the portable profile overlays. A nil file is omitted.
+// ProfileFiles contains the portable profile overlays. A nil file is omitted unless
+// its corresponding Remove* flag is set.
 type ProfileFiles struct {
-	Merge, Rules, Chains []byte
+	Merge, Rules, Chains            []byte
+	RemoveMerge, RemoveRules, RemoveChains bool
 }
 
 // ReadProfileFiles takes a consistent snapshot for sync export and upload.
@@ -86,9 +88,15 @@ func restoreProfileFiles(prepare func(*Config) (ProfileFiles, error), install fu
 		}
 	}()
 	for _, file := range []struct {
-		name string
-		data []byte
-	}{{"merge.yaml", files.Merge}, {"rule-edits.yaml", files.Rules}, {"chain-edits.yaml", files.Chains}, {"config.yaml", nil}} {
+		name   string
+		data   []byte
+		remove bool
+	}{
+		{"merge.yaml", files.Merge, files.RemoveMerge},
+		{"rule-edits.yaml", files.Rules, files.RemoveRules},
+		{"chain-edits.yaml", files.Chains, files.RemoveChains},
+		{"config.yaml", nil, false},
+	} {
 		var err error
 		dst := filepath.Join(stage, file.name+".new")
 		switch {
@@ -99,6 +107,8 @@ func restoreProfileFiles(prepare func(*Config) (ProfileFiles, error), install fu
 				_, err := w.Write(file.data)
 				return err
 			})
+		case file.remove:
+			// Back up existing file (if any) so rollback can restore it if a later step fails.
 		default:
 			continue
 		}
@@ -109,13 +119,22 @@ func restoreProfileFiles(prepare func(*Config) (ProfileFiles, error), install fu
 		if err != nil {
 			return fmt.Errorf("back up %s: %w", file.name, err)
 		}
-		entries = append(entries, restoreEntry{Name: file.name, Existed: existed})
+		if file.remove && !existed {
+			continue
+		}
+		entries = append(entries, restoreEntry{Name: file.name, Existed: existed, Remove: file.remove})
 	}
 	journal := filepath.Join(stage, restoreJournal)
 	if err := writeConfigAtomically(journal, 0600, func(w io.Writer) error { return json.NewEncoder(w).Encode(entries) }); err != nil {
 		return err
 	}
 	for _, entry := range entries {
+		if entry.Remove {
+			if err := os.Remove(filepath.Join(root, entry.Name)); err != nil && !os.IsNotExist(err) {
+				return errors.Join(fmt.Errorf("remove %s: %w", entry.Name, err), recoverProfileRestore(root))
+			}
+			continue
+		}
 		if err := install(filepath.Join(stage, entry.Name+".new"), filepath.Join(root, entry.Name)); err != nil {
 			return errors.Join(fmt.Errorf("restore %s: %w", entry.Name, err), recoverProfileRestore(root))
 		}
@@ -159,6 +178,7 @@ func backupRestoreFile(path, backup string) (bool, error) {
 type restoreEntry struct {
 	Name    string `json:"name"`
 	Existed bool   `json:"existed"`
+	Remove  bool   `json:"remove,omitempty"`
 }
 
 func recoverProfileRestore(root string) error {
@@ -194,10 +214,12 @@ func recoverProfileRestore(root string) error {
 	}
 	for i := len(entries) - 1; i >= 0; i-- {
 		entry := entries[i]
-		if _, err := os.Lstat(filepath.Join(stage, entry.Name+".new")); err == nil {
-			continue // The staged file was never installed.
-		} else if !os.IsNotExist(err) {
-			return err
+		if !entry.Remove {
+			if _, err := os.Lstat(filepath.Join(stage, entry.Name+".new")); err == nil {
+				continue // The staged file was never installed.
+			} else if !os.IsNotExist(err) {
+				return err
+			}
 		}
 		path := filepath.Join(root, entry.Name)
 		if entry.Existed {

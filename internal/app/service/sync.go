@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	syncinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/sync"
@@ -222,6 +223,15 @@ func (s *SyncService) RestoreBundle(bundle syncinfra.Bundle, source, profileKey 
 		}
 		// Host-specific core and sync settings stay local.
 		prefs := bundle.Config.Preferences
+		if prefs.Language != "" && prefs.Language != "auto" && prefs.Language != "zh-CN" && prefs.Language != "en-US" {
+			return config.ProfileFiles{}, fmt.Errorf("invalid language preference: %q", prefs.Language)
+		}
+		if prefs.Theme != "" && !model.IsValidTheme(prefs.Theme) {
+			return config.ProfileFiles{}, fmt.Errorf("invalid theme preference: %q", prefs.Theme)
+		}
+		if prefs.BorderStyle != "" && prefs.BorderStyle != "rounded" && prefs.BorderStyle != "square" {
+			return config.ProfileFiles{}, fmt.Errorf("invalid border_style preference: %q", prefs.BorderStyle)
+		}
 		if prefs.TestURL != "" {
 			cfg.TestURL = prefs.TestURL
 		}
@@ -255,6 +265,12 @@ func (s *SyncService) RestoreBundle(bundle syncinfra.Bundle, source, profileKey 
 		restoredSubs := make([]profile.Profile, 0, len(bundle.Config.Subs))
 		validUIDs := make(map[string]struct{}, len(bundle.Config.Subs))
 		for _, incoming := range bundle.Config.Subs {
+			if err := validateSyncSubUID(incoming.UID); err != nil {
+				return config.ProfileFiles{}, err
+			}
+			if _, dup := validUIDs[incoming.UID]; dup {
+				return config.ProfileFiles{}, fmt.Errorf("duplicate subscription UID in bundle: %q", incoming.UID)
+			}
 			mergedSub := incoming
 			if local, ok := existingByUID[incoming.UID]; ok {
 				if mergedSub.Source.URL != "" && syncinfra.ContainsRedacted(mergedSub.Source.URL) &&
@@ -298,6 +314,13 @@ func (s *SyncService) RestoreBundle(bundle syncinfra.Bundle, source, profileKey 
 	return res, nil
 }
 
+func validateSyncSubUID(uid string) error {
+	if uid == "" || uid == "." || uid == ".." || strings.ContainsAny(uid, `/\`) || !filepath.IsLocal(uid) {
+		return fmt.Errorf("invalid subscription UID in bundle: %q", uid)
+	}
+	return nil
+}
+
 func prepareSyncProfileFiles(bundle syncinfra.Bundle) (config.ProfileFiles, int, error) {
 	var files config.ProfileFiles
 	if len(bytes.TrimSpace(bundle.RuleEdits)) > 0 {
@@ -305,14 +328,19 @@ func prepareSyncProfileFiles(bundle syncinfra.Bundle) (config.ProfileFiles, int,
 			return files, 0, fmt.Errorf("validate rule-edits.yaml: %w", err)
 		}
 		files.Rules = bundle.RuleEdits
+	} else {
+		files.RemoveRules = true
 	}
 	if len(bytes.TrimSpace(bundle.ChainEdits)) > 0 {
 		if _, err := profile.DecodeChainEdits(bundle.ChainEdits); err != nil {
 			return files, 0, fmt.Errorf("validate chain-edits.yaml: %w", err)
 		}
 		files.Chains = bundle.ChainEdits
+	} else {
+		files.RemoveChains = true
 	}
 	if len(bytes.TrimSpace(bundle.MergeYAML)) == 0 {
+		files.RemoveMerge = true
 		return files, 0, nil
 	}
 	previous, err := readOptionalSyncFile(profile.MergePath)
@@ -330,8 +358,9 @@ func prepareSyncProfileFiles(bundle syncinfra.Bundle) (config.ProfileFiles, int,
 	if err != nil {
 		return files, 0, err
 	}
-	if files.Rules == nil {
+	if files.Rules == nil && migratedRules != nil {
 		files.Rules = migratedRules
+		files.RemoveRules = false
 	}
 	if err := profile.BackupMergeBeforeRestore(previous, merged); err != nil {
 		return files, 0, err
@@ -451,15 +480,6 @@ func (s *SyncService) Status(ctx context.Context, dsnOverride, keyOverride strin
 	if dsn == "" {
 		return SyncStatusResult{}, errors.New("PostgreSQL DSN is not configured (pass --dsn, set MIHOSH_SYNC_PG_DSN, or configure in Settings)")
 	}
-	localBundle, err := s.CollectLocalBundle(true)
-	if err != nil {
-		return SyncStatusResult{}, err
-	}
-	localSHA, err := syncinfra.ContentSHA256(localBundle)
-	if err != nil {
-		return SyncStatusResult{}, err
-	}
-
 	store, err := s.openStore(ctx, dsn)
 	if err != nil {
 		return SyncStatusResult{}, err
@@ -471,6 +491,14 @@ func (s *SyncService) Status(ctx context.Context, dsnOverride, keyOverride strin
 	}
 	meta, err := store.Status(ctx, key)
 	if errors.Is(err, syncinfra.ErrSnapshotNotFound) {
+		localBundle, bErr := s.CollectLocalBundle(true)
+		if bErr != nil {
+			return SyncStatusResult{}, bErr
+		}
+		localSHA, hErr := syncinfra.ContentSHA256(localBundle)
+		if hErr != nil {
+			return SyncStatusResult{}, hErr
+		}
 		return SyncStatusResult{
 			ProfileKey:  key,
 			DSN:         syncinfra.RedactDSN(dsn),
@@ -478,6 +506,15 @@ func (s *SyncService) Status(ctx context.Context, dsnOverride, keyOverride strin
 			LocalSHA256: localSHA,
 		}, nil
 	}
+	if err != nil {
+		return SyncStatusResult{}, err
+	}
+
+	localBundle, err := s.CollectLocalBundle(meta.Redacted)
+	if err != nil {
+		return SyncStatusResult{}, err
+	}
+	localSHA, err := syncinfra.ContentSHA256(localBundle)
 	if err != nil {
 		return SyncStatusResult{}, err
 	}

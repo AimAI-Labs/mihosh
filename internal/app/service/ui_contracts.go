@@ -14,7 +14,6 @@ import (
 // shapes while the service package remains the only assembly boundary.
 type (
 	Client          = api.Client
-	APIClient       = api.Client
 	WSClient        = api.WSClient
 	ConnectionsData = api.ConnectionsData
 	MemoryData      = api.MemoryData
@@ -36,6 +35,7 @@ type (
 	ChainEdits      = profile.ChainEdits
 	FileDiffOptions = profile.FileDiffOptions
 	FileDiffRow     = profile.FileDiffRow
+	GeneratedConfig = profile.GeneratedConfig
 	Profile         = profile.Profile
 	ProxyChain      = profile.ProxyChain
 	Snapshot        = profile.Snapshot
@@ -109,7 +109,7 @@ func ClearedOverrideKeys(before, after map[string]string) []string {
 	return profile.ClearedOverrideKeys(before, after)
 }
 
-func GenerateSourcePreview(data []byte) (profile.GeneratedConfig, error) {
+func GenerateSourcePreview(data []byte) (GeneratedConfig, error) {
 	return profile.GenerateSourcePreview(data)
 }
 

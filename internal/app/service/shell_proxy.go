@@ -101,16 +101,27 @@ func SaveShellProxy(enabled bool) (string, error) {
 	path := filepath.Join(root, "proxy.sh")
 	activate := shellProxyCommand(executable, root) + " activate " + shell
 	loader := "_mihosh_proxy_script=$(" + activate + ") || return\neval \"$_mihosh_proxy_script\" || {\n  unset _mihosh_proxy_script\n  return 1\n}\nunset _mihosh_proxy_script\n"
+	prevProxy, prevProxyExisted, err := readOptionalFile(path)
+	if err != nil {
+		return "", err
+	}
+	prevStartup, prevStartupExisted, err := readOptionalFile(startup)
+	if err != nil {
+		return "", err
+	}
 	if err := privateWrite(path, []byte(loader)); err != nil {
 		return "", err
 	}
 	if err := installShellProxyStartup(startup, "eval \"$("+activate+")\""); err != nil {
+		_ = restoreMergeFile(path, prevProxyExisted, prevProxy)
 		return "", err
 	}
 	if err := config.Update(func(cfg *config.Config) error {
 		cfg.ShellProxy = enabled
 		return nil
 	}); err != nil {
+		_ = restoreMergeFile(startup, prevStartupExisted, prevStartup)
+		_ = restoreMergeFile(path, prevProxyExisted, prevProxy)
 		return "", err
 	}
 	return startup, nil
