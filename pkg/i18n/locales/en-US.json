@@ -452,6 +452,7 @@
   "logs.stats": "Total %d logs (level: %s)",
   "logs.paused_badge": "PAUSED",
   "logs.paused_badge_new": "PAUSED (+%d)",
+  "logs.dropped": "Dropped logs: %d",
   "logs.pause_btn": "Pause",
   "conns.paused_badge": "PAUSED",
   "conns.paused_badge_new": "PAUSED (+%d)",

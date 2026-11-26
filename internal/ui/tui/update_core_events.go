@@ -49,7 +49,7 @@ func (m Model) applyCoreEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 		var stream tea.Cmd
 		if !m.wsStarted {
 			m.wsStarted = true
-			stream = startWSStreams(m.wsCtx, m.wsClient, m.wsMsgChan)
+			stream = startWSStreams(m.wsCtx, m.wsClient, m.wsInbox)
 		}
 		if m.autoRefreshInterval() > 0 {
 			// Run one follow-up auto-refresh on the next tick so delayed core startup data appears automatically.

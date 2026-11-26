@@ -270,6 +270,10 @@ func (c *WSClient) IsRunning() bool {
 
 // connectStream owns one endpoint through dials, reads and reconnections.
 func connectStream[T any](c *WSClient, run *wsRun, endpoint string, handler func(T, uint64)) {
+	var readLimit int64
+	if strings.HasPrefix(endpoint, "logs?") {
+		readLimit = 128 << 10
+	}
 	for run.ctx.Err() == nil {
 		c.mu.RLock()
 		ctx, generation := run.target, c.generation
@@ -277,7 +281,7 @@ func connectStream[T any](c *WSClient, run *wsRun, endpoint string, handler func
 		c.mu.RUnlock()
 
 		wait := 2 * time.Second
-		if readWSStream(ctx, buildWSURL(baseURL, secret, endpoint), generation, handler) {
+		if readWSStream(ctx, buildWSURL(baseURL, secret, endpoint), generation, readLimit, handler) {
 			wait = time.Second
 		}
 		timer := time.NewTimer(wait)
@@ -289,7 +293,7 @@ func connectStream[T any](c *WSClient, run *wsRun, endpoint string, handler func
 	}
 }
 
-func readWSStream[T any](ctx context.Context, wsURL string, generation uint64, handler func(T, uint64)) bool {
+func readWSStream[T any](ctx context.Context, wsURL string, generation uint64, readLimit int64, handler func(T, uint64)) bool {
 	if wsURL == "" || ctx.Err() != nil {
 		return false
 	}
@@ -317,6 +321,7 @@ func readWSStream[T any](ctx context.Context, wsURL string, generation uint64, h
 		return false
 	}
 	defer conn.Close()
+	conn.SetReadLimit(readLimit)
 	for ctx.Err() == nil {
 		_, message, err := conn.ReadMessage()
 		if err != nil {

@@ -496,9 +496,13 @@ type CoreTargetChangedMsg struct {
 	ProxyURL   string
 }
 
-type CoreWSMsg struct {
-	Generation uint64
-	Payload    any
+type CoreWSBatchMsg struct {
+	Generation  uint64
+	Memory      *MemoryWSMsg
+	Traffic     *TrafficWSMsg
+	Connections *ConnectionsWSMsg
+	Logs        []model.LogEntry
+	DroppedLogs uint64
 }
 
 // CoreHTTPMsg carries the generation captured when the controller read was scheduled.

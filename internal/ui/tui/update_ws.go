@@ -1,9 +1,10 @@
 package tui
 
 import (
-	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"time"
 
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
@@ -64,11 +65,11 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m.applyWSMessage(msg.Payload)
 
-	case messages.CoreWSMsg:
-		if m.wsClient == nil || msg.Generation != m.wsClient.Generation() {
-			return m, listenWSMessages(m.wsCtx, m.wsMsgChan)
+	case messages.CoreWSBatchMsg:
+		if m.wsClient != nil && msg.Generation == m.wsClient.Generation() {
+			m.applyStreamBatch(msg)
 		}
-		return m.applyWSMessage(msg.Payload)
+		return m, listenWSMessages(m.wsCtx, m.wsInbox)
 	}
 
 	if next, cmd, handled := m.applyCoreEvent(msg); handled {
@@ -107,41 +108,16 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case messages.MemoryWSMsg:
-		if m.chartData != nil {
-			m.chartData.AddMemoryData(msg.Memory)
-		}
-		if m.wsMsgChan != nil {
-			return m, listenWSMessages(m.wsCtx, m.wsMsgChan)
-		}
+		m.applyStreamBatch(messages.CoreWSBatchMsg{Memory: &msg})
 
 	case messages.TrafficWSMsg:
-		if m.chartData != nil {
-			m.chartData.AddSpeedData(msg.Up, msg.Down)
-		}
-		if m.wsMsgChan != nil {
-			return m, listenWSMessages(m.wsCtx, m.wsMsgChan)
-		}
+		m.applyStreamBatch(messages.CoreWSBatchMsg{Traffic: &msg})
 
 	case messages.ConnectionsWSMsg:
-		m.connsState = m.connsState.ApplyWSConnections(msg.Data)
-		if m.chartData != nil {
-			m.chartData.AddConnCountData(len(msg.Data.Connections))
-		}
-		if m.wsMsgChan != nil {
-			return m, listenWSMessages(m.wsCtx, m.wsMsgChan)
-		}
+		m.applyStreamBatch(messages.CoreWSBatchMsg{Connections: &msg})
 
 	case messages.LogsWSMsg:
-		if !m.usesProcessLogs() {
-			m.logsState = m.logsState.AppendLog(msg.LogType, msg.Payload)
-		}
-		if m.currentPage == layout.PageCore && m.coreState.IsMihomoPage() {
-			pw, ph := m.getPageSize()
-			m.coreState, _ = m.coreState.HandleEditorMsg(nil, pw, ph, m.logsState.GetSysLogs())
-		}
-		if m.wsMsgChan != nil {
-			return m, listenWSMessages(m.wsCtx, m.wsMsgChan)
-		}
+		m.applyStreamLogs([]model.LogEntry{{Type: msg.LogType, Payload: msg.Payload, Timestamp: time.Now()}}, 0)
 
 	case messages.LogIPResolvedMsg:
 		m.logsState = m.logsState.ApplyIPResolved(msg.IP, msg.Resolved)
@@ -262,6 +238,34 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 		m.notice.Expire(msg.ID)
 	}
 	return m, nil
+}
+
+func (m *Model) applyStreamBatch(msg messages.CoreWSBatchMsg) {
+	if msg.Memory != nil && m.chartData != nil {
+		m.chartData.AddMemoryData(msg.Memory.Memory)
+	}
+	if msg.Traffic != nil && m.chartData != nil {
+		m.chartData.AddSpeedData(msg.Traffic.Up, msg.Traffic.Down)
+	}
+	if msg.Connections != nil {
+		m.connsState = m.connsState.ApplyWSConnections(msg.Connections.Data)
+		if m.chartData != nil {
+			m.chartData.AddConnCountData(len(msg.Connections.Data.Connections))
+		}
+	}
+	if len(msg.Logs) != 0 || msg.DroppedLogs != 0 {
+		m.applyStreamLogs(msg.Logs, msg.DroppedLogs)
+	}
+}
+
+func (m *Model) applyStreamLogs(entries []model.LogEntry, dropped uint64) {
+	if !m.usesProcessLogs() {
+		m.logsState = m.logsState.AppendLogs(entries, dropped)
+	}
+	if m.currentPage == layout.PageCore && m.coreState.IsMihomoPage() {
+		pw, ph := m.getPageSize()
+		m.coreState, _ = m.coreState.HandleEditorMsg(nil, pw, ph, m.logsState.GetSysLogs())
+	}
 }
 
 func (m *Model) advanceAutoRefreshTransientState() {

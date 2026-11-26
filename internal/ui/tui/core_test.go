@@ -80,7 +80,7 @@ func TestQueuedWebSocketMessageFromPreviousControllerIsIgnored(t *testing.T) {
 	old := ws.Generation()
 	ws.UpdateEndpoint("127.0.0.1:9091", "")
 	m := Model{wsClient: ws, chartData: model.NewChartData(10)}
-	updated, _ := m.Update(messages.CoreWSMsg{Generation: old, Payload: messages.MemoryWSMsg{Memory: 1234}})
+	updated, _ := m.Update(messages.CoreWSBatchMsg{Generation: old, Memory: &messages.MemoryWSMsg{Memory: 1234}})
 	if len(updated.(Model).chartData.MemoryHistory) != 0 {
 		t.Fatal("old controller message polluted new chart")
 	}

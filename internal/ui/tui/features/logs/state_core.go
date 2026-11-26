@@ -4,7 +4,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -34,6 +36,8 @@ func (s State) applyProcessLogs(msg messages.CoreProcessLogsMsg) State {
 	if len(s.coreLogPending) > 64<<10 {
 		s.coreLogPending = s.coreLogPending[len(s.coreLogPending)-(64<<10):]
 	}
+	s.ensureLogBuf()
+	added := 0
 	for _, line := range lines {
 		line = strings.TrimSpace(ansi.Strip(line))
 		if line == "" {
@@ -54,7 +58,11 @@ func (s State) applyProcessLogs(msg messages.CoreProcessLogsMsg) State {
 				line = decoded
 			}
 		}
-		s = s.AppendLog(level, line)
+		s.pushLog(model.LogEntry{Type: level, Payload: line, Timestamp: time.Now()})
+		added++
+	}
+	if added != 0 {
+		s.finishLogBatch(added)
 	}
 	return s
 }

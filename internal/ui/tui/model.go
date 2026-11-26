@@ -73,7 +73,7 @@ type Model struct {
 	connectionReady    bool
 	wsStarted          bool
 	wsClient           *service.WSClient
-	wsMsgChan          chan interface{}
+	wsInbox            *wsInbox
 	wsCtx              context.Context
 	wsCancel           context.CancelFunc
 
@@ -132,7 +132,7 @@ func NewModel(client *service.Client, testURL string, timeout int) Model {
 		currentPage:          initialPage,
 		chartData:            chartData,
 		wsClient:             app.WSClient,
-		wsMsgChan:            make(chan interface{}, common.WSMsgChanCap),
+		wsInbox:              newWSInbox(),
 		wsCtx:                wsCtx,
 		wsCancel:             wsCancel,
 		ipResolver:           app.IPResolver,

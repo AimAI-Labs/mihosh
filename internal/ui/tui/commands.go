@@ -2,8 +2,8 @@ package tui
 
 import (
 	"context"
-	"github.com/AimAI-Labs/mihosh/internal/app/service"
 
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -22,68 +22,26 @@ func fetchMemory(client *service.Client) tea.Cmd {
 }
 
 // startWSStreams 启动WebSocket流
-func startWSStreams(ctx context.Context, wsClient *service.WSClient, msgChan chan interface{}) tea.Cmd {
+func startWSStreams(ctx context.Context, wsClient *service.WSClient, inbox *wsInbox) tea.Cmd {
 	return func() tea.Msg {
-		if wsClient == nil {
+		if wsClient == nil || inbox == nil {
 			return nil
 		}
-
-		// 设置内存处理器
 		wsClient.SetMemoryHandler(func(data service.MemoryData) {
-			select {
-			case msgChan <- messages.CoreWSMsg{Generation: data.Generation, Payload: messages.MemoryWSMsg{Memory: data.Inuse}}:
-			default:
-				// channel满了就丢弃
-			}
+			inbox.publish(data.Generation, messages.MemoryWSMsg{Memory: data.Inuse})
 		})
-
-		// 设置流量处理器
 		wsClient.SetTrafficHandler(func(data service.TrafficData) {
-			select {
-			case msgChan <- messages.CoreWSMsg{Generation: data.Generation, Payload: messages.TrafficWSMsg{Up: data.Up, Down: data.Down}}:
-			default:
-				// channel满了就丢弃
-			}
+			inbox.publish(data.Generation, messages.TrafficWSMsg{Up: data.Up, Down: data.Down})
 		})
-
-		// 设置连接处理器
 		wsClient.SetConnectionsHandler(func(data service.ConnectionsData) {
-			select {
-			case msgChan <- messages.CoreWSMsg{Generation: data.Generation, Payload: messages.ConnectionsWSMsg{Data: data}}:
-			default:
-				// channel满了就丢弃
-			}
+			inbox.publish(data.Generation, messages.ConnectionsWSMsg{Data: data})
 		})
-
-		// 设置日志处理器
 		wsClient.SetLogsHandler(func(data service.LogData) {
-			select {
-			case msgChan <- messages.CoreWSMsg{Generation: data.Generation, Payload: messages.LogsWSMsg{LogType: data.Type, Payload: data.Payload}}:
-			default:
-				// channel满了就丢弃
-			}
+			inbox.publish(data.Generation, messages.LogsWSMsg{LogType: data.Type, Payload: data.Payload})
 		})
-
-		// 启动WebSocket连接
 		if err := wsClient.Start(ctx); err != nil {
 			return messages.ErrMsg{Err: err}
 		}
 		return nil
-	}
-}
-
-// listenWSMessages 监听WebSocket消息
-func listenWSMessages(ctx context.Context, msgChan chan interface{}) tea.Cmd {
-	return func() tea.Msg {
-		select {
-		case <-ctx.Done():
-			return nil
-		case msg := <-msgChan:
-			// 将interface{}转换为tea.Msg
-			if teaMsg, ok := msg.(tea.Msg); ok {
-				return teaMsg
-			}
-			return msg
-		}
 	}
 }

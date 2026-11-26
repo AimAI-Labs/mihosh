@@ -27,6 +27,7 @@ type State struct {
 	paused         bool
 	frozenLogs     []model.LogEntry // 暂停期间冻结的可见快照（独立拷贝）
 	pausedNewCount int
+	droppedLogs    uint64
 	coreLogCursor  uint64
 	coreLogPending string
 
@@ -127,30 +128,44 @@ func (s *State) rebuildCachedLogs() {
 
 // AppendLog 追加一条日志并更新过滤缓存
 func (s State) AppendLog(logType, payload string) State {
-	s.ensureLogBuf()
-	entry := model.LogEntry{
-		Type:      logType,
-		Payload:   payload,
-		Timestamp: time.Now(),
+	return s.AppendLogs([]model.LogEntry{{Type: logType, Payload: payload, Timestamp: time.Now()}}, 0)
+}
+
+// AppendLogs updates the cache and filter once for an entire batch.
+func (s State) AppendLogs(entries []model.LogEntry, dropped uint64) State {
+	s.droppedLogs += dropped
+	if len(entries) == 0 {
+		return s
 	}
+	s.ensureLogBuf()
+	for _, entry := range entries {
+		s.pushLog(entry)
+	}
+	s.finishLogBatch(len(entries))
+	return s
+}
+
+func (s *State) pushLog(entry model.LogEntry) {
 	s.logBuf[s.logHead] = entry
 	s.logHead = (s.logHead + 1) % common.LogsCap
-	if s.logCount < common.LogsCap {
-		s.logCount++
-	}
+	s.logCount = min(s.logCount+1, common.LogsCap)
+}
+
+func (s *State) finishLogBatch(count int) {
 	s.rebuildCachedLogs()
 	if s.paused {
-		s.pausedNewCount++
+		s.pausedNewCount += count
 	} else {
 		s.updateFilteredLogs()
 	}
-	return s
 }
 
 func (s State) ClearLogs() State {
 	s.coreLogPending = ""
 	s.logHead = 0
 	s.logCount = 0
+	s.droppedLogs = 0
+	clear(s.logBuf)
 	s.frozenLogs = nil
 	s.pausedNewCount = 0
 	s.filteredLogIndices = s.filteredLogIndices[:0] // 保留底层数组，避免重新分配
@@ -196,6 +211,7 @@ func (s State) ToPageState(width, height int) PageState {
 		DetailScroll:        s.detailScroll,
 		Paused:              s.paused,
 		PausedNewCount:      s.pausedNewCount,
+		DroppedLogs:         s.droppedLogs,
 	}
 }
 

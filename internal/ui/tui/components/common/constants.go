@@ -23,7 +23,6 @@ const (
 	// 业务逻辑常量
 	TestConcurrency = model.TestConcurrency
 	IPApiURL        = model.IPApiURL
-	WSMsgChanCap    = 100
 
 	// 常用边距
 	DefaultPadding = 1

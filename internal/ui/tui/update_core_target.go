@@ -35,6 +35,9 @@ func (m *Model) updateCoreTarget(endpoint service.MihomoEndpoint, update coreTar
 	if reset {
 		if m.wsClient != nil {
 			m.wsClient.UpdateEndpoint(endpoint.ExternalController, endpoint.Secret)
+			if m.wsInbox != nil {
+				m.wsInbox.reset(m.wsClient.Generation())
+			}
 		}
 	}
 	path, _ := service.GetMihomoConfigPathForWrite()

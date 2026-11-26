@@ -54,7 +54,7 @@ func (m Model) Init() tea.Cmd {
 		},
 		autoRefreshTick(),
 		subAutoUpdateTick(),
-		listenWSMessages(m.wsCtx, m.wsMsgChan),
+		listenWSMessages(m.wsCtx, m.wsInbox),
 		func() tea.Msg {
 			info, err := service.CheckUpdate(model.Version)
 			if err != nil || info == nil {

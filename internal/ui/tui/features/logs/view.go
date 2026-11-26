@@ -65,6 +65,7 @@ type PageState struct {
 	DetailScroll        int
 	Paused              bool
 	PausedNewCount      int
+	DroppedLogs         uint64
 }
 
 func RenderLogsPage(state PageState) string {
@@ -90,6 +91,11 @@ func RenderLogsPage(state PageState) string {
 
 	// 渲染统计信息
 	stats := common.MutedStyle().Render(i18n.Tf("logs.stats", len(filteredLogs), logLevels[state.LogLevel]))
+	if state.DroppedLogs != 0 {
+		dropped := lipgloss.NewStyle().Foreground(theme.Resolve(theme.Current().Warning)).
+			Render(i18n.Tf("logs.dropped", state.DroppedLogs))
+		stats = dropped + "  " + stats
+	}
 	if state.Paused {
 		badgeText := i18n.T("logs.paused_badge")
 		if state.PausedNewCount > 0 {

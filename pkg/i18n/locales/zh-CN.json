@@ -452,6 +452,7 @@
   "logs.stats": "共 %d 条日志 (级别: %s)",
   "logs.paused_badge": "已暂停",
   "logs.paused_badge_new": "已暂停 (+%d)",
+  "logs.dropped": "已丢弃日志 %d 条",
   "logs.pause_btn": "暂停",
   "conns.paused_badge": "已暂停",
   "conns.paused_badge_new": "已暂停 (+%d)",
