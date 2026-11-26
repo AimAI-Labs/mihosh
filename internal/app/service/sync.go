@@ -138,27 +138,11 @@ func (s *SyncService) SaveSettings(dsn, profileKey string) error {
 // CollectLocalBundle gathers local preferences, subscription metadata, merge.yaml,
 // rule-edits.yaml, and chain-edits.yaml into a portable Bundle.
 func (s *SyncService) CollectLocalBundle(redact bool) (syncinfra.Bundle, error) {
-	cfg, err := config.Load()
-	if errors.Is(err, config.ErrConfigNotFound) {
-		c := config.DefaultConfig
-		cfg = &c
-	} else if err != nil {
-		return syncinfra.Bundle{}, err
-	}
-
-	mergeData, err := readOptionalSyncFile(profile.MergePath)
+	cfg, files, err := config.ReadProfileFiles()
 	if err != nil {
 		return syncinfra.Bundle{}, err
 	}
-	ruleData, err := readOptionalSyncFile(profile.RuleEditsPath)
-	if err != nil {
-		return syncinfra.Bundle{}, err
-	}
-	chainData, err := readOptionalSyncFile(profile.ChainEditsPath)
-	if err != nil {
-		return syncinfra.Bundle{}, err
-	}
-	return syncinfra.BuildBundle(cfg, mergeData, ruleData, chainData, redact)
+	return syncinfra.BuildBundle(cfg, files.Merge, files.Rules, files.Chains, redact)
 }
 
 func readOptionalSyncFile(pathFn func() (string, error)) ([]byte, error) {
@@ -229,62 +213,14 @@ func (s *SyncService) RestoreBundle(bundle syncinfra.Bundle, source, profileKey 
 		Redacted:   bundle.Manifest.Redacted,
 	}
 
-	// 1. Validate & restore merge.yaml (preserving existing local secrets for [REDACTED] fields).
-	if len(bytes.TrimSpace(bundle.MergeYAML)) > 0 {
-		existingMerge, err := readOptionalSyncFile(profile.MergePath)
+	var files config.ProfileFiles
+	err := config.RestoreProfileFiles(func(cfg *config.Config) (config.ProfileFiles, error) {
+		var err error
+		files, res.PreservedSecrets, err = prepareSyncProfileFiles(bundle)
 		if err != nil {
-			return res, err
+			return config.ProfileFiles{}, err
 		}
-		merged, preserved, err := syncinfra.RestoreRedactedYAML(bundle.MergeYAML, existingMerge)
-		if err != nil {
-			return res, fmt.Errorf("restore merge.yaml: %w", err)
-		}
-		res.PreservedSecrets += preserved
-		if err := profile.WriteMerge(merged); err != nil {
-			return res, fmt.Errorf("write merge.yaml: %w", err)
-		}
-		res.RestoredMerge = true
-	}
-
-	// 2. Validate & restore rule-edits.yaml.
-	if len(bytes.TrimSpace(bundle.RuleEdits)) > 0 {
-		if _, err := profile.DecodeRuleEdits(bundle.RuleEdits); err != nil {
-			return res, fmt.Errorf("validate rule-edits.yaml: %w", err)
-		}
-		rulePath, err := profile.RuleEditsPath()
-		if err != nil {
-			return res, err
-		}
-		if err := os.MkdirAll(filepath.Dir(rulePath), 0700); err != nil {
-			return res, err
-		}
-		if err := privateWrite(rulePath, bundle.RuleEdits); err != nil {
-			return res, fmt.Errorf("write rule-edits.yaml: %w", err)
-		}
-		res.RestoredRules = true
-	}
-
-	// 3. Validate & restore chain-edits.yaml.
-	if len(bytes.TrimSpace(bundle.ChainEdits)) > 0 {
-		if _, err := profile.DecodeChainEdits(bundle.ChainEdits); err != nil {
-			return res, fmt.Errorf("validate chain-edits.yaml: %w", err)
-		}
-		chainPath, err := profile.ChainEditsPath()
-		if err != nil {
-			return res, err
-		}
-		if err := os.MkdirAll(filepath.Dir(chainPath), 0700); err != nil {
-			return res, err
-		}
-		if err := privateWrite(chainPath, bundle.ChainEdits); err != nil {
-			return res, fmt.Errorf("write chain-edits.yaml: %w", err)
-		}
-		res.RestoredChains = true
-	}
-
-	// 4. Atomically restore portable preferences & subscription metadata into config.yaml.
-	// Never overwrite Core or Sync local settings; preserve local unredacted URLs when incoming URL is redacted.
-	err := config.Update(func(cfg *config.Config) error {
+		// Host-specific core and sync settings stay local.
 		prefs := bundle.Config.Preferences
 		if prefs.TestURL != "" {
 			cfg.TestURL = prefs.TestURL
@@ -339,21 +275,64 @@ func (s *SyncService) RestoreBundle(bundle syncinfra.Bundle, source, profileKey 
 		}
 		cfg.Subs = restoredSubs
 
-		if bundle.Config.ActiveSub != "" {
-			if _, exists := validUIDs[bundle.Config.ActiveSub]; exists {
-				cfg.ActiveSub = bundle.Config.ActiveSub
-			}
-		} else if cfg.ActiveSub != "" {
-			if _, exists := validUIDs[cfg.ActiveSub]; !exists {
-				cfg.ActiveSub = ""
-			}
+		if _, exists := validUIDs[bundle.Config.ActiveSub]; bundle.Config.ActiveSub != "" && exists {
+			cfg.ActiveSub = bundle.Config.ActiveSub
 		}
-		return nil
+		if _, exists := validUIDs[cfg.ActiveSub]; !exists {
+			cfg.ActiveSub = ""
+		}
+		return files, nil
 	})
 	if err != nil {
-		return res, fmt.Errorf("update config.yaml: %w", err)
+		res.PreservedSecrets = 0
+		return res, fmt.Errorf("restore configuration bundle: %w", err)
 	}
+	res.RestoredMerge = files.Merge != nil
+	res.RestoredRules = files.Rules != nil
+	res.RestoredChains = files.Chains != nil
 	return res, nil
+}
+
+func prepareSyncProfileFiles(bundle syncinfra.Bundle) (config.ProfileFiles, int, error) {
+	var files config.ProfileFiles
+	if len(bytes.TrimSpace(bundle.RuleEdits)) > 0 {
+		if _, err := profile.DecodeRuleEdits(bundle.RuleEdits); err != nil {
+			return files, 0, fmt.Errorf("validate rule-edits.yaml: %w", err)
+		}
+		files.Rules = bundle.RuleEdits
+	}
+	if len(bytes.TrimSpace(bundle.ChainEdits)) > 0 {
+		if _, err := profile.DecodeChainEdits(bundle.ChainEdits); err != nil {
+			return files, 0, fmt.Errorf("validate chain-edits.yaml: %w", err)
+		}
+		files.Chains = bundle.ChainEdits
+	}
+	if len(bytes.TrimSpace(bundle.MergeYAML)) == 0 {
+		return files, 0, nil
+	}
+	previous, err := readOptionalSyncFile(profile.MergePath)
+	if err != nil {
+		return files, 0, err
+	}
+	merged, preserved, err := syncinfra.RestoreRedactedYAML(bundle.MergeYAML, previous)
+	if err != nil {
+		return files, 0, fmt.Errorf("restore merge.yaml: %w", err)
+	}
+	if err := profile.ValidateMergeWrite(merged); err != nil {
+		return files, 0, fmt.Errorf("validate merge.yaml: %w", err)
+	}
+	_, migratedRules, err := profile.PrepareLegacyRuleEdits(previous)
+	if err != nil {
+		return files, 0, err
+	}
+	if files.Rules == nil {
+		files.Rules = migratedRules
+	}
+	if err := profile.BackupMergeBeforeRestore(previous, merged); err != nil {
+		return files, 0, err
+	}
+	files.Merge = merged
+	return files, preserved, nil
 }
 
 // Push uploads a compressed (and by default redacted) local snapshot to PostgreSQL.

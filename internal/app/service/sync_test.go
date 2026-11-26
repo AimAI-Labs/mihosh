@@ -63,6 +63,29 @@ func (m *memorySyncStore) Status(_ context.Context, profileKey string) (syncinfr
 
 func (m *memorySyncStore) Close() error { return nil }
 
+func TestRestoreBundleRejectsInvalidRulesWithoutReplacingAnyFile(t *testing.T) {
+	root := t.TempDir()
+	seedSyncDevice(t, root)
+	svc := NewSyncService()
+	beforeConfig, beforeFiles, err := config.ReadProfileFiles()
+	require.NoError(t, err)
+	bundle, err := svc.CollectLocalBundle(false)
+	require.NoError(t, err)
+	bundle.MergeYAML = []byte("log-level: debug\n")
+	bundle.RuleEdits = []byte("legacy:\n  mixed-port: 7890\n")
+	bundle.Config.Preferences.Language = "en-US"
+	archive := filepath.Join(t.TempDir(), "invalid-rules.tar.gz")
+	_, err = syncinfra.WriteArchiveFile(archive, bundle)
+	require.NoError(t, err)
+	result, err := svc.ImportArchive(archive)
+	require.ErrorContains(t, err, "validate rule-edits.yaml")
+	require.False(t, result.RestoredMerge)
+	afterConfig, afterFiles, err := config.ReadProfileFiles()
+	require.NoError(t, err)
+	require.Equal(t, beforeConfig, afterConfig)
+	require.Equal(t, beforeFiles, afterFiles)
+}
+
 func seedSyncDevice(t *testing.T, dir string) {
 	t.Helper()
 	t.Setenv("MIHOSH_CONFIG_DIR", dir)

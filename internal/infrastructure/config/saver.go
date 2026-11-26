@@ -1,6 +1,7 @@
 package config
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 
@@ -30,6 +31,10 @@ func saveLocked(cfg *Config) error {
 		return err
 	}
 
+	return writeConfigFile(cfg, configDir, filepath.Join(configDir, "config.yaml"))
+}
+
+func writeConfigFile(cfg *Config, configDir, destination string) error {
 	configFile := filepath.Join(configDir, "config.yaml")
 	writer := viper.New()
 	writer.SetConfigFile(configFile)
@@ -66,23 +71,27 @@ func saveLocked(cfg *Config) error {
 		writer.Set("sync", cfg.Sync)
 	}
 
-	writer.SetConfigFile(configFile)
-	writer.SetConfigType("yaml")
-	file, err := os.CreateTemp(configDir, ".mihosh-config-*")
+	return writeConfigAtomically(destination, 0600, writer.WriteConfigTo)
+}
+
+func writeConfigAtomically(path string, mode os.FileMode, write func(io.Writer) error) error {
+	file, err := os.CreateTemp(filepath.Dir(path), ".mihosh-config-*")
 	if err != nil {
 		return err
 	}
 	defer func() { _ = os.Remove(file.Name()) }()
-	if err = writer.WriteConfigTo(file); err != nil {
-		_ = file.Close()
+	defer file.Close()
+	if err = file.Chmod(mode); err != nil {
+		return err
+	}
+	if err = write(file); err != nil {
 		return err
 	}
 	if err = file.Sync(); err != nil {
-		_ = file.Close()
 		return err
 	}
 	if err = file.Close(); err != nil {
 		return err
 	}
-	return os.Rename(file.Name(), configFile)
+	return os.Rename(file.Name(), path)
 }

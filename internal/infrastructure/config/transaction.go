@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"time"
-
-	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 )
+
+var ErrConfigBusy = errors.New("application configuration is busy")
 
 // Update applies a field-scoped mutation to freshly loaded configuration. Callbacks
 // must not call other config functions; the configuration mutex is held throughout.
@@ -21,11 +21,8 @@ func Update(change func(*Config) error) error {
 		return err
 	}
 	defer unlock()
-	cfg, err := loadLocked()
-	if errors.Is(err, ErrConfigNotFound) {
-		copy := DefaultConfig
-		cfg = &copy
-	} else if err != nil {
+	cfg, err := loadOrDefaultLocked()
+	if err != nil {
 		return err
 	}
 	if err = change(cfg); err != nil {
@@ -35,11 +32,6 @@ func Update(change func(*Config) error) error {
 }
 
 func lockAppConfig() (func(), error) {
-	// Managed core support is Linux/Windows. Keep the existing client-only behavior
-	// on other platforms rather than making their application preferences unusable.
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
-		return func() {}, nil
-	}
 	root, err := GetConfigDir()
 	if err != nil {
 		return nil, err
@@ -47,14 +39,21 @@ func lockAppConfig() (func(), error) {
 	if err = os.MkdirAll(root, 0755); err != nil {
 		return nil, err
 	}
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		return func() {}, recoverProfileRestore(root)
+	}
 	deadline := time.Now().Add(time.Second)
 	for {
-		release, err := coreinfra.LockRuntime(filepath.Join(root, ".config.lock"))
+		release, err := lockAppConfigFile(filepath.Join(root, ".config.lock"))
 		if err == nil {
+			if err := recoverProfileRestore(root); err != nil {
+				release()
+				return nil, err
+			}
 			return release, nil
 		}
 		if time.Now().After(deadline) {
-			return nil, fmt.Errorf("application configuration is busy: %w", err)
+			return nil, fmt.Errorf("%w: %v", ErrConfigBusy, err)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}

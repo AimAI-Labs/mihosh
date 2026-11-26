@@ -224,11 +224,7 @@ func parseReadableMerge(data []byte) (*yaml.Node, error) {
 // WriteMerge validates and atomically saves native Mihomo overrides, retaining
 // the original bytes when replacing a legacy override file.
 func WriteMerge(data []byte) error {
-	doc, err := parseOverrideDocument(data)
-	if err != nil {
-		return fmt.Errorf("覆写 YAML 语法错误: %w", err)
-	}
-	if err := validateMergeDocument(doc, false); err != nil {
+	if err := ValidateMergeWrite(data); err != nil {
 		return err
 	}
 	p, err := MergePath()
@@ -242,11 +238,43 @@ func WriteMerge(data []byte) error {
 	if err != nil {
 		return err
 	}
+	if err := backupLegacyMerge(p, previous); err != nil {
+		return err
+	}
+	if err := PreserveLegacyRuleEdits(previous); err != nil {
+		return err
+	}
+	snapshotMergeBeforeWrite(previous, data)
+	return atomicWrite(p, data, 0600)
+}
+
+func ValidateMergeWrite(data []byte) error {
+	doc, err := parseOverrideDocument(data)
+	if err != nil {
+		return fmt.Errorf("覆写 YAML 语法错误: %w", err)
+	}
+	return validateMergeDocument(doc, false)
+}
+
+// BackupMergeBeforeRestore keeps the same merge history as an interactive edit.
+func BackupMergeBeforeRestore(previous, replacement []byte) error {
+	path, err := MergePath()
+	if err != nil {
+		return err
+	}
+	if err := backupLegacyMerge(path, previous); err != nil {
+		return err
+	}
+	snapshotMergeBeforeWrite(previous, replacement)
+	return nil
+}
+
+func backupLegacyMerge(path string, previous []byte) error {
 	if old, err := parseOverrideDocument(previous); err == nil {
 		root := topLevelMapping(old)
 		for i := 0; i < len(root.Content); i += 2 {
 			if legacyMergeTarget(root.Content[i].Value) != "" {
-				backup := fmt.Sprintf("%s.legacy-%x.bak", p, sha256.Sum256(previous))
+				backup := fmt.Sprintf("%s.legacy-%x.bak", path, sha256.Sum256(previous))
 				if err := atomicWrite(backup, previous, 0600); err != nil {
 					return fmt.Errorf("backup legacy merge.yaml: %w", err)
 				}
@@ -254,13 +282,13 @@ func WriteMerge(data []byte) error {
 			}
 		}
 	}
-	if err := PreserveLegacyRuleEdits(previous); err != nil {
-		return err
-	}
+	return nil
+}
+
+func snapshotMergeBeforeWrite(previous, data []byte) {
 	if len(trimSpaceBytes(previous)) > 0 && !bytes.Equal(previous, data) {
 		_, _ = SaveMergeSnapshot(previous, DefaultSnapshotRetention)
 	}
-	return atomicWrite(p, data, 0600)
 }
 
 // DeleteProfileDir 删除某订阅的整个目录（raw + 历史快照）。

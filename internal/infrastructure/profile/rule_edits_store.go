@@ -71,35 +71,44 @@ func legacyRuleOverrides(root *yaml.Node) (bool, *yaml.Node) {
 // PreserveLegacyRuleEdits stages old rule directives before merge.yaml is
 // converted. They are replayed from this file once the old fields are removed.
 func PreserveLegacyRuleEdits(previous []byte) error {
+	path, data, err := PrepareLegacyRuleEdits(previous)
+	if err != nil || data == nil {
+		return err
+	}
+	return atomicWrite(path, data, 0600)
+}
+
+// PrepareLegacyRuleEdits derives the migrated rule file without writing it.
+func PrepareLegacyRuleEdits(previous []byte) (string, []byte, error) {
 	doc, err := parseOverrideDocument(previous)
 	if err != nil {
-		return nil // An invalid draft can still be replaced with valid YAML.
+		return "", nil, nil // An invalid draft can still be replaced with valid YAML.
 	}
 	found, legacy := legacyRuleOverrides(topLevelMapping(doc))
 	if !found {
-		return nil
+		return "", nil, nil
 	}
 	path, err := RuleEditsPath()
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 	current, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
-		return err
+		return "", nil, err
 	}
 	edits, err := DecodeRuleEdits(current)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 	edits.Legacy = *legacy
 	data, err := marshalYAML2Spaces(edits)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 	if bytes.Equal(current, data) {
-		return nil
+		return "", nil, nil
 	}
-	return atomicWrite(path, data, 0600)
+	return path, data, nil
 }
 
 func applyProfileMerge(raw, merge *yaml.Node, replay bool) (*yaml.Node, error) {

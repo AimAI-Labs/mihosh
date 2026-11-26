@@ -352,7 +352,27 @@ func buildMihomoConfigPathNotFoundError() error {
 func Load() (*Config, error) {
 	mu.Lock()
 	defer mu.Unlock()
+	root, err := GetConfigDir()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := os.Lstat(filepath.Join(root, profileRestoreDir)); !os.IsNotExist(err) {
+		unlock, err := lockAppConfig()
+		if err != nil {
+			return nil, err
+		}
+		defer unlock()
+	}
 	return loadLocked()
+}
+
+func loadOrDefaultLocked() (*Config, error) {
+	cfg, err := loadLocked()
+	if errors.Is(err, ErrConfigNotFound) {
+		defaults := DefaultConfig
+		return &defaults, nil
+	}
+	return cfg, err
 }
 
 func loadLocked() (*Config, error) {
