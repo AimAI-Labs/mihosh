@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/url"
 	"strings"
 	"sync"
@@ -83,82 +84,78 @@ type WSClient struct {
 	secret     string
 	generation uint64
 
-	connsMu sync.Mutex
-	conns   map[string]*websocket.Conn // key: 端点名称
-
 	memoryHandler      func(MemoryData)
 	trafficHandler     func(TrafficData)
 	connectionsHandler func(ConnectionsData)
 	logsHandler        func(LogData)
 
-	logLevel  string // 日志级别过滤
-	ctx       context.Context
-	cancel    context.CancelFunc
-	isRunning bool
-	runningMu sync.Mutex
+	logLevel string
+	run      *wsRun
+}
+
+type wsRun struct {
+	ctx          context.Context
+	cancel       context.CancelFunc
+	target       context.Context
+	cancelTarget context.CancelFunc
+	done         chan struct{}
 }
 
 // NewWSClient 创建WebSocket客户端
 func NewWSClient(baseURL, secret string) *WSClient {
-	return &WSClient{
-		baseURL: baseURL,
-		secret:  secret,
-		conns:   make(map[string]*websocket.Conn),
-	}
+	return &WSClient{baseURL: baseURL, secret: secret}
 }
 
-// UpdateEndpoint 原子更新 baseURL 与 secret，并主动断开所有现有连接，
-// 触发 connectStream 在下一轮用新端点重连。
-// 若 client 未启动（Start 未调用或已 Stop），仅更新字段，不重连。
+// UpdateEndpoint cancels the previous target's dials and sockets. The same
+// workers then connect to the new target.
 func (c *WSClient) UpdateEndpoint(baseURL, secret string) {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.baseURL = baseURL
 	c.secret = secret
 	c.generation++
-	c.mu.Unlock()
-
-	// 关闭现有连接：connectStream 的 ReadMessage 会返回错误，
-	// 进入重连循环，下一轮 buildWSURL 读到新值。
-	c.connsMu.Lock()
-	for key, conn := range c.conns {
-		_ = conn.Close()
-		delete(c.conns, key)
+	if c.run != nil {
+		c.run.cancelTarget()
+		c.run.target, c.run.cancelTarget = context.WithCancel(c.run.ctx)
 	}
-	c.connsMu.Unlock()
 }
 
 // SetMemoryHandler 设置内存数据处理器
 func (c *WSClient) SetMemoryHandler(handler func(MemoryData)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.memoryHandler = handler
 }
 
 // SetTrafficHandler 设置流量数据处理器
 func (c *WSClient) SetTrafficHandler(handler func(TrafficData)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.trafficHandler = handler
 }
 
 // SetConnectionsHandler 设置连接数据处理器
 func (c *WSClient) SetConnectionsHandler(handler func(ConnectionsData)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.connectionsHandler = handler
 }
 
 // SetLogsHandler 设置日志数据处理器
 func (c *WSClient) SetLogsHandler(handler func(LogData)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.logsHandler = handler
 }
 
 // SetLogLevel 设置日志级别过滤
 func (c *WSClient) SetLogLevel(level string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.logLevel = level
 }
 
-// buildWSURL 构建WebSocket URL
-func (c *WSClient) buildWSURL(endpoint string) string {
-	c.mu.RLock()
-	baseURL := c.baseURL
-	secret := c.secret
-	c.mu.RUnlock()
-
+func buildWSURL(baseURL, secret, endpoint string) string {
 	// external-controller 原值无 scheme：先补 http:// 再转换为 ws scheme。
 	wsURL := ensureScheme(baseURL)
 	wsURL = strings.Replace(wsURL, "https://", "wss://", 1)
@@ -178,170 +175,159 @@ func (c *WSClient) buildWSURL(endpoint string) string {
 	return u.String()
 }
 
-// setConn 线程安全地保存当前连接
-func (c *WSClient) setConn(key string, conn *websocket.Conn) {
-	c.connsMu.Lock()
-	if conn == nil {
-		delete(c.conns, key)
-	} else {
-		c.conns[key] = conn
-	}
-	c.connsMu.Unlock()
-}
-
-// Start 启动WebSocket连接
+// Start 启动WebSocket连接。取消中的上一次启动退出后才能再次启动。
 func (c *WSClient) Start(ctx context.Context) error {
-	c.runningMu.Lock()
-	if c.isRunning {
-		c.runningMu.Unlock()
+	c.mu.Lock()
+	for c.run != nil {
+		run := c.run
+		if run.ctx.Err() == nil {
+			c.mu.Unlock()
+			return nil
+		}
+		c.mu.Unlock()
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-run.done:
+		}
+		c.mu.Lock()
+	}
+	if ctx.Err() != nil {
+		c.mu.Unlock()
 		return nil
 	}
-	c.isRunning = true
-	c.ctx, c.cancel = context.WithCancel(ctx)
-	c.runningMu.Unlock()
-
+	run := &wsRun{done: make(chan struct{})}
+	run.ctx, run.cancel = context.WithCancel(ctx)
+	run.target, run.cancelTarget = context.WithCancel(run.ctx)
+	c.run = run
 	level := c.logLevel
+	c.mu.Unlock()
 	if level == "" {
 		level = "debug"
 	}
 
-	go connectStream(c, "memory", func(d MemoryData, generation uint64) {
-		d.Generation = generation
-		if c.memoryHandler != nil {
-			c.memoryHandler(d)
-		}
+	var streams sync.WaitGroup
+	streams.Go(func() {
+		connectStream(c, run, "memory", func(d MemoryData, generation uint64) {
+			d.Generation = generation
+			deliverWS(c, &c.memoryHandler, d)
+		})
 	})
-	go connectStream(c, "traffic", func(d TrafficData, generation uint64) {
-		d.Generation = generation
-		if c.trafficHandler != nil {
-			c.trafficHandler(d)
-		}
+	streams.Go(func() {
+		connectStream(c, run, "traffic", func(d TrafficData, generation uint64) {
+			d.Generation = generation
+			deliverWS(c, &c.trafficHandler, d)
+		})
 	})
-	go connectStream(c, "connections", func(d ConnectionsData, generation uint64) {
-		d.Generation = generation
-		if c.connectionsHandler != nil {
-			c.connectionsHandler(d)
-		}
+	streams.Go(func() {
+		connectStream(c, run, "connections", func(d ConnectionsData, generation uint64) {
+			d.Generation = generation
+			deliverWS(c, &c.connectionsHandler, d)
+		})
 	})
-	go connectStream(c, "logs?level="+level, func(d LogData, generation uint64) {
-		d.Generation = generation
-		if c.logsHandler != nil {
-			c.logsHandler(d)
-		}
+	streams.Go(func() {
+		connectStream(c, run, "logs?level="+url.QueryEscape(level), func(d LogData, generation uint64) {
+			d.Generation = generation
+			deliverWS(c, &c.logsHandler, d)
+		})
 	})
-
+	go func() {
+		streams.Wait()
+		run.cancel()
+		c.mu.Lock()
+		c.run = nil
+		close(run.done)
+		c.mu.Unlock()
+	}()
 	return nil
 }
 
-// Stop 停止所有WebSocket连接
+func deliverWS[T any](c *WSClient, handler *func(T), data T) {
+	c.mu.RLock()
+	fn := *handler
+	c.mu.RUnlock()
+	if fn != nil {
+		fn(data)
+	}
+}
+
+// Stop cancels this run and waits for all four workers to release their sockets.
 func (c *WSClient) Stop() {
-	c.runningMu.Lock()
-	if !c.isRunning {
-		c.runningMu.Unlock()
-		return
+	c.mu.RLock()
+	run := c.run
+	c.mu.RUnlock()
+	if run != nil {
+		run.cancel()
+		<-run.done
 	}
-	c.isRunning = false
-	if c.cancel != nil {
-		c.cancel()
-	}
-	c.runningMu.Unlock()
-
-	c.connsMu.Lock()
-	for key, conn := range c.conns {
-		_ = conn.Close()
-		delete(c.conns, key)
-	}
-	c.connsMu.Unlock()
 }
 
-// IsRunning 检查是否正在运行
 func (c *WSClient) IsRunning() bool {
-	c.runningMu.Lock()
-	defer c.runningMu.Unlock()
-	return c.isRunning
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.run != nil && c.run.ctx.Err() == nil
 }
 
-// noProxyWSDialer 屏蔽系统环境变量代理（如 http_proxy/https_proxy），
-// 确保与 mihomo 本地 WebSocket 的通信不受终端代理污染。
-var noProxyWSDialer = &websocket.Dialer{
-	Proxy:            nil,
-	HandshakeTimeout: 45 * time.Second,
-}
-
-// connectStream 通用WebSocket流连接，处理重连生命周期。
-// endpoint 同时作为 conns map 的 key，因此带查询参数的端点（如 "logs?level=debug"）
-// 与其他端点不会冲突。
-func connectStream[T any](c *WSClient, endpoint string, handler func(T, uint64)) {
-	for {
-		select {
-		case <-c.ctx.Done():
-			return
-		default:
-		}
-
-		generation := c.Generation()
-		wsURL := c.buildWSURL(endpoint)
-		if wsURL == "" {
-			select {
-			case <-c.ctx.Done():
-				return
-			case <-time.After(2 * time.Second):
-				continue
-			}
-		}
-
-		conn, _, err := noProxyWSDialer.Dial(wsURL, nil) //nolint:bodyclose // Gorilla owns the handshake response body; DialContext requires no application close.
-		if err != nil {
-			select {
-			case <-c.ctx.Done():
-				return
-			case <-time.After(2 * time.Second):
-				continue
-			}
-		}
-
+// connectStream owns one endpoint through dials, reads and reconnections.
+func connectStream[T any](c *WSClient, run *wsRun, endpoint string, handler func(T, uint64)) {
+	for run.ctx.Err() == nil {
 		c.mu.RLock()
-		if c.generation != generation {
-			c.mu.RUnlock()
-			_ = conn.Close()
-			continue
-		}
-		c.setConn(endpoint, conn)
+		ctx, generation := run.target, c.generation
+		baseURL, secret := c.baseURL, c.secret
 		c.mu.RUnlock()
 
-		// 读取消息，直到连接断开或收到停止信号
-		for {
-			select {
-			case <-c.ctx.Done():
-				_ = conn.Close()
-				c.setConn(endpoint, nil)
-				return
-			default:
-			}
-
-			_, message, err := conn.ReadMessage()
-			if err != nil {
-				break
-			}
-
-			var data T
-			if err := json.Unmarshal(message, &data); err != nil {
-				continue
-			}
-			if generation == c.Generation() {
-				handler(data, generation)
-			}
+		wait := 2 * time.Second
+		if readWSStream(ctx, buildWSURL(baseURL, secret, endpoint), generation, handler) {
+			wait = time.Second
 		}
-
-		c.setConn(endpoint, nil)
-
-		// 断线后等待重连，期间响应停止信号
+		timer := time.NewTimer(wait)
 		select {
-		case <-c.ctx.Done():
-			return
-		case <-time.After(1 * time.Second):
+		case <-ctx.Done():
+		case <-timer.C:
+		}
+		timer.Stop()
+	}
+}
+
+func readWSStream[T any](ctx context.Context, wsURL string, generation uint64, handler func(T, uint64)) bool {
+	if wsURL == "" || ctx.Err() != nil {
+		return false
+	}
+	// Closing the TCP connection on cancellation also interrupts a handshake
+	// blocked after dialing and an established stream blocked in ReadMessage.
+	var stopClose func() bool
+	dialer := websocket.Dialer{
+		HandshakeTimeout: 45 * time.Second,
+		NetDialContext: func(dialCtx context.Context, network, addr string) (net.Conn, error) {
+			conn, err := (&net.Dialer{}).DialContext(dialCtx, network, addr)
+			if err == nil {
+				stopClose = context.AfterFunc(ctx, func() { _ = conn.Close() })
+			}
+			return conn, err
+		},
+	}
+	conn, resp, err := dialer.DialContext(ctx, wsURL, nil)
+	if stopClose != nil {
+		defer stopClose()
+	}
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	if err != nil {
+		return false
+	}
+	defer conn.Close()
+	for ctx.Err() == nil {
+		_, message, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+		var data T
+		if json.Unmarshal(message, &data) == nil && ctx.Err() == nil {
+			handler(data, generation)
 		}
 	}
+	return true
 }
 
 // Generation identifies the controller snapshot that produced stream messages.

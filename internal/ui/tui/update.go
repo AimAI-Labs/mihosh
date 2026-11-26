@@ -76,12 +76,16 @@ func (m Model) Init() tea.Cmd {
 
 // Close also covers terminal errors and signal-driven exits from Bubble Tea.
 func (m Model) Close() {
+	if m.wsCancel != nil {
+		m.wsCancel()
+	}
+	if m.wsClient != nil {
+		m.wsClient.Stop()
+	}
+	m.connsState.CancelTest()
 	m.coreState.Close()
 	if m.coreSvc != nil {
 		m.coreSvc.Close()
-	}
-	if m.wsCancel != nil {
-		m.wsCancel()
 	}
 }
 
@@ -177,14 +181,7 @@ func (m *Model) onPageLeave() {
 
 // onAppQuit 应用退出前清理
 func (m *Model) onAppQuit() {
-	m.coreState.Close()
-	if m.coreSvc != nil {
-		m.coreSvc.Close()
-	}
-	m.connsState.CancelTest()
-	if m.wsCancel != nil {
-		m.wsCancel()
-	}
+	m.Close()
 }
 
 // refreshCurrentPage 刷新当前页面

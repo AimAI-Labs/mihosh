@@ -3,10 +3,12 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -108,93 +110,148 @@ func TestWSClient_StartStopAndHandlers(t *testing.T) {
 }
 
 func TestWSClient_Reconnection(t *testing.T) {
-	var connCount int
-	var mu sync.Mutex
-
+	var attempts, active atomic.Int32
+	closed := make(chan error, 2)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			return
 		}
-		mu.Lock()
-		connCount++
-		mu.Unlock()
-
-		// Immediately close to trigger reconnection logic
-		_ = conn.Close()
+		defer conn.Close()
+		if r.URL.Path == "/memory" {
+			if active.Add(1) != 1 {
+				t.Error("memory endpoint had overlapping connections")
+			}
+			defer active.Add(-1)
+			if attempts.Add(1) <= 2 {
+				_ = conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "reconnect"))
+				_ = conn.UnderlyingConn().SetReadDeadline(time.Now().Add(3 * time.Second))
+				// The server leaves TCP open after the close frame. Only the client
+				// can end this read, including if it sent a close-frame reply.
+				_, err := io.Copy(io.Discard, conn.UnderlyingConn())
+				closed <- err
+				return
+			}
+			_ = conn.WriteJSON(MemoryData{Inuse: 123})
+		}
+		_, _, _ = conn.ReadMessage()
 	}))
 	defer ts.Close()
 
 	client := NewWSClient(ts.URL, "")
-	// We only start memory stream manually to test reconnection simply
-
-	// Need to manually set isRunning for test to avoid immediate exit in connectStream loop
-	client.runningMu.Lock()
-	client.isRunning = true
-	client.ctx, client.cancel = context.WithCancel(context.Background())
-	client.runningMu.Unlock()
-	go connectStream(client, "memory", func(MemoryData, uint64) {})
-
-	time.Sleep(2500 * time.Millisecond) // enough time for initial connection + 1s delay + second connection
-
-	client.Stop()
-
-	mu.Lock()
-	defer mu.Unlock()
-	if connCount < 2 {
-		t.Errorf("Expected at least 2 connections (reconnection), got %d", connCount)
+	received := make(chan MemoryData, 1)
+	client.SetMemoryHandler(func(d MemoryData) { received <- d })
+	if err := client.Start(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	defer client.Stop()
+	for range 2 {
+		if err := awaitWS(t, closed); err != nil {
+			t.Fatalf("client failed to close the socket after a read error: %v", err)
+		}
+	}
+	if got := awaitWS(t, received); got.Inuse != 123 || attempts.Load() != 3 {
+		t.Fatalf("unexpected reconnection: %+v, attempts %d", got, attempts.Load())
 	}
 }
 
-func TestWSClient_UpdateEndpoint(t *testing.T) {
-	ts1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			return
-		}
-		defer func() { _ = conn.Close() }()
-		for {
-			if _, _, err := conn.ReadMessage(); err != nil {
-				break
-			}
+func TestWSClientStopCancelsBlockedHandshake(t *testing.T) {
+	started, released := make(chan struct{}, 4), make(chan struct{}, 4)
+	unblock := make(chan struct{})
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		started <- struct{}{}
+		select {
+		case <-r.Context().Done():
+			released <- struct{}{}
+		case <-unblock:
 		}
 	}))
-	defer ts1.Close()
+	defer ts.Close()
+	defer close(unblock)
+	client := NewWSClient(ts.URL, "")
+	if err := client.Start(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	for range 4 {
+		awaitWS(t, started)
+	}
+	done := make(chan struct{})
+	go func() { client.Stop(); close(done) }()
+	awaitWS(t, done)
+	for range 4 {
+		awaitWS(t, released)
+	}
+}
 
-	ts2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			return
-		}
-		defer func() { _ = conn.Close() }()
-		for {
-			if _, _, err := conn.ReadMessage(); err != nil {
-				break
+func TestWSClientSwitchThenParentCancellationClosesReadLoops(t *testing.T) {
+	newTarget := func(token string, value int64) (*httptest.Server, <-chan string, <-chan string) {
+		connected, closed := make(chan string, 4), make(chan string, 4)
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Query().Get("token") != token {
+				t.Errorf("wrong token for %s", r.URL.Path)
 			}
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				return
+			}
+			defer conn.Close()
+			connected <- r.URL.Path
+			if r.URL.Path == "/memory" {
+				_ = conn.WriteJSON(MemoryData{Inuse: value})
+			}
+			_, _, _ = conn.ReadMessage()
+			closed <- r.URL.Path
+		}))
+		t.Cleanup(server.Close)
+		return server, connected, closed
+	}
+	old, oldConnected, oldClosed := newTarget("old", 1)
+	next, nextConnected, nextClosed := newTarget("new", 2)
+	client := NewWSClient(old.URL, "old")
+	received := make(chan MemoryData, 4)
+	client.SetMemoryHandler(func(d MemoryData) { received <- d })
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	if err := client.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer client.Stop()
+	checkPaths := func(events <-chan string) {
+		t.Helper()
+		paths := map[string]bool{}
+		for range 4 {
+			paths[awaitWS(t, events)] = true
 		}
-	}))
-	defer ts2.Close()
-
-	client := NewWSClient(ts1.URL, "secret1")
-	_ = client.Start(context.Background())
-
-	// give it a moment to connect
-	time.Sleep(100 * time.Millisecond)
-
-	// Update endpoint
-	client.UpdateEndpoint(ts2.URL, "secret2")
-
-	client.mu.RLock()
-	baseURL := client.baseURL
-	secret := client.secret
-	client.mu.RUnlock()
-
-	if baseURL != ts2.URL {
-		t.Errorf("Expected baseURL %s, got %s", ts2.URL, baseURL)
+		if len(paths) != 4 {
+			t.Fatalf("expected one stream per endpoint, got %v", paths)
+		}
 	}
-	if secret != "secret2" {
-		t.Errorf("Expected secret %s, got %s", "secret2", secret)
+	checkPaths(oldConnected)
+	if data := awaitWS(t, received); data.Inuse != 1 || data.Generation != 0 {
+		t.Fatalf("old snapshot: %+v", data)
 	}
-
+	client.UpdateEndpoint(next.URL, "new")
+	checkPaths(oldClosed)
+	checkPaths(nextConnected)
+	if data := awaitWS(t, received); data.Inuse != 2 || data.Generation != client.Generation() || data.Generation == 0 {
+		t.Fatalf("new snapshot: %+v", data)
+	}
+	cancel()
+	checkPaths(nextClosed)
 	client.Stop()
+	if client.IsRunning() {
+		t.Fatal("client still running after cancellation")
+	}
+}
+
+func awaitWS[T any](t *testing.T, events <-chan T) T {
+	t.Helper()
+	select {
+	case event := <-events:
+		return event
+	case <-time.After(4 * time.Second):
+		t.Fatal("timeout waiting for websocket event")
+		var zero T
+		return zero
+	}
 }
