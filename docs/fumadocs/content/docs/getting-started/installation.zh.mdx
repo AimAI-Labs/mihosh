@@ -11,18 +11,19 @@ Mihosh 支持 Linux 和 macOS 系统 (amd64 和 arm64 架构)。
 
 我们提供多种安装方式，请根据你的系统环境选择最适合的一种：
 
-<Tabs items={['脚本安装 (推荐)', 'Homebrew (macOS)', '源码编译']}>
+<Tabs items={['脚本安装 (推荐)', 'Homebrew (macOS / Linux)', '源码编译']}>
   <Tab value="脚本安装 (推荐)">
     在 Linux 或 macOS 终端中运行以下一键安装脚本：
     ```bash
     curl -fsSL https://raw.githubusercontent.com/AimAI-Labs/mihosh/refs/heads/main/install.sh | bash
     ```
   </Tab>
-  <Tab value="Homebrew (macOS)">
-    如果你是 macOS 用户，并使用 Homebrew 包管理器，可以通过以下命令安装：
+  <Tab value="Homebrew (macOS / Linux)">
+    如果你在 macOS 或 Linux 上使用 Homebrew 包管理器，可以通过以下命令安装：
     ```bash
     brew tap AimAI-Labs/mihosh https://github.com/AimAI-Labs/mihosh
-    brew install mihosh
+    brew trust AimAI-Labs/mihosh # Homebrew 6+ 需要先信任第三方 tap
+    brew install AimAI-Labs/mihosh/mihosh
     ```
   </Tab>
   <Tab value="源码编译">

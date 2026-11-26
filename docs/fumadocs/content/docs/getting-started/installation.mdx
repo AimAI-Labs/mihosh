@@ -11,18 +11,19 @@ Mihosh supports Linux and macOS systems (amd64 and arm64 architectures).
 
 We provide multiple installation methods, please choose the one that best suits your system environment:
 
-<Tabs items={['Script Installation (Recommended)', 'Homebrew (macOS)', 'Build from Source']}>
+<Tabs items={['Script Installation (Recommended)', 'Homebrew (macOS / Linux)', 'Build from Source']}>
   <Tab value="Script Installation (Recommended)">
     Run the following one-click installation script in the Linux or macOS terminal:
     ```bash
     curl -fsSL https://raw.githubusercontent.com/AimAI-Labs/mihosh/refs/heads/main/install.sh | bash
     ```
   </Tab>
-  <Tab value="Homebrew (macOS)">
-    If you are a macOS user and use the Homebrew package manager, you can install it via the following commands:
+  <Tab value="Homebrew (macOS / Linux)">
+    If you use Homebrew on macOS or Linux, install Mihosh with:
     ```bash
     brew tap AimAI-Labs/mihosh https://github.com/AimAI-Labs/mihosh
-    brew install mihosh
+    brew trust AimAI-Labs/mihosh # Required on Homebrew 6+
+    brew install AimAI-Labs/mihosh/mihosh
     ```
   </Tab>
   <Tab value="Build from Source">

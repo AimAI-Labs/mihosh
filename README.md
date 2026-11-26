@@ -30,7 +30,8 @@ Supports Linux and macOS on amd64 and arm64.
 
 ```bash
 brew tap AimAI-Labs/mihosh https://github.com/AimAI-Labs/mihosh
-brew install mihosh
+brew trust AimAI-Labs/mihosh # Required on Homebrew 6+
+brew install AimAI-Labs/mihosh/mihosh
 ```
 
 ### Install Script
