@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/unix"
 )
 
 func TestProxyBackendPreservesValuesAndWritesModeLast(t *testing.T) {
@@ -64,4 +66,17 @@ func TestTUNCleanupOnlyDeletesReservedPriorities(t *testing.T) {
 	for _, mutation := range mutations {
 		require.True(t, strings.HasSuffix(mutation, "priority "+strconv.Itoa(identity.Rule)) || strings.HasSuffix(mutation, "priority "+strconv.Itoa(identity.Rule+10)))
 	}
+}
+func TestCheckTUNReportsSetcapCommandWhenUnprivileged(t *testing.T) {
+	if _, err := os.Stat("/dev/net/tun"); err != nil {
+		t.Skip("/dev/net/tun unavailable in test environment")
+	}
+	if hasEffectiveCap(unix.CAP_NET_ADMIN) {
+		t.Skip("process already holds CAP_NET_ADMIN")
+	}
+	n := &DesktopNetwork{}
+	err := n.CheckTUN(context.Background(), "/tmp/fake/mihomo", TUNIdentity(t.TempDir()))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "sudo setcap cap_net_admin,cap_net_raw+ep ")
+	require.NotContains(t, err.Error(), "/tmp/fake/mihomo")
 }

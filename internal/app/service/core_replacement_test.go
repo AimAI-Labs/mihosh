@@ -16,6 +16,7 @@ import (
 )
 
 func markReplacementRunning(s *CoreService, onStop func()) {
+	s.network = &fakeCoreNetwork{}
 	s.process = &exec.Cmd{}
 	s.done = make(chan error, 1)
 	s.stop = func() {

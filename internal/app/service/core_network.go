@@ -381,6 +381,15 @@ func (s *CoreService) SetTUN(ctx context.Context, enabled bool) error {
 	if cfg.Core.TUN == enabled {
 		return nil
 	}
+	if enabled && s.process != nil {
+		binary, err := coreinfra.BinaryPath(root, cfg.Core.Version, runtime.GOOS)
+		if err != nil {
+			return err
+		}
+		if err = s.network.CheckTUN(ctx, binary, host.TUNIdentity(root)); err != nil {
+			return err
+		}
+	}
 	path := filepath.Join(root, "runtime", "config.yaml")
 	old, err := os.ReadFile(path)
 	if err != nil {

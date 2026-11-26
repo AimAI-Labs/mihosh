@@ -21,11 +21,12 @@ import (
 )
 
 type fakeCoreNetwork struct {
-	mu     sync.Mutex
-	values host.ProxySettings
-	fail   bool
-	clean  []host.TUN
-	writes int
+	mu          sync.Mutex
+	values      host.ProxySettings
+	fail        bool
+	checkTUNErr error
+	clean       []host.TUN
+	writes      int
 }
 
 func fakeSettings(server, mode string) host.ProxySettings {
@@ -53,7 +54,11 @@ func (n *fakeCoreNetwork) WriteProxy(_ context.Context, values host.ProxySetting
 	}
 	return nil
 }
-func (*fakeCoreNetwork) CheckTUN(context.Context, string, host.TUN) error { return nil }
+func (n *fakeCoreNetwork) CheckTUN(context.Context, string, host.TUN) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.checkTUNErr
+}
 func (*fakeCoreNetwork) CaptureTUN(_ context.Context, value host.TUN) (host.TUN, error) {
 	value.Index = 99
 	return value, nil
@@ -206,4 +211,33 @@ func TestInterruptedTUNChangeRestoresConfigAndPreference(t *testing.T) {
 	cfg, err := config.Load()
 	require.NoError(t, err)
 	require.False(t, cfg.Core.TUN)
+}
+
+func TestSetTUNPrechecksBeforeStoppingRunningCore(t *testing.T) {
+	s, n, root := networkService(t)
+	n.checkTUNErr = errors.New("TUN requires CAP_NET_ADMIN on Mihosh")
+	require.NoError(t, config.Update(func(cfg *config.Config) error {
+		cfg.Core.Mode = "managed"
+		cfg.Core.Version = "v1.19.34"
+		cfg.Core.TUN = false
+		return nil
+	}))
+	stopped := false
+	s.process = &exec.Cmd{}
+	s.done = make(chan error)
+	s.stop = func() { stopped = true }
+	t.Cleanup(func() {
+		s.process = nil
+		s.done = nil
+		s.stop = nil
+	})
+	err := s.SetTUN(context.Background(), true)
+	require.ErrorContains(t, err, "TUN requires CAP_NET_ADMIN on Mihosh")
+	require.NotContains(t, err.Error(), "candidate core failed")
+	require.False(t, stopped, "failed TUN precheck must not stop the running core")
+	cfg, loadErr := config.Load()
+	require.NoError(t, loadErr)
+	require.False(t, cfg.Core.TUN)
+	_, journalErr := os.Stat(filepath.Join(root, "runtime", "network-change.json"))
+	require.True(t, os.IsNotExist(journalErr))
 }

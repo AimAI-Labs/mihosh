@@ -13,13 +13,67 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
 
 type DesktopNetwork struct{ Run Runner }
 
-func NewNetwork() Network { return &DesktopNetwork{Run: Run} }
+func NewNetwork() Network { return &DesktopNetwork{} }
+
+func (n *DesktopNetwork) run(ctx context.Context, name string, args ...string) ([]byte, error) {
+	if n.Run != nil {
+		return n.Run(ctx, name, args...)
+	}
+	return Run(ctx, name, args...)
+}
+
+func (n *DesktopNetwork) runPrivileged(ctx context.Context, name string, args ...string) ([]byte, error) {
+	if n.Run != nil {
+		return n.Run(ctx, name, args...)
+	}
+	return runWithTUNCapabilities(ctx, name, args...)
+}
+
+func runWithTUNCapabilities(ctx context.Context, name string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, name, args...)
+	if os.Geteuid() != 0 && hasEffectiveCap(unix.CAP_NET_ADMIN) {
+		ConfigureTUNProcess(cmd)
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("%s failed: %w", name, err)
+	}
+	return out, nil
+}
+
+func currentCapabilities() ([2]unix.CapUserData, bool) {
+	var data [2]unix.CapUserData
+	header := unix.CapUserHeader{Version: unix.LINUX_CAPABILITY_VERSION_3}
+	if unix.Capget(&header, &data[0]) != nil {
+		return data, false
+	}
+	return data, true
+}
+
+func hasEffectiveCap(capability uint) bool {
+	data, ok := currentCapabilities()
+	if !ok {
+		return false
+	}
+	return data[capability/32].Effective&(1<<(capability%32)) != 0
+}
+
+func hasPermittedCap(capability uint) bool {
+	data, ok := currentCapabilities()
+	if !ok {
+		return false
+	}
+	return data[capability/32].Permitted&(1<<(capability%32)) != 0
+}
 
 var desktopKeys = []string{"http.host", "http.port", "http.use-authentication", "https.host", "https.port", "socks.host", "socks.port", "ignore-hosts", "mode"}
 
@@ -41,7 +95,7 @@ func (n *DesktopNetwork) ReadProxy(ctx context.Context) (ProxySettings, error) {
 	settings := ProxySettings{}
 	for _, key := range desktopKeys {
 		schema, name := settingKey(key)
-		value, err := n.Run(ctx, "gsettings", "get", schema, name)
+		value, err := n.run(ctx, "gsettings", "get", schema, name)
 		if err != nil {
 			if errors.Is(err, exec.ErrNotFound) {
 				return nil, errors.New("GNOME system proxy requires gsettings (GNOME desktop); on headless or non-GNOME Linux, use terminal proxy (mihosh proxy on/off) or TUN instead")
@@ -89,7 +143,7 @@ func (n *DesktopNetwork) WriteProxy(ctx context.Context, settings ProxySettings)
 	}
 	for _, key := range keys {
 		schema, name := settingKey(key)
-		if _, err := n.Run(ctx, "gsettings", "set", schema, name, string(settings[key].Data)); err != nil {
+		if _, err := n.run(ctx, "gsettings", "set", schema, name, string(settings[key].Data)); err != nil {
 			if errors.Is(err, exec.ErrNotFound) {
 				return errors.New("GNOME system proxy requires gsettings (GNOME desktop); on headless or non-GNOME Linux, use terminal proxy (mihosh proxy on/off) or TUN instead")
 			}
@@ -99,7 +153,7 @@ func (n *DesktopNetwork) WriteProxy(ctx context.Context, settings ProxySettings)
 	return nil
 }
 func (n *DesktopNetwork) rules(ctx context.Context, family string) ([]map[string]any, error) {
-	out, err := n.Run(ctx, "ip", family, "-json", "rule", "show")
+	out, err := n.run(ctx, "ip", family, "-json", "rule", "show")
 	if err != nil {
 		return nil, err
 	}
@@ -107,15 +161,18 @@ func (n *DesktopNetwork) rules(ctx context.Context, family string) ([]map[string
 	err = json.Unmarshal(out, &rules)
 	return rules, err
 }
-func (n *DesktopNetwork) CheckTUN(ctx context.Context, binaryPath string, t TUN) error {
+func (n *DesktopNetwork) CheckTUN(ctx context.Context, _ string, t TUN) error {
 	if _, err := os.Stat("/dev/net/tun"); err != nil {
 		return errors.New("TUN requires /dev/net/tun")
 	}
-	var data unix.CapUserData
-	header := unix.CapUserHeader{Version: unix.LINUX_CAPABILITY_VERSION_1}
-	privileged := unix.Capget(&header, &data) == nil && data.Effective&(1<<unix.CAP_NET_ADMIN) != 0
-	if !privileged {
-		return fmt.Errorf("TUN requires CAP_NET_ADMIN on the Mihosh coordinator and recovery guard; run elevated or grant cap_net_admin,cap_net_raw+ep to the installed Mihosh executable (selected kernel: %s)", binaryPath)
+	if !hasEffectiveCap(unix.CAP_NET_ADMIN) {
+		exe, err := os.Executable()
+		if err != nil || exe == "" {
+			exe = "mihosh"
+		} else if resolved, err := filepath.EvalSymlinks(exe); err == nil && resolved != "" {
+			exe = resolved
+		}
+		return fmt.Errorf("TUN requires CAP_NET_ADMIN on Mihosh (needed to spawn mihomo with TUN and clean up routes). Run with sudo or grant capabilities: sudo setcap cap_net_admin,cap_net_raw+ep %s", exe)
 	}
 	if _, err := net.InterfaceByName(t.Device); err == nil {
 		return errors.New("managed TUN interface already exists; recover it before enabling TUN")
@@ -147,7 +204,7 @@ func (n *DesktopNetwork) CleanupTUN(ctx context.Context, t TUN) error {
 		for _, rule := range rules {
 			priority, _ := rule["priority"].(float64)
 			if int(priority) >= t.Rule && int(priority) <= t.Rule+10 {
-				if _, err = n.Run(ctx, "ip", family, "rule", "del", "priority", strconv.Itoa(int(priority))); err != nil {
+				if _, err = n.runPrivileged(ctx, "ip", family, "rule", "del", "priority", strconv.Itoa(int(priority))); err != nil {
 					return err
 				}
 			}
@@ -156,31 +213,30 @@ func (n *DesktopNetwork) CleanupTUN(ctx context.Context, t TUN) error {
 	if _, err := net.InterfaceByName(t.Device); err == nil {
 		// Interface-scoped resolver state is reverted before deleting our own device.
 		if _, err := exec.LookPath("resolvectl"); err == nil {
-			if _, err = n.Run(ctx, "resolvectl", "revert", t.Device); err != nil {
+			if _, err = n.run(ctx, "resolvectl", "revert", t.Device); err != nil {
 				return err
 			}
 		}
-		_, err = n.Run(ctx, "ip", "link", "delete", "dev", t.Device)
+		_, err = n.runPrivileged(ctx, "ip", "link", "delete", "dev", t.Device)
 		return err
 	}
 	return nil
 }
 func configureGuard(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	var data unix.CapUserData
-	header := unix.CapUserHeader{Version: unix.LINUX_CAPABILITY_VERSION_1}
-	if unix.Capget(&header, &data) == nil && data.Effective&(1<<unix.CAP_NET_ADMIN) != 0 {
+	if hasEffectiveCap(unix.CAP_NET_ADMIN) {
 		ConfigureTUNProcess(cmd)
 	}
 }
 func ConfigureTUNProcess(cmd *exec.Cmd) {
+	if os.Geteuid() == 0 || !hasPermittedCap(unix.CAP_NET_ADMIN) {
+		return
+	}
 	if cmd.SysProcAttr == nil {
 		cmd.SysProcAttr = &syscall.SysProcAttr{}
 	}
 	cmd.SysProcAttr.AmbientCaps = []uintptr{unix.CAP_NET_ADMIN}
-	var data unix.CapUserData
-	header := unix.CapUserHeader{Version: unix.LINUX_CAPABILITY_VERSION_1}
-	if unix.Capget(&header, &data) == nil && data.Permitted&(1<<unix.CAP_NET_RAW) != 0 {
+	if hasPermittedCap(unix.CAP_NET_RAW) {
 		cmd.SysProcAttr.AmbientCaps = append(cmd.SysProcAttr.AmbientCaps, unix.CAP_NET_RAW)
 	}
 }
