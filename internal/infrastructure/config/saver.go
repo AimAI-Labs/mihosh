@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/fsutil"
 	"github.com/spf13/viper"
 )
 
@@ -54,6 +55,8 @@ func writeConfigFile(cfg *Config, configDir, destination string) error {
 	writer.Set("shell_proxy", cfg.ShellProxy)
 	if cfg.FileDiffOptions != nil {
 		writer.Set("file_diff_options", *cfg.FileDiffOptions)
+	} else if writer.IsSet("file_diff_options") {
+		writer.Set("file_diff_options", nil)
 	}
 	// 订阅管理字段：subs 为订阅元数据列表，active_sub 为当前激活 UID
 	if cfg.Subs == nil {
@@ -75,23 +78,11 @@ func writeConfigFile(cfg *Config, configDir, destination string) error {
 }
 
 func writeConfigAtomically(path string, mode os.FileMode, write func(io.Writer) error) error {
-	file, err := os.CreateTemp(filepath.Dir(path), ".mihosh-config-*")
-	if err != nil {
-		return err
-	}
-	defer func() { _ = os.Remove(file.Name()) }()
-	defer file.Close()
-	if err = file.Chmod(mode); err != nil {
-		return err
-	}
-	if err = write(file); err != nil {
-		return err
-	}
-	if err = file.Sync(); err != nil {
-		return err
-	}
-	if err = file.Close(); err != nil {
-		return err
-	}
-	return os.Rename(file.Name(), path)
+	return fsutil.WriteStreamAtomic(path, fsutil.WriteOptions{
+		Perm:          mode,
+		DirPerm:       0755,
+		EnsureDir:     true,
+		FollowSymlink: true,
+		TempPattern:   ".mihosh-config-*",
+	}, write)
 }

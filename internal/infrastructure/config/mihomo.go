@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -123,6 +122,9 @@ func ReadMihomoYAML(configPath string) (map[string]interface{}, error) {
 	if err := yaml.Unmarshal(data, &result); err != nil {
 		return nil, err
 	}
+	if result == nil {
+		result = make(map[string]interface{})
+	}
 	return result, nil
 }
 
@@ -193,17 +195,5 @@ func WriteMihomoField(configPath, key string, value interface{}) error {
 		return err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
-		return err
-	}
-
-	target := configPath
-	if info, err := os.Lstat(configPath); err == nil && info.Mode()&os.ModeSymlink != 0 {
-		resolved, err := filepath.EvalSymlinks(configPath)
-		if err != nil {
-			return err
-		}
-		target = resolved
-	}
-	return atomicWriteFile(target, out, 0644)
+	return atomicWriteFile(configPath, out, 0600)
 }

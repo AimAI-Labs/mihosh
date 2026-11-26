@@ -177,3 +177,31 @@ func TestManagedFieldAndRuleEditsPreservePrivatePermissions(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, os.FileMode(0600), info.Mode().Perm())
 }
+
+func TestReadMihomoYAML_EmptyReturnsNonNilMap(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "empty.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("# comment only\n"), 0600))
+	m, err := ReadMihomoYAML(path)
+	require.NoError(t, err)
+	require.NotNil(t, m)
+	m["mixed-port"] = 7890
+}
+
+func TestRuleEditsPreserveSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires elevated privilege on Windows")
+	}
+	dir := t.TempDir()
+	realPath := filepath.Join(dir, "real-config.yaml")
+	linkPath := filepath.Join(dir, "config.yaml")
+	require.NoError(t, os.WriteFile(realPath, []byte("rules:\n  - MATCH,DIRECT\n"), 0600))
+	require.NoError(t, os.Symlink(realPath, linkPath))
+
+	require.NoError(t, InsertRule(linkPath, "DOMAIN,a.com,DIRECT", 1))
+	require.NoError(t, ReplaceRule(linkPath, "DOMAIN", "a.com", "DIRECT", false, "DOMAIN,b.com,DIRECT", 1))
+	require.NoError(t, DeleteRule(linkPath, "DOMAIN", "b.com", "DIRECT", false))
+
+	linfo, err := os.Lstat(linkPath)
+	require.NoError(t, err)
+	assert.NotZero(t, linfo.Mode()&os.ModeSymlink, "rule edits must not clobber symlinks")
+}

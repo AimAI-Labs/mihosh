@@ -19,6 +19,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/fsutil"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"gopkg.in/yaml.v3"
 )
@@ -208,16 +209,7 @@ func ContentSHA256(b Bundle) (string, error) {
 }
 
 func marshalBundleYAML(v any) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := yaml.NewEncoder(&buf)
-	enc.SetIndent(2)
-	if err := enc.Encode(v); err != nil {
-		return nil, err
-	}
-	if err := enc.Close(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return fsutil.MarshalYAMLIndent2(v)
 }
 
 type archiveEntry struct {
@@ -490,31 +482,12 @@ func WriteArchiveFile(targetPath string, b Bundle) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	dir := filepath.Dir(targetPath)
-	if err = os.MkdirAll(dir, 0700); err != nil {
-		return 0, err
-	}
-	tmp, err := os.CreateTemp(dir, ".mihosh-export-*")
-	if err != nil {
-		return 0, err
-	}
-	defer func() { _ = os.Remove(tmp.Name()) }()
-	if _, err = tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		return 0, err
-	}
-	if err = tmp.Chmod(0600); err != nil {
-		_ = tmp.Close()
-		return 0, err
-	}
-	if err = tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		return 0, err
-	}
-	if err = tmp.Close(); err != nil {
-		return 0, err
-	}
-	if err = os.Rename(tmp.Name(), targetPath); err != nil {
+	if err = fsutil.WriteFileAtomic(targetPath, data, fsutil.WriteOptions{
+		Perm:        0600,
+		DirPerm:     0700,
+		EnsureDir:   true,
+		TempPattern: ".mihosh-export-*",
+	}); err != nil {
 		return 0, err
 	}
 	return len(data), nil

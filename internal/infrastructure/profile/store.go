@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/fsutil"
 	"gopkg.in/yaml.v3"
 )
 
@@ -345,35 +346,14 @@ func DeleteProfileDir(uid string) error {
 	return nil
 }
 
-// atomicWrite 先写临时文件再 Rename 覆盖目标（避免半写损坏）。
-// 与 config 包的 atomicWriteFile 行为一致。
+// atomicWrite 先写临时文件再 Rename 覆盖目标（避免半写损坏），并自动创建父目录。
 func atomicWrite(path string, data []byte, perm os.FileMode) error {
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".mihosh-profile-*")
-	if err != nil {
-		return fmt.Errorf("创建临时文件失败: %w", err)
-	}
-	tmpName := tmp.Name()
-	defer func() { _ = os.Remove(tmpName) }() // Rename 成功后已不存在，忽略错误
-
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf("写入临时文件失败: %w", err)
-	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf("同步临时文件失败: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("关闭临时文件失败: %w", err)
-	}
-	if err := os.Chmod(tmpName, perm); err != nil {
-		return fmt.Errorf("设置临时文件权限失败: %w", err)
-	}
-	if err := os.Rename(tmpName, path); err != nil {
-		return fmt.Errorf("替换配置文件失败: %w", err)
-	}
-	return nil
+	return fsutil.WriteFileAtomic(path, data, fsutil.WriteOptions{
+		Perm:        perm,
+		DirPerm:     0700,
+		EnsureDir:   true,
+		TempPattern: ".mihosh-profile-*",
+	})
 }
 
 // mihoshConfigDir 返回 ~/.mihosh 配置目录。
@@ -409,15 +389,5 @@ func isSpaceByte(c byte) bool {
 
 // marshalYAML2Spaces 以 2 空格缩进序列化。
 func marshalYAML2Spaces(v interface{}) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := yaml.NewEncoder(&buf)
-	enc.SetIndent(2)
-	err := enc.Encode(v)
-	if err != nil {
-		return nil, err
-	}
-	if err := enc.Close(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return fsutil.MarshalYAMLIndent2(v)
 }

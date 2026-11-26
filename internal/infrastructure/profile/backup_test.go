@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,20 +36,16 @@ func TestBackup_CreatesBackup(t *testing.T) {
 	assert.Equal(t, "mode: rule\n", string(data))
 }
 
-// TestBackup_RotateEnforcesMaxBackups 验证超过上限后最旧备份被删除。
-//
-// 注意：备份名带秒级时间戳，连续创建可能重名。本测试通过 sleep 1s 保证时间戳唯一。
+// TestBackup_RotateEnforcesMaxBackups 验证超过上限后最旧备份被删除，且同秒连续备份不会互相覆盖。
 func TestBackup_RotateEnforcesMaxBackups(t *testing.T) {
 	dir := t.TempDir()
 	target := writeTargetConfig(t, dir, "mode: rule\n")
 
-	// 创建 MaxBackups + 3 个备份。
+	// 创建 MaxBackups + 3 个备份（无需 sleep，纳秒级命名确保连续调用不冲突）。
 	total := MaxBackups + 3
 	for i := 0; i < total; i++ {
 		_, err := BackupConfig(target)
 		require.NoError(t, err)
-		// 等待 1.1s 以保证时间戳唯一（避免秒级重名导致 rotate 统计偏差）。
-		time.Sleep(1100 * time.Millisecond)
 	}
 
 	backupDir, err := configBackupsDir()
@@ -78,7 +73,6 @@ func TestBackup_RotateKeepsNewest(t *testing.T) {
 		name, err := BackupConfig(target)
 		require.NoError(t, err)
 		created = append(created, name)
-		time.Sleep(1100 * time.Millisecond)
 	}
 
 	backupDir, err := configBackupsDir()

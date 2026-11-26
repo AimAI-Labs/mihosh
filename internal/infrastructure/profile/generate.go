@@ -3,13 +3,12 @@ package profile
 // generate.go — 订阅配置生成与原子写入；备份和激活由调用方编排。
 
 import (
-	"bytes"
 	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/fsutil"
 	"gopkg.in/yaml.v3"
 )
 
@@ -233,32 +232,26 @@ func marshalNode(n *yaml.Node) ([]byte, error) {
 	if n != nil {
 		doc.Content = []*yaml.Node{n}
 	}
-	var buf bytes.Buffer
-	enc := yaml.NewEncoder(&buf)
-	enc.SetIndent(2)
-	if err := enc.Encode(doc); err != nil {
+	out, err := fsutil.MarshalYAMLIndent2(doc)
+	if err != nil {
 		return nil, fmt.Errorf("序列化配置失败: %w", err)
 	}
-	if err := enc.Close(); err != nil {
-		return nil, fmt.Errorf("序列化配置失败: %w", err)
-	}
-	return buf.Bytes(), nil
+	return out, nil
 }
 
-// WriteFinal 原子写入最终配置到 targetPath（覆盖，保留符号链接目标）。
+// WriteFinal 原子写入最终配置到 targetPath（覆盖，保留符号链接目标与现有权限，自动创建父目录）。
 func WriteFinal(targetPath string, data []byte) error {
 	if targetPath == "" {
 		return fmt.Errorf("目标配置路径为空")
 	}
-	target := targetPath
-	if info, err := os.Lstat(targetPath); err == nil && info.Mode()&os.ModeSymlink != 0 {
-		resolved, err := filepath.EvalSymlinks(targetPath)
-		if err != nil {
-			return err
-		}
-		target = resolved
-	}
-	return atomicWrite(target, data, 0644)
+	return fsutil.WriteFileAtomic(targetPath, data, fsutil.WriteOptions{
+		Perm:          0600,
+		DirPerm:       0755,
+		EnsureDir:     true,
+		PreserveMode:  true,
+		FollowSymlink: true,
+		TempPattern:   ".mihosh-profile-*",
+	})
 }
 
 // GeneratedConfig 包含有效配置和已降级忽略的覆写警告。

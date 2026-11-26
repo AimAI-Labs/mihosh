@@ -1,13 +1,12 @@
 package config
 
 import (
-	"bytes"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	domainrules "github.com/AimAI-Labs/mihosh/internal/domain/rules"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/fsutil"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"gopkg.in/yaml.v3"
 )
@@ -454,49 +453,19 @@ func normalizeInsertIndex(index, length int) int {
 // marshalYAML 以 2 空格缩进序列化 yaml.Node，保持与 yaml.Marshal 一致的输出格式，
 // 仅将默认的 4 空格缩进改为 2 空格（符合 Mihomo 配置惯例）。
 func marshalYAML(doc *yaml.Node) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := yaml.NewEncoder(&buf)
-	enc.SetIndent(2)
-	if err := enc.Encode(doc); err != nil {
-		return nil, err
-	}
-	if err := enc.Close(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return fsutil.MarshalYAMLIndent2(doc)
 }
 
-// atomicWriteFile 先写入同目录临时文件再 Rename 覆盖目标，降低半写损坏风险。
+// atomicWriteFile 先写入同目录临时文件再 Rename 覆盖目标，降低半写损坏风险，同时保留符号链接与现有权限。
 func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
-	if info, err := os.Stat(path); err == nil {
-		perm = info.Mode().Perm()
-	}
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".mihosh-config-*")
-	if err != nil {
-		return fmt.Errorf(i18n.T("config.file.err_create_temp"), err)
-	}
-	tmpName := tmp.Name()
-	defer func() { _ = os.Remove(tmpName) }() // Rename 成功后已不存在，忽略错误
-
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf(i18n.T("config.file.err_write_temp"), err)
-	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf(i18n.T("config.file.err_sync_temp"), err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf(i18n.T("config.file.err_close_temp"), err)
-	}
-	if err := os.Chmod(tmpName, perm); err != nil {
-		return fmt.Errorf(i18n.T("config.file.err_chmod_temp"), err)
-	}
-	if err := os.Rename(tmpName, path); err != nil {
-		return fmt.Errorf(i18n.T("config.file.err_replace"), err)
-	}
-	return nil
+	return fsutil.WriteFileAtomic(path, data, fsutil.WriteOptions{
+		Perm:          perm,
+		DirPerm:       0755,
+		EnsureDir:     true,
+		PreserveMode:  true,
+		FollowSymlink: true,
+		TempPattern:   ".mihosh-config-*",
+	})
 }
 
 // 下面是少量内部常量与工具，避免在调用点散布 yaml 内部细节。

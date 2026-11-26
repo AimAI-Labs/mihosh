@@ -499,3 +499,41 @@ rules:
 	assert.Contains(t, outStr, "顶部注释", "raw 顶部注释应保留")
 	assert.Contains(t, outStr, "规则注释", "raw 规则注释应保留")
 }
+
+func TestDeepCopyNode_IsolatesAliases(t *testing.T) {
+	doc := parseDoc(t, `base: &base
+  server: example.com
+  port: 443
+proxies:
+  - <<: *base
+    name: p1
+`)
+	proxies := findMappingValue(topLevelMapping(doc), "proxies")
+	require.NotNil(t, proxies)
+	require.Len(t, proxies.Content, 1)
+
+	cloned := deepCopyNode(proxies.Content[0])
+	require.NotNil(t, cloned)
+	nameNode := findMappingValue(cloned, "name")
+	require.NotNil(t, nameNode)
+	nameNode.Value = "mutated"
+
+	assert.Equal(t, "p1", findMappingValue(proxies.Content[0], "name").Value, "mutating clone must not mutate source")
+}
+
+func TestWriteFinal_CreatesParentDirAndPreservesMode(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "missing", "mihomo", "config.yaml")
+	require.NoError(t, WriteFinal(target, []byte("secret: s1\n")))
+	data, err := os.ReadFile(target)
+	require.NoError(t, err)
+	assert.Equal(t, "secret: s1\n", string(data))
+
+	require.NoError(t, os.Chmod(target, 0600))
+	require.NoError(t, WriteFinal(target, []byte("secret: s2\n")))
+	info, err := os.Stat(target)
+	require.NoError(t, err)
+	if info.Mode().Perm()&0077 != 0 {
+		t.Fatalf("expected 0600 permissions preserved, got %o", info.Mode().Perm())
+	}
+}

@@ -266,28 +266,33 @@ func topLevelMapping(n *yaml.Node) *yaml.Node {
 	return nil
 }
 
-// deepCopyNode 通过 marshal/unmarshal 深拷贝节点（保留注释与样式）。
-// yaml.v3 的 Encode/Decode 会保留 HeadComment/LineComment/FootComment 等元信息。
+// deepCopyNode 递归深拷贝 yaml.Node（保留注释、样式与锚点/别名隔离）。
 func deepCopyNode(n *yaml.Node) *yaml.Node {
 	if n == nil {
 		return nil
 	}
-	out, err := marshalYAML2Spaces(n)
-	if err != nil {
-		// marshal 失败时退化为浅拷贝（极少触发）。
-		c := *n
-		return &c
+	return cloneYAMLNode(n, make(map[*yaml.Node]*yaml.Node))
+}
+
+func cloneYAMLNode(n *yaml.Node, seen map[*yaml.Node]*yaml.Node) *yaml.Node {
+	if n == nil {
+		return nil
 	}
-	var doc yaml.Node
-	if err := yaml.Unmarshal(out, &doc); err != nil {
-		c := *n
-		return &c
+	if cloned, ok := seen[n]; ok {
+		return cloned
 	}
-	// Marshal 总会包一层 DocumentNode。
-	if doc.Kind == yaml.DocumentNode && len(doc.Content) > 0 {
-		return doc.Content[0]
+	c := *n
+	seen[n] = &c
+	if len(n.Content) > 0 {
+		c.Content = make([]*yaml.Node, len(n.Content))
+		for i, child := range n.Content {
+			c.Content[i] = cloneYAMLNode(child, seen)
+		}
 	}
-	return &doc
+	if n.Alias != nil {
+		c.Alias = cloneYAMLNode(n.Alias, seen)
+	}
+	return &c
 }
 
 // copyNodes 深拷贝一组节点。
