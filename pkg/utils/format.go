@@ -19,15 +19,16 @@ func FormatBytes(bytes int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
-// MaskSecret 掩码敏感信息
+// MaskSecret 掩码敏感信息（按 rune 切片以避免截断多字节 UTF-8 字符）。
 func MaskSecret(secret string) string {
 	if secret == "" {
-		return "<未设置>"
+		return ""
 	}
-	if len(secret) <= 6 {
+	runes := []rune(secret)
+	if len(runes) <= 6 {
 		return "****"
 	}
-	return secret[:3] + "****" + secret[len(secret)-3:]
+	return string(runes[:3]) + "****" + string(runes[len(runes)-3:])
 }
 
 // FormatDuration 格式化连接时长

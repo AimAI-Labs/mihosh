@@ -112,7 +112,7 @@ func resolveTestAction(args []string) (testAction, string, error) {
 		}
 	}
 
-	return "", "", fmt.Errorf("%s", i18n.T("cli.test.err_format"))
+	return "", "", fmt.Errorf("%s", i18n.T("cli.test.err_args"))
 }
 
 func runTestAction(w io.Writer, proxySvc *service.ProxyService, proxyAddress string, action testAction, target string, format outputFormat) error {
@@ -149,12 +149,12 @@ func runTestAction(w io.Writer, proxySvc *service.ProxyService, proxyAddress str
 
 	case actionGroup:
 		if err := proxySvc.TestGroupDelay(target); err != nil {
-			return fmt.Errorf(i18n.T("cli.test.err_test_group")+": %w", err)
+			return fmt.Errorf(i18n.T("cli.test.err_group_delay")+": %w", err)
 		}
 		return renderGroupTestOutput(w, target, format)
 	}
 
-	return fmt.Errorf(i18n.T("cli.test.err_unsupported_action"), action)
+	return fmt.Errorf(i18n.T("cli.test.unsupported_action"), action)
 }
 
 func renderNoCurrentTestOutput(w io.Writer, format outputFormat) error {
@@ -291,7 +291,7 @@ func renderNodeTestOutput(w io.Writer, node string, delay int, format outputForm
 		}
 		return tw.Flush()
 	case outputFormatPlain:
-		if _, err := fmt.Fprintln(w, i18n.Tf("cli.test.success_node", node, delay)); err != nil {
+		if _, err := fmt.Fprintln(w, i18n.Tf("cli.test.node_delay", node, delay)); err != nil {
 			return err
 		}
 		return nil
@@ -324,7 +324,7 @@ func renderGroupTestOutput(w io.Writer, group string, format outputFormat) error
 		}
 		return tw.Flush()
 	case outputFormatPlain:
-		if _, err := fmt.Fprintln(w, i18n.Tf("cli.test.success_group", group)); err != nil {
+		if _, err := fmt.Fprintln(w, i18n.Tf("cli.test.group_done", group)); err != nil {
 			return err
 		}
 		return nil

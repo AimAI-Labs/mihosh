@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -113,6 +115,9 @@ func inferErrorKind(err error) commandErrorKind {
 }
 
 func isLikelyParameterError(err error) bool {
+	if errors.Is(err, service.ErrInvalidConfigValue) {
+		return true
+	}
 	msg := strings.ToLower(strings.TrimSpace(err.Error()))
 	needles := []string{
 		"unknown command",
@@ -123,6 +128,7 @@ func isLikelyParameterError(err error) bool {
 		"requires at most",
 		"requires exactly",
 		"invalid argument",
+		"unsupported output format",
 		"参数格式错误",
 		"不支持的输出格式",
 	}
@@ -135,6 +141,10 @@ func isLikelyParameterError(err error) bool {
 }
 
 func isLikelyNetworkError(err error) bool {
+	var apiErr *api.APIError
+	if errors.As(err, &apiErr) {
+		return true
+	}
 	var netErr net.Error
 	if errors.As(err, &netErr) {
 		return true
@@ -151,6 +161,7 @@ func isLikelyNetworkError(err error) bool {
 		"no such host",
 		"i/o timeout",
 		"context deadline exceeded",
+		"api request failed",
 		"api 请求失败",
 	}
 	for _, needle := range needles {

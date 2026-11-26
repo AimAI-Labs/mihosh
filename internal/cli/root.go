@@ -25,15 +25,21 @@ var rootCmd = &cobra.Command{
 		// 配置缺失（含首次启动）直接用默认值继续，不在启动期写文件；
 		// 连接信息由 mihomo 配置文件自动发现。
 		app := bootstrap.NewApp()
+		defer app.Close()
 		if app.ConfigErr == nil {
 			i18n.SetLanguageOverride(app.Config.Language)
 		}
 
 		m := tui.NewModel(app)
-		defer m.Close()
 
 		p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithoutCatchPanics())
-		if _, err := p.Run(); err != nil {
+		finalModel, err := p.Run()
+		if fm, ok := finalModel.(tui.Model); ok {
+			fm.Close()
+		} else {
+			m.Close()
+		}
+		if err != nil {
 			return fmt.Errorf(i18n.T("cli.root.err_start")+": %w", err)
 		}
 		return nil
@@ -69,6 +75,9 @@ func Execute() {
 
 func executeRootCommand(root *cobra.Command, stderr io.Writer) int {
 	i18n.Init()
+	if cfg, err := config.Load(); err == nil && cfg != nil && cfg.Language != "" {
+		i18n.SetLanguageOverride(cfg.Language)
+	}
 	localizeCommands()
 	if err := root.Execute(); err != nil {
 		_, _ = fmt.Fprintln(stderr, renderCommandError(err))
@@ -207,11 +216,7 @@ func localizeCommands() {
 	}
 	for _, action := range []string{"start", "stop", "restart", "enable", "disable", "status"} {
 		if c, _, err := serviceCmd.Find([]string{action}); err == nil && c != nil {
-			if action == "status" {
-				c.Short = i18n.T("cli.service.action_status")
-			} else {
-				c.Short = i18n.T("cli.service.action_" + action)
-			}
+			c.Short = i18n.T("cli.service.action." + action)
 		}
 	}
 

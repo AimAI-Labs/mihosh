@@ -48,9 +48,12 @@ func detectProxyState() (proxyState, string) {
 	if !hasHTTP && !hasHTTPS && !hasAll {
 		return proxyStateNone, ""
 	}
+	if httpProxy == "" && httpsProxy == "" && allProxy == "" {
+		return proxyStateNone, ""
+	}
 
-	// 全部设置且值一致 → Full；否则 Partial。
-	if hasHTTP && hasHTTPS && hasAll && httpProxy == httpsProxy && httpsProxy == allProxy {
+	// 全部设置且非空且值一致 → Full；否则 Partial。
+	if hasHTTP && hasHTTPS && hasAll && httpProxy != "" && httpProxy == httpsProxy && httpsProxy == allProxy {
 		return proxyStateFull, httpProxy
 	}
 

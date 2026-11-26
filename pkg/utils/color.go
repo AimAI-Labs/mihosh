@@ -33,11 +33,10 @@ func HexToHSL(hex string) (HSL, error) {
 	h := 0.0
 
 	if delta != 0 {
-		s = l / 0.5
-		if s < 1 {
-			s = delta / (2.0 - max - min)
-		} else {
+		if l < 0.5 {
 			s = delta / (max + min)
+		} else {
+			s = delta / (2.0 - max - min)
 		}
 
 		switch max {
@@ -80,7 +79,17 @@ func HSLToHex(hsl HSL) string {
 		b = hueToRGB(p, q, h-1.0/3.0)
 	}
 
-	return rgbToHex(int(r*255), int(g*255), int(b*255))
+	return rgbToHex(clampByte(math.Round(r*255)), clampByte(math.Round(g*255)), clampByte(math.Round(b*255)))
+}
+
+func clampByte(v float64) int {
+	if v < 0 {
+		return 0
+	}
+	if v > 255 {
+		return 255
+	}
+	return int(v)
 }
 
 func hueToRGB(p, q, t float64) float64 {
@@ -108,7 +117,7 @@ func hexToRGB(hex string) (int, int, int, error) {
 		hex = string(hex[0]) + string(hex[0]) + string(hex[1]) + string(hex[1]) + string(hex[2]) + string(hex[2])
 	}
 	if len(hex) != 6 {
-		return 0, 0, 0, nil
+		return 0, 0, 0, fmt.Errorf("invalid hex color %q", hex)
 	}
 
 	r := 0
@@ -155,6 +164,7 @@ func hexToInt(c byte, v *int) (int, error) {
 		*v = int(c - 'a' + 10)
 	default:
 		*v = 0
+		return 0, fmt.Errorf("invalid hex digit %q", c)
 	}
 	return *v, nil
 }

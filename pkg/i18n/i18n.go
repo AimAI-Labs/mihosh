@@ -41,6 +41,7 @@ func Init() {
 	}
 
 	// Detect system language
+	isChinese = false
 	localesList, err := locale.GetLocales()
 	if err == nil && len(localesList) > 0 {
 		if strings.HasPrefix(strings.ToLower(localesList[0]), "zh") {

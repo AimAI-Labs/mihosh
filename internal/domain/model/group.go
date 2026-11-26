@@ -8,8 +8,3 @@ type Group struct {
 	All     []string `json:"all"`
 	History []Delay  `json:"history"`
 }
-
-// GroupsResponse 策略组列表响应
-type GroupsResponse struct {
-	Proxies map[string]Group `json:"proxies"`
-}

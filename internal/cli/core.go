@@ -191,10 +191,23 @@ func writeCoreResult(out io.Writer, format outputFormat, result any) error {
 			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", value["action"], value["stage"], value["version"], value["route"], value["result"]); err != nil {
 				return err
 			}
-			return w.Flush()
+			if err := w.Flush(); err != nil {
+				return err
+			}
+			if next := strings.TrimSpace(value["next"]); next != "" {
+				_, err := fmt.Fprintln(out, next)
+				return err
+			}
+			return nil
 		}
-		_, err := fmt.Fprintf(out, "%s %s %s %s %s\n", value["action"], value["stage"], value["version"], value["route"], value["result"])
-		return err
+		if _, err := fmt.Fprintf(out, "%s %s %s %s %s\n", value["action"], value["stage"], value["version"], value["route"], value["result"]); err != nil {
+			return err
+		}
+		if next := strings.TrimSpace(value["next"]); next != "" {
+			_, err := fmt.Fprintln(out, next)
+			return err
+		}
+		return nil
 	}
 	return fmt.Errorf("unsupported core output")
 }

@@ -1,5 +1,7 @@
 package model
 
+import "sort"
+
 // ProxySnapshot derives topology from one response without further network reads.
 // Callers treat its proxy map as read-only for the duration of a projection.
 type ProxySnapshot map[string]Proxy
@@ -55,11 +57,14 @@ func (proxies ProxySnapshot) Groups() (map[string]Group, []string) {
 		for _, name := range orderedNames {
 			existing[name] = true
 		}
+		extra := make([]string, 0, len(groups)-len(orderedNames))
 		for name := range groups {
 			if !existing[name] {
-				orderedNames = append(orderedNames, name)
+				extra = append(extra, name)
 			}
 		}
+		sort.Strings(extra)
+		orderedNames = append(orderedNames, extra...)
 	}
 
 	return groups, orderedNames

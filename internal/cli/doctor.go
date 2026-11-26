@@ -37,8 +37,9 @@ var doctorCmd = &cobra.Command{
 		cfg, err := config.Load()
 		if err != nil {
 			if errors.Is(err, config.ErrConfigNotFound) {
-				// 使用默认配置以便能继续测试
-				cfg = &config.Config{Timeout: 5}
+				// 使用默认配置（Timeout 为毫秒，不可硬编码为 5）以便能继续测试
+				defaults := config.DefaultConfig
+				cfg = &defaults
 			} else {
 				return wrapConfigError(fmt.Errorf(i18n.T("cli.doctor.err_load_config")+": %w", err))
 			}
@@ -102,7 +103,7 @@ func checkMihoshConfig() doctorCheckResult {
 	}
 	path := filepath.Join(dir, "config.yaml")
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return doctorCheckResult{Name: "mihosh_config", Status: doctorStatusWarn, Message: "not found", Target: path, Hint: "Mihosh 配置文件不存在。这通常是因为这是首次运行，请使用 `mihosh config edit` 初始化配置。"}
+		return doctorCheckResult{Name: "mihosh_config", Status: doctorStatusWarn, Message: "not found", Target: path, Hint: "Mihosh 配置文件不存在。首次运行请直接启动 `mihosh` 或执行 `mihosh setup` 初始化配置。"}
 	}
 	return doctorCheckResult{Name: "mihosh_config", Status: doctorStatusOK, Message: "found", Target: path}
 }
@@ -145,7 +146,11 @@ func checkProxyAddress(raw string) doctorCheckResult {
 }
 
 func checkMihomoReachable(cfg *config.Config, endpoint config.MihomoEndpoint) doctorCheckResult {
-	client := api.NewClient(endpoint, cfg.Timeout)
+	timeout := config.DefaultConfig.Timeout
+	if cfg != nil && cfg.Timeout > 0 {
+		timeout = cfg.Timeout
+	}
+	client := api.NewClient(endpoint, timeout)
 	if _, err := client.GetConfigs(); err != nil {
 		return doctorCheckResult{Name: "mihomo_api", Status: doctorStatusFail, Message: err.Error(), Target: endpoint.ExternalController, Hint: "无法访问 Mihomo API。请检查 Mihomo 是否已启动，且 external-controller 配置是否正确。若配置了 secret，请确保一致。"}
 	}

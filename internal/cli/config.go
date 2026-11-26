@@ -1,12 +1,12 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
@@ -202,24 +202,22 @@ func checkConfigFileSize(path string) error {
 	return nil
 }
 
-func detectEditor() string {
-	var editors []string
-	if runtime.GOOS == "windows" {
-		editors = []string{"code.cmd", "code", "notepad.exe", "notepad"}
-	} else {
-		editors = []string{"code", "vim", "vi", "nano"}
-	}
+var (
+	errEditorNotFound = errors.New("editor not found")
+	errEditorLaunch   = errors.New("editor launch failed")
+)
 
-	for _, e := range editors {
-		if _, err := exec.LookPath(e); err == nil {
-			return e
-		}
-	}
-	return ""
+func detectEditor() string {
+	return utils.DetectDefaultEditor()
 }
 
 func runEditor(editor, path string) error {
-	cmd := exec.Command(editor, path)
+	parts := utils.SplitEditorCommand(editor)
+	if len(parts) == 0 {
+		return errEditorNotFound
+	}
+	args := append(parts[1:], path)
+	cmd := exec.Command(parts[0], args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -298,11 +296,11 @@ func editConfigFileWithEditor(path, preferredEditor string) error {
 		editor = detectEditorFn()
 	}
 	if editor == "" {
-		return fmt.Errorf("%s", i18n.T("cli.config.edit.err_no_editor"))
+		return fmt.Errorf("%w: %s", errEditorNotFound, i18n.T("cli.config.edit.err_no_editor"))
 	}
 
 	if err := runEditorFn(editor, path); err != nil {
-		return fmt.Errorf(i18n.T("cli.config.edit.err_launch_editor")+": %w", err)
+		return fmt.Errorf("%w: %s: %w", errEditorLaunch, i18n.T("cli.config.edit.err_launch_editor"), err)
 	}
 	if err := validateConfigFile(path); err != nil {
 		return fmt.Errorf(i18n.T("cli.config.edit.err_syntax")+": %w", err)
@@ -318,8 +316,7 @@ func classifyConfigEditError(err error) error {
 		return nil
 	}
 
-	msg := strings.TrimSpace(err.Error())
-	if strings.Contains(msg, "未找到可用的编辑器") || strings.Contains(msg, "启动编辑器失败") {
+	if errors.Is(err, errEditorNotFound) || errors.Is(err, errEditorLaunch) {
 		return wrapGeneralError(err)
 	}
 	return wrapConfigError(err)
@@ -333,6 +330,9 @@ func wrapGeneralError(err error) error {
 }
 
 func isConfigSetValidationError(err error) bool {
+	if errors.Is(err, service.ErrInvalidConfigValue) {
+		return true
+	}
 	msg := strings.TrimSpace(err.Error())
 	return strings.Contains(msg, "未知的配置项:") ||
 		strings.Contains(msg, "timeout 必须是数字:") ||

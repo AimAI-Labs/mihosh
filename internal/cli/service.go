@@ -71,6 +71,9 @@ func newServiceActionCommand(action, short string, sudo bool, opts *serviceOptio
 					return nil, svc.ServiceAction(ctx, action)
 				})
 			}
+			if _, err := parseOutputFormat(opts.output); err != nil {
+				return wrapParameterError(err)
+			}
 			if err := ensureLinuxSystemd(); err != nil {
 				return err
 			}

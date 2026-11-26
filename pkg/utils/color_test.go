@@ -33,6 +33,20 @@ func TestHexToHSL(t *testing.T) {
 			wantS: 1.0,
 			wantL: 0.5,
 		},
+		{
+			name:  "dark red (L < 0.5)",
+			hex:   "#800000",
+			wantH: 0,
+			wantS: 1.0,
+			wantL: 128.0 / 510.0,
+		},
+		{
+			name:  "light red (L > 0.5)",
+			hex:   "#FF8080",
+			wantH: 0,
+			wantS: 1.0,
+			wantL: (255.0 + 128.0) / 510.0,
+		},
 	}
 
 	for _, tt := range tests {
@@ -42,10 +56,22 @@ func TestHexToHSL(t *testing.T) {
 				t.Errorf("HexToHSL() error = %v", err)
 				return
 			}
-			if got.H != tt.wantH || got.S != tt.wantS || got.L != tt.wantL {
-				t.Errorf("HexToHSL() = (%v, %v, %v), want (%v, %v, %v)", got.H, got.S, got.L, tt.wantH, tt.wantS, tt.wantL)
+			diff := func(a, b float64) float64 {
+				if a > b {
+					return a - b
+				}
+				return b - a
+			}
+			if diff(got.H, tt.wantH) > 1e-6 || diff(got.S, tt.wantS) > 1e-6 || diff(got.L, tt.wantL) > 1e-6 {
+				t.Errorf("HexToHSL(%s) = (%v, %v, %v), want (%v, %v, %v)", tt.hex, got.H, got.S, got.L, tt.wantH, tt.wantS, tt.wantL)
 			}
 		})
+	}
+
+	for _, bad := range []string{"invalid", "#ZZZZZZ", "#12345"} {
+		if _, err := HexToHSL(bad); err == nil {
+			t.Errorf("HexToHSL(%q) expected error, got nil", bad)
+		}
 	}
 }
 
@@ -324,9 +350,8 @@ func TestHexToRGBToHex(t *testing.T) {
 
 		converted := HSLToHex(hsl)
 
-		// Verify conversion produces valid hex
-		if len(converted) != 7 || converted[0] != '#' {
-			t.Errorf("HSLToHex produced invalid hex: %s", converted)
+		if !ColorStringsEqual(converted, original) {
+			t.Errorf("HSL round-trip failed for %s: got %s", original, converted)
 		}
 
 		// Verify RGB components are in valid range

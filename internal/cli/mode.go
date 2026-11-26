@@ -26,7 +26,7 @@ var modeCmd = &cobra.Command{
 			if err != nil {
 				return wrapNetworkError(fmt.Errorf(i18n.T("cli.mode.err_get")+": %w", err))
 			}
-			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s: %s\n", i18n.T("cli.mode.label_current"), configs.Mode); err != nil {
+			if _, err := fmt.Fprintln(cmd.OutOrStdout(), i18n.Tf("cli.mode.current", configs.Mode)); err != nil {
 				return err
 			}
 			return nil
@@ -40,10 +40,10 @@ var modeCmd = &cobra.Command{
 
 		err = client.UpdateConfig(model.UpdateConfigRequest{Mode: mode})
 		if err != nil {
-			return wrapNetworkError(fmt.Errorf(i18n.T("cli.mode.err_update")+": %w", err))
+			return wrapNetworkError(fmt.Errorf(i18n.T("cli.mode.err_set")+": %w", err))
 		}
 
-		if _, err := fmt.Fprintln(cmd.OutOrStdout(), i18n.Tf("cli.mode.success", mode)); err != nil {
+		if _, err := fmt.Fprintln(cmd.OutOrStdout(), i18n.Tf("cli.mode.switched", mode)); err != nil {
 			return err
 		}
 		return nil
