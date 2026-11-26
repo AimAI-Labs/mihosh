@@ -192,6 +192,9 @@ func sanitizeManagedInbound(data []byte) ([]byte, error) {
 	if err := yaml.Unmarshal(data, &mapping); err != nil {
 		return nil, err
 	}
+	if mapping == nil {
+		mapping = make(map[string]any)
+	}
 	for _, key := range []string{"port", "socks-port", "redir-port", "tproxy-port", "listeners", "external-controller-tls", "external-controller-unix", "external-controller-pipe", "external-ui", "external-ui-url"} {
 		delete(mapping, key)
 	}
@@ -200,6 +203,79 @@ func sanitizeManagedInbound(data []byte) ([]byte, error) {
 	}
 	mapping["tun"] = map[string]any{"enable": false}
 	return yaml.Marshal(mapping)
+}
+
+// lockManagedProcessState reaps an exited child process if needed and holds process.lock
+// across offline mutations so no other Mihosh process can start a managed core mid-edit.
+// Caller must hold s.mu and runtime/config.lock.
+func (s *CoreService) lockManagedProcessState(root string) (running bool, releaseProcess func(), err error) {
+	if s.process != nil {
+		select {
+		case <-s.done:
+			if err := s.stopLocked(); err != nil {
+				return false, nil, err
+			}
+		default:
+			return true, func() {}, nil
+		}
+	}
+	unlockRuntime, err := coreinfra.LockRuntime(filepath.Join(root, "runtime", "process.lock"))
+	if err != nil {
+		return false, nil, err
+	}
+	return false, unlockRuntime, nil
+}
+
+// prepareManagedCandidate sanitizes, applies managed TUN/DNS policy, validates with the
+// managed core binary, and backs up the existing runtime config.
+func (s *CoreService) prepareManagedCandidate(ctx context.Context, cfg *config.Config, root, path string, generated []byte) ([]byte, string, error) {
+	data, err := sanitizeManagedInbound(generated)
+	if err != nil {
+		return nil, "", err
+	}
+	data, err = applyManagedNetwork(data, cfg.Core.TUN, root)
+	if err != nil {
+		return nil, "", err
+	}
+	candidate, err := os.CreateTemp(filepath.Dir(path), ".candidate-*.yaml")
+	if err != nil {
+		return nil, "", err
+	}
+	defer func() { _ = os.Remove(candidate.Name()) }()
+	if _, err = candidate.Write(data); err != nil {
+		_ = candidate.Close()
+		return nil, "", err
+	}
+	if err = candidate.Close(); err != nil {
+		return nil, "", err
+	}
+	binary, err := coreinfra.BinaryPath(root, cfg.Core.Version, runtime.GOOS)
+	if err != nil {
+		return nil, "", err
+	}
+	if err = s.validateConfig(ctx, cfg, binary, path, candidate.Name(), data); err != nil {
+		return nil, "", err
+	}
+	if err = ctx.Err(); err != nil {
+		return nil, "", err
+	}
+	backupDir := filepath.Join(root, "config-backups")
+	if err = os.MkdirAll(backupDir, 0700); err != nil {
+		return nil, "", err
+	}
+	if err = os.Chmod(backupDir, 0700); err != nil {
+		return nil, "", err
+	}
+	backup, err := profile.BackupConfig(path)
+	if err != nil {
+		return nil, "", err
+	}
+	if backup != "" {
+		if err = os.Chmod(filepath.Join(backupDir, backup), 0600); err != nil {
+			return nil, "", err
+		}
+	}
+	return data, backup, nil
 }
 
 func recoverManagedProfile(root string) error {
@@ -324,17 +400,19 @@ func (s *CoreService) applyProfile(ctx context.Context, uid string, startIfStopp
 	if basic && cfg.Core.Mode != "managed" {
 		return ActivateResult{}, errors.New("a basic configuration requires a managed core")
 	}
-	if s.process == nil {
-		// Do not mutate a live managed core owned by another Mihosh process.
-		unlockRuntime, e := coreinfra.LockRuntime(filepath.Join(root, "runtime", "process.lock"))
-		if e != nil {
-			return ActivateResult{}, e
-		}
-		unlockRuntime()
+	running, releaseProcess, err := s.lockManagedProcessState(root)
+	if err != nil {
+		return ActivateResult{}, err
 	}
+	processLocked := !running
+	defer func() {
+		if processLocked {
+			releaseProcess()
+		}
+	}()
 	old, err := os.ReadFile(path)
 	if basic && os.IsNotExist(err) {
-		if s.process != nil {
+		if running {
 			return ActivateResult{}, errors.New("managed configuration is missing; restart the core to create a basic configuration")
 		}
 		_, err := prepareMissingManagedConfig(path)
@@ -371,56 +449,13 @@ func (s *CoreService) applyProfile(ctx context.Context, uid string, startIfStopp
 	updateActiveSub := func() error {
 		return config.Update(func(latest *config.Config) error { return setActiveProfile(latest, selected) })
 	}
-	data, err := sanitizeManagedInbound(generated.Data)
+	data, backup, err := s.prepareManagedCandidate(ctx, cfg, root, path, generated.Data)
 	if err != nil {
 		return ActivateResult{}, err
-	}
-	data, err = applyManagedNetwork(data, cfg.Core.TUN, root)
-	if err != nil {
-		return ActivateResult{}, err
-	}
-	candidate, err := os.CreateTemp(filepath.Dir(path), ".candidate-*.yaml")
-	if err != nil {
-		return ActivateResult{}, err
-	}
-	defer func() { _ = os.Remove(candidate.Name()) }()
-	if _, err = candidate.Write(data); err != nil {
-		_ = candidate.Close()
-		return ActivateResult{}, err
-	}
-	if err = candidate.Close(); err != nil {
-		return ActivateResult{}, err
-	}
-	binary, err := coreinfra.BinaryPath(root, cfg.Core.Version, runtime.GOOS)
-	if err != nil {
-		return ActivateResult{}, err
-	}
-	if err = s.validateConfig(ctx, cfg, binary, path, candidate.Name(), data); err != nil {
-		return ActivateResult{}, err
-	}
-	if err = ctx.Err(); err != nil {
-		return ActivateResult{}, err
-	}
-	backupDir := filepath.Join(root, "config-backups")
-	if err = os.MkdirAll(backupDir, 0700); err != nil {
-		return ActivateResult{}, err
-	}
-	if err = os.Chmod(backupDir, 0700); err != nil {
-		return ActivateResult{}, err
-	}
-	backup, err := profile.BackupConfig(path)
-	if err != nil {
-		return ActivateResult{}, err
-	}
-	if backup != "" {
-		if err = os.Chmod(filepath.Join(backupDir, backup), 0600); err != nil {
-			return ActivateResult{}, err
-		}
 	}
 	recovery := profileRecovery{Config: old, ActiveSub: cfg.ActiveSub}
 	journal := filepath.Join(root, "runtime", "profile-recovery.json")
-	running := s.process != nil
-	if running && controllerIdentityChanged(old, data) {
+	if running && (controllerIdentityChanged(old, data) || (mixedPortChanged(old, data) && cfg.Core.SystemProxy)) {
 		change := &managedConfigReplacement{
 			root:      root,
 			path:      path,
@@ -472,6 +507,10 @@ func (s *CoreService) applyProfile(ctx context.Context, uid string, startIfStopp
 			return rollback(err)
 		}
 	} else if startIfStopped {
+		if processLocked {
+			releaseProcess()
+			processLocked = false
+		}
 		if err = s.start(ctx, true); err != nil {
 			return rollback(err)
 		}

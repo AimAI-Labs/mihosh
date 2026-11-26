@@ -242,18 +242,7 @@ func (s *CoreService) start(ctx context.Context, skipRecovery ...bool) error {
 		case <-timer.C:
 			return errors.Join(errors.New("managed core did not become ready before timeout"), s.stopLocked())
 		case <-done:
-			s.process = nil
-			if s.releaseLock != nil {
-				s.releaseLock()
-				s.releaseLock = nil
-			}
-			if s.releaseJob != nil {
-				s.releaseJob()
-				s.releaseJob = nil
-			}
-			stop()
-			s.stop = nil
-			return errors.New("managed core exited during startup")
+			return errors.Join(errors.New("managed core exited during startup"), s.stopLocked())
 		case <-ticker.C:
 			if info, versionErr := client.GetVersion(); versionErr == nil {
 				if info.Version != cfg.Core.Version {
@@ -312,6 +301,9 @@ func (s *CoreService) stopLocked() error {
 	var recoveryErr error
 	if root, err := config.GetConfigDir(); err == nil {
 		recoveryErr = s.recoverNetworkLocked(context.Background(), root)
+		if s.controlOwner.Token != "" {
+			removeOwner(root, s.controlOwner.Token)
+		}
 	} else {
 		recoveryErr = err
 	}

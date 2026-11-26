@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
@@ -62,8 +63,6 @@ func loadCoreConfig() (*config.Config, error) {
 	return cfg, err
 }
 func (s *CoreService) Status() (CoreStatus, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	cfg, err := loadCoreConfig()
 	if err != nil {
 		return CoreStatus{}, err
@@ -95,9 +94,32 @@ func (s *CoreService) Status() (CoreStatus, error) {
 	if state.Mode == "managed" && runtime.GOOS == "linux" {
 		state.ServiceUnit = host.ServiceName(root) + ".service"
 	}
+
+	// Hold s.mu only for in-memory process reaping and service manager lookup;
+	// keep slow subprocess (systemctl) and HTTP probes outside s.mu so polling
+	// cannot cause spurious "another core operation is active" failures.
+	s.mu.Lock()
+	var svcManager host.Services
 	if state.ServiceUnit != "" || state.Runtime == "service" {
+		svcManager = s.serviceManager(root)
+	}
+	if s.process != nil {
+		select {
+		case <-s.done:
+			s.failure = errors.New("managed core exited unexpectedly")
+			if err = s.stopLocked(); err != nil {
+				s.mu.Unlock()
+				return state, err
+			}
+		default:
+			state.Running = true
+		}
+	}
+	s.mu.Unlock()
+
+	if svcManager != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		service, serviceErr := s.serviceManager(root).Status(ctx)
+		service, serviceErr := svcManager.Status(ctx)
 		cancel()
 		state.ServiceInstalled = service.Installed
 		state.ServiceRunning = service.Running
@@ -123,19 +145,8 @@ func (s *CoreService) Status() (CoreStatus, error) {
 			}
 		}
 	}
-	if s.process != nil {
-		select {
-		case <-s.done:
-			s.failure = errors.New("managed core exited unexpectedly")
-			if err = s.stopLocked(); err != nil {
-				return state, err
-			}
-		default:
-			state.Running = true
-		}
-	}
 	if state.Mode == "managed" {
-		client := api.NewClient(config.ResolveMihomoEndpoint(), 500)
+		client := api.NewClient(endpoint, 500)
 		if !state.Running {
 			lock := filepath.Join(root, "runtime", "process.lock")
 			if _, err := os.Stat(lock); err == nil {
@@ -150,17 +161,21 @@ func (s *CoreService) Status() (CoreStatus, error) {
 		}
 		if state.Running {
 			if proxies, e := client.GetProxies(); e == nil {
-				for name, p := range proxies {
-					if len(p.All) == 0 && name != "DIRECT" && name != "REJECT" && name != "REJECT-DROP" && name != "PASS" && name != "COMPATIBLE" {
-						state.HasNodes = true
-						break
-					}
-				}
+				state.HasNodes = hasProxyNodes(proxies)
 			}
 		}
 	}
 	state.RecoveryPending = state.RecoveryPending && !state.Running
 	return state, nil
+}
+
+func hasProxyNodes(proxies map[string]model.Proxy) bool {
+	for name, p := range proxies {
+		if len(p.All) == 0 && name != "DIRECT" && name != "REJECT" && name != "REJECT-DROP" && name != "PASS" && name != "COMPATIBLE" {
+			return true
+		}
+	}
+	return false
 }
 
 // The caller holds s.mu. An inactive session must prove there is no other runtime

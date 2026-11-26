@@ -300,10 +300,8 @@ func managedDownloadProxy(cfg *config.Config) string {
 	if err != nil {
 		return ""
 	}
-	for name, p := range proxies {
-		if len(p.All) == 0 && name != "DIRECT" && name != "REJECT" && name != "REJECT-DROP" && name != "PASS" && name != "COMPATIBLE" {
-			return config.MixedPortToProxyURL(endpoint.MixedPort)
-		}
+	if hasProxyNodes(proxies) {
+		return config.MixedPortToProxyURL(endpoint.MixedPort)
 	}
 	return ""
 }

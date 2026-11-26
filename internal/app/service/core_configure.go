@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -146,8 +147,14 @@ func (s *CoreService) ConnectExternal(address, secret string, mixedPort int) err
 		normalized = "http://" + normalized
 	}
 	u, err := url.Parse(normalized)
-	if err != nil || u.Hostname() == "" || u.User != nil || (u.Scheme != "http" && u.Scheme != "https") || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" {
+	if err != nil || u.Hostname() == "" || u.User != nil || (u.Scheme != "http" && u.Scheme != "https") || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" || strings.HasSuffix(u.Host, ":") {
 		return errors.New("invalid HTTP(S) controller address")
+	}
+	if port := u.Port(); port != "" {
+		n, err := strconv.ParseUint(port, 10, 16)
+		if err != nil || n == 0 {
+			return errors.New("invalid HTTP(S) controller address")
+		}
 	}
 	if mixedPort < 1 || mixedPort > 65535 {
 		return errors.New("invalid mixed proxy port")

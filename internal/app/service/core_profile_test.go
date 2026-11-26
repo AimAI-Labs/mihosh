@@ -302,3 +302,24 @@ func TestProfileActivationKeepsMergeWarning(t *testing.T) {
 		})
 	}
 }
+
+func TestManagedYAMLHelpersHandleEmptyAndNullInput(t *testing.T) {
+	for _, input := range []string{"", "   \n# comment\n", "null\n"} {
+		sanitized, err := sanitizeManagedInbound([]byte(input))
+		require.NoError(t, err)
+		require.Contains(t, string(sanitized), "tun:")
+
+		networked, err := applyManagedNetwork([]byte(input), false, t.TempDir())
+		require.NoError(t, err)
+		require.Contains(t, string(networked), "tun:")
+	}
+}
+
+func TestConnectExternalRejectsInvalidPort(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	svc := NewCoreService()
+	defer svc.Close()
+	for _, addr := range []string{"127.0.0.1:", "127.0.0.1:0", "127.0.0.1:99999", "http://127.0.0.1:abc"} {
+		require.Error(t, svc.ConnectExternal(addr, "", 7890), "expected error for %q", addr)
+	}
+}

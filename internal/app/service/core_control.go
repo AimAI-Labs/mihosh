@@ -46,6 +46,9 @@ type coreControlResponse struct {
 	Restarted       bool              `json:"restarted,omitempty"`
 	EndpointChanged bool              `json:"endpoint_changed,omitempty"`
 	Restored        bool              `json:"restored,omitempty"`
+	ConfigWritten   bool              `json:"config_written,omitempty"`
+	CoreApplied     bool              `json:"core_applied,omitempty"`
+	ActiveSaved     bool              `json:"active_saved,omitempty"`
 }
 
 type coreControlErrorResponse struct {
@@ -82,8 +85,8 @@ func (s *CoreService) startControl(root string) error {
 			http.Error(w, "invalid local control request", 400)
 			return
 		}
-		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if subtle.ConstantTimeCompare([]byte(token), []byte(owner.Token)) != 1 {
+		token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if !ok || subtle.ConstantTimeCompare([]byte(token), []byte(owner.Token)) != 1 {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -157,6 +160,9 @@ func (s *CoreService) startControl(root string) error {
 			Result:          "ok",
 			BackupName:      activation.BackupName,
 			Restarted:       activation.Restarted,
+			ConfigWritten:   activation.ConfigWritten,
+			CoreApplied:     activation.CoreApplied,
+			ActiveSaved:     activation.ActiveSaved,
 			Overrides:       overrideRes.Overrides,
 			WriteOK:         overrideRes.WriteOK,
 			Applied:         overrideRes.Applied,
@@ -272,6 +278,9 @@ func (s *CoreService) sendControlRequest(ctx context.Context, request coreContro
 		if activation != nil {
 			activation.BackupName = response.BackupName
 			activation.Restarted = response.Restarted
+			activation.ConfigWritten = response.ConfigWritten
+			activation.CoreApplied = response.CoreApplied
+			activation.ActiveSaved = response.ActiveSaved
 			if response.MergeWarning != "" {
 				activation.MergeErr = errors.New(response.MergeWarning)
 			}

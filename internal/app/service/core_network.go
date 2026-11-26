@@ -107,6 +107,9 @@ func applyManagedNetwork(data []byte, enabled bool, root string) ([]byte, error)
 	if err := yaml.Unmarshal(data, &mapping); err != nil {
 		return nil, err
 	}
+	if mapping == nil {
+		mapping = make(map[string]any)
+	}
 	mapping["tun"] = map[string]any{"enable": false}
 	if enabled {
 		id := host.TUNIdentity(root)
@@ -250,6 +253,8 @@ func (s *CoreService) SetSystemProxy(ctx context.Context, enabled bool) error {
 			return err
 		}
 	}
+	var prevRecord networkRecovery
+	var hadPrevRecord bool
 	if s.process != nil {
 		if enabled {
 			if err = s.startGuard(root); err != nil {
@@ -268,15 +273,34 @@ func (s *CoreService) SetSystemProxy(ctx context.Context, enabled bool) error {
 				return err
 			}
 			if err = s.network.WriteProxy(ctx, record.Applied); err != nil {
-				return errors.Join(err, s.restoreProxyOnly(ctx, root))
+				rbCtx, rbCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer rbCancel()
+				return errors.Join(err, s.restoreProxyOnly(rbCtx, root))
 			}
-		} else if err = s.restoreProxyOnly(ctx, root); err != nil {
-			return err
+		} else {
+			if rec, e := s.readNetwork(root); e == nil && len(rec.Applied) > 0 {
+				prevRecord = rec
+				hadPrevRecord = true
+			}
+			if err = s.restoreProxyOnly(ctx, root); err != nil {
+				return err
+			}
 		}
 	}
 	if err = config.Update(func(latest *config.Config) error { latest.Core.SystemProxy = enabled; return nil }); err != nil {
+		rbCtx, rbCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer rbCancel()
 		if enabled {
-			return errors.Join(err, s.restoreProxyOnly(ctx, root))
+			return errors.Join(err, s.restoreProxyOnly(rbCtx, root))
+		}
+		if hadPrevRecord {
+			var reApplyErr error
+			if wErr := writeNetwork(root, prevRecord); wErr != nil {
+				reApplyErr = wErr
+			} else {
+				reApplyErr = s.network.WriteProxy(rbCtx, prevRecord.Applied)
+			}
+			return errors.Join(err, reApplyErr)
 		}
 		return err
 	}

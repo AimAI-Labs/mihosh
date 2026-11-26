@@ -83,12 +83,16 @@ func (s *CoreService) ServiceAction(ctx context.Context, action string) (resultE
 		action = "start"
 	}
 	hadSession := s.process != nil
-	if hadSession && (action == "start" || action == "restart") {
-		// Release ports and the runtime lock before systemd starts the new owner.
-		if err = s.stopLocked(); err != nil {
-			return err
+	if action == "start" || action == "restart" {
+		if hadSession {
+			// Release ports and the runtime lock before systemd starts the new owner.
+			if err = s.stopLocked(); err != nil {
+				return err
+			}
 		}
-		removeOwner(root, s.controlOwner.Token)
+		if s.controlOwner.Token != "" {
+			removeOwner(root, s.controlOwner.Token)
+		}
 	}
 	if action == "start" || action == "restart" {
 		restoreRuntime := cfg.Core.Runtime
@@ -101,8 +105,8 @@ func (s *CoreService) ServiceAction(ctx context.Context, action string) (resultE
 			defer cancel()
 			if stopErr := manager.Action(recovery, "stop"); stopErr != nil {
 				state, statusErr := manager.Status(recovery)
-				if statusErr == nil && state.Running {
-					resultErr = errors.Join(resultErr, stopErr)
+				if statusErr != nil || state.Running {
+					resultErr = errors.Join(resultErr, stopErr, statusErr)
 					return
 				}
 			}

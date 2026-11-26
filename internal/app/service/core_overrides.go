@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -151,16 +150,14 @@ func (s *CoreService) applyMergeMutation(ctx context.Context, mutation mergeMuta
 		err = errors.New("managed core mode is not enabled")
 		return MihomoOverridesSaveResult{Err: err}, err
 	}
-	if s.process == nil {
-		unlockRuntime, e := coreinfra.LockRuntime(filepath.Join(root, "runtime", "process.lock"))
-		if e != nil {
-			return MihomoOverridesSaveResult{Err: e}, e
-		}
-		unlockRuntime()
+	running, releaseProcess, err := s.lockManagedProcessState(root)
+	if err != nil {
+		return MihomoOverridesSaveResult{Err: err}, err
 	}
+	defer releaseProcess()
 	oldConfig, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		if s.process != nil {
+		if running {
 			err = errors.New("managed configuration is missing; restart the core to create a basic configuration")
 			return MihomoOverridesSaveResult{Err: err}, err
 		}
@@ -191,52 +188,9 @@ func (s *CoreService) applyMergeMutation(ctx context.Context, mutation mergeMuta
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}, err
 	}
-	data, err := sanitizeManagedInbound(generated)
+	data, backup, err := s.prepareManagedCandidate(ctx, cfg, root, path, generated)
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}, err
-	}
-	data, err = applyManagedNetwork(data, cfg.Core.TUN, root)
-	if err != nil {
-		return MihomoOverridesSaveResult{Err: err}, err
-	}
-	candidate, err := os.CreateTemp(filepath.Dir(path), ".candidate-*.yaml")
-	if err != nil {
-		return MihomoOverridesSaveResult{Err: err}, err
-	}
-	defer func() { _ = os.Remove(candidate.Name()) }()
-	if _, err = candidate.Write(data); err != nil {
-		_ = candidate.Close()
-		return MihomoOverridesSaveResult{Err: err}, err
-	}
-	if err = candidate.Close(); err != nil {
-		return MihomoOverridesSaveResult{Err: err}, err
-	}
-	binary, err := coreinfra.BinaryPath(root, cfg.Core.Version, runtime.GOOS)
-	if err != nil {
-		return MihomoOverridesSaveResult{Err: err}, err
-	}
-	if err = s.validateConfig(ctx, cfg, binary, path, candidate.Name(), data); err != nil {
-		return MihomoOverridesSaveResult{Err: err}, err
-	}
-	if err = ctx.Err(); err != nil {
-		return MihomoOverridesSaveResult{Err: err}, err
-	}
-
-	backupDir := filepath.Join(root, "config-backups")
-	if err = os.MkdirAll(backupDir, 0700); err != nil {
-		return MihomoOverridesSaveResult{Err: err}, err
-	}
-	if err = os.Chmod(backupDir, 0700); err != nil {
-		return MihomoOverridesSaveResult{Err: err}, err
-	}
-	backup, err := profile.BackupConfig(path)
-	if err != nil {
-		return MihomoOverridesSaveResult{Err: err}, err
-	}
-	if backup != "" {
-		if err = os.Chmod(filepath.Join(backupDir, backup), 0600); err != nil {
-			return MihomoOverridesSaveResult{Err: err}, err
-		}
 	}
 
 	identityChanged := controllerIdentityChanged(oldConfig, data)
@@ -251,7 +205,6 @@ func (s *CoreService) applyMergeMutation(ctx context.Context, mutation mergeMuta
 		recovery.HasMerge, recovery.MergeExisted, recovery.Merge = true, mergeExisted, oldMerge
 	}
 	journal := filepath.Join(root, "runtime", "profile-recovery.json")
-	running := s.process != nil
 
 	// Mihomo hot-reload cannot rebuild external-controller or change secret;
 	// SystemProxy also needs a controlled restart when mixed-port changes.
