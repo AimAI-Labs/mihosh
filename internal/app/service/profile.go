@@ -287,29 +287,43 @@ func (s *ProfileService) BatchUpdateRemoteProfiles(ctx context.Context, uids []s
 		return res
 	}
 	limit := min(model.TestConcurrency, 4)
-	sem := make(chan struct{}, limit)
+	jobs := make(chan string)
 	var (
 		wg sync.WaitGroup
 		mu sync.Mutex
 	)
-	for _, uid := range uids {
-		wg.Add(1)
-		go func(id string) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			err := s.FetchProfileContext(ctx, id)
-			mu.Lock()
-			if err != nil {
-				res.Failed++
-				res.Errors = append(res.Errors, err.Error())
-			} else {
-				res.Updated++
+	for range min(limit, len(uids)) {
+		wg.Go(func() {
+			for id := range jobs {
+				if ctx.Err() != nil {
+					return
+				}
+				err := s.FetchProfileContext(ctx, id)
+				mu.Lock()
+				if err != nil {
+					res.Failed++
+					res.Errors = append(res.Errors, err.Error())
+				} else {
+					res.Updated++
+				}
+				mu.Unlock()
 			}
-			mu.Unlock()
-		}(uid)
+		})
 	}
+dispatch:
+	for _, uid := range uids {
+		select {
+		case jobs <- uid:
+		case <-ctx.Done():
+			break dispatch
+		}
+	}
+	close(jobs)
 	wg.Wait()
+	if skipped := res.Total - res.Updated - res.Failed; skipped > 0 {
+		res.Failed += skipped
+		res.Errors = append(res.Errors, ctx.Err().Error())
+	}
 	return res
 }
 

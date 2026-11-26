@@ -6,8 +6,6 @@ package profile
 //               token 仅支持 URL 内嵌（?token= 或 basic auth in URL）；
 //               响应按 YAML 解析校验，非法则拒绝并保留旧 raw。
 // SourceLocal:  直接读文件，同样做 YAML 校验。
-//
-// 并发：v1 仅单个更新；批量更新（若后续支持）由调用方用 semaphore 限制。
 
 import (
 	"context"
@@ -30,6 +28,9 @@ import (
 
 // fetchTimeout 远程拉取超时。
 const fetchTimeout = 30 * time.Second
+
+// MaxRemoteSubscriptionBytes bounds the decoded HTTP response before parsing it.
+const MaxRemoteSubscriptionBytes = 8 << 20
 
 // fetchUserAgent 远程拉取使用的 User-Agent，伪装成 clash-verge 以获取订阅后端的完整 Clash 规则。
 const fetchUserAgent = "clash-verge/v2.4.5"
@@ -116,6 +117,7 @@ func fetchRemoteContext(ctx context.Context, source SubSource, opts DownloadOpti
 	}
 
 	transport := http.DefaultTransport.(*http.Transport).Clone()
+	defer transport.CloseIdleConnections()
 	if source.UseProxy {
 		proxyRaw := strings.TrimSpace(opts.ProxyURL)
 		if proxyRaw != "" {
@@ -159,9 +161,15 @@ func fetchRemoteContext(ctx context.Context, source SubSource, opts DownloadOpti
 		return nil, nil, fmt.Errorf(i18n.T("profile.fetcher.err_status_code"), resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	if resp.ContentLength > MaxRemoteSubscriptionBytes {
+		return nil, nil, fmt.Errorf("%s", i18n.Tf("profile.fetcher.err_size_limit", MaxRemoteSubscriptionBytes>>20))
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, MaxRemoteSubscriptionBytes+1))
 	if err != nil {
 		return nil, nil, fmt.Errorf(i18n.T("profile.fetcher.err_read_resp"), err)
+	}
+	if len(body) > MaxRemoteSubscriptionBytes {
+		return nil, nil, fmt.Errorf("%s", i18n.Tf("profile.fetcher.err_size_limit", MaxRemoteSubscriptionBytes>>20))
 	}
 	return body, subscriptionUsage(resp.Header), nil
 }

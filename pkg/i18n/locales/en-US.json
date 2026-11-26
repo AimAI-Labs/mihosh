@@ -303,6 +303,7 @@
   "profile.fetcher.err_fetch": "Failed to fetch subscription: %w",
   "profile.fetcher.err_status_code": "Subscription server returned non-success status code: %d",
   "profile.fetcher.err_read_resp": "Failed to read subscription response: %w",
+  "profile.fetcher.err_size_limit": "Subscription response exceeds the %d MiB limit.",
   "profile.fetcher.err_empty_local": "Local config path cannot be empty",
   "profile.fetcher.err_read_local": "Failed to read local config: %w",
 

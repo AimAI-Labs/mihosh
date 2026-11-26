@@ -303,6 +303,7 @@
   "profile.fetcher.err_fetch": "拉取订阅失败: %w",
   "profile.fetcher.err_status_code": "订阅服务器返回非成功状态码: %d",
   "profile.fetcher.err_read_resp": "读取订阅响应失败: %w",
+  "profile.fetcher.err_size_limit": "订阅响应超过 %d MiB 上限。",
   "profile.fetcher.err_empty_local": "本地配置路径不能为空",
   "profile.fetcher.err_read_local": "读取本地配置失败: %w",
 
