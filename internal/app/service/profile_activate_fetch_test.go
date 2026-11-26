@@ -81,6 +81,23 @@ func TestActivateRefreshesChangedSourceAndPreservesItsHistory(t *testing.T) {
 	require.Equal(t, int32(2), requests.Load())
 }
 
+func TestActivateLoadsChangedLocalSourceWithoutCachedSnapshot(t *testing.T) {
+	svc := newIsolatedService(t)
+	attachProfileController(t, svc, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	dir := t.TempDir()
+	p, err := svc.AddProfile("local source", profile.SubSource{Kind: profile.SourceLocal, Path: filepath.Join(dir, "old.yaml")})
+	require.NoError(t, err)
+	path := filepath.Join(dir, "new.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("mode: rule\nproxies: []\n"), 0600))
+	require.NoError(t, svc.EditProfile(p.UID, p.Name, profile.SubSource{Kind: profile.SourceLocal, Path: path}))
+	result, err := svc.Activate(p.UID)
+	require.NoError(t, err)
+	require.True(t, result.ActiveSaved)
+	cached, err := profile.ReadRawFile(p.UID)
+	require.NoError(t, err)
+	require.Equal(t, "mode: rule\nproxies: []\n", string(cached))
+}
+
 func TestActivateRemoteRetriesUnfetchedSubscriptionAndKeepsCachedActivationOffline(t *testing.T) {
 	s := newIsolatedService(t)
 	attachProfileController(t, s, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })

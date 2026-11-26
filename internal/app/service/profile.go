@@ -262,9 +262,13 @@ func fetchProfile(ctx context.Context, p profile.Profile) error {
 
 func snapshotForActivation(ctx context.Context, p profile.Profile) (*yaml.Node, error) {
 	raw, err := profile.ReadRawForProfile(p)
-	if errors.Is(err, profile.ErrStaleRaw) || p.Source.Kind == profile.SourceRemote && errors.Is(err, profile.ErrRawNotFound) {
-		if err := fetchProfile(ctx, p); err != nil {
-			return nil, err
+	missing := errors.Is(err, profile.ErrRawNotFound)
+	if errors.Is(err, profile.ErrStaleRaw) || missing {
+		if fetchErr := fetchProfile(ctx, p); fetchErr != nil {
+			if missing && p.Source.Kind == profile.SourceLocal {
+				return nil, errors.Join(err, fetchErr)
+			}
+			return nil, fetchErr
 		}
 		return profile.ReadRawForProfile(p)
 	}
