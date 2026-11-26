@@ -258,7 +258,7 @@ func Import(ctx context.Context, root, source, tag, expected, goos string) (Inst
 		return Installation{}, errors.New("local core copy failed")
 	}
 	digest := hex.EncodeToString(hash.Sum(nil))
-	if digest != strings.TrimPrefix(expected, "sha256:") {
+	if digest != normalizeDigest(expected) {
 		return Installation{}, errors.New("local core SHA-256 mismatch")
 	}
 	result := Installation{Version: tag, Asset: filepath.Base(source), Source: "local", Route: "local", SHA256: digest, BinarySHA256: digest}

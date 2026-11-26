@@ -3,6 +3,7 @@ package host
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -79,4 +80,25 @@ func TestCheckTUNReportsSetcapCommandWhenUnprivileged(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "sudo setcap cap_net_admin,cap_net_raw+ep ")
 	require.NotContains(t, err.Error(), "/tmp/fake/mihomo")
+}
+
+func TestCleanupTUN_SkipsDisabledIPv6(t *testing.T) {
+	identity := TUNIdentity(t.TempDir())
+	var ipv4Deleted int
+	n := &DesktopNetwork{Run: func(_ context.Context, name string, args ...string) ([]byte, error) {
+		require.Equal(t, "ip", name)
+		joined := strings.Join(args, " ")
+		if strings.HasPrefix(joined, "-6 ") {
+			return nil, errors.New("RTNETLINK answers: Address family not supported by protocol")
+		}
+		if strings.Contains(joined, "rule show") {
+			return json.Marshal([]map[string]any{{"priority": identity.Rule}})
+		}
+		if strings.Contains(joined, "rule del") {
+			ipv4Deleted++
+		}
+		return nil, nil
+	}}
+	require.NoError(t, n.CleanupTUN(context.Background(), identity))
+	require.Equal(t, 1, ipv4Deleted)
 }

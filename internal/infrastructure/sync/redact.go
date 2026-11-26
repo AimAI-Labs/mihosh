@@ -18,7 +18,8 @@ var (
 	uuidPattern        = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 	hexTokenPattern    = regexp.MustCompile(`(?i)^[0-9a-f]{16,}$`)
 	opaqueTokenPattern = regexp.MustCompile(`^[A-Za-z0-9._~-]{24,}$`)
-	dsnKVPassword      = regexp.MustCompile(`(?i)(\bpassword\s*=\s*)('(?:\\'|[^'])*'|"(?:\\"|[^"])*"|\S+)`)
+	dsnKVPassword      = regexp.MustCompile(`(?i)(\b(?:ssl)?password\s*=\s*)('(?:\\'|[^'])*'|"(?:\\"|[^"])*"|\S+)`)
+	dsnURIPassword     = regexp.MustCompile(`(://[^/@\s]*:)([^/@\s]+)(@)`)
 )
 
 var sensitiveQueryKeys = []string{
@@ -183,17 +184,40 @@ func RedactDSN(dsn string) string {
 		return ""
 	}
 	if strings.Contains(trimmed, "://") {
-		if u, err := url.Parse(trimmed); err == nil && u.User != nil {
-			username := u.User.Username()
-			if _, hasPass := u.User.Password(); hasPass {
-				if username != "" {
-					u.User = url.UserPassword(username, RedactedPlaceholder)
-				} else {
-					u.User = url.User(RedactedPlaceholder)
+		if u, err := url.Parse(trimmed); err == nil {
+			changed := false
+			if u.User != nil {
+				username := u.User.Username()
+				if _, hasPass := u.User.Password(); hasPass {
+					if username != "" {
+						u.User = url.UserPassword(username, RedactedPlaceholder)
+					} else {
+						u.User = url.User(RedactedPlaceholder)
+					}
+					changed = true
 				}
+			}
+			if u.RawQuery != "" {
+				q := u.Query()
+				for key := range q {
+					lower := strings.ToLower(key)
+					if lower == "password" || lower == "sslpassword" {
+						q.Set(key, RedactedPlaceholder)
+						changed = true
+					}
+				}
+				if changed {
+					u.RawQuery = q.Encode()
+				}
+			}
+			if changed {
 				return strings.ReplaceAll(u.String(), "%5BREDACTED%5D", RedactedPlaceholder)
 			}
+			return trimmed
 		}
+		// Fallback for URIs that fail url.Parse (e.g. unescaped '%' in password).
+		redacted := dsnURIPassword.ReplaceAllString(trimmed, "${1}"+RedactedPlaceholder+"${3}")
+		return dsnKVPassword.ReplaceAllString(redacted, "${1}"+RedactedPlaceholder)
 	}
 	return dsnKVPassword.ReplaceAllString(trimmed, "${1}"+RedactedPlaceholder)
 }
@@ -338,12 +362,14 @@ func restoreYAMLNode(in, ex *yaml.Node) int {
 		preserved := 0
 		for idx, item := range in.Content {
 			if name := yamlMappingName(item); name != "" {
+				// Named entries must never fall back to positional matching,
+				// otherwise a newly inserted proxy would inherit another proxy's credentials.
 				if match, ok := exByName[name]; ok {
 					preserved += restoreYAMLNode(item, match)
-					continue
 				}
+				continue
 			}
-			if idx < len(ex.Content) {
+			if len(exByName) == 0 && idx < len(ex.Content) {
 				preserved += restoreYAMLNode(item, ex.Content[idx])
 			}
 		}

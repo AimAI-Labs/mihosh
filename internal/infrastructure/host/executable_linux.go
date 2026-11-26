@@ -58,7 +58,7 @@ func procListenerExecutable(root string, ips []net.IP, port int) string {
 				continue
 			}
 			candidate, err := os.Readlink(filepath.Join(dir, "exe"))
-			if err != nil || (path != "" && path != candidate) {
+			if err != nil || strings.HasSuffix(candidate, " (deleted)") || (path != "" && path != candidate) {
 				return ""
 			}
 			path = candidate

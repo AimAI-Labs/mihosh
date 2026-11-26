@@ -180,6 +180,9 @@ func (n *DesktopNetwork) CheckTUN(ctx context.Context, _ string, t TUN) error {
 	for _, family := range []string{"-4", "-6"} {
 		rules, err := n.rules(ctx, family)
 		if err != nil {
+			if family == "-6" && isIPv6Unsupported(err) {
+				continue
+			}
 			return err
 		}
 		for _, rule := range rules {
@@ -196,31 +199,44 @@ func (n *DesktopNetwork) CleanupTUN(ctx context.Context, t TUN) error {
 	if i, err := net.InterfaceByName(t.Device); err == nil && t.Index != 0 && i.Index != t.Index {
 		return errors.New("TUN interface identity changed; refusing to remove unrelated routes")
 	}
+	var errs []error
 	for _, family := range []string{"-4", "-6"} {
 		rules, err := n.rules(ctx, family)
 		if err != nil {
-			return err
+			if family == "-6" && isIPv6Unsupported(err) {
+				continue
+			}
+			errs = append(errs, err)
+			continue
 		}
 		for _, rule := range rules {
 			priority, _ := rule["priority"].(float64)
 			if int(priority) >= t.Rule && int(priority) <= t.Rule+10 {
 				if _, err = n.runPrivileged(ctx, "ip", family, "rule", "del", "priority", strconv.Itoa(int(priority))); err != nil {
-					return err
+					errs = append(errs, err)
 				}
 			}
 		}
 	}
 	if _, err := net.InterfaceByName(t.Device); err == nil {
-		// Interface-scoped resolver state is reverted before deleting our own device.
+		// Interface-scoped resolver state is best-effort reverted; deleting the link below
+		// drops interface-scoped state and must not be blocked when systemd-resolved is inactive.
 		if _, err := exec.LookPath("resolvectl"); err == nil {
-			if _, err = n.run(ctx, "resolvectl", "revert", t.Device); err != nil {
-				return err
-			}
+			_, _ = n.run(ctx, "resolvectl", "revert", t.Device)
 		}
-		_, err = n.runPrivileged(ctx, "ip", "link", "delete", "dev", t.Device)
-		return err
+		if _, err = n.runPrivileged(ctx, "ip", "link", "delete", "dev", t.Device); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	return nil
+	return errors.Join(errs...)
+}
+
+func isIPv6Unsupported(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "address family not supported") || strings.Contains(msg, "eafnosupport")
 }
 func configureGuard(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}

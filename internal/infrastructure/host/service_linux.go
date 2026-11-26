@@ -19,10 +19,21 @@ type UserService struct {
 }
 
 func NewServices(root string) Services {
-	dir, _ := os.UserConfigDir()
-	return &UserService{Root: root, UnitDir: filepath.Join(dir, "systemd", "user"), Run: Run}
+	dir, err := os.UserConfigDir()
+	unitDir := ""
+	if err == nil && filepath.IsAbs(dir) {
+		unitDir = filepath.Join(dir, "systemd", "user")
+	}
+	return &UserService{Root: root, UnitDir: unitDir, Run: Run}
 }
 func (s *UserService) unit() string { return ServiceName(s.Root) + ".service" }
+
+func (s *UserService) validateUnitDir() error {
+	if s.UnitDir == "" || !filepath.IsAbs(s.UnitDir) {
+		return errors.New("systemd user unit directory is unavailable")
+	}
+	return nil
+}
 
 // systemd specifiers and environment substitutions are escaped independently of quoting.
 func unitQuote(value string) (string, error) {
@@ -33,6 +44,9 @@ func unitQuote(value string) (string, error) {
 	return strconv.Quote(value), nil
 }
 func (s *UserService) owned() error {
+	if err := s.validateUnitDir(); err != nil {
+		return err
+	}
 	data, err := os.ReadFile(filepath.Join(s.UnitDir, s.unit()))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -46,6 +60,9 @@ func (s *UserService) owned() error {
 	return nil
 }
 func (s *UserService) Install(ctx context.Context, executable string) error {
+	if err := s.validateUnitDir(); err != nil {
+		return err
+	}
 	path := filepath.Join(s.UnitDir, s.unit())
 	if _, err := os.Stat(path); err == nil {
 		if err = s.owned(); err != nil {

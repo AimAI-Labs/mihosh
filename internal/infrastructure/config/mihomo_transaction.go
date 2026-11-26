@@ -1,9 +1,11 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 )
@@ -20,12 +22,19 @@ func lockMihomoFile(path string) (func(), error) {
 			mihomoWriteMu.Unlock()
 			return nil, err
 		}
-		release, err := coreinfra.LockRuntime(filepath.Join(filepath.Dir(path), "config.lock"))
-		if err != nil {
-			mihomoWriteMu.Unlock()
-			return nil, err
+		lockPath := filepath.Join(filepath.Dir(path), "config.lock")
+		deadline := time.Now().Add(time.Second)
+		for {
+			release, err := coreinfra.LockRuntime(lockPath)
+			if err == nil {
+				return func() { release(); mihomoWriteMu.Unlock() }, nil
+			}
+			if !errors.Is(err, coreinfra.ErrRuntimeLocked) || time.Now().After(deadline) {
+				mihomoWriteMu.Unlock()
+				return nil, err
+			}
+			time.Sleep(10 * time.Millisecond)
 		}
-		return func() { release(); mihomoWriteMu.Unlock() }, nil
 	}
 	return mihomoWriteMu.Unlock, nil
 }

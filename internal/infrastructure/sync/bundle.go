@@ -387,6 +387,8 @@ func DecodeTarGz(data []byte) (Bundle, error) {
 	tr := tar.NewReader(gz)
 	files := make(map[string][]byte)
 	var total int64
+	const maxArchiveEntries = 32
+	entries := 0
 
 	for {
 		hdr, err := tr.Next()
@@ -395,6 +397,10 @@ func DecodeTarGz(data []byte) (Bundle, error) {
 		}
 		if err != nil {
 			return Bundle{}, fmt.Errorf("%w: %v", ErrInvalidArchive, err)
+		}
+		entries++
+		if entries > maxArchiveEntries {
+			return Bundle{}, fmt.Errorf("%w: too many archive entries", ErrInvalidArchive)
 		}
 		if hdr.Typeflag == tar.TypeDir {
 			continue
@@ -405,6 +411,9 @@ func DecodeTarGz(data []byte) (Bundle, error) {
 		name, err := validateArchiveEntryName(hdr.Name)
 		if err != nil {
 			return Bundle{}, err
+		}
+		if _, dup := files[name]; dup {
+			return Bundle{}, fmt.Errorf("%w: duplicate archive entry %q", ErrInvalidArchive, name)
 		}
 		if hdr.Size < 0 || hdr.Size > MaxArchiveFileBytes {
 			return Bundle{}, fmt.Errorf("%w: entry %q exceeds size limit", ErrInvalidArchive, name)
@@ -434,6 +443,10 @@ func DecodeZip(data []byte) (Bundle, error) {
 	}
 	files := make(map[string][]byte)
 	var total int64
+	const maxArchiveEntries = 32
+	if len(zr.File) > maxArchiveEntries {
+		return Bundle{}, fmt.Errorf("%w: too many archive entries", ErrInvalidArchive)
+	}
 
 	for _, f := range zr.File {
 		if f.FileInfo().IsDir() {
@@ -445,6 +458,9 @@ func DecodeZip(data []byte) (Bundle, error) {
 		name, err := validateArchiveEntryName(f.Name)
 		if err != nil {
 			return Bundle{}, err
+		}
+		if _, dup := files[name]; dup {
+			return Bundle{}, fmt.Errorf("%w: duplicate archive entry %q", ErrInvalidArchive, name)
 		}
 		rc, err := f.Open()
 		if err != nil {

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"time"
+
+	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
 )
 
 var ErrConfigBusy = errors.New("application configuration is busy")
@@ -51,6 +53,9 @@ func lockAppConfig() (func(), error) {
 				return nil, err
 			}
 			return release, nil
+		}
+		if !errors.Is(err, coreinfra.ErrRuntimeLocked) {
+			return nil, err
 		}
 		if time.Now().After(deadline) {
 			return nil, fmt.Errorf("%w: %v", ErrConfigBusy, err)

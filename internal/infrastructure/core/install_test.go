@@ -167,3 +167,21 @@ func TestRuntimeLockReleasesWithoutDeletingLockFile(t *testing.T) {
 	}
 	release()
 }
+
+func TestImportAcceptsUppercaseSHA256(t *testing.T) {
+	root := t.TempDir()
+	src := filepath.Join(t.TempDir(), "mihomo")
+	payload := []byte("fake-mihomo-binary")
+	if err := os.WriteFile(src, payload, 0700); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(payload)
+	upper := "sha256:" + strings.ToUpper(hex.EncodeToString(sum[:]))
+	inst, err := Import(context.Background(), root, src, "v1.19.0", upper, "linux")
+	if err != nil {
+		t.Fatalf("expected uppercase SHA-256 to succeed, got: %v", err)
+	}
+	if inst.SHA256 != hex.EncodeToString(sum[:]) {
+		t.Fatalf("expected lowercase normalized digest, got %q", inst.SHA256)
+	}
+}

@@ -111,7 +111,8 @@ func fetchRemoteContext(ctx context.Context, source SubSource, opts DownloadOpti
 		return nil, nil, fmt.Errorf("%s", i18n.T("profile.fetcher.err_empty_url"))
 	}
 
-	if !strings.HasPrefix(subURL, "http://") && !strings.HasPrefix(subURL, "https://") {
+	lowerURL := strings.ToLower(subURL)
+	if !strings.HasPrefix(lowerURL, "http://") && !strings.HasPrefix(lowerURL, "https://") {
 		// 禁止 file:// 等其它协议，防止与 local 混淆绕过。
 		return nil, nil, fmt.Errorf("%s", i18n.T("profile.fetcher.err_only_http"))
 	}

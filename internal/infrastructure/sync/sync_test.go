@@ -175,3 +175,57 @@ func TestBundleTarGzAndZipRoundTripAndSecurity(t *testing.T) {
 	_, err = DecodeZip(maliciousZip.Bytes())
 	require.ErrorIs(t, err, ErrInvalidArchive)
 }
+
+func TestRestoreRedactedYAML_NamedSequenceDoesNotLeakAcrossProxies(t *testing.T) {
+	existing := []byte(`proxies:
+  - name: Private-JP
+    server: jp.internal
+    password: secret-jp-password
+`)
+	incoming := []byte(`proxies:
+  - name: New-US
+    server: us.thirdparty
+    password: "[REDACTED]"
+  - name: Private-JP
+    server: jp.internal
+    password: "[REDACTED]"
+`)
+	restored, count, err := RestoreRedactedYAML(incoming, existing)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+	out := string(restored)
+	require.Contains(t, out, "name: Private-JP")
+	require.Contains(t, out, "secret-jp-password")
+	// New-US must NOT inherit Private-JP's password!
+	require.Equal(t, 1, bytes.Count(restored, []byte("secret-jp-password")))
+	require.Contains(t, out, `password: "[REDACTED]"`)
+}
+
+func TestRedactDSN_FallbackAndQueryParams(t *testing.T) {
+	// Invalid percent escape in password fails url.Parse; fallback regex must still mask it.
+	badURI := "postgres://admin:p%ss@db.example:5432/app"
+	redactedBad := RedactDSN(badURI)
+	require.NotContains(t, redactedBad, "p%ss")
+	require.Contains(t, redactedBad, RedactedPlaceholder)
+
+	// Query parameters carrying password or sslpassword must be redacted too.
+	queryURI := "postgres://admin@db.example:5432/app?sslmode=require&password=topsecret&sslpassword=keypass"
+	redactedQuery := RedactDSN(queryURI)
+	require.NotContains(t, redactedQuery, "topsecret")
+	require.NotContains(t, redactedQuery, "keypass")
+	require.Contains(t, redactedQuery, "sslmode=require")
+}
+
+func TestDecodeArchive_RejectsDuplicateEntries(t *testing.T) {
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	for _, content := range []string{"version: 1\n", "version: 1\n"} {
+		_ = tw.WriteHeader(&tar.Header{Name: "manifest.json", Mode: 0600, Size: int64(len(content))})
+		_, _ = tw.Write([]byte(content))
+	}
+	_ = tw.Close()
+	_ = gz.Close()
+	_, err := DecodeTarGz(buf.Bytes())
+	require.ErrorIs(t, err, ErrInvalidArchive)
+}

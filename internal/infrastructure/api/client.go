@@ -82,13 +82,21 @@ func (c *Client) Generation() uint64 {
 	return c.generation
 }
 
-// ensureScheme 为 baseURL 补 http:// 前缀（若无 http:///https://）。
-// external-controller 原值无 scheme，与 mihomo 配置文件一致；仅 HTTP 层补全。
+// ensureScheme 为 baseURL 补 http:// 前缀（若无 http:///https://），去掉末尾斜杠，
+// 并将通配监听地址（如 ":9090"、"0.0.0.0:9090"、"[::]:9090"）归一为可拨号的 127.0.0.1。
 func ensureScheme(baseURL string) string {
-	if strings.HasPrefix(baseURL, "http://") || strings.HasPrefix(baseURL, "https://") {
-		return baseURL
+	trimmed := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if !strings.HasPrefix(trimmed, "http://") && !strings.HasPrefix(trimmed, "https://") {
+		if strings.HasPrefix(trimmed, ":") {
+			trimmed = "127.0.0.1" + trimmed
+		} else if strings.HasPrefix(trimmed, "0.0.0.0:") {
+			trimmed = "127.0.0.1" + strings.TrimPrefix(trimmed, "0.0.0.0")
+		} else if strings.HasPrefix(trimmed, "[::]:") {
+			trimmed = "127.0.0.1" + strings.TrimPrefix(trimmed, "[::]")
+		}
+		return "http://" + trimmed
 	}
-	return "http://" + baseURL
+	return trimmed
 }
 
 // DoRequest 执行 HTTP 请求（导出供 endpoints 使用）
@@ -164,13 +172,13 @@ func (c *Client) NewHTTPClientWithProxy(proxyAddr string) (*http.Client, error) 
 		return nil, err
 	}
 
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.DisableKeepAlives = true
+	tr.Proxy = http.ProxyURL(proxyURL)
+
 	return &http.Client{
-		Timeout: c.httpClient.Timeout,
-		Transport: &http.Transport{
-			Proxy: func(req *http.Request) (*url.URL, error) {
-				return proxyURL, nil
-			},
-		},
+		Timeout:   c.httpClient.Timeout,
+		Transport: tr,
 	}, nil
 }
 

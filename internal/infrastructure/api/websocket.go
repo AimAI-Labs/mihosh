@@ -12,12 +12,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// WSMessage WebSocket消息类型
-type WSMessage struct {
-	Type string
-	Data []byte
-}
-
 // MemoryData 内存数据
 type MemoryData struct {
 	Generation uint64 `json:"-"`
@@ -146,13 +140,6 @@ func (c *WSClient) SetLogsHandler(handler func(LogData)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.logsHandler = handler
-}
-
-// SetLogLevel 设置日志级别过滤
-func (c *WSClient) SetLogLevel(level string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.logLevel = level
 }
 
 func buildWSURL(baseURL, secret, endpoint string) string {

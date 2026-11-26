@@ -19,7 +19,10 @@ func LockRuntime(path string) (func(), error) {
 	var overlap windows.Overlapped
 	if err = windows.LockFileEx(windows.Handle(f.Fd()), windows.LOCKFILE_EXCLUSIVE_LOCK|windows.LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &overlap); err != nil {
 		f.Close()
-		return nil, errors.New("another Mihosh process owns this managed core")
+		if errors.Is(err, windows.ERROR_LOCK_VIOLATION) {
+			return nil, ErrRuntimeLocked
+		}
+		return nil, err
 	}
 	return func() { windows.UnlockFileEx(windows.Handle(f.Fd()), 0, 1, 0, &overlap); f.Close() }, nil
 }

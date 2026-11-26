@@ -237,18 +237,22 @@ func (r Release) TrustedDigest(asset Asset, pinned map[string]string) (string, e
 	// A pin is keyed by immutable release tag and asset name, never the gateway URL.
 	if digest := pinned[r.Tag+"/"+asset.Name]; digest != "" {
 		if validDigest(digest) {
-			return strings.TrimPrefix(digest, "sha256:"), nil
+			return normalizeDigest(digest), nil
 		}
 		return "", errors.New("invalid pinned asset digest")
 	}
 	if r.Trusted && validDigest(asset.Digest) {
-		return strings.TrimPrefix(asset.Digest, "sha256:"), nil
+		return normalizeDigest(asset.Digest), nil
 	}
 	return "", errors.New("no independently trusted asset digest; use a verified SHA-256 or retry through direct/proxy access")
 }
 
+func normalizeDigest(s string) string {
+	return strings.ToLower(strings.TrimPrefix(strings.TrimSpace(s), "sha256:"))
+}
+
 func validDigest(s string) bool {
-	b, err := hex.DecodeString(strings.TrimPrefix(s, "sha256:"))
+	b, err := hex.DecodeString(normalizeDigest(s))
 	return err == nil && len(b) == 32
 }
 

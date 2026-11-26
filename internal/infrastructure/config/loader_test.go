@@ -248,3 +248,12 @@ func TestSearchKnownMihomoDirectoriesFindsLegacyClashVerge(t *testing.T) {
 	got := searchKnownMihomoDirectories()
 	assert.Equal(t, configPath, got, "应发现上游 Clash Verge 的 config.yaml")
 }
+
+func TestExtractConfigDirFromCommandLine_FlagsAndEmpty(t *testing.T) {
+	assert.Equal(t, "", extractConfigDirFromCommandLine(""))
+	assert.Equal(t, "/etc/mihomo", extractConfigDirFromCommandLine("/usr/bin/mihomo -d=/etc/mihomo"))
+	assert.Equal(t, "/etc/mihomo", extractConfigDirFromCommandLine("/usr/bin/mihomo -d \"/etc/mihomo\""))
+	assert.Equal(t, "/opt/mihomo", extractConfigDirFromCommandLine("/usr/bin/mihomo -f /opt/mihomo/config.yaml"))
+	// -debug must not be misparsed as -d with dir "ebug"
+	assert.NotEqual(t, "ebug", extractConfigDirFromCommandLine("/usr/bin/mihomo -debug"))
+}

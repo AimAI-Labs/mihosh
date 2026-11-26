@@ -247,15 +247,21 @@ func parseSystemctlStatus(output string) string {
 
 func extractConfigDirFromCommandLine(cmdLine string) string {
 	parts := strings.Fields(cmdLine)
-	for i, part := range parts {
-		if part == "-d" && i+1 < len(parts) {
-			return strings.Trim(parts[i+1], "\"")
-		}
-		if strings.HasPrefix(part, "-d") {
-			return strings.TrimPrefix(part, "-d")
-		}
+	if len(parts) == 0 {
+		return ""
 	}
-	execPath := parts[0]
+	cleaned := make([]string, len(parts))
+	for i, part := range parts {
+		cleaned[i] = strings.Trim(part, "\"'")
+	}
+	cfgFile, cfgDir := parseMihomoProcessArgs(cleaned[1:])
+	if cfgDir != "" {
+		return cfgDir
+	}
+	if cfgFile != "" {
+		return filepath.Dir(cfgFile)
+	}
+	execPath := cleaned[0]
 	if absPath, err := filepath.Abs(execPath); err == nil {
 		return filepath.Dir(absPath)
 	}

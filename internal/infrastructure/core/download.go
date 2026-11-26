@@ -226,7 +226,7 @@ func newDownloadClient(route Route, metadata bool) *http.Client {
 
 // request validates the complete response within each route before accepting success.
 // A rejected response is discarded before the next route, including interrupted files.
-func (f *Fetcher) request(ctx context.Context, raw string, metadata bool, consume func(*http.Response, Route) error) (Route, error) {
+func (f *Fetcher) request(ctx context.Context, raw string, metadata bool, consume func(*http.Response, Route, context.CancelFunc) error) (Route, error) {
 	routes, err := f.routes(raw, metadata)
 	if err != nil {
 		return Route{}, err
@@ -268,34 +268,35 @@ func (f *Fetcher) request(ctx context.Context, raw string, metadata bool, consum
 		if client.Timeout > 0 {
 			routeCtx, routeCancel = context.WithTimeout(ctx, client.Timeout)
 		}
-		req = req.WithContext(routeCtx)
+		attemptCtx, attemptCancel := context.WithCancel(routeCtx)
+		req = req.WithContext(attemptCtx)
 		resp, requestErr := client.Do(req)
 		// One retry shares this route's deadline; it cannot consume the time reserved
 		// for later proxy/gateway stages. Only idempotent public GETs are issued here.
 		retry := requestErr != nil
 		if resp != nil {
 			status := resp.StatusCode
-			retry = status == 408 || status == 429 || status >= 500 || (status == 403 && (route.Gateway != "" || resp.Header.Get("X-RateLimit-Remaining") == "0"))
+			retry = requestErr == nil && (status == 408 || status == 429 || status >= 500 || (status == 403 && (route.Gateway != "" || resp.Header.Get("X-RateLimit-Remaining") == "0")))
 		}
 		if retry && routeCtx.Err() == nil {
 			wait := time.Second
 			if resp != nil {
 				wait = max(wait, retryDelay(resp.Header.Get("Retry-After")))
 				_ = resp.Body.Close()
+				resp = nil
 			}
+			attemptCancel()
 			timer := time.NewTimer(wait)
 			select {
 			case <-routeCtx.Done():
 				timer.Stop()
 			case <-timer.C:
-				resp, requestErr = client.Do(req.Clone(routeCtx))
+				attemptCtx, attemptCancel = context.WithCancel(routeCtx)
+				resp, requestErr = client.Do(req.Clone(attemptCtx))
 			}
 		}
 		if routeCtx.Err() != nil {
 			requestErr = routeCtx.Err()
-			if resp != nil {
-				_ = resp.Body.Close()
-			}
 		}
 		fatal := false
 		detail := "network request failed" // Transport errors can contain proxy credentials or signed URLs.
@@ -305,7 +306,7 @@ func (f *Fetcher) request(ctx context.Context, raw string, metadata bool, consum
 				attemptedGateways[final.Scheme+"://"+final.Host+"/"] = true
 			}
 			if resp.StatusCode == http.StatusOK {
-				requestErr = consume(resp, route)
+				requestErr = consume(resp, route, attemptCancel)
 				if requestErr != nil {
 					detail = requestErr.Error()
 				}
@@ -318,11 +319,13 @@ func (f *Fetcher) request(ctx context.Context, raw string, metadata bool, consum
 					wait := retryDelay(resp.Header.Get("Retry-After"))
 					if wait > 0 {
 						_ = resp.Body.Close()
+						resp = nil
 						timer := time.NewTimer(wait)
 						select {
 						case <-routeCtx.Done():
 							timer.Stop()
 							if ctx.Err() != nil {
+								attemptCancel()
 								routeCancel()
 								client.CloseIdleConnections()
 								return Route{}, ctx.Err()
@@ -332,8 +335,11 @@ func (f *Fetcher) request(ctx context.Context, raw string, metadata bool, consum
 					}
 				}
 			}
+		}
+		if resp != nil {
 			_ = resp.Body.Close()
 		}
+		attemptCancel()
 		client.CloseIdleConnections()
 		routeCancel()
 		if requestErr == nil {
@@ -362,7 +368,7 @@ func retryDelay(value string) time.Duration {
 
 func (f *Fetcher) Metadata(ctx context.Context, raw string, validate func([]byte) error) ([]byte, Route, error) {
 	var data []byte
-	route, err := f.request(ctx, raw, true, func(resp *http.Response, _ Route) error {
+	route, err := f.request(ctx, raw, true, func(resp *http.Response, _ Route, _ context.CancelFunc) error {
 		b, err := io.ReadAll(io.LimitReader(resp.Body, (4<<20)+1))
 		if err != nil {
 			return errors.New("metadata transfer interrupted")
@@ -388,7 +394,7 @@ func (f *Fetcher) Download(ctx context.Context, raw, destination, expected strin
 	}
 	part := destination + ".part"
 	defer func() { _ = os.Remove(part) }() // The verified file is renamed on success; failed transfers are best-effort cleanup.
-	route, err := f.request(ctx, raw, false, func(resp *http.Response, route Route) error {
+	route, err := f.request(ctx, raw, false, func(resp *http.Response, route Route, cancelAttempt context.CancelFunc) error {
 		if resp.ContentLength > MaxAssetBytes {
 			return errors.New("asset exceeds size limit")
 		}
@@ -401,8 +407,8 @@ func (f *Fetcher) Download(ctx context.Context, raw, destination, expected strin
 		started := time.Now()
 		reader := io.LimitReader(resp.Body, MaxAssetBytes+1)
 		buf := make([]byte, 64<<10)
-		// Cancel a stalled body independently of the overall download deadline.
-		idle := time.AfterFunc(30*time.Second, func() { _ = resp.Body.Close() })
+		// Cancel a stalled body via the request context rather than closing resp.Body concurrently.
+		idle := time.AfterFunc(30*time.Second, cancelAttempt)
 		defer idle.Stop()
 		for {
 			if err := ctx.Err(); err != nil {
