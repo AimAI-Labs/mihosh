@@ -78,8 +78,8 @@ func RenderDetailModalLeft(conn *model.Connection, ipInfo *model.IPInfo, width, 
 
 	output = append(output, visibleLines...)
 
-	// 补齐到 height（视口 + 上下两行提示）
-	for len(output) < height {
+	// 补齐到 height-1（为底部滚动提示预留 1 行，总计恰好 height 行）
+	for len(output) < height-1 {
 		output = append(output, "")
 	}
 

@@ -834,3 +834,21 @@ func TestAddRuleTypePickerMatchesAllTypesIgnoringCase(t *testing.T) {
 	s, _ = s.Update(pressKey("enter"))
 	require.Equal(t, "MATCH", s.addForm.currentType())
 }
+
+func TestAddForm_AllowsTypingJKInPayloadAndProxyPicker(t *testing.T) {
+	s := State{}.SetConfigPath("/tmp/fake-config.yaml")
+	s, _ = s.Update(keyMsg('n'))
+	for _, r := range "tiktok.jp" {
+		s, _ = s.Update(keyMsg(r))
+	}
+	require.Equal(t, addFieldPayload, s.addForm.fieldCursor, "j/k must not switch focus out of payload")
+	require.Equal(t, "tiktok.jp", s.addForm.fields[addFieldPayload].Value())
+
+	// Open proxy picker and type "jk" into search filter.
+	s, _ = s.Update(pressTab()) // -> proxy
+	s, _ = s.Update(pressKey("enter"))
+	require.True(t, s.addForm.showProxyPicker)
+	s, _ = s.Update(keyMsg('j'))
+	s, _ = s.Update(keyMsg('k'))
+	require.Equal(t, "jk", s.addForm.pickerSearch)
+}

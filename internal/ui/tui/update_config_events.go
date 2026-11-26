@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 
-	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
-	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/preferences"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/nodes"
@@ -20,6 +18,9 @@ import (
 func reloadConfigCmd(client interface {
 	ReloadConfig(path string) error
 }) tea.Cmd {
+	if client == nil {
+		return nil
+	}
 	return func() tea.Msg {
 		path, err := service.GetMihomoConfigPath()
 		if err != nil {
@@ -43,14 +44,7 @@ func (m Model) applyConfigEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 		m.clearErrorNotice()
 		if msg.Reloaded {
 			if cfg, err := service.Load(); err == nil && cfg != nil {
-				m.config = cfg
-				m.settingsState.SetConfig(cfg)
-				if cfg.Theme != "" {
-					theme.SetTheme(cfg.Theme)
-				}
-				theme.SetBorderStyle(cfg.BorderStyle)
-				i18n.SetLanguageOverride(cfg.Language)
-				common.InitKeyBindings()
+				m.applyStoredConfig(cfg)
 				m.autoRefreshRemaining = cfg.AutoRefreshInterval
 				m.subState = m.subState.ApplySubs(cfg.Subs, cfg.ActiveSub)
 			}

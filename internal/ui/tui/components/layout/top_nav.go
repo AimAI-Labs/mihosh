@@ -282,7 +282,7 @@ func GetPageTitle(page PageType) string {
 		i18n.T("title.settings"),
 		i18n.T("title.core"),
 	}
-	if int(page) < len(titles) {
+	if page >= 0 && int(page) < len(titles) {
 		return titles[page]
 	}
 	return ""

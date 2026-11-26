@@ -33,7 +33,7 @@ func CalcThumbRange(viewHeight, total, scrollTop int) (start, end int) {
 // 仅当内容溢出（total > viewHeight）时返回非空字符串；否则返回空串表示无需显示。
 // thumbFocused 控制滑块是否使用焦点高亮色。
 func BuildVerticalScrollbar(viewHeight, total, scrollTop int, thumbFocused bool) string {
-	if total <= viewHeight {
+	if viewHeight <= 0 || total <= viewHeight {
 		return ""
 	}
 

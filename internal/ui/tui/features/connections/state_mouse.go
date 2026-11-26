@@ -56,14 +56,7 @@ func (s State) HandleMouseLeft(
 					// 查找匹配的连接
 					if conn := s.findConnectionByName(item.Name); conn != nil {
 						// 不要关闭 topNModalMode，详情渲染优先级更高
-						s.connDetailMode = true
-						s.connDetailSnapshot = conn
-						s.connDetailLeftPanel.Reset()
-						s.connDetailRightPanel.Reset()
-						s.connDetailFocusPanel = 0
-						s.connIPInfo = nil
-						s.connDetailJSONLineCount = countConnJSONLines(conn)
-						return s, FetchIPInfo(conn.Metadata.DestinationIP)
+						return s.openConnectionDetail(conn)
 					}
 				}
 			}
@@ -96,6 +89,8 @@ func (s State) HandleMouseLeft(
 		if s.doubleClickDetector.IsDoubleClickWithThreshold(hit.Target, 0, now, connsChartDoubleClickMax) {
 			s.topNModalMode = true
 			s.topNModalPanel.Reset()
+			items := s.CalculateTopN(0, 5*time.Minute)
+			s.topNModalPanel.SetMaxScroll(max(0, len(items)-5))
 		}
 		return s, nil
 
@@ -220,6 +215,8 @@ func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight in
 	}
 
 	if s.topNModalMode {
+		items := s.CalculateTopN(0, 5*time.Minute)
+		s.topNModalPanel.SetMaxScroll(max(0, len(items)-5))
 		s.topNModalPanel.HandleMouseScroll(up)
 		return s, nil
 	}
@@ -230,6 +227,7 @@ func (s State) HandleMouseScroll(up bool, mainX, mainY, mainWidth, mainHeight in
 	layout := layoutConnectionList(s.ToPageState(s.chartData, mainWidth, mainHeight))
 	if layout.hit(mainX, mainY, mainWidth).Target == MouseTargetInlineDetail {
 		s.inlineDetailFocused = true
+		s.inlineDetailPanel.SetMaxScroll(50)
 		s.inlineDetailPanel.HandleMouseScroll(up)
 		return s, nil
 	}

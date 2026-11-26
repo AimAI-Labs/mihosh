@@ -30,12 +30,15 @@ func FetchProxies(client *service.Client) tea.Cmd {
 }
 
 func SelectProxy(client *service.Client, group, proxy string) tea.Cmd {
-	return func() tea.Msg {
+	if client == nil {
+		return func() tea.Msg { return messages.ErrMsg{Err: fmt.Errorf("client is nil")} }
+	}
+	return messages.CoreRequest(client, func(client *service.Client) tea.Msg {
 		if err := client.SelectProxy(group, proxy); err != nil {
 			return messages.ErrMsg{Err: err}
 		}
 		return tea.Batch(FetchGroups(client), FetchProxies(client))()
-	}
+	})
 }
 
 func TestProxy(client *service.Client, task service.TestTask, testURL string, timeout int) tea.Cmd {
@@ -71,11 +74,14 @@ func FetchConfigMode(client *service.Client) tea.Cmd {
 }
 
 func UpdateConfigMode(client *service.Client, mode string) tea.Cmd {
-	return func() tea.Msg {
+	if client == nil {
+		return nil
+	}
+	return messages.CoreRequest(client, func(client *service.Client) tea.Msg {
 		err := client.UpdateConfig(model.UpdateConfigRequest{Mode: mode})
 		if err != nil {
 			return messages.ErrMsg{Err: err}
 		}
 		return messages.ConfigModeMsg{Mode: mode}
-	}
+	})
 }

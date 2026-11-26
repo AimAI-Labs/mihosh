@@ -52,10 +52,13 @@ func (m *Model) mainPageLayout() mainPageLayout {
 	rows := wrapPageHelp(hints, width-1, firstWidth)
 	if len(rows) > height-common.MinContentHeight+1 {
 		// In a very short terminal, keep the shortcuts accessible while reserving the page itself.
-		for i := range hints {
-			hints[i].Desc = ""
+		// Clone hints first so shared/package-level hint slices are never mutated in place.
+		compact := make([]common.InlineHelpHint, len(hints))
+		copy(compact, hints)
+		for i := range compact {
+			compact[i].Desc = ""
 		}
-		rows = wrapPageHelp(hints, width-1, firstWidth)
+		rows = wrapPageHelp(compact, width-1, firstWidth)
 	}
 	return mainPageLayout{width: width, height: max(common.MinContentHeight, height-max(0, len(rows)-1)), help: rows}
 }

@@ -137,6 +137,20 @@ func (s State) ApplySubs(subs []service.Profile, active string) State {
 		s.filteredIdx = make([]int, 0, len(subs))
 	}
 	s.updateFiltered()
+	if len(s.filteredIdx) == 0 {
+		s.selected = 0
+		s.scrollTop = 0
+	} else {
+		if s.selected >= len(s.filteredIdx) {
+			s.selected = len(s.filteredIdx) - 1
+		}
+		if s.selected < 0 {
+			s.selected = 0
+		}
+		if s.scrollTop > s.selected {
+			s.scrollTop = s.selected
+		}
+	}
 	return s
 }
 
@@ -571,5 +585,9 @@ func (s *State) updateFiltered() {
 
 // InputCapture declares which input belongs to the current page mode.
 func (s State) InputCapture() common.InputCapture {
-	return common.InputCapture{Active: s.Querying(), Interrupt: s.Querying()}
+	return common.InputCapture{
+		Active:    s.Querying(),
+		Help:      s.filterMode || s.showAddForm || s.showEditForm,
+		Interrupt: s.Querying(),
+	}
 }

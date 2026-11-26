@@ -105,8 +105,9 @@ type DNSQueryResultMsg struct {
 }
 
 type IPInfoMsg struct {
-	Info *model.IPInfo
-	Err  error
+	RequestID uint64
+	Info      *model.IPInfo
+	Err       error
 }
 
 type CurrentIPInfoMsg struct {

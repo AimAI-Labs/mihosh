@@ -103,3 +103,10 @@ func TestWSInboxDelaysOnlyLogsAndDiscardsPreviousTarget(t *testing.T) {
 	require.Nil(t, batch.Traffic)
 	require.Empty(t, batch.Logs)
 }
+
+func TestBoundLogPayloadInvalidUTF8DoesNotPanic(t *testing.T) {
+	// All continuation bytes (0x80) > maxWSLogBytes previously decremented end to -1 and panicked.
+	invalid := strings.Repeat("\x80", maxWSLogBytes+64)
+	got := boundLogPayload(invalid)
+	require.Equal(t, "…", got)
+}

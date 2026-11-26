@@ -51,6 +51,7 @@ type State struct {
 	connDetailMode          bool
 	connDetailSnapshot      *model.Connection
 	connIPInfo              *model.IPInfo
+	connIPRequestID         uint64
 	connDetailLeftPanel     common.ScrollablePanel
 	connDetailRightPanel    common.ScrollablePanel
 	connDetailFocusPanel    int  // 0=左侧(基础+地理), 1=右侧(JSON)
@@ -360,6 +361,8 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 				s.closeTopNModal()
 				return s, nil
 			}
+			items := s.CalculateTopN(0, 5*time.Minute)
+			s.topNModalPanel.SetMaxScroll(max(0, len(items)-5))
 			s.topNModalPanel.Update(msg)
 			return s, nil
 		}
@@ -463,10 +466,17 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case msg.String() == "i":
 			if s.connViewMode == ConnViewActive || s.connViewMode == ConnViewHistory {
 				s.inlineDetailMode = !s.inlineDetailMode
+				if s.inlineDetailMode {
+					s.inlineDetailPanel.SetMaxScroll(50)
+				} else {
+					s.inlineDetailFocused = false
+					s.inlineDetailPanel.Reset()
+				}
 			}
 
 		case key.Matches(msg, common.Keys.Up):
 			if s.inlineDetailFocused {
+				s.inlineDetailPanel.SetMaxScroll(50)
 				s.inlineDetailPanel.Update(msg)
 			} else {
 				s.filterList.SetItemCount(s.filteredConnCount())
@@ -476,6 +486,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 
 		case key.Matches(msg, common.Keys.Down):
 			if s.inlineDetailFocused {
+				s.inlineDetailPanel.SetMaxScroll(50)
 				s.inlineDetailPanel.Update(msg)
 			} else {
 				s.filterList.SetItemCount(s.filteredConnCount())
@@ -615,7 +626,7 @@ func (s State) findConnectionByName(name string) *model.Connection {
 func (s State) InputCapture() common.InputCapture {
 	return common.InputCapture{
 		Active:    s.FilterMode() || s.connDetailMode || s.topNModalMode || s.unlock.open || s.dns.open || s.currentIP.modalOpen,
-		Help:      s.dns.open,
+		Help:      s.dns.open || s.FilterMode(),
 		Interrupt: s.FilterMode() || s.dns.open,
 	}
 }

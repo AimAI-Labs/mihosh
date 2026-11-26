@@ -121,8 +121,13 @@ func TestPageInputCaptureBlocksGlobalNavigation(t *testing.T) {
 			}
 			m := capturedPage(t, mode)
 			next, _ := m.Update(keyMsg("?"))
-			if next.(Model).showHelp != (mode != "Core edit") {
-				t.Fatal("help policy changed")
+			wantHelp := false
+			switch mode {
+			case "connection detail", "connection TopN", "log detail", "node results", "rule delete", "subscription delete":
+				wantHelp = true
+			}
+			if next.(Model).showHelp != wantHelp {
+				t.Fatalf("mode %s: showHelp=%t, want %t", mode, next.(Model).showHelp, wantHelp)
 			}
 		})
 	}
@@ -156,8 +161,8 @@ func TestPageInputCapturePreservesInterruptPolicy(t *testing.T) {
 		mode string
 		quit bool
 	}{
-		{"connection detail", true}, {"connection TopN", true}, {"log detail", true}, {"node results", true}, {"rule edit", true}, {"Core edit", true},
-		{"connection filter", false}, {"log filter", false}, {"node filter", false}, {"rule add", false}, {"rule filter", false},
+		{"connection detail", true}, {"connection TopN", true}, {"log detail", true}, {"node results", true}, {"Core edit", true},
+		{"connection filter", false}, {"log filter", false}, {"node filter", false}, {"rule add", false}, {"rule edit", false}, {"rule filter", false},
 		{"subscription edit", false}, {"subscription filter", false}, {"settings edit", false},
 	} {
 		t.Run(tc.mode, func(t *testing.T) {

@@ -99,8 +99,10 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.showUpdateDialog {
 		switch msg.String() {
 		case "esc", "q":
-			m.showUpdateDialog = false
-			m.updateError = nil
+			if !m.isUpdating {
+				m.showUpdateDialog = false
+				m.updateError = nil
+			}
 			return m, nil
 		case "enter":
 			if !m.isUpdating && m.updateInfo != nil && m.updateInfo.DownloadURL != "" {
@@ -194,24 +196,35 @@ func (m Model) dispatchToPage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.subState, cmd = m.subState.Update(msg)
 
 	case layout.PageSettings:
-		var newCfg = m.config
 		oldLanguage := ""
+		oldInterval := 0
+		oldTestURL := ""
+		oldTimeout := 0
 		if m.config != nil {
 			oldLanguage = m.config.Language
+			oldInterval = m.config.AutoRefreshInterval
+			oldTestURL = m.config.TestURL
+			oldTimeout = m.config.Timeout
 		}
-		m.settingsState.Config = m.config
+		m.settingsState.SetConfig(m.config)
 		m.settingsState, cmd = m.settingsState.Update(msg)
-		newCfg = m.settingsState.Config
-		m.config = newCfg
-		if newCfg != nil && newCfg.Language != oldLanguage {
-			i18n.SetLanguageOverride(newCfg.Language)
-			common.InitKeyBindings()
-			cmd = tea.Batch(cmd, tea.ClearScreen)
-		}
+		newCfg := m.settingsState.Config
 		if newCfg != nil {
-			m.autoRefreshRemaining = newCfg.AutoRefreshInterval
-			m.autoRefreshSynced = false
-			m.autoRefreshSyncedTTL = 0
+			m.config = newCfg
+			if newCfg.Language != oldLanguage {
+				i18n.SetLanguageOverride(newCfg.Language)
+				common.InitKeyBindings()
+				cmd = tea.Batch(cmd, tea.ClearScreen)
+			}
+			if newCfg.AutoRefreshInterval != oldInterval {
+				m.autoRefreshRemaining = newCfg.AutoRefreshInterval
+				m.autoRefreshSynced = false
+				m.autoRefreshSyncedTTL = 0
+			}
+			if newCfg.TestURL != oldTestURL || newCfg.Timeout != oldTimeout {
+				m.nodesState = m.nodesState.UpdateTestConfig(newCfg.TestURL, newCfg.Timeout)
+				m.connsState = m.connsState.UpdateTimeout(newCfg.Timeout)
+			}
 		}
 	}
 	return m, cmd

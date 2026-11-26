@@ -173,7 +173,7 @@ func (s State) handleSyncPGConfigKey(msg tea.KeyMsg) (State, tea.Cmd) {
 	case key.Matches(msg, common.Keys.Escape):
 		m.Mode = syncModeMenu
 		return s, nil
-	case msg.String() == "tab", msg.String() == "shift+tab", key.Matches(msg, common.Keys.Up), key.Matches(msg, common.Keys.Down):
+	case msg.String() == "tab", msg.String() == "shift+tab", msg.Type == tea.KeyUp, msg.Type == tea.KeyDown:
 		if m.PGField == 0 {
 			m.PGField = 1
 			m.FormCursor = len([]rune(m.KeyValue))

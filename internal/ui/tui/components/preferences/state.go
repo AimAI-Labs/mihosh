@@ -325,9 +325,9 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 	if s.editMode {
 		if s.activeTab == 0 && s.selectedSetting == LanguageSettingIndex() {
 			if lang, ok := resolveLanguageMouseTarget(pageX); ok {
-				if err := s.configSvc.SetConfigValue(s.activeKeys()[s.selectedSetting], lang); err == nil {
-					newCfg, _ := s.configSvc.LoadConfig()
-					s.Config = newCfg
+				if s.configSvc != nil && s.configSvc.SetConfigValue(s.activeKeys()[s.selectedSetting], lang) == nil {
+					s.reloadConfig()
+					i18n.SetLanguageOverride(lang)
 					s.editMode = false
 					s.editValue = ""
 					s.editCursor = 0
@@ -338,14 +338,13 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		}
 		if s.selectedSetting == ThemeSettingIndex() && settingIdx == s.selectedSetting {
 			if t, ok := resolveThemeMouseTarget(pageX, pageY, pageWidth); ok {
-				if err := s.configSvc.SetConfigValue("theme", t); err == nil {
-					newCfg, _ := s.configSvc.LoadConfig()
-					s.Config = newCfg
+				if s.configSvc != nil && s.configSvc.SetConfigValue("theme", t) == nil {
+					s.reloadConfig()
 					theme.SetTheme(t)
 					s.editMode = false
 					s.editValue = ""
 					s.editCursor = 0
-					return s, noticeCmd(i18n.T("settings.toast.save_success_theme"), messages.NoticeSuccess)
+					return s, tea.Batch(func() tea.Msg { return messages.ThemeChangedMsg{} }, noticeCmd(i18n.T("settings.toast.save_success_theme"), messages.NoticeSuccess))
 				}
 				return s, noticeCmd(i18n.T("settings.toast.save_failed"), messages.NoticeError)
 			}
@@ -377,9 +376,9 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 	}
 	if s.activeTab == 0 && settingIdx == LanguageSettingIndex() {
 		if lang, ok := resolveLanguageMouseTarget(pageX); ok {
-			if err := s.configSvc.SetConfigValue(s.activeKeys()[settingIdx], lang); err == nil {
-				newCfg, _ := s.configSvc.LoadConfig()
-				s.Config = newCfg
+			if s.configSvc != nil && s.configSvc.SetConfigValue(s.activeKeys()[settingIdx], lang) == nil {
+				s.reloadConfig()
+				i18n.SetLanguageOverride(lang)
 				return s, noticeCmd(i18n.T("settings.toast.save_success_lang"), messages.NoticeSuccess)
 			}
 			feedback = noticeCmd(i18n.T("settings.toast.save_failed"), messages.NoticeError)
@@ -387,11 +386,10 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 	}
 	if s.activeTab == 0 && settingIdx == ThemeSettingIndex() {
 		if t, ok := resolveThemeMouseTarget(pageX, pageY, pageWidth); ok {
-			if err := s.configSvc.SetConfigValue("theme", t); err == nil {
-				newCfg, _ := s.configSvc.LoadConfig()
-				s.Config = newCfg
+			if s.configSvc != nil && s.configSvc.SetConfigValue("theme", t) == nil {
+				s.reloadConfig()
 				theme.SetTheme(t)
-				return s, noticeCmd(i18n.T("settings.toast.save_success_theme"), messages.NoticeSuccess)
+				return s, tea.Batch(func() tea.Msg { return messages.ThemeChangedMsg{} }, noticeCmd(i18n.T("settings.toast.save_success_theme"), messages.NoticeSuccess))
 			}
 			feedback = noticeCmd(i18n.T("settings.toast.save_failed"), messages.NoticeError)
 		}
@@ -496,7 +494,7 @@ func (s State) saveBorderStyle(style string) (State, tea.Cmd) {
 	if err := s.configSvc.SetConfigValue("border-style", style); err != nil {
 		return s, noticeCmd(i18n.T("settings.toast.save_failed"), messages.NoticeError)
 	}
-	s.Config, _ = s.configSvc.LoadConfig()
+	s.reloadConfig()
 	theme.SetBorderStyle(style)
 	return s, tea.ClearScreen
 }
@@ -546,9 +544,10 @@ func (s State) handleEditMode(msg tea.KeyMsg) (State, tea.Cmd) {
 			s.editValue = ""
 		case key.Matches(msg, common.Keys.Enter):
 			settingKey := s.activeKeys()[s.selectedSetting]
-			if err := s.configSvc.SetConfigValue(settingKey, s.editValue); err == nil {
-				newCfg, _ := s.configSvc.LoadConfig()
-				s.Config = newCfg
+			if s.configSvc != nil && s.configSvc.SetConfigValue(settingKey, s.editValue) == nil {
+				lang := s.editValue
+				s.reloadConfig()
+				i18n.SetLanguageOverride(lang)
 				s.editMode = false
 				s.editValue = ""
 				return s, noticeCmd(i18n.T("settings.toast.save_success_lang"), messages.NoticeSuccess)
@@ -569,11 +568,10 @@ func (s State) handleEditMode(msg tea.KeyMsg) (State, tea.Cmd) {
 			s.editValue = ""
 		case key.Matches(msg, common.Keys.Enter):
 			newTheme := s.editValue
-			if err := s.configSvc.SetConfigValue("theme", newTheme); err != nil {
+			if s.configSvc == nil || s.configSvc.SetConfigValue("theme", newTheme) != nil {
 				return s, noticeCmd(i18n.T("settings.toast.save_failed"), messages.NoticeError)
 			}
-			newCfg, _ := s.configSvc.LoadConfig()
-			s.Config = newCfg
+			s.reloadConfig()
 			theme.SetTheme(newTheme)
 			s.editMode = false
 			s.editValue = ""
@@ -602,12 +600,14 @@ func (s State) handleEditMode(msg tea.KeyMsg) (State, tea.Cmd) {
 			return next, nil
 		}
 
+		if s.configSvc == nil {
+			return s, noticeCmd(i18n.T("settings.toast.save_failed"), messages.NoticeError)
+		}
 		if err := s.configSvc.SetConfigValue(settingKey, s.editValue); err != nil {
 			// 保存失败：保持编辑模式，显示错误提示
 			return s, saveErrorNotice(err)
 		}
-		newCfg, _ := s.configSvc.LoadConfig()
-		s.Config = newCfg
+		s.reloadConfig()
 		s.editMode = false
 		s.editValue = ""
 		s.editCursor = 0
@@ -1130,8 +1130,10 @@ func (s State) SyncSysStatus(width, height int, cfg *service.Config, sysLogs []m
 
 // InputCapture declares which input belongs to the current page mode.
 func (s State) InputCapture() common.InputCapture {
+	textInput := s.editMode || (s.syncModal.Open && s.syncModal.Mode != syncModeMenu)
 	return common.InputCapture{
 		Active:    s.editMode || s.syncModal.Open,
-		Interrupt: s.editMode || (s.syncModal.Open && s.syncModal.Mode != syncModeMenu),
+		Help:      textInput,
+		Interrupt: textInput,
 	}
 }

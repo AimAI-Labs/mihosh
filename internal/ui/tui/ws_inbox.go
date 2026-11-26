@@ -83,7 +83,7 @@ func boundLogPayload(payload string) string {
 		return payload
 	}
 	end := maxWSLogBytes - len("…")
-	for !utf8.RuneStart(payload[end]) {
+	for end > 0 && !utf8.RuneStart(payload[end]) {
 		end--
 	}
 	return payload[:end] + "…"

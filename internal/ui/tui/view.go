@@ -17,7 +17,7 @@ import (
 // View 渲染视图
 func (m Model) View() string {
 	if m.width == 0 {
-		return "正在初始化..."
+		return i18n.T("status.initializing")
 	}
 
 	// ── 布局参数 ──
@@ -63,8 +63,13 @@ func (m Model) View() string {
 	)
 
 	footer := strings.LastIndexByte(pageContent, '\n')
-	fullPage := lipgloss.JoinVertical(lipgloss.Left, topNav, pageContent[:footer],
-		notice.Render(m.visibleNotice(), m.width), page.renderFooter(pageContent[footer+1:]), statusBar)
+	bodyContent, footerContent := pageContent, ""
+	if footer >= 0 {
+		bodyContent = pageContent[:footer]
+		footerContent = pageContent[footer+1:]
+	}
+	fullPage := lipgloss.JoinVertical(lipgloss.Left, topNav, bodyContent,
+		notice.Render(m.visibleNotice(), m.width), page.renderFooter(footerContent), statusBar)
 
 	// ── 报错弹窗叠加 ──
 	if m.notice.DetailsOpen {
@@ -196,10 +201,10 @@ func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo,
 
 	var body string
 	if isUpdating {
-		body = "\n" + lipgloss.NewStyle().Foreground(common.TokyoCyan()).Render("  正在下载并更新中，请稍候...") + "\n\n"
+		body = "\n" + lipgloss.NewStyle().Foreground(common.TokyoCyan()).Render("  "+i18n.T("update.downloading")) + "\n\n"
 	} else if err != nil {
-		body = "\n" + lipgloss.NewStyle().Foreground(common.TokyoRed()).Render("  更新失败: "+err.Error()) + "\n\n"
-		body += lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render("  [Esc] 关闭")
+		body = "\n" + lipgloss.NewStyle().Foreground(common.TokyoRed()).Render("  "+i18n.Tf("update.failed", err.Error())) + "\n\n"
+		body += lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render("  " + i18n.T("update.close"))
 	} else {
 		verStr := fmt.Sprintf("%s  →  %s", info.CurrentVersion, info.Version)
 		body = lipgloss.NewStyle().Foreground(common.TokyoCyan()).Bold(true).Render(verStr) + "\n\n"
@@ -208,8 +213,8 @@ func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo,
 			body += i18n.T("update.manual_install")
 		} else {
 
-			leftBtn := lipgloss.NewStyle().Foreground(common.TokyoGreen()).Render("[Enter] 立即更新")
-			rightBtn := lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render("[Esc] 稍后更新")
+			leftBtn := lipgloss.NewStyle().Foreground(common.TokyoGreen()).Render(i18n.T("update.apply_now"))
+			rightBtn := lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render(i18n.T("update.later"))
 
 			halfWidth := contentWidth / 2
 			leftHalf := lipgloss.NewStyle().Width(halfWidth).Align(lipgloss.Right).Render(leftBtn + "  ")
@@ -233,7 +238,7 @@ func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo,
 
 	finalBody := strings.Join(bodyLines, "\n")
 
-	title := "发现新版本"
+	title := i18n.T("update.title")
 	borderColor := common.TokyoCyan()
 	if err != nil {
 		borderColor = common.TokyoRed()

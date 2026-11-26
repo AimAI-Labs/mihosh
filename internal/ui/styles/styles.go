@@ -52,7 +52,7 @@ func TableAltRowStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(t
 func InputStyle() lipgloss.Style {
 	p := theme.Resolve(Primary())
 	return lipgloss.NewStyle().Foreground(p).
-		Border(lipgloss.RoundedBorder()).BorderForeground(p).Padding(0, 1)
+		Border(theme.Frame()).BorderForeground(p).Padding(0, 1)
 }
 func InputLabelStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Bold(true).Foreground(theme.Resolve(Gray()))

@@ -16,15 +16,25 @@ func (s State) openSelectedConnectionDetail() (State, tea.Cmd) {
 	if conn == nil {
 		return s, nil
 	}
+	return s.openConnectionDetail(conn)
+}
 
+func (s State) openConnectionDetail(conn *model.Connection) (State, tea.Cmd) {
+	if conn == nil {
+		return s, nil
+	}
 	snapshot := *conn
 	s.connDetailSnapshot = &snapshot
 	s.connDetailMode = true
 	s.connIPInfo = nil
+	s.connIPRequestID++
+	s.connDetailLeftPanel.Reset()
+	s.connDetailRightPanel.Reset()
+	s.connDetailFocusPanel = 0
 	s.connDetailJSONLineCount = countConnJSONLines(&snapshot)
-	s.connDetailRightPanel.SetMaxScroll(s.connDetailJSONLineCount - 5)
+	s.connDetailRightPanel.SetMaxScroll(max(0, s.connDetailJSONLineCount-5))
 	s.connDetailLeftPanel.SetMaxScroll(50)
-	return s, FetchIPInfo(conn.Metadata.DestinationIP)
+	return s, fetchIPInfoWithID(s.connIPRequestID, snapshot.Metadata.DestinationIP)
 }
 
 func (s *State) closeConnectionDetail() {

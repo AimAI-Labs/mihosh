@@ -151,10 +151,7 @@ func renderRuleEntry(rule model.Rule, index int, selected bool, width int, adjus
 		payloadWidth = 20
 	}
 	payloadStyle := lipgloss.NewStyle().Foreground(common.Secondary())
-	payload := rule.Payload
-	if len(payload) > payloadWidth {
-		payload = payload[:payloadWidth-3] + "..."
-	}
+	payload := common.TruncateDisplay(rule.Payload, payloadWidth)
 	payloadStr := payloadStyle.Width(payloadWidth).Render(payload)
 
 	// 代理

@@ -123,6 +123,7 @@ func (m Model) applyCoreEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 			text = "Update applied, please restart."
 		}
 		m.publishNotice(text, messages.NoticeSuccess)
+		m.onAppQuit()
 		return m, tea.Quit, true
 
 	case messages.CoreActionDoneMsg:

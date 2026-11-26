@@ -31,22 +31,20 @@ type Model struct {
 	client     *service.Client
 	config     *service.Config
 	configSvc  *service.ConfigService
-	connSvc    *service.ConnectionService
 	profileSvc *service.ProfileService
 	coreSvc    *service.CoreService
 
 	// 路由与布局
-	currentPage          layout.PageType
-	width                int
-	height               int
-	showHelp             bool
-	autoRefreshRemaining int
-	autoRefreshSynced    bool
-	autoRefreshSyncedTTL int
-
-	// 测速参数（供 NodesState 使用）
-	testURL string
-	timeout int
+	currentPage           layout.PageType
+	width                 int
+	height                int
+	showHelp              bool
+	autoRefreshRemaining  int
+	autoRefreshSynced     bool
+	autoRefreshSyncedTTL  int
+	connTickActive        bool
+	logsTickActive        bool
+	placeholderTickActive bool
 
 	// 共享图表数据（Connections 页面和 StatusBar 共用）
 	chartData *model.ChartData
@@ -69,10 +67,7 @@ type Model struct {
 	wsCtx              context.Context
 	wsCancel           context.CancelFunc
 
-	// IP 解析器
-	ipResolver *service.IPResolver
-
-	// 六个页面子状态
+	// 页面子状态
 	nodesState    nodes.State
 	connsState    connections.State
 	logsState     logs.State
@@ -117,17 +112,13 @@ func NewModel(app *bootstrap.App) Model {
 		coreState:            corepage.NewState(app.CoreSvc, app.ConfigSvc, client),
 		config:               cfg,
 		configSvc:            app.ConfigSvc,
-		connSvc:              app.ConnSvc,
 		profileSvc:           app.ProfileSvc,
-		testURL:              testURL,
-		timeout:              timeout,
 		currentPage:          initialPage,
 		chartData:            chartData,
 		wsClient:             app.WSClient,
 		wsInbox:              newWSInbox(),
 		wsCtx:                wsCtx,
 		wsCancel:             wsCancel,
-		ipResolver:           app.IPResolver,
 		nodesState:           nodes.NewState(client, testURL, timeout).SetServices(app.ConfigSvc, app.CoreSvc),
 		connsState:           connections.NewState(service.MixedPortToProxyURL(app.Target.Endpoint.MixedPort), model.DefaultSiteTests(), client, timeout, chartData),
 		logsState:            logs.NewState(app.IPResolver),

@@ -10,6 +10,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -126,6 +127,9 @@ func RenderStatusBar(width int, chartData *model.ChartData, uploadTotal int64, d
 		gap = 0
 	}
 	statusLine := nodeInfo + strings.Repeat(" ", gap) + metricsStr + rightIcon
+	if width > 0 && lipgloss.Width(statusLine) > width {
+		statusLine = ansi.Truncate(statusLine, width, "…")
+	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, divider, statusLine)
 }

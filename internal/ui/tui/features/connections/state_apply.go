@@ -1,10 +1,11 @@
 package connections
 
 import (
-	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"time"
 
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 )
 
 // ApplyWSConnections 处理 WebSocket 连接推送（含历史记录检测与相邻样本速率估算）
@@ -118,6 +119,26 @@ func (s State) ApplyAllConnectionsClosed() State {
 // ApplyIPInfo 更新 IP 地理信息
 func (s State) ApplyIPInfo(info *model.IPInfo) State {
 	s.connIPInfo = info
+	return s
+}
+
+// ApplyIPInfoMsg 仅在详情仍打开且请求 ID 匹配时应用异步 GeoIP 结果，防止旧请求覆盖新连接。
+func (s State) ApplyIPInfoMsg(msg messages.IPInfoMsg) State {
+	if msg.Info == nil || !s.connDetailMode {
+		return s
+	}
+	if msg.RequestID != 0 && msg.RequestID != s.connIPRequestID {
+		return s
+	}
+	s.connIPInfo = msg.Info
+	return s
+}
+
+// UpdateTimeout 更新测速超时（设置页保存后调用）
+func (s State) UpdateTimeout(timeout int) State {
+	if timeout > 0 {
+		s.timeout = timeout
+	}
 	return s
 }
 

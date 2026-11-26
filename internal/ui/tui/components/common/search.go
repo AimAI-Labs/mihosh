@@ -43,6 +43,16 @@ func (q *SearchQuery) Edit(msg tea.KeyMsg) bool {
 		runes := []rune(q.Text)
 		q.Text = string(runes[:len(runes)-1])
 	default:
+		if msg.Paste && len(msg.Runes) > 0 {
+			added := false
+			for _, r := range msg.Runes {
+				if r >= 32 {
+					q.Text += string(r)
+					added = true
+				}
+			}
+			return added
+		}
 		input := []rune(msg.String())
 		if len(input) != 1 || input[0] < 32 {
 			return false

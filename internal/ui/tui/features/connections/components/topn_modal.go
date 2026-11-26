@@ -93,7 +93,7 @@ func buildTopNModal(items []TopNItem, width, height, scroll int) string {
 		} else {
 			// 必须压缩名称了
 			barWidth = 10
-			nameColWidth = remaining - barWidth
+			nameColWidth = max(1, remaining-barWidth)
 		}
 	} else {
 		// 如果有多余空间，可以给进度条

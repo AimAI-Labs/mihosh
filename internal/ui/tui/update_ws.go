@@ -30,11 +30,27 @@ func connTick() tea.Cmd {
 	})
 }
 
+func (m *Model) ensureConnTick() tea.Cmd {
+	if m.connTickActive {
+		return nil
+	}
+	m.connTickActive = true
+	return connTick()
+}
+
 // logsTick 创建日志页面定时器
 func logsTick() tea.Cmd {
 	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
 		return messages.LogsTickMsg(t)
 	})
+}
+
+func (m *Model) ensureLogsTick() tea.Cmd {
+	if m.logsTickActive {
+		return nil
+	}
+	m.logsTickActive = true
+	return logsTick()
 }
 
 func autoRefreshTick() tea.Cmd {
@@ -146,9 +162,7 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 		return m, cmd
 
 	case messages.IPInfoMsg:
-		if msg.Info != nil {
-			m.connsState = m.connsState.ApplyIPInfo(msg.Info)
-		}
+		m.connsState = m.connsState.ApplyIPInfoMsg(msg)
 
 	case messages.CurrentIPInfoMsg:
 		var cmd tea.Cmd
@@ -170,22 +184,25 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case messages.PlaceholderTickMsg:
+		m.placeholderTickActive = false
 		if !m.coreUnavailable() {
 			return m, nil
 		}
 		m.placeholderState = m.placeholderState.Advance()
-		return m, placeholderTick()
+		return m, m.placeholderTickCmd()
 
 	case messages.ConnTickMsg:
+		m.connTickActive = false
 		if m.currentPage == layout.PageConnections {
 			var cmd tea.Cmd
 			m.connsState, cmd = m.connsState.Update(msg)
-			return m, tea.Batch(connTick(), cmd)
+			return m, tea.Batch(m.ensureConnTick(), cmd)
 		}
 
 	case messages.LogsTickMsg:
+		m.logsTickActive = false
 		if m.currentPage == layout.PageLogs {
-			return m, logsTick()
+			return m, m.ensureLogsTick()
 		}
 
 	case messages.AutoRefreshTickMsg:
@@ -330,6 +347,8 @@ func (m *Model) applyStoredConfig(cfg *service.Config) {
 	}
 	m.config = cfg
 	m.settingsState.SetConfig(cfg)
+	m.nodesState = m.nodesState.UpdateTestConfig(cfg.TestURL, cfg.Timeout)
+	m.connsState = m.connsState.UpdateTimeout(cfg.Timeout)
 	if cfg.Language != previousLanguage {
 		i18n.SetLanguageOverride(cfg.Language)
 		common.InitKeyBindings()

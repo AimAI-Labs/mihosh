@@ -79,13 +79,13 @@ func (s State) handleFormMode(msg tea.KeyMsg, isEdit bool) (State, tea.Cmd) {
 	case msg.String() == "shift+tab":
 		form.cycleField(-1)
 
-	case key.Matches(msg, common.Keys.Up):
+	case msg.Type == tea.KeyUp:
 		form.cycleField(-1)
 
-	case key.Matches(msg, common.Keys.Down):
+	case msg.Type == tea.KeyDown:
 		form.cycleField(1)
 
-	case key.Matches(msg, common.Keys.Left):
+	case msg.Type == tea.KeyLeft:
 		switch {
 		case form.isTypeField():
 			form.cycleType(-1)
@@ -99,7 +99,7 @@ func (s State) handleFormMode(msg tea.KeyMsg, isEdit bool) (State, tea.Cmd) {
 			return s, cmd
 		}
 
-	case key.Matches(msg, common.Keys.Right):
+	case msg.Type == tea.KeyRight:
 		switch {
 		case form.isTypeField():
 			form.cycleType(1)
@@ -188,10 +188,10 @@ func (s State) handleProxyPickerMode(msg tea.KeyMsg) (State, tea.Cmd) {
 	case msg.String() == "shift+tab":
 		form.cyclePickerTab(-1)
 
-	case key.Matches(msg, common.Keys.Up):
+	case msg.Type == tea.KeyUp:
 		form.movePickerCursor(-1)
 
-	case key.Matches(msg, common.Keys.Down):
+	case msg.Type == tea.KeyDown:
 		form.movePickerCursor(1)
 
 	case key.Matches(msg, common.Keys.Backspace):

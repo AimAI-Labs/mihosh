@@ -8,6 +8,9 @@ import (
 
 // ResolveLogSourceIP 异步解析内网IP来源
 func ResolveLogSourceIP(resolver *service.IPResolver, ip string) tea.Cmd {
+	if resolver == nil {
+		return nil
+	}
 	return func() tea.Msg {
 		resolved := resolver.Resolve(ip)
 		return messages.LogIPResolvedMsg{

@@ -898,10 +898,22 @@ func (s State) LocateActiveProxy() (State, tea.Cmd) {
 	return s, nodesNoticeCmd(i18n.Tf("nodes.locate_success", groupName, proxyName), messages.NoticeInfo)
 }
 
+// UpdateTestConfig updates test URL and timeout after Settings/Sync changes.
+func (s State) UpdateTestConfig(testURL string, timeout int) State {
+	if testURL != "" {
+		s.testURL = testURL
+	}
+	if timeout > 0 {
+		s.timeout = timeout
+	}
+	return s
+}
+
 // InputCapture declares which input belongs to the current page mode.
 func (s State) InputCapture() common.InputCapture {
 	return common.InputCapture{
 		Active:    s.NodeFilterMode || s.ShowTestDetail || s.ChainModal.Open,
+		Help:      s.NodeFilterMode,
 		Interrupt: s.NodeFilterMode,
 	}
 }

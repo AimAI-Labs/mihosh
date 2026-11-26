@@ -43,20 +43,14 @@ func ComputeChartSectionHeight(maxHeight int) int {
 }
 
 // RenderChartsSection 渲染监控图表区域（对称柱状图）
-// maxHeight 控制图表最大行数，实现高度响应式；<= 0 时使用默认最大高度。
+// maxHeight 控制图表最大行数，实现高度响应式；<= 0 时表示可用高度不足，隐藏图表。
 func RenderChartsSection(chartData *model.ChartData, width int, maxHeight int) string {
-	if chartData == nil {
+	if chartData == nil || maxHeight <= 0 {
 		return ""
 	}
 
 	// 动态计算 halfHeight
-	halfH := maxSymmetricHalfHeight
-	if maxHeight > 0 {
-		computed := (maxHeight - chartSectionChrome) / 2
-		if computed < halfH {
-			halfH = computed
-		}
-	}
+	halfH := min(maxSymmetricHalfHeight, (maxHeight-chartSectionChrome)/2)
 	if halfH < minSymmetricHalfHeight {
 		return ""
 	}

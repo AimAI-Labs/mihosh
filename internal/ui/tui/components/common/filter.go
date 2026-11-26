@@ -7,14 +7,14 @@ func FuzzyMatch(pattern, text string) bool {
 	if pattern == "" {
 		return true
 	}
-	pattern = strings.ToLower(pattern)
-	text = strings.ToLower(text)
+	patternRunes := []rune(strings.ToLower(pattern))
+	textRunes := []rune(strings.ToLower(text))
 
 	pIdx := 0
-	for i := 0; i < len(text) && pIdx < len(pattern); i++ {
-		if text[i] == pattern[pIdx] {
+	for i := 0; i < len(textRunes) && pIdx < len(patternRunes); i++ {
+		if textRunes[i] == patternRunes[pIdx] {
 			pIdx++
 		}
 	}
-	return pIdx == len(pattern)
+	return pIdx == len(patternRunes)
 }

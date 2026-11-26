@@ -129,13 +129,13 @@ func (m *Model) onPageChange() tea.Cmd {
 		m.connsState, ipCmd = m.connsState.EnsureCurrentIP()
 		if cmd != nil {
 			m.connsState = m.connsState.ResetPrevConnIDs()
-			cmd = tea.Batch(cmd, connTick())
+			cmd = tea.Batch(cmd, m.ensureConnTick())
 		} else if ipCmd != nil {
-			cmd = connTick()
+			cmd = m.ensureConnTick()
 		}
 		cmd = tea.Batch(cmd, ipCmd)
 	case layout.PageLogs:
-		cmd = tea.Batch(cmd, logsTick())
+		cmd = tea.Batch(cmd, m.ensureLogsTick())
 	case layout.PageSub:
 		width, height := m.getPageSize()
 		m.subState, _ = m.subState.Update(messages.PageResizeMsg{Width: width, Height: height})
@@ -231,6 +231,9 @@ func (m *Model) checkCoreConnection(keepPage bool) tea.Cmd {
 }
 
 func (m *Model) listenCoreOwner() tea.Cmd {
+	if m.coreSvc == nil {
+		return nil
+	}
 	ctx := m.wsCtx
 	events := m.coreSvc.Events()
 	return func() tea.Msg {

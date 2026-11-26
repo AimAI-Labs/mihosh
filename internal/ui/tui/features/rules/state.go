@@ -218,6 +218,20 @@ func (s State) ApplyRules(rules []model.Rule) State {
 		s.filteredRuleIndices = make([]int, 0, len(rules))
 	}
 	s.updateFilteredRules()
+	if len(s.filteredRuleIndices) == 0 {
+		s.selectedRule = 0
+		s.ruleScrollTop = 0
+	} else {
+		if s.selectedRule >= len(s.filteredRuleIndices) {
+			s.selectedRule = len(s.filteredRuleIndices) - 1
+		}
+		if s.selectedRule < 0 {
+			s.selectedRule = 0
+		}
+		if s.ruleScrollTop > s.selectedRule {
+			s.ruleScrollTop = s.selectedRule
+		}
+	}
 	return s
 }
 
@@ -238,6 +252,7 @@ func (s State) FilterMode() bool { return s.ruleFilterMode }
 
 // InputCapture declares which input belongs to the current page mode.
 func (s State) InputCapture() common.InputCapture {
-	active := s.ruleFilterMode || s.showAddForm || s.showDeleteConfirm
-	return common.InputCapture{Active: active || s.showEditForm, Interrupt: active}
+	textInput := s.ruleFilterMode || s.showAddForm || s.showEditForm
+	active := textInput || s.showDeleteConfirm
+	return common.InputCapture{Active: active, Help: textInput, Interrupt: active}
 }

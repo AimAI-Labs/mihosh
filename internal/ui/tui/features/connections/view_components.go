@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	connectionsSiteCardsTopLine = 2
+	connectionsSiteCardsTopLine = 1
 	connectionsSiteCardHeight   = 5
 	connectionsSiteCardMinWidth = 12
 	connectionsSiteCardMaxWidth = 20

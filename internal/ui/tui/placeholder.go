@@ -29,10 +29,11 @@ func placeholderTick() tea.Cmd {
 	})
 }
 
-// placeholderTickCmd 在占位屏可见时启动像素动画；连接成功或离开页面后自然停止。
+// placeholderTickCmd 在占位屏可见时启动像素动画；连接成功或离开页面后自然停止，避免重复并发 tick 链。
 func (m *Model) placeholderTickCmd() tea.Cmd {
-	if !m.coreUnavailable() {
+	if !m.coreUnavailable() || m.placeholderTickActive {
 		return nil
 	}
+	m.placeholderTickActive = true
 	return placeholderTick()
 }

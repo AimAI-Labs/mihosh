@@ -27,22 +27,28 @@ func FetchConnections(client *service.Client) tea.Cmd {
 
 // CloseConnection 关闭单个连接
 func CloseConnection(client *service.Client, id string) tea.Cmd {
-	return func() tea.Msg {
+	if client == nil {
+		return nil
+	}
+	return messages.CoreRequest(client, func(client *service.Client) tea.Msg {
 		if err := client.CloseConnection(id); err != nil {
 			return messages.ErrMsg{Err: err}
 		}
 		return messages.ConnectionClosedMsg{ID: id}
-	}
+	})
 }
 
 // CloseAllConnections 关闭所有连接
 func CloseAllConnections(client *service.Client) tea.Cmd {
-	return func() tea.Msg {
+	if client == nil {
+		return nil
+	}
+	return messages.CoreRequest(client, func(client *service.Client) tea.Msg {
 		if err := client.CloseAllConnections(); err != nil {
 			return messages.ErrMsg{Err: err}
 		}
 		return messages.AllConnectionsClosedMsg{}
-	}
+	})
 }
 
 // CloseConnectionsByIDs 按活跃连接 ID 批量关闭筛选命中的连接（限制并发为 model.TestConcurrency）
@@ -93,9 +99,13 @@ func CloseConnectionsByIDs(client *service.Client, ids []string) tea.Cmd {
 
 // FetchIPInfo 获取IP地理位置信息
 func FetchIPInfo(ip string) tea.Cmd {
+	return fetchIPInfoWithID(0, ip)
+}
+
+func fetchIPInfoWithID(requestID uint64, ip string) tea.Cmd {
 	return func() tea.Msg {
 		if ip == "" {
-			return messages.IPInfoMsg{Info: nil, Err: nil}
+			return messages.IPInfoMsg{RequestID: requestID, Info: nil, Err: nil}
 		}
 
 		client := &http.Client{Timeout: 5 * time.Second}
@@ -103,23 +113,23 @@ func FetchIPInfo(ip string) tea.Cmd {
 
 		req, err := http.NewRequest("GET", apiURL, nil)
 		if err != nil {
-			return messages.IPInfoMsg{Info: nil, Err: err}
+			return messages.IPInfoMsg{RequestID: requestID, Info: nil, Err: err}
 		}
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 		req.Header.Set("Accept", "*/*")
 
 		resp, err := client.Do(req)
 		if err != nil {
-			return messages.IPInfoMsg{Info: nil, Err: err}
+			return messages.IPInfoMsg{RequestID: requestID, Info: nil, Err: err}
 		}
 		defer func() { _ = resp.Body.Close() }()
 
 		var info model.IPInfo
 		if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
-			return messages.IPInfoMsg{Info: nil, Err: err}
+			return messages.IPInfoMsg{RequestID: requestID, Info: nil, Err: err}
 		}
 
-		return messages.IPInfoMsg{Info: &info, Err: nil}
+		return messages.IPInfoMsg{RequestID: requestID, Info: &info, Err: nil}
 	}
 }
 

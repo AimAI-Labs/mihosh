@@ -60,6 +60,7 @@ func NewState(resolver *service.IPResolver) State {
 	return State{
 		logBuf:             make([]model.LogEntry, common.LogsCap),
 		logLevel:           1, // 默认 info
+		maxHScrollOffset:   4096,
 		filteredLogIndices: make([]int, 0, filteredLogIndexCap),
 		resolver:           resolver,
 	}
@@ -543,6 +544,20 @@ func (s *State) updateFilteredLogs() {
 		}
 		s.filteredLogIndices = append(s.filteredLogIndices, i)
 	}
+	if len(s.filteredLogIndices) == 0 {
+		s.selectedLog = 0
+		s.logScrollTop = 0
+	} else {
+		if s.selectedLog >= len(s.filteredLogIndices) {
+			s.selectedLog = len(s.filteredLogIndices) - 1
+		}
+		if s.selectedLog < 0 {
+			s.selectedLog = 0
+		}
+		if s.logScrollTop > s.selectedLog {
+			s.logScrollTop = s.selectedLog
+		}
+	}
 }
 
 // getLogLevelIndex 获取日志级别索引（0=debug,1=info,2=warning,3=error,4=silent）
@@ -558,5 +573,9 @@ func getLogLevelIndex(level string) int {
 
 // InputCapture declares which input belongs to the current page mode.
 func (s State) InputCapture() common.InputCapture {
-	return common.InputCapture{Active: s.FilterMode() || s.detailMode, Interrupt: s.FilterMode()}
+	return common.InputCapture{
+		Active:    s.FilterMode() || s.detailMode,
+		Help:      s.FilterMode(),
+		Interrupt: s.FilterMode(),
+	}
 }

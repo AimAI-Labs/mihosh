@@ -112,8 +112,8 @@ func RenderTokyoPanel(title, body string, width int) string {
 		lineLen := lipgloss.Width(line)
 		pad := contentWidth - lineLen
 		if pad < 0 {
-			pad = 0
 			line = TruncateDisplay(line, contentWidth)
+			pad = max(0, contentWidth-lipgloss.Width(line))
 		}
 		middleLine := TokyoBlueStyle().Render("│ ") +
 			line +
@@ -162,7 +162,7 @@ func RenderBorderedPanel(title, body string, width int, borderColor lipgloss.Col
 		pad := contentWidth - lineLen
 		if pad < 0 {
 			line = TruncateDisplay(line, contentWidth)
-			pad = 0
+			pad = max(0, contentWidth-lipgloss.Width(line))
 		}
 		middleLine := borderStyle.Render("│ ") +
 			line +
