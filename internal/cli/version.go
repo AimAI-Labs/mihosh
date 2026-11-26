@@ -25,7 +25,7 @@ var versionCmd = &cobra.Command{
 }
 
 func init() {
-	versionCmd.Flags().StringVar(&versionOutput, "output", string(outputFormatPlain), "")
+	versionCmd.Flags().StringVarP(&versionOutput, "output", "o", string(outputFormatPlain), "")
 }
 
 func renderVersion(w io.Writer, format outputFormat) error {

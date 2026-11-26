@@ -55,7 +55,7 @@ var doctorCmd = &cobra.Command{
 }
 
 func init() {
-	doctorCmd.Flags().StringVar(&doctorOutput, "output", string(outputFormatPlain), "")
+	doctorCmd.Flags().StringVarP(&doctorOutput, "output", "o", string(outputFormatPlain), "")
 }
 
 type doctorStatus string

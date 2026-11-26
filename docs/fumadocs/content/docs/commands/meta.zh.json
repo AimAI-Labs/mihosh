@@ -1,1 +1,21 @@
-{"title": "命令参考", "pages": ["index", "list", "select", "test", "connections", "mode", "status", "core", "config", "service", "doctor", "sysproxy", "selfupdate", "version"]}
+{
+  "title": "命令参考",
+  "pages": [
+    "index",
+    "list",
+    "select",
+    "test",
+    "connections",
+    "mode",
+    "status",
+    "dns",
+    "core",
+    "config",
+    "sync",
+    "service",
+    "doctor",
+    "sysproxy",
+    "completion",
+    "version"
+  ]
+}

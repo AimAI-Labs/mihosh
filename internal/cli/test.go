@@ -94,8 +94,8 @@ var testGroupCmd = &cobra.Command{
 }
 
 func init() {
-	testCmd.Flags().StringVar(&testOutput, "output", string(outputFormatPlain), "")
-	testGroupCmd.Flags().StringVar(&testGroupOutput, "output", string(outputFormatPlain), "")
+	testCmd.Flags().StringVarP(&testOutput, "output", "o", string(outputFormatPlain), "")
+	testGroupCmd.Flags().StringVarP(&testGroupOutput, "output", "o", string(outputFormatPlain), "")
 }
 
 func resolveTestAction(args []string) (testAction, string, error) {

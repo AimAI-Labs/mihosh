@@ -1,21 +1,21 @@
 ---
 title: "mihosh test"
-description: Perform latency tests on proxy nodes.
+description: Test the current active node or measure latency of a node or proxy group.
 ---
 
-The `mihosh test` command performs latency testing on proxy nodes to help you understand the network quality of each node.
+The `mihosh test` command tests the currently selected proxy node (including exit IP, country/region, city, ASN, and organization) or measures latency for a specific node or proxy group.
 
 ## Usage
 
 ```bash
-mihosh test [command] [flags]
+mihosh test [node <name> | group <name>] [flags]
 ```
 
-## Subcommands
+## Modes
 
-### Test Current Node
+### Test Current Active Node
 
-Without subcommands, tests the currently selected proxy node:
+Without arguments, tests the currently selected proxy node and prints its proxy chain and exit IP details:
 
 ```bash
 mihosh test
@@ -23,7 +23,7 @@ mihosh test
 
 ### Test Specific Node
 
-Use the `node` subcommand to test a node by name:
+Test latency for a single node by name:
 
 ```bash
 mihosh test node <name>
@@ -31,7 +31,7 @@ mihosh test node <name>
 
 ### Test Proxy Group
 
-Use the `group` subcommand to test all nodes within a proxy group:
+Test latency for all nodes in a proxy group:
 
 ```bash
 mihosh test group <name>
@@ -41,40 +41,25 @@ mihosh test group <name>
 
 | Option | Shorthand | Default | Description |
 | --- | --- | --- | --- |
-| `--output` | `-o` | `text` | Output format, supports `text`, `json`, `table` |
+| `--output` | `-o` | `plain` | Output format, supports `plain`, `table`, `json` |
 
 ## Examples
 
-### Test Current Node
-
 ```bash
+# Test current active node and exit IP info
 mihosh test
-```
 
-### Test Latency of Specific Node
-
-```bash
+# Test latency of a specific node
 mihosh test node "Hong Kong 01"
-```
 
-### Test Entire Proxy Group
-
-```bash
+# Test an entire proxy group
 mihosh test group Proxy
-```
 
-### Display Results as Table
-
-```bash
+# Display results as a table or JSON
 mihosh test group Proxy -o table
-```
-
-### Output in JSON Format
-
-```bash
-mihosh test group Proxy -o json
+mihosh test -o json
 ```
 
 <Callout type="info">
-The target URL and timeout for latency testing can be configured via the `mihosh config set` command.
+The latency test URL and timeout can be configured via `mihosh config set test_url <url>` and `mihosh config set timeout <ms>`.
 </Callout>

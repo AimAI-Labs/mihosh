@@ -1,0 +1,32 @@
+---
+title: "mihosh dns"
+description: Query DNS records via Mihomo /dns/query to diagnose DNS resolution and Fake-IP mappings.
+---
+
+The `mihosh dns` command queries Mihomo's built-in `/dns/query` endpoint to inspect DNS answers, TTLs, and Fake-IP / private / public IP classifications.
+
+## Usage
+
+```bash
+mihosh dns query <domain> [flags]
+```
+
+## Options
+
+| Option | Shorthand | Default | Description |
+| --- | --- | --- | --- |
+| `--type` | `-t` | `A` | DNS record type (e.g., `A`, `AAAA`, `CNAME`, `MX`, `TXT`) |
+| `--output` | `-o` | `plain` | Output format: `plain`, `table`, or `json` |
+
+## Examples
+
+```bash
+# Query A record (default)
+mihosh dns query example.com
+
+# Query AAAA record in table format
+mihosh dns query example.com --type AAAA --output table
+
+# Query A record in JSON format (includes fake_ip and tag fields)
+mihosh dns query example.com -t A -o json
+```

@@ -48,7 +48,7 @@ var listCmd = &cobra.Command{
 }
 
 func init() {
-	listCmd.Flags().StringVar(&listOutput, "output", string(outputFormatPlain), "")
+	listCmd.Flags().StringVarP(&listOutput, "output", "o", string(outputFormatPlain), "")
 }
 
 func renderGroupList(w io.Writer, groups map[string]model.Group, orderedNames []string, proxiesMap map[string]model.Proxy, format outputFormat) error {

@@ -1,24 +1,57 @@
 ---
 title: mihosh service
-description: systemd 服务管理
+description: 在 Linux 上管理 Mihomo 的 systemd 服务并查看日志。
 ---
 
 ## 说明
 
-`mihosh service <action>` 命令用于在 Linux 系统中管理 Mihomo 的 systemd 服务。
+`mihosh service` 命令用于在 Linux 系统上管理 Mihomo 的 systemd 服务和查看服务日志。
 
-## 支持的动作 (action)
+- 当 Mihosh 处于**托管模式**且未显式传入 `--unit` 时，命令会自动指向 Mihosh 托管的 `systemd --user` 用户服务（`logs` 自动使用 `journalctl --user`）。
+- 显式传入 `--unit`（或处于外部内核模式）时，命令通过 `systemctl` / `journalctl` 管理指定的系统服务（默认 `mihomo.service`）。
 
-- `status`：查看服务状态
-- `start`：启动服务
-- `stop`：停止服务
-- `restart`：重启服务
-- `enable`：设置开机自启
-- `disable`：取消开机自启
+## 子命令
+
+| 子命令 | 说明 |
+| --- | --- |
+| `status` | 查看服务状态 |
+| `start` | 启动服务 |
+| `stop` | 停止服务 |
+| `restart` | 重启服务 |
+| `enable` | 开启自动启动 |
+| `disable` | 关闭自动启动 |
+| `logs` | 查看 systemd journal 日志 |
+
+## 选项
+
+### 通用选项
+
+| 选项 | 简写 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--unit` | | `mihomo.service` | 指定外部 systemd 服务名称 |
+| `--output` | `-o` | `table` | 托管模式下操作结果输出格式（`plain`、`table`、`json`） |
+
+### `logs` 选项
+
+| 选项 | 简写 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--lines` | `-n` | `200` | 显示最近日志行数 |
+| `--follow` | `-f` | `false` | 实时跟踪输出新日志 |
 
 ## 示例
 
 ```bash
+# 查看托管服务或默认 mihomo.service 状态
 mihosh service status
+mihosh service status -o json
+
+# 重启服务
 mihosh service restart
+
+# 管理指定的外部 systemd 服务
+mihosh service status --unit clash-meta.service
+
+# 查看或实时跟踪日志
+mihosh service logs -n 100
+mihosh service logs -f
 ```

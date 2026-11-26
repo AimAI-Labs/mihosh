@@ -1,14 +1,28 @@
 ---
 title: mihosh status
-description: 查看 Mihomo 核心状态
+description: 查看 Mihomo 核心运行状态。
 ---
 
 ## 说明
 
-`mihosh status` 命令用于查看当前 Mihomo 核心的状态，包括版本信息、当前代理模式以及实时流量数据。
+`mihosh status` 命令用于查看当前 Mihomo 核心的运行状态快照，包括代理模式、活跃连接数、实时上传/下载速率、内存占用以及 `GLOBAL` / `Proxy` 策略组当前选中节点。
+
+## 用法
+
+```bash
+mihosh status [flags]
+```
+
+## 选项
+
+| 选项 | 简写 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--output` | `-o` | `plain` | 输出格式，支持 `plain`、`table`、`json` |
 
 ## 示例
 
 ```bash
 mihosh status
+mihosh status -o table
+mihosh status -o json
 ```

@@ -1,15 +1,15 @@
 ---
 title: "mihosh config"
-description: Configuration Management
+description: Show, set, or edit Mihosh and Mihomo configuration files.
 ---
 
 ## Description
 
-`mihosh config` provides a set of subcommands for managing Mihosh configurations.
+`mihosh config` provides subcommands for inspecting, updating, and editing Mihosh and Mihomo configurations.
 
-## Environment variables
+## Environment Variables
 
-`MIHOSH_CONFIG_DIR` sets the Mihosh configuration root. Use an absolute path. Configuration, subscriptions, backups, and managed core runtime files use this directory. When the variable is unset or empty, Mihosh uses `~/.mihosh`.
+`MIHOSH_CONFIG_DIR` sets the Mihosh configuration root (must be an absolute path). Configuration, subscriptions, backups, and managed core runtime files all share this directory. When unset or empty, Mihosh defaults to `~/.mihosh`.
 
 ```bash
 export MIHOSH_CONFIG_DIR="$HOME/.mihosh-work"
@@ -23,26 +23,43 @@ mihosh config show
 
 ## Subcommands
 
-### init
+### `show`
 
-Interactively initialize the configuration file.
-- Options: `--force, -f` Overwrite existing configuration.
+Display the current Mihosh configuration together with auto-discovered Mihomo connection info (`external-controller`, masked `secret`, `mixed-port`, `proxy_url`, and discovered Mihomo config path).
 
-### set
+| Option | Shorthand | Default | Description |
+| --- | --- | --- | --- |
+| `--output` | `-o` | `plain` | Output format, supports `plain`, `table`, `json` |
 
-Set a specific configuration item.
+### `set <key> <value>`
+
+Set a single Mihosh application preference.
+
 - Usage: `mihosh config set <key> <value>`
-- Supported keys: `test-url`, `timeout`, `theme`, `language`, `auto-refresh-interval`
+- Supported keys:
+  - `test_url` / `test-url`: Latency test URL
+  - `timeout`: Request/test timeout in milliseconds
+  - `language`: `auto`, `zh-CN`, or `en-US`
+  - `auto_refresh_interval` / `auto-refresh-interval`: Auto refresh interval in seconds (`>= 0`)
+  - `theme`: UI theme name (e.g., `tokyo-night`, `catppuccin`, `gruvbox`, `nord`, `dracula`, etc.)
+  - `border_style` / `border-style`: `rounded` or `square`
 
-### show
+### `edit`
 
-Display the complete current configuration information.
-- Options: `--output, -o` Output format (`text`, `json`, `table`).
+Launch an interactive selector to edit either Mihosh's config file or Mihomo's config file in an external editor, with syntax validation on save and automatic Mihomo hot-reload when Mihomo's config changes.
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--editor` | `$VISUAL` / `$EDITOR` / auto-detect | Specify the editor executable (e.g., `vim`, `nano`, `code`) |
+| `--path` | auto-discovered | Explicit Mihomo config file or directory path |
 
 ## Examples
 
 ```bash
-mihosh config init -f
-mihosh config set theme gruvbox
+mihosh config show
 mihosh config show -o table
+mihosh config show -o json
+mihosh config set theme gruvbox
+mihosh config set border-style square
+mihosh config edit --editor vim
 ```

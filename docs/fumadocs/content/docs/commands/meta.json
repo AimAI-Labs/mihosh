@@ -7,12 +7,15 @@
     "test",
     "connections",
     "mode",
-    "status", "core",
+    "status",
+    "dns",
+    "core",
     "config",
+    "sync",
     "service",
     "doctor",
     "sysproxy",
-    "selfupdate",
+    "completion",
     "version"
   ]
 }

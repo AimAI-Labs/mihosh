@@ -92,8 +92,10 @@ Press `h` in Core, select **Install background service** with the arrow keys or 
 
 ```bash
 mihosh core service install --output json
+mihosh core service start --output json
+mihosh core service stop --output json
+mihosh core service restart --output json
 mihosh core service enable --output json
-mihosh core start --output json
 mihosh core service status --output json
 mihosh core service boot --output json
 mihosh core service disable --output json
@@ -109,8 +111,10 @@ After updating Mihosh itself, stop and reinstall the stable service entry. Legac
 ```bash
 mihosh core system-proxy on --output json
 mihosh core system-proxy off --output json
+mihosh core system-proxy status --output json
 mihosh core tun on --output json
 mihosh core tun off --output json
+mihosh core tun status --output json
 mihosh core network-recover --output json
 ```
 

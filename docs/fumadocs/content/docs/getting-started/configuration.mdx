@@ -5,45 +5,58 @@ description: Detailed explanation of Mihosh configuration
 
 import { Callout } from 'fumadocs-ui/components/callout';
 
-The configuration file for Mihosh is stored in `~/.mihosh/config.yaml` by default. When running `mihosh` for the first time, if the configuration file does not exist, the system will automatically generate a configuration with default values.
+The configuration file for Mihosh is stored in `~/.mihosh/config.yaml` by default (or `$MIHOSH_CONFIG_DIR/config.yaml` when `MIHOSH_CONFIG_DIR` is set to an absolute path). When running `mihosh` for the first time, default values are used automatically and Mihomo connection settings (`external-controller`, `secret`, `mixed-port`) are discovered from your Mihomo configuration.
 
-## Initialize Configuration
+## Quick Setup & Editing
 
-You can quickly initialize or reset the configuration through interactive commands:
+To install the bundled Mihomo core and create a baseline managed configuration from the CLI:
 
 ```bash
-mihosh config init
+mihosh setup
 ```
-This command will prompt you to enter the Mihomo API address, port, and secret.
+
+To inspect or interactively edit Mihosh / Mihomo configuration files:
+
+```bash
+mihosh config show
+mihosh config edit
+```
 
 <Callout title="Hint" type="info">
-  If your Mihomo core does not have an authentication secret set, simply press Enter to leave it blank when prompted for the secret.
+  When editing Mihomo's configuration with `mihosh config edit`, Mihosh validates the YAML syntax on save and automatically hot-reloads the running Mihomo core.
 </Callout>
 
 ## Configuration Items Reference
 
-Here are all the configuration items supported by Mihosh:
+Here are the main application preferences in `~/.mihosh/config.yaml` that can be updated via `mihosh config set`:
 
-| Configuration Item | Type | Description | Default Value |
-| --- | --- | --- | --- |
-| `server.host` | string | Mihomo API address | `127.0.0.1` |
-| `server.port` | int | Mihomo API port | `9090` |
-| `server.secret` | string | API secret | `""` |
-| `test_url` | string | Latency test URL | `http://www.gstatic.com/generate_204` |
-| `timeout` | int | Test timeout (ms) | `5000` |
-| `language` | string | Interface language | `auto` (Supports: `auto`, `en-US`, `zh-CN`) |
-| `auto_refresh_interval` | int | Auto refresh interval (seconds) | `5` |
-| `theme` | string | UI theme | `tokyo-night` |
+| Configuration Item | CLI Key | Type | Description | Default Value |
+| --- | --- | --- | --- | --- |
+| `test_url` | `test_url` / `test-url` | string | Latency test URL | `http://www.gstatic.com/generate_204` |
+| `timeout` | `timeout` | int | Test/API timeout (ms) | `5000` |
+| `language` | `language` | string | Interface language (`auto`, `en-US`, `zh-CN`) | `auto` |
+| `auto_refresh_interval` | `auto_refresh_interval` / `auto-refresh-interval` | int | Auto refresh interval in seconds (`0` disables) | `5` |
+| `theme` | `theme` | string | UI theme name | `tokyo-night` |
+| `border_style` | `border_style` / `border-style` | string | Panel border style (`rounded`, `square`) | `rounded` |
 
 ## Command Line Configuration Management
 
-In addition to manually modifying the file, you can also use command-line tools directly to quickly modify or view configuration items, which is very useful when writing automation scripts:
+You can quickly view or modify preferences from the CLI for automation and scripting:
 
 ```bash
 mihosh config set theme catppuccin
 mihosh config set language zh-CN
-mihosh config show
+mihosh config set border-style square
+mihosh config show -o table
 ```
+
+## Environment Variables
+
+| Variable | Description |
+| --- | --- |
+| `MIHOSH_CONFIG_DIR` | Absolute path to override the default `~/.mihosh` configuration and data root |
+| `MIHOSH_SYNC_PG_DSN` | Default PostgreSQL DSN for `mihosh sync push/pull/status` |
+| `MIHOSH_SYNC_KEY` | Default profile key for `mihosh sync push/pull/status` |
 
 ## Complete Configuration Example
 
@@ -51,20 +64,14 @@ mihosh config show
 active_sub: 0eadd5c7
 auto_refresh_highlight: false
 auto_refresh_interval: 5
+border_style: rounded
 language: auto
 subs:
   - uid: c37c7c25
     name: fn
     source:
       kind: 0
-      url: https://xx.xx.xx.xx/subscribe?token=1a3b3a4
-      path: ""
-    updated_at: 0
-  - uid: 2fb6a0dc
-    name: tf
-    source:
-      kind: 0
-      url: https://xx.x.x.xx/subscribe?token=f47f9
+      url: https://example.com/subscribe?token=redacted
       path: ""
     updated_at: 0
 test_url: http://www.gstatic.com/generate_204

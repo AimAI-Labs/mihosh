@@ -1,24 +1,57 @@
 ---
 title: "mihosh service"
-description: systemd service management
+description: Manage Mihomo systemd service and inspect logs on Linux.
 ---
 
 ## Description
 
-The `mihosh service <action>` command manages Mihomo's systemd service on Linux systems.
+The `mihosh service` command manages the Mihomo systemd service and views service logs on Linux.
 
-## Supported Actions
+- When Mihosh runs in **managed mode** and `--unit` is not explicitly specified, `mihosh service` automatically targets Mihosh's managed `systemd --user` service (and reads logs with `journalctl --user`).
+- When `--unit` is explicitly specified (or in external mode), `mihosh service` manages the specified system unit via `systemctl` / `journalctl` (default: `mihomo.service`).
 
-- `status`: View service status
-- `start`: Start service
-- `stop`: Stop service
-- `restart`: Restart service
-- `enable`: Enable service on boot
-- `disable`: Disable service on boot
+## Subcommands
+
+| Subcommand | Description |
+| --- | --- |
+| `status` | View service status |
+| `start` | Start the service |
+| `stop` | Stop the service |
+| `restart` | Restart the service |
+| `enable` | Enable the service on startup |
+| `disable` | Disable the service on startup |
+| `logs` | View systemd journal logs |
+
+## Options
+
+### Persistent Options
+
+| Option | Shorthand | Default | Description |
+| --- | --- | --- | --- |
+| `--unit` | | `mihomo.service` | External systemd unit name |
+| `--output` | `-o` | `table` | Output format for managed service actions (`plain`, `table`, `json`) |
+
+### `logs` Options
+
+| Option | Shorthand | Default | Description |
+| --- | --- | --- | --- |
+| `--lines` | `-n` | `200` | Number of recent log lines to show |
+| `--follow` | `-f` | `false` | Stream new log entries continuously |
 
 ## Examples
 
 ```bash
+# View managed or default mihomo.service status
 mihosh service status
+mihosh service status -o json
+
+# Restart service
 mihosh service restart
+
+# Manage a specific external systemd unit
+mihosh service status --unit clash-meta.service
+
+# View or follow service logs
+mihosh service logs -n 100
+mihosh service logs -f
 ```

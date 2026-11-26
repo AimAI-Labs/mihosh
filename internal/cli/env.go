@@ -76,6 +76,6 @@ func newEnvCommand() *cobra.Command {
 			}
 		},
 	}
-	cmd.Flags().StringVar(&output, "output", "plain", "plain|table|json")
+	cmd.Flags().StringVarP(&output, "output", "o", "plain", "plain|table|json")
 	return cmd
 }

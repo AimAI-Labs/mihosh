@@ -1,14 +1,28 @@
 ---
 title: "mihosh version"
-description: Version information
+description: Show Mihosh version, Git commit hash, and build date.
 ---
 
 ## Description
 
-The `mihosh version` command displays Mihosh's current version, Git Commit Hash, and build date.
+The `mihosh version` command displays Mihosh's current version, Git commit hash, and build date. You can also run `mihosh --version` (`-v`) for a brief version string.
+
+## Usage
+
+```bash
+mihosh version [flags]
+```
+
+## Options
+
+| Option | Shorthand | Default | Description |
+| --- | --- | --- | --- |
+| `--output` | `-o` | `plain` | Output format, supports `plain`, `table`, `json` |
 
 ## Examples
 
 ```bash
 mihosh version
+mihosh version -o table
+mihosh version -o json
 ```

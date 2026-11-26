@@ -92,8 +92,10 @@ Core 菜单按 `h`，使用方向键或鼠标滚轮选择「安装后台服务�
 
 ```bash
 mihosh core service install --output json
+mihosh core service start --output json
+mihosh core service stop --output json
+mihosh core service restart --output json
 mihosh core service enable --output json
-mihosh core start --output json
 mihosh core service status --output json
 mihosh core service boot --output json
 mihosh core service disable --output json
@@ -109,8 +111,10 @@ Mihosh 自身升级后，可停止服务并重新安装固定入口。既有 `mi
 ```bash
 mihosh core system-proxy on --output json
 mihosh core system-proxy off --output json
+mihosh core system-proxy status --output json
 mihosh core tun on --output json
 mihosh core tun off --output json
+mihosh core tun status --output json
 mihosh core network-recover --output json
 ```
 

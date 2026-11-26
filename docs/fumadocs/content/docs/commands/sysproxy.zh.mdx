@@ -21,3 +21,7 @@ mihosh proxy off
 在 TUI 的 **Core → 运行与代理 → 终端代理** 按 `w` 切换偏好。Mihosh 会将初始化命令写入 Bash 的 `~/.bashrc` 或 Zsh 的 `${ZDOTDIR:-$HOME}/.zshrc`。重新打开或刷新 shell 后生效。重复保存会更新已有的 Mihosh 区块，并保留文件中的其他设置。移动可执行文件后可重新保存以更新路径。
 
 现有脚本仍可使用 `mihosh env`、`mihosh on` 和 `mihosh off`。
+
+## 选项
+
+`mihosh activate <bash|zsh>` 与所有 `mihosh proxy <on|off|test>` 子命令均支持 `--output` / `-o`（可选 `plain`、`table`、`json`，默认 `plain`）。

@@ -1,0 +1,75 @@
+---
+title: "mihosh sync"
+description: Export/import local backup archives and synchronize configurations via PostgreSQL.
+---
+
+The `mihosh sync` command backs up and restores subscription metadata, override configuration (`merge.yaml`), custom rule edits, proxy chains, and application preferences using either local archives (`.tar.gz` / `.zip`) or a PostgreSQL database. Sensitive credentials (such as subscription URLs/tokens, secrets, and DSNs) are automatically redacted by default on export/push and preserved on import/pull.
+
+## Subcommands
+
+### `export [file]`
+
+Export configuration and metadata to a local `.tar.gz` or `.zip` archive. If `[file]` is omitted, Mihosh generates a timestamped archive path in the current directory.
+
+| Option | Shorthand | Default | Description |
+| --- | --- | --- | --- |
+| `--no-redact` | | `false` | Keep sensitive credentials unredacted in the exported archive |
+| `--output` | `-o` | `plain` | Output format: `plain`, `table`, or `json` |
+
+### `import <file>`
+
+Restore configuration and metadata from a local `.tar.gz` or `.zip` backup archive as a recoverable atomic bundle.
+
+| Option | Shorthand | Default | Description |
+| --- | --- | --- | --- |
+| `--output` | `-o` | `plain` | Output format: `plain`, `table`, or `json` |
+
+### `push`
+
+Push the local configuration snapshot to PostgreSQL.
+
+| Option | Shorthand | Default | Description |
+| --- | --- | --- | --- |
+| `--dsn` | | *(from env / config)* | PostgreSQL connection DSN |
+| `--key` | | *(from env / config)* | Remote profile key (defaults to `default`) |
+| `--no-redact` | | `false` | Keep sensitive credentials unredacted when pushing |
+| `--output` | `-o` | `plain` | Output format: `plain`, `table`, or `json` |
+
+### `pull`
+
+Pull and restore a configuration snapshot from PostgreSQL.
+
+| Option | Shorthand | Default | Description |
+| --- | --- | --- | --- |
+| `--dsn` | | *(from env / config)* | PostgreSQL connection DSN |
+| `--key` | | *(from env / config)* | Remote profile key |
+| `--output` | `-o` | `plain` | Output format: `plain`, `table`, or `json` |
+
+### `status`
+
+Compare the local snapshot SHA-256 against the remote PostgreSQL record.
+
+| Option | Shorthand | Default | Description |
+| --- | --- | --- | --- |
+| `--dsn` | | *(from env / config)* | PostgreSQL connection DSN |
+| `--key` | | *(from env / config)* | Remote profile key |
+| `--output` | `-o` | `plain` | Output format: `plain`, `table`, or `json` |
+
+## Environment Variables
+
+- `MIHOSH_SYNC_PG_DSN`: Default PostgreSQL DSN when `--dsn` is not passed.
+- `MIHOSH_SYNC_KEY`: Default profile key when `--key` is not passed.
+
+## Examples
+
+```bash
+# Local archive export & import
+mihosh sync export ./mihosh-backup.tar.gz
+mihosh sync export ./backup.zip --output json
+mihosh sync import ./mihosh-backup.tar.gz --output table
+
+# PostgreSQL cloud sync
+mihosh sync push --dsn "postgres://user:pass@host/db" --key laptop
+mihosh sync status --key laptop --output json
+mihosh sync pull --dsn "postgres://user:pass@host/db" --key laptop
+```

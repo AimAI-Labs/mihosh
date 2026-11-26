@@ -1,6 +1,6 @@
 ---
-title: completion
-description: 生成终端自动补全脚本
+title: mihosh completion
+description: 为 Bash、Zsh、Fish 或 PowerShell 生成终端自动补全脚本。
 ---
 
 ## 用法
@@ -11,28 +11,29 @@ mihosh completion <bash|zsh|fish|powershell>
 
 ## 说明
 
-生成用于所选 shell 的自动补全脚本，可以极大地提升命令输入效率，支持自动补全子命令、代理组名称、节点名称等。
+为指定 shell（`bash`、`zsh`、`fish`、`powershell`）生成命令行自动补全脚本。
 
 ## 示例配置
 
 ### Bash
 
 ```bash
-# 将补全加载到当前会话
+# 加载到当前会话
 source <(mihosh completion bash)
 
-# 或将其配置为全局可用（Linux）
-mihosh completion bash > /etc/bash_completion.d/mihosh
+# 在 Linux 上全局安装
+mihosh completion bash | sudo tee /etc/bash_completion.d/mihosh > /dev/null
 ```
 
 ### Zsh
 
 ```zsh
-# 如果未开启自动补全功能，请先运行
-echo "autoload -U compinit; compinit" >> ~/.zshrc
-
-# 加载到当前会话
-source <(mihosh completion zsh)
+# 安装到 fpath 目录
+mkdir -p ~/.zsh/completions
+mihosh completion zsh > ~/.zsh/completions/_mihosh
+# 在 ~/.zshrc 中添加：
+#   fpath=(~/.zsh/completions $fpath)
+#   autoload -Uz compinit && compinit
 ```
 
 ### Fish
@@ -40,6 +41,16 @@ source <(mihosh completion zsh)
 ```fish
 mihosh completion fish | source
 
-# 永久加载
+# 永久安装
 mihosh completion fish > ~/.config/fish/completions/mihosh.fish
+```
+
+### PowerShell
+
+```powershell
+# 加载到当前会话
+mihosh completion powershell | Out-String | Invoke-Expression
+
+# 永久安装
+mihosh completion powershell >> $PROFILE
 ```

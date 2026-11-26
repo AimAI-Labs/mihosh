@@ -47,7 +47,7 @@ var connectionsCmd = &cobra.Command{
 }
 
 func init() {
-	connectionsCmd.Flags().StringVar(&connectionsOutput, "output", string(outputFormatPlain), "")
+	connectionsCmd.Flags().StringVarP(&connectionsOutput, "output", "o", string(outputFormatPlain), "")
 }
 
 func renderConnections(w io.Writer, conns model.ConnectionsResponse, format outputFormat) error {

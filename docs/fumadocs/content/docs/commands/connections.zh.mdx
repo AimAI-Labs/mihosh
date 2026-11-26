@@ -1,20 +1,28 @@
 ---
 title: mihosh connections
-description: 查看活跃连接
+description: 查看当前活跃连接与累计流量。
 ---
 
 ## 说明
 
-`mihosh connections` 命令用于列出当前所有的活跃代理连接。
+`mihosh connections` 命令用于列出当前所有活跃连接，以及累计上传与下载流量。
+
+## 用法
+
+```bash
+mihosh connections [flags]
+```
 
 ## 选项
 
-- `--output, -o`：输出格式，支持 `text`, `json`, `table`（默认：`text`）。
-- `--limit, -l`：最大显示的连接数（默认：`20`）。
+| 选项 | 简写 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--output` | `-o` | `plain` | 输出格式，支持 `plain`、`table`、`json` |
 
 ## 示例
 
 ```bash
 mihosh connections
-mihosh connections -o table -l 50
+mihosh connections -o table
+mihosh connections -o json
 ```

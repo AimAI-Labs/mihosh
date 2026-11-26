@@ -1,0 +1,32 @@
+---
+title: mihosh dns
+description: 基于 Mihomo /dns/query 查询 DNS 记录，排查 DNS 污染与 Fake-IP 映射。
+---
+
+`mihosh dns` 命令调用 Mihomo 内置的 `/dns/query` 接口查询指定域名的解析记录、TTL 以及 Fake-IP / 内网 / 公网 IP 标签分类。
+
+## 用法
+
+```bash
+mihosh dns query <domain> [flags]
+```
+
+## 选项
+
+| 选项 | 简写 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--type` | `-t` | `A` | DNS 记录类型（如 `A`、`AAAA`、`CNAME`、`MX`、`TXT`） |
+| `--output` | `-o` | `plain` | 输出格式，支持 `plain`、`table`、`json` |
+
+## 示例
+
+```bash
+# 查询 A 记录（默认）
+mihosh dns query example.com
+
+# 以表格格式查询 AAAA 记录
+mihosh dns query example.com --type AAAA --output table
+
+# 以 JSON 格式输出（包含 fake_ip 与 tag 字段）
+mihosh dns query example.com -t A -o json
+```

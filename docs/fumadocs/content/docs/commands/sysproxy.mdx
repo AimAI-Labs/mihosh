@@ -21,3 +21,7 @@ This is a no-privilege fallback when managed system proxy or TUN is unavailable.
 In the TUI, toggle **Shell proxy** under **Core > Runtime & proxy** with `w`. Mihosh installs the initialization call in Bash's `~/.bashrc` or Zsh's `${ZDOTDIR:-$HOME}/.zshrc`. Reopen or reload the shell to apply it. Saving again updates the existing Mihosh block and keeps the rest of the startup file. After moving the executable, save again to update its path.
 
 The legacy `mihosh env`, `mihosh on` and `mihosh off` commands continue to work for existing scripts.
+
+## Options
+
+`mihosh activate <bash|zsh>` and all `mihosh proxy <on|off|test>` subcommands support `--output` / `-o` with `plain`, `table`, or `json` (default: `plain`).

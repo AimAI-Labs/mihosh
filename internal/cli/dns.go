@@ -75,7 +75,7 @@ func newDNSCommand() *cobra.Command {
 		},
 	}
 	queryCmd.Flags().StringVarP(&recordType, "type", "t", "A", "")
-	queryCmd.Flags().StringVar(&outputRaw, "output", string(outputFormatPlain), "")
+	queryCmd.Flags().StringVarP(&outputRaw, "output", "o", string(outputFormatPlain), "")
 	dnsCmd.AddCommand(queryCmd)
 	return dnsCmd
 }

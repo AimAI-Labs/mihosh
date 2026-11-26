@@ -1,0 +1,75 @@
+---
+title: mihosh sync
+description: 本地压缩包导入导出与 PostgreSQL 云端同步备份。
+---
+
+`mihosh sync` 用于通过本地压缩包（`.tar.gz` / `.zip`）或 PostgreSQL 数据库一键备份与跨设备恢复订阅元数据、覆写配置（`merge.yaml`）、自定义规则变更、链式代理与应用偏好。导出与推送默认自动脱敏敏感凭据，导入与拉取时自动保留本机已有凭据。
+
+## 子命令
+
+### `export [file]`
+
+将配置与元数据导出为本地 `.tar.gz` 或 `.zip` 压缩包；省略 `[file]` 时会在当前目录自动生成带时间戳的文件名。
+
+| 选项 | 简写 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--no-redact` | | `false` | 禁用自动脱敏，保留原始敏感凭据 |
+| `--output` | `-o` | `plain` | 输出格式，支持 `plain`、`table`、`json` |
+
+### `import <file>`
+
+从本地 `.tar.gz` 或 `.zip` 备份包原子化恢复配置与元数据。
+
+| 选项 | 简写 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--output` | `-o` | `plain` | 输出格式，支持 `plain`、`table`、`json` |
+
+### `push`
+
+将本地配置快照推送到 PostgreSQL 数据库。
+
+| 选项 | 简写 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--dsn` | | *（读取环境变量或配置）* | PostgreSQL 连接 DSN |
+| `--key` | | *（读取环境变量或配置）* | 云端配置键名（默认 `default`） |
+| `--no-redact` | | `false` | 禁用自动脱敏，保留原始敏感凭据 |
+| `--output` | `-o` | `plain` | 输出格式，支持 `plain`、`table`、`json` |
+
+### `pull`
+
+从 PostgreSQL 数据库拉取并恢复配置快照。
+
+| 选项 | 简写 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--dsn` | | *（读取环境变量或配置）* | PostgreSQL 连接 DSN |
+| `--key` | | *（读取环境变量或配置）* | 云端配置键名 |
+| `--output` | `-o` | `plain` | 输出格式，支持 `plain`、`table`、`json` |
+
+### `status`
+
+对比本地配置快照与 PostgreSQL 远端记录的 SHA-256 同步状态。
+
+| 选项 | 简写 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--dsn` | | *（读取环境变量或配置）* | PostgreSQL 连接 DSN |
+| `--key` | | *（读取环境变量或配置）* | 云端配置键名 |
+| `--output` | `-o` | `plain` | 输出格式，支持 `plain`、`table`、`json` |
+
+## 环境变量
+
+- `MIHOSH_SYNC_PG_DSN`：未传入 `--dsn` 时使用的默认 PostgreSQL DSN。
+- `MIHOSH_SYNC_KEY`：未传入 `--key` 时使用的默认配置键名。
+
+## 示例
+
+```bash
+# 本地备份导出与导入
+mihosh sync export ./mihosh-backup.tar.gz
+mihosh sync export ./backup.zip --output json
+mihosh sync import ./mihosh-backup.tar.gz --output table
+
+# PostgreSQL 云端同步
+mihosh sync push --dsn "postgres://user:pass@host/db" --key laptop
+mihosh sync status --key laptop --output json
+mihosh sync pull --dsn "postgres://user:pass@host/db" --key laptop
+```

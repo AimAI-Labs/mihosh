@@ -1,20 +1,28 @@
 ---
 title: "mihosh connections"
-description: View active connections
+description: View active proxy connections and total traffic.
 ---
 
 ## Description
 
-The `mihosh connections` command lists all currently active proxy connections.
+The `mihosh connections` command lists all currently active connections together with total upload and download traffic.
+
+## Usage
+
+```bash
+mihosh connections [flags]
+```
 
 ## Options
 
-- `--output, -o`: Output format, supports `text`, `json`, `table` (Default: `text`).
-- `--limit, -l`: Maximum number of connections to display (Default: `20`).
+| Option | Shorthand | Default | Description |
+| --- | --- | --- | --- |
+| `--output` | `-o` | `plain` | Output format, supports `plain`, `table`, `json` |
 
 ## Examples
 
 ```bash
 mihosh connections
-mihosh connections -o table -l 50
+mihosh connections -o table
+mihosh connections -o json
 ```

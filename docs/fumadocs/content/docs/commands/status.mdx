@@ -1,14 +1,28 @@
 ---
 title: "mihosh status"
-description: View Mihomo core status
+description: View Mihomo core status.
 ---
 
 ## Description
 
-The `mihosh status` command views the current status of the Mihomo core, including version information, current proxy mode, and real-time traffic data.
+The `mihosh status` command displays a snapshot of the running Mihomo core, including current proxy mode, active connection count, real-time upload/download speeds, memory usage, and active nodes for `GLOBAL` / `Proxy` groups.
+
+## Usage
+
+```bash
+mihosh status [flags]
+```
+
+## Options
+
+| Option | Shorthand | Default | Description |
+| --- | --- | --- | --- |
+| `--output` | `-o` | `plain` | Output format, supports `plain`, `table`, `json` |
 
 ## Examples
 
 ```bash
 mihosh status
+mihosh status -o table
+mihosh status -o json
 ```

@@ -46,7 +46,7 @@ func newSyncCommandWithFactory(factory func() *service.SyncService) *cobra.Comma
 		},
 	}
 	exportCmd.Flags().BoolVar(&exportNoRedact, "no-redact", false, "")
-	exportCmd.Flags().StringVar(&exportOutput, "output", string(outputFormatPlain), "")
+	exportCmd.Flags().StringVarP(&exportOutput, "output", "o", string(outputFormatPlain), "")
 
 	// 2. mihosh sync import <file>
 	var importOutput string
@@ -66,7 +66,7 @@ func newSyncCommandWithFactory(factory func() *service.SyncService) *cobra.Comma
 			return renderSyncRestoreResult(cmdOut(cmd), res, format)
 		},
 	}
-	importCmd.Flags().StringVar(&importOutput, "output", string(outputFormatPlain), "")
+	importCmd.Flags().StringVarP(&importOutput, "output", "o", string(outputFormatPlain), "")
 
 	// 3. mihosh sync push
 	var pushDSN, pushKey, pushOutput string
@@ -92,7 +92,7 @@ func newSyncCommandWithFactory(factory func() *service.SyncService) *cobra.Comma
 	pushCmd.Flags().StringVar(&pushDSN, "dsn", "", "")
 	pushCmd.Flags().StringVar(&pushKey, "key", "", "")
 	pushCmd.Flags().BoolVar(&pushNoRedact, "no-redact", false, "")
-	pushCmd.Flags().StringVar(&pushOutput, "output", string(outputFormatPlain), "")
+	pushCmd.Flags().StringVarP(&pushOutput, "output", "o", string(outputFormatPlain), "")
 
 	// 4. mihosh sync pull
 	var pullDSN, pullKey, pullOutput string
@@ -116,7 +116,7 @@ func newSyncCommandWithFactory(factory func() *service.SyncService) *cobra.Comma
 	}
 	pullCmd.Flags().StringVar(&pullDSN, "dsn", "", "")
 	pullCmd.Flags().StringVar(&pullKey, "key", "", "")
-	pullCmd.Flags().StringVar(&pullOutput, "output", string(outputFormatPlain), "")
+	pullCmd.Flags().StringVarP(&pullOutput, "output", "o", string(outputFormatPlain), "")
 
 	// 5. mihosh sync status
 	var statusDSN, statusKey, statusOutput string
@@ -140,7 +140,7 @@ func newSyncCommandWithFactory(factory func() *service.SyncService) *cobra.Comma
 	}
 	statusSyncCmd.Flags().StringVar(&statusDSN, "dsn", "", "")
 	statusSyncCmd.Flags().StringVar(&statusKey, "key", "", "")
-	statusSyncCmd.Flags().StringVar(&statusOutput, "output", string(outputFormatPlain), "")
+	statusSyncCmd.Flags().StringVarP(&statusOutput, "output", "o", string(outputFormatPlain), "")
 
 	syncCmd.AddCommand(exportCmd, importCmd, pushCmd, pullCmd, statusSyncCmd)
 	return syncCmd

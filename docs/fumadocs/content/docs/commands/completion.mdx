@@ -1,6 +1,6 @@
 ---
-title: "completion"
-description: Generate terminal auto-completion script
+title: "mihosh completion"
+description: Generate shell auto-completion scripts for Bash, Zsh, Fish, or PowerShell.
 ---
 
 ## Usage
@@ -11,7 +11,7 @@ mihosh completion <bash|zsh|fish|powershell>
 
 ## Description
 
-Generates an auto-completion script for the selected shell, which can greatly improve command input efficiency. It supports auto-completion for subcommands, proxy group names, node names, etc.
+Generates an auto-completion script for the selected shell (`bash`, `zsh`, `fish`, or `powershell`).
 
 ## Example Configuration
 
@@ -21,18 +21,19 @@ Generates an auto-completion script for the selected shell, which can greatly im
 # Load completions into the current session
 source <(mihosh completion bash)
 
-# Or make it globally available (Linux)
-mihosh completion bash > /etc/bash_completion.d/mihosh
+# Install globally on Linux
+mihosh completion bash | sudo tee /etc/bash_completion.d/mihosh > /dev/null
 ```
 
 ### Zsh
 
 ```zsh
-# If auto-completion is not enabled, run this first
-echo "autoload -U compinit; compinit" >> ~/.zshrc
-
-# Load into the current session
-source <(mihosh completion zsh)
+# Install into your fpath
+mkdir -p ~/.zsh/completions
+mihosh completion zsh > ~/.zsh/completions/_mihosh
+# Ensure ~/.zshrc includes:
+#   fpath=(~/.zsh/completions $fpath)
+#   autoload -Uz compinit && compinit
 ```
 
 ### Fish
@@ -40,6 +41,16 @@ source <(mihosh completion zsh)
 ```fish
 mihosh completion fish | source
 
-# Permanent load
+# Permanent installation
 mihosh completion fish > ~/.config/fish/completions/mihosh.fish
+```
+
+### PowerShell
+
+```powershell
+# Load into the current session
+mihosh completion powershell | Out-String | Invoke-Expression
+
+# Permanent installation
+mihosh completion powershell >> $PROFILE
 ```

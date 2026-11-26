@@ -1,18 +1,36 @@
 ---
 title: mihosh doctor
-description: 配置健康检查
+description: 诊断 Mihosh 配置、Mihomo API、代理端口与 WebSocket 连通性。
 ---
 
 ## 说明
 
-`mihosh doctor` 命令用于对 Mihosh 及 Mihomo 的运行环境进行全面体检。它会检查：
+`mihosh doctor` 命令会对 Mihosh 与 Mihomo 的运行环境执行全面健康检查，任意检查项失败时返回退出码 `4`。检查项目包括：
 
-- 配置文件是否存在且有效
-- 是否能成功连接到 Mihomo API
-- API 版本的兼容性
+1. `mihosh_config`：`~/.mihosh/config.yaml` 是否存在
+2. `mihomo_config`：是否能自动发现 Mihomo 配置文件
+3. `external_controller`：外部控制器地址格式是否合法
+4. `secret`：是否配置了 API 密钥（未配置时给出警告）
+5. `proxy`：`mixed-port` 混合代理地址格式及 TCP 连通性
+6. `mihomo_api`：Mihomo HTTP API 是否可达
+7. `websocket`：Mihomo `/traffic` WebSocket 握手是否正常
+
+## 用法
+
+```bash
+mihosh doctor [flags]
+```
+
+## 选项
+
+| 选项 | 简写 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--output` | `-o` | `plain` | 输出格式，支持 `plain`、`table`、`json` |
 
 ## 示例
 
 ```bash
 mihosh doctor
+mihosh doctor -o table
+mihosh doctor -o json
 ```

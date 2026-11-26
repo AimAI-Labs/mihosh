@@ -5,11 +5,7 @@ description: Quick start guide for Mihosh
 
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 
-Mihosh is a full-featured Terminal UI (TUI) proxy management tool based on Mihomo.
-
-## Prerequisites
-
-Before running Mihosh, you need to ensure that the Mihomo proxy core is running and the RESTful API is enabled.
+Mihosh is a full-featured Terminal UI (TUI) and CLI management tool for Mihomo. It works both with an existing Mihomo instance and in standalone managed-core mode.
 
 ## Quick Steps
 
@@ -20,11 +16,12 @@ Before running Mihosh, you need to ensure that the Mihomo proxy core is running 
   </Step>
 
   <Step>
-    ### Initialize Configuration
-    Run the following command and enter the Mihomo API address and secret when prompted:
+    ### Set Up Core or Connect Existing Mihomo
+    If you want Mihosh to install and manage a bundled Mihomo core automatically, run:
     ```bash
-    mihosh config init
+    mihosh setup
     ```
+    If you already run Mihomo locally, Mihosh auto-discovers its configuration (`external-controller`, `secret`, `mixed-port`). You can verify connectivity with `mihosh doctor`.
   </Step>
 
   <Step>

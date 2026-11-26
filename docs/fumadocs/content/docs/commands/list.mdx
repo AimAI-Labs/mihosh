@@ -15,11 +15,11 @@ mihosh list [flags]
 
 | Option | Shorthand | Default | Description |
 | --- | --- | --- | --- |
-| `--output` | `-o` | `text` | Output format, supports `text`, `json`, `table` |
+| `--output` | `-o` | `plain` | Output format, supports `plain`, `table`, `json` |
 
 ## Examples
 
-### Default Text Output
+### Default Plain Output
 
 ```bash
 mihosh list
@@ -39,11 +39,11 @@ Ideal for use with other tools (e.g., `jq`):
 mihosh list -o json
 
 # Filter for a specific proxy group using jq
-mihosh list -o json | jq '.[] | select(.name == "Proxy")'
+mihosh list -o json | jq '.groups[] | select(.name == "Proxy")'
 ```
 
-### Using Custom Configuration
+### Using Custom Configuration Directory
 
 ```bash
-mihosh list -c ~/.config/mihosh/custom.toml
+MIHOSH_CONFIG_DIR="$HOME/.mihosh-work" mihosh list
 ```

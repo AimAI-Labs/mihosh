@@ -1,21 +1,32 @@
 ---
 title: mihosh mode
-description: 切换代理模式
+description: 查询或切换 Mihomo 代理模式。
 ---
 
 ## 说明
 
-`mihosh mode <mode>` 命令用于切换 Mihomo 的代理模式。
+`mihosh mode` 不带参数时查询当前代理模式，传入模式名称时切换 Mihomo 的代理模式。
+
+## 用法
+
+```bash
+mihosh mode [rule|global|direct]
+```
 
 ## 支持的模式
 
-- `rule`：规则模式，根据配置的规则分流。
+- `rule`：规则模式，按配置的规则分流。
 - `global`：全局模式，所有流量走全局代理节点。
-- `direct`：直连模式，所有流量直接连接，不走代理。
+- `direct`：直连模式，所有流量直接连接，不经过代理。
 
 ## 示例
 
 ```bash
+# 查看当前代理模式
+mihosh mode
+
+# 切换代理模式
 mihosh mode rule
 mihosh mode global
+mihosh mode direct
 ```

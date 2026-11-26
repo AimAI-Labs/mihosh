@@ -1,18 +1,36 @@
 ---
 title: "mihosh doctor"
-description: Configuration health check
+description: Diagnose Mihosh configuration, Mihomo API, proxy port, and WebSocket connectivity.
 ---
 
 ## Description
 
-The `mihosh doctor` command performs a comprehensive health check on the Mihosh and Mihomo runtime environment. It checks:
+The `mihosh doctor` command runs a health check across Mihosh and Mihomo and exits with code `4` if any check fails. It checks:
 
-- If the configuration file exists and is valid
-- If it can successfully connect to the Mihomo API
-- API version compatibility
+1. `mihosh_config`: Whether `~/.mihosh/config.yaml` exists
+2. `mihomo_config`: Whether Mihomo's configuration file can be discovered
+3. `external_controller`: Whether the controller address is a valid HTTP/HTTPS URL
+4. `secret`: Whether an API secret is configured (warns when empty)
+5. `proxy`: Whether the configured `mixed-port` proxy address is valid and TCP-reachable
+6. `mihomo_api`: Whether Mihomo's HTTP API responds
+7. `websocket`: Whether Mihomo's `/traffic` WebSocket handshake succeeds
+
+## Usage
+
+```bash
+mihosh doctor [flags]
+```
+
+## Options
+
+| Option | Shorthand | Default | Description |
+| --- | --- | --- | --- |
+| `--output` | `-o` | `plain` | Output format, supports `plain`, `table`, `json` |
 
 ## Examples
 
 ```bash
 mihosh doctor
+mihosh doctor -o table
+mihosh doctor -o json
 ```

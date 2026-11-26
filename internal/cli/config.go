@@ -177,7 +177,7 @@ func reloadMihomoCore(configPath string) error {
 }
 
 func init() {
-	configShowCmd.Flags().StringVar(&configShowOutput, "output", string(outputFormatPlain), "")
+	configShowCmd.Flags().StringVarP(&configShowOutput, "output", "o", string(outputFormatPlain), "")
 	configEditCmd.Flags().StringVar(&configEditEditor, "editor", "", "")
 	configEditCmd.Flags().StringVar(&configEditPath, "path", "", "")
 	configCmd.AddCommand(configShowCmd)

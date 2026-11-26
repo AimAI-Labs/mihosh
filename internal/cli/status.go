@@ -60,7 +60,7 @@ var statusCmd = &cobra.Command{
 }
 
 func init() {
-	statusCmd.Flags().StringVar(&statusOutput, "output", string(outputFormatPlain), "")
+	statusCmd.Flags().StringVarP(&statusOutput, "output", "o", string(outputFormatPlain), "")
 }
 
 type statusSelectedGroup struct {

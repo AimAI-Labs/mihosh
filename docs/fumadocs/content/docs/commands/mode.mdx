@@ -1,11 +1,17 @@
 ---
 title: "mihosh mode"
-description: Switch proxy mode
+description: Query or switch Mihomo proxy mode.
 ---
 
 ## Description
 
-The `mihosh mode <mode>` command switches Mihomo's proxy mode.
+The `mihosh mode` command displays the current proxy mode when called without arguments, or switches Mihomo's proxy mode when a mode is specified.
+
+## Usage
+
+```bash
+mihosh mode [rule|global|direct]
+```
 
 ## Supported Modes
 
@@ -16,6 +22,11 @@ The `mihosh mode <mode>` command switches Mihomo's proxy mode.
 ## Examples
 
 ```bash
+# Show current mode
+mihosh mode
+
+# Switch proxy mode
 mihosh mode rule
 mihosh mode global
+mihosh mode direct
 ```

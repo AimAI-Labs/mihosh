@@ -3,7 +3,7 @@ title: 命令参考
 description: Mihosh 所有可用命令的概览与快速参考。
 ---
 
-Mihosh 提供了丰富的命令行接口，让你无需打开 TUI 界面即可快速管理 Mihomo 代理核心。
+Mihosh 提供了丰富的命令行接口，让你无需打开 TUI 界面即可管理 Mihomo 代理核心、配置、备份同步、DNS 排查与终端代理环境。
 
 ## 命令一览
 
@@ -11,37 +11,37 @@ Mihosh 提供了丰富的命令行接口，让你无需打开 TUI 界面即可�
 | --- | --- |
 | `mihosh` | 启动交互式 TUI 界面 |
 | `mihosh list` | 列出代理组和节点 |
-| `mihosh select` | 切换代理节点 |
-| `mihosh test` | 延迟测试 |
+| `mihosh select` | 切换代理组中的活跃节点 |
+| `mihosh test` | 测试当前生效节点出口信息，或测速指定节点 / 策略组 |
 | `mihosh connections` | 查看活跃连接 |
-| `mihosh mode` | 切换代理模式 |
+| `mihosh mode` | 查询或切换代理模式（`rule` / `global` / `direct`） |
 | `mihosh status` | 查看 Mihomo 核心状态 |
-| `mihosh core / setup` | 内核安装、首次配置与托管 |
-| `mihosh config` | 配置管理 |
-| `mihosh service` | systemd 服务管理 |
-| `mihosh doctor` | 配置健康检查 |
-| `mihosh env` / `mihosh on/off` | 设置当前终端代理环境与测试函数 |
-| `mihosh selfupdate` | 自动更新 |
-| `mihosh version` | 版本信息 |
+| `mihosh dns` | 基于 Mihomo `/dns/query` 查询 DNS 记录与 Fake-IP 映射 |
+| `mihosh core` / `mihosh setup` | 托管内核安装、生命周期、后台服务、系统代理与 TUN |
+| `mihosh config` | 查看、修改或编辑 Mihosh / Mihomo 配置 |
+| `mihosh sync` | 本地压缩包导入导出与 PostgreSQL 云端同步 |
+| `mihosh service` | 管理 systemd 服务与查看日志（Linux） |
+| `mihosh doctor` | 配置与连通性健康检查 |
+| `mihosh activate` / `mihosh proxy` | 终端代理初始化、`on`/`off` 开关与出口 IP 检测（兼容旧命令 `on`/`off`/`env`） |
+| `mihosh completion` | 生成 shell 自动补全脚本（`bash`、`zsh`、`fish`、`powershell`） |
+| `mihosh version` | 显示版本号、Commit 与构建日期 |
 
-## 全局选项
+## 输出格式与环境变量
 
-所有命令均支持以下全局选项：
+绝大多数查询和管理命令均支持 `--output` / `-o`，可选 `plain`、`table`、`json`，便于脚本化处理。
 
-```bash
-mihosh <command> --config, -c <path>
-```
-
-使用 `--config`（或简写 `-c`）可以指定自定义的配置文件路径。当你有多套配置需要切换时，这个选项尤为实用：
+如需指定自定义配置目录（默认 `~/.mihosh`），请将环境变量 `MIHOSH_CONFIG_DIR` 设为绝对路径：
 
 ```bash
-# 使用自定义配置文件
-mihosh list -c ~/.config/mihosh/custom.toml
-
-# 等价写法
-mihosh list --config ~/.config/mihosh/custom.toml
+MIHOSH_CONFIG_DIR="$HOME/.mihosh-work" mihosh list --output json
 ```
 
-<Callout type="info">
-如果不指定 `--config`，Mihosh 将使用默认路径下的配置文件。
-</Callout>
+## 退出码
+
+| 退出码 | 含义 |
+| --- | --- |
+| `0` | 执行成功 |
+| `1` | 通用错误 |
+| `2` | 参数或选项错误 |
+| `3` | 配置错误 |
+| `4` | 网络、API 或健康检查失败 |
