@@ -4,10 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
+	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -176,5 +181,37 @@ func TestRenderDoctorReportReturnsWriterError(t *testing.T) {
 			err := renderDoctorReport(doctorFailingWriter{err: want}, doctorReport{}, format)
 			require.ErrorIs(t, err, want)
 		})
+	}
+}
+
+func TestDoctorWebSocketNormalizesWildcardAndUsesAuthorization(t *testing.T) {
+	const secret = "fixture"
+	upgrader := websocket.Upgrader{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host, _, err := net.SplitHostPort(r.Host)
+		if err != nil || host != "127.0.0.1" {
+			t.Errorf("websocket controller host = %q, want 127.0.0.1", r.Host)
+		}
+		if r.URL.Path != "/traffic" || r.URL.RawQuery != "" {
+			t.Error("doctor must probe the traffic stream without query parameters")
+		}
+		if r.Header.Get("Authorization") != "Bearer "+secret {
+			t.Error("missing bearer authorization")
+		}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		_ = conn.Close()
+	}))
+	defer server.Close()
+
+	_, port, err := net.SplitHostPort(server.Listener.Addr().String())
+	require.NoError(t, err)
+	for _, host := range []string{"0.0.0.0", "::", ""} {
+		raw := net.JoinHostPort(host, port)
+		result := checkWebSocketAvailable(config.MihomoEndpoint{ExternalController: raw, Secret: secret})
+		require.Equal(t, doctorStatusOK, result.Status, result.Message)
 	}
 }

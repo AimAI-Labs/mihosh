@@ -82,9 +82,9 @@ func (c *Client) Generation() uint64 {
 	return c.generation
 }
 
-// ensureScheme 为 baseURL 补 http:// 前缀（若无 http:///https://），去掉末尾斜杠，
+// ControllerHTTPURL 为 baseURL 补 http:// 前缀（若无 http:///https://），去掉末尾斜杠，
 // 并将通配监听地址（如 ":9090"、"0.0.0.0:9090"、"[::]:9090"）归一为可拨号的 127.0.0.1。
-func ensureScheme(baseURL string) string {
+func ControllerHTTPURL(baseURL string) string {
 	trimmed := strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if !strings.HasPrefix(trimmed, "http://") && !strings.HasPrefix(trimmed, "https://") {
 		if strings.HasPrefix(trimmed, ":") {
@@ -117,7 +117,7 @@ func (c *Client) doRawRequest(method, path string, body interface{}) (*http.Resp
 	secret := c.secret
 	c.mu.RUnlock()
 
-	reqURL := ensureScheme(baseURL) + path
+	reqURL := ControllerHTTPURL(baseURL) + path
 
 	var reqBody io.Reader
 	if body != nil {

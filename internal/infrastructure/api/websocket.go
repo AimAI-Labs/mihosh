@@ -144,7 +144,7 @@ func (c *WSClient) SetLogsHandler(handler func(LogData)) {
 
 func buildWSURL(baseURL, secret, endpoint string) string {
 	// external-controller 原值无 scheme：先补 http:// 再转换为 ws scheme。
-	wsURL := ensureScheme(baseURL)
+	wsURL := ControllerHTTPURL(baseURL)
 	wsURL = strings.Replace(wsURL, "https://", "wss://", 1)
 	wsURL = strings.Replace(wsURL, "http://", "ws://", 1)
 

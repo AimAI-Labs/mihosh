@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -118,7 +119,7 @@ func checkMihomoConfig() doctorCheckResult {
 
 // checkExternalController 校验 external-controller 地址（原值，可能无 scheme）。
 func checkExternalController(raw string) doctorCheckResult {
-	normalized := ensureDoctorHTTPScheme(raw)
+	normalized := api.ControllerHTTPURL(raw)
 	if err := validateDoctorHTTPURL(normalized); err != nil {
 		return doctorCheckResult{Name: "external_controller", Status: doctorStatusFail, Message: err.Error(), Target: raw, Hint: "Mihomo API 外部控制器地址无效。请检查是否为有效的 HTTP/HTTPS URL，例如 127.0.0.1:9090。"}
 	}
@@ -158,27 +159,25 @@ func checkMihomoReachable(cfg *config.Config, endpoint config.MihomoEndpoint) do
 }
 
 func checkWebSocketAvailable(endpoint config.MihomoEndpoint) doctorCheckResult {
-	wsURL, err := buildDoctorWSURL(endpoint.ExternalController, endpoint.Secret, "traffic")
+	wsURL, err := buildDoctorWSURL(endpoint.ExternalController, "traffic")
 	if err != nil {
 		return doctorCheckResult{Name: "websocket", Status: doctorStatusFail, Message: err.Error(), Target: endpoint.ExternalController, Hint: "WebSocket URL 构建失败，请检查 external-controller 地址是否合法。"}
 	}
 
 	dialer := websocket.Dialer{HandshakeTimeout: doctorProbeTimeout}
-	conn, _, err := dialer.Dial(wsURL, nil) //nolint:bodyclose // Gorilla owns the handshake response body; DialContext requires no application close.
+	headers := make(http.Header)
+	if endpoint.Secret != "" {
+		headers.Set("Authorization", "Bearer "+endpoint.Secret)
+	}
+	conn, resp, err := dialer.Dial(wsURL, headers)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	if err != nil {
 		return doctorCheckResult{Name: "websocket", Status: doctorStatusFail, Message: err.Error(), Target: endpoint.ExternalController, Hint: "WebSocket 握手失败。可能的原因：API 地址错误、网络不通或 Mihomo 版本过低不支持此端点。"}
 	}
 	_ = conn.Close()
 	return doctorCheckResult{Name: "websocket", Status: doctorStatusOK, Message: "reachable", Target: endpoint.ExternalController}
-}
-
-// ensureDoctorHTTPScheme 为 external-controller 原值（无 scheme）补 http://，
-// 供 doctor 校验/拼接 URL 时使用。
-func ensureDoctorHTTPScheme(raw string) string {
-	if strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://") {
-		return raw
-	}
-	return "http://" + raw
 }
 
 func buildDoctorSummary(checks []doctorCheckResult) doctorReport {
@@ -320,9 +319,9 @@ func dialDoctorTCP(address string) error {
 	return conn.Close()
 }
 
-func buildDoctorWSURL(baseURL, secret, endpoint string) (string, error) {
+func buildDoctorWSURL(baseURL, endpoint string) (string, error) {
 	// external-controller 原值无 scheme，先补 http:// 再校验/转换。
-	normalized := ensureDoctorHTTPScheme(baseURL)
+	normalized := api.ControllerHTTPURL(baseURL)
 	if err := validateDoctorHTTPURL(normalized); err != nil {
 		return "", err
 	}
@@ -337,10 +336,5 @@ func buildDoctorWSURL(baseURL, secret, endpoint string) (string, error) {
 		parsed.Scheme = "ws"
 	}
 	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/" + endpoint
-	if secret != "" {
-		q := parsed.Query()
-		q.Set("token", secret)
-		parsed.RawQuery = q.Encode()
-	}
 	return parsed.String(), nil
 }
