@@ -10,11 +10,13 @@ description: 如何参与 Mihosh 的开发
 - Go 1.25 或更高版本
 - [mise](https://mise.jdx.dev/) (可选，用于环境管理)
 
+开发工作和开发 PR 使用 `dev` 分支。发布稳定版时，将已验收的变更同步到 `main`，在 `main` 上为已验证的提交打正式标签。安装脚本从 `main` 提供，发布工作流也将 Homebrew Formula 写回 `main`。
+
 ## 获取与构建
 
 ```bash
 # 1. 克隆代码
-git clone https://github.com/AimAI-Labs/mihosh.git
+git clone --branch dev https://github.com/AimAI-Labs/mihosh.git
 cd mihosh
 
 # 2. 安装依赖

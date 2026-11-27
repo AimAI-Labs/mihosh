@@ -22,6 +22,10 @@ A terminal UI and CLI for mihomo. Manage proxy nodes, connections, logs, subscri
 
 See the [online documentation](https://aimai-labs.github.io/mihosh/) for setup, usage, configuration, and development.
 
+## Release Branches
+
+`main` holds stable releases and the Homebrew formula. Active development and prerelease builds use `dev`. Both branches run CI and lint checks.
+
 ## Quick Installation
 
 Supports Linux and macOS on amd64 and arm64.
@@ -37,7 +41,7 @@ brew install AimAI-Labs/mihosh/mihosh
 ### Install Script
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AimAI-Labs/mihosh/HEAD/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/AimAI-Labs/mihosh/refs/heads/main/install.sh | bash
 ```
 
 ### Manual Installation

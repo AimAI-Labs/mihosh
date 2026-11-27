@@ -111,7 +111,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          ref: main
+          fetch-depth: 0
 
       - name: Download artifacts
         uses: actions/download-artifact@v8
@@ -126,6 +127,10 @@ jobs:
           if [[ "$version" == *-* ]]; then
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
           else
+            if ! git merge-base --is-ancestor "$GITHUB_SHA" HEAD; then
+              echo "::error::Stable release tags must point to commits on main."
+              exit 1
+            fi
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -196,8 +201,6 @@ jobs:
 
       - name: Push Homebrew formula
         if: steps.channel.outputs.prerelease == 'false'
-        env:
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
 
@@ -211,4 +214,4 @@ jobs:
           fi
 
           git commit -m "Update mihosh to ${GITHUB_REF_NAME}"
-          git push origin HEAD:${DEFAULT_BRANCH}
+          git push origin HEAD:main

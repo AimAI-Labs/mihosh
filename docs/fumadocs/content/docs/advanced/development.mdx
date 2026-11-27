@@ -10,11 +10,13 @@ Welcome to contribute to Mihosh! Below is a guide for setting up your developmen
 - Go 1.25 or higher
 - [mise](https://mise.jdx.dev/) (Optional, for environment management)
 
+Use `dev` for ongoing development and open development pull requests against it. Promote verified changes to `main` for a stable release. Tag the verified `main` commit for a stable release. The release workflow updates the Homebrew formula on `main`, which also serves the installation script.
+
 ## Fetch & Build
 
 ```bash
 # 1. Clone code
-git clone https://github.com/AimAI-Labs/mihosh.git
+git clone --branch dev https://github.com/AimAI-Labs/mihosh.git
 cd mihosh
 
 # 2. Install dependencies

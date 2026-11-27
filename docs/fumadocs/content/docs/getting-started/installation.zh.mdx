@@ -7,6 +7,8 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 Mihosh 支持 Linux 和 macOS 系统 (amd64 和 arm64 架构)。
 
+下方安装方式使用稳定版分支 `main` 或正式发布包。构建开发版时，请切换到 `dev`。
+
 ## 安装方法
 
 我们提供多种安装方式，请根据你的系统环境选择最适合的一种：
@@ -15,7 +17,7 @@ Mihosh 支持 Linux 和 macOS 系统 (amd64 和 arm64 架构)。
   <Tab value="脚本安装 (推荐)">
     在 Linux 或 macOS 终端中运行以下一键安装脚本：
     ```bash
-    curl -fsSL https://raw.githubusercontent.com/AimAI-Labs/mihosh/HEAD/install.sh | bash
+    curl -fsSL https://raw.githubusercontent.com/AimAI-Labs/mihosh/refs/heads/main/install.sh | bash
     ```
   </Tab>
   <Tab value="Homebrew (macOS / Linux)">
@@ -29,7 +31,7 @@ Mihosh 支持 Linux 和 macOS 系统 (amd64 和 arm64 架构)。
   <Tab value="源码编译">
     要求你的系统中已安装 Go 1.25+：
     ```bash
-    git clone https://github.com/AimAI-Labs/mihosh.git
+    git clone --branch main https://github.com/AimAI-Labs/mihosh.git
     cd mihosh
     make build
     # 编译后的二进制文件位于当前目录的 mihosh

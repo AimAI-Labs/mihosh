@@ -7,6 +7,8 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 Mihosh supports Linux and macOS systems (amd64 and arm64 architectures).
 
+The installation instructions below use the stable `main` branch and stable releases. For development builds, check out `dev`.
+
 ## Installation Methods
 
 We provide multiple installation methods, please choose the one that best suits your system environment:
@@ -15,7 +17,7 @@ We provide multiple installation methods, please choose the one that best suits 
   <Tab value="Script Installation (Recommended)">
     Run the following one-click installation script in the Linux or macOS terminal:
     ```bash
-    curl -fsSL https://raw.githubusercontent.com/AimAI-Labs/mihosh/HEAD/install.sh | bash
+    curl -fsSL https://raw.githubusercontent.com/AimAI-Labs/mihosh/refs/heads/main/install.sh | bash
     ```
   </Tab>
   <Tab value="Homebrew (macOS / Linux)">
@@ -29,7 +31,7 @@ We provide multiple installation methods, please choose the one that best suits 
   <Tab value="Build from Source">
     Requires Go 1.25+ installed on your system:
     ```bash
-    git clone https://github.com/AimAI-Labs/mihosh.git
+    git clone --branch main https://github.com/AimAI-Labs/mihosh.git
     cd mihosh
     make build
     # The compiled binary file is located in the current directory as mihosh
