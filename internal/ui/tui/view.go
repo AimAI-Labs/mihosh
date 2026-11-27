@@ -209,7 +209,9 @@ func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo,
 		verStr := fmt.Sprintf("%s  →  %s", info.CurrentVersion, info.Version)
 		body = lipgloss.NewStyle().Foreground(common.TokyoCyan()).Bold(true).Render(verStr) + "\n\n"
 		body += lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render(i18n.T("update.release_page")+"\n"+info.ReleaseURL) + "\n\n"
-		if info.DownloadURL == "" {
+		if info.HomebrewManaged {
+			body += i18n.T("update.homebrew_install")
+		} else if info.DownloadURL == "" {
 			body += i18n.T("update.manual_install")
 		} else {
 

@@ -1309,6 +1309,7 @@
   "core.desc.mihomo": "Manage the controller, secret, proxy port, LAN access and log level in one place.",
   "update.release_page": "Release page",
   "update.manual_install": "No verified automatic update is available. Install from the release page. [Esc] Close",
+  "update.homebrew_install": "Run brew upgrade mihosh to update this Homebrew installation. [Esc] Close",
   "update.title": "New Version Available",
   "update.downloading": "Downloading and applying update, please wait...",
   "update.failed": "Update failed: %s",

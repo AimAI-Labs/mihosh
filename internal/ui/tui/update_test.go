@@ -64,6 +64,17 @@ func TestUpdate_GlobalMessages(t *testing.T) {
 	}
 }
 
+func TestHomebrewUpdateDialogShowsManualUpgrade(t *testing.T) {
+	i18n.Init()
+	const width, height = 140, 30
+	background := strings.Repeat(strings.Repeat(" ", width)+"\n", height)
+	info := &model.UpdateInfo{Version: "v2.0.1", HomebrewManaged: true}
+	rendered := ansi.Strip(overlayUpdateDialog(background, width, height, info, false, nil))
+	if !strings.Contains(rendered, "brew upgrade mihosh") || strings.Contains(rendered, i18n.T("update.apply_now")) {
+		t.Fatalf("expected Homebrew upgrade instructions without an automatic update button:\n%s", rendered)
+	}
+}
+
 func TestUpdate_MouseMessages(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	client := api.NewClient(config.MihomoEndpoint{}, 2000)

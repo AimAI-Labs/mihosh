@@ -84,10 +84,11 @@ func CheckUpdate(currentVersion string) (*model.UpdateInfo, error) {
 		}
 	}
 
-	return release.updateInfo(currentVersion, runtime.GOOS, runtime.GOARCH), nil
+	executable, _ := os.Executable()
+	return release.updateInfo(currentVersion, runtime.GOOS, runtime.GOARCH, executable), nil
 }
 
-func (r githubRelease) updateInfo(currentVersion, goos, goarch string) *model.UpdateInfo {
+func (r githubRelease) updateInfo(currentVersion, goos, goarch, executable string) *model.UpdateInfo {
 	tag := url.PathEscape(r.TagName)
 	info := &model.UpdateInfo{
 		CurrentVersion: currentVersion,
@@ -95,6 +96,10 @@ func (r githubRelease) updateInfo(currentVersion, goos, goarch string) *model.Up
 		ReleaseURL:     releaseBase + "tag/" + tag,
 	}
 	if goos != "linux" && goos != "darwin" {
+		return info
+	}
+	if target, err := filepath.EvalSymlinks(executable); err == nil && isHomebrewUpdateTarget(target) {
+		info.HomebrewManaged = true
 		return info
 	}
 	// 与 release.yml 的 tar 打包步骤使用相同的文件名和归档成员名。
@@ -130,6 +135,14 @@ func isTrustedUpdateURL(raw string) bool {
 	return err == nil && u.Scheme == "https" && u.Host == "github.com" && u.User == nil
 }
 
+func isHomebrewUpdateTarget(target string) bool {
+	if strings.Contains(filepath.ToSlash(target), "/Cellar/mihosh/") {
+		return true
+	}
+	cellar := os.Getenv("HOMEBREW_CELLAR")
+	return filepath.IsAbs(cellar) && strings.HasPrefix(target, filepath.Join(cellar, "mihosh")+string(filepath.Separator))
+}
+
 // DownloadAndApplyUpdate verifies the release archive before replacing the running executable.
 func DownloadAndApplyUpdate(info model.UpdateInfo) error {
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
@@ -142,10 +155,6 @@ func DownloadAndApplyUpdate(info model.UpdateInfo) error {
 	if err != nil {
 		return err
 	}
-	target, err = filepath.EvalSymlinks(target)
-	if err != nil {
-		return err
-	}
 	client := &http.Client{Timeout: 60 * time.Second}
 	return applyReleaseUpdate(client, info, target)
 }
@@ -155,6 +164,22 @@ func applyReleaseUpdate(client *http.Client, info model.UpdateInfo, target strin
 	if info.DownloadURL == "" || digest == nil {
 		return errors.New("no verified update archive available")
 	}
+	target, err := filepath.EvalSymlinks(target)
+	if err != nil {
+		return err
+	}
+	if isHomebrewUpdateTarget(target) {
+		return errors.New("Homebrew manages this installation. Run brew upgrade mihosh")
+	}
+	staged, err := os.CreateTemp(filepath.Dir(target), ".mihosh-update-*")
+	if err != nil {
+		if errors.Is(err, os.ErrPermission) {
+			return fmt.Errorf("cannot write to the install directory. Please rerun the installer with the required permissions: %w", err)
+		}
+		return err
+	}
+	defer func() { _ = os.Remove(staged.Name()) }()
+	defer func() { _ = staged.Close() }()
 
 	resp, err := client.Get(info.DownloadURL)
 	if err != nil {
@@ -186,10 +211,10 @@ func applyReleaseUpdate(client *http.Client, info model.UpdateInfo, target strin
 	if _, err := archive.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
-	return replaceFromUpdateArchive(archive, target)
+	return replaceFromUpdateArchive(archive, staged, target)
 }
 
-func replaceFromUpdateArchive(archive io.Reader, target string) error {
+func replaceFromUpdateArchive(archive io.Reader, staged *os.File, target string) error {
 	gz, err := gzip.NewReader(archive)
 	if err != nil {
 		return fmt.Errorf("open update archive: %w", err)
@@ -205,12 +230,6 @@ func replaceFromUpdateArchive(archive io.Reader, target string) error {
 	if err != nil {
 		return err
 	}
-	staged, err := os.CreateTemp(filepath.Dir(target), ".mihosh-update-*")
-	if err != nil {
-		return err
-	}
-	defer func() { _ = os.Remove(staged.Name()) }()
-	defer func() { _ = staged.Close() }()
 	if _, err := io.Copy(staged, contents); err != nil {
 		return fmt.Errorf("extract update executable: %w", err)
 	}
