@@ -1,7 +1,6 @@
 package nodes
 
 import (
-	"fmt"
 	"slices"
 	"sort"
 	"strings"
@@ -668,7 +667,7 @@ func (s State) LaunchBatchTests() (State, tea.Cmd) {
 	s.TestingTarget = s.testBatch.Current()
 	if s.Testing && s.batchMode {
 		done, total := s.testBatch.Progress()
-		s.TestingTarget = fmt.Sprintf("%s（已完成 %d/%d）", s.TestingTarget, done, total)
+		s.TestingTarget = i18n.Tf("nodes.test_progress", s.TestingTarget, done, total)
 	}
 	return s, tea.Batch(cmds...)
 }

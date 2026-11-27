@@ -415,3 +415,18 @@ func TestUpdateDownloadModalAndFailureStayVisible(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateAppliedNoticeUsesTheSelectedLanguage(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("auto") })
+	for _, tc := range []struct{ lang, want string }{
+		{"zh-CN", "更新已完成"},
+		{"en-US", "Update applied"},
+	} {
+		i18n.SetLanguageOverride(tc.lang)
+		m, _, _ := (Model{}).applyCoreEvent(messages.UpdateAppliedMsg{})
+		if m.notice.Message.Level != messages.NoticeSuccess || !strings.Contains(m.notice.Message.Text, tc.want) {
+			t.Errorf("%s: unexpected update notice %q", tc.lang, m.notice.Message.Text)
+		}
+	}
+}

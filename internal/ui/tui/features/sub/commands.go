@@ -11,6 +11,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -179,4 +180,4 @@ var errNoService = errNoServiceErr{}
 
 type errNoServiceErr struct{}
 
-func (errNoServiceErr) Error() string { return "订阅服务未初始化" }
+func (errNoServiceErr) Error() string { return i18n.T("sub.service_unavailable") }

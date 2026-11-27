@@ -192,7 +192,7 @@ func (s State) InlineHelpHints() []common.InlineHelpHint {
 		return []common.InlineHelpHint{
 			{Key: "↵", Desc: i18n.T("help.nodes_search.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.nodes_search.cancel")},
-			{Key: "Ctrl+R/F", Desc: "正则/模糊"},
+			{Key: "Ctrl+R/F", Desc: i18n.T("help.rules_search.regex_fuzzy")},
 		}
 	}
 

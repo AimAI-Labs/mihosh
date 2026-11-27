@@ -2,10 +2,12 @@ package cli
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
 	"strings"
 	"text/tabwriter"
+
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
 
 type outputFormat string
@@ -25,7 +27,7 @@ func parseOutputFormat(raw string) (outputFormat, error) {
 	case outputFormatPlain:
 		return outputFormatPlain, nil
 	default:
-		return "", fmt.Errorf("不支持的输出格式: %q (可选: json|table|plain)", raw)
+		return "", errors.New(i18n.Tf("cli.output.unsupported_format", raw))
 	}
 }
 

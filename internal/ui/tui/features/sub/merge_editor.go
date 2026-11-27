@@ -10,6 +10,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -18,7 +19,7 @@ func (s State) openMergeExternalEditor() (State, tea.Cmd) {
 	command := utils.SplitEditorCommand(utils.ResolveEditor())
 	if len(command) == 0 {
 		return s, func() tea.Msg {
-			return messages.MergeEditFinishedMsg{Err: errors.New("未找到可用的编辑器，请设置 EDITOR 变量")}
+			return messages.MergeEditFinishedMsg{Err: errors.New(i18n.T("sub.merge_editor.no_editor"))}
 		}
 	}
 	cmd := &mergeEditor{command: command, activeUID: s.activeUID}
@@ -76,7 +77,7 @@ func (e *mergeEditor) Run() error {
 		return err
 	}
 	if !bytes.Equal(current, original) {
-		return errors.New("merge.yaml changed while the editor was open")
+		return errors.New(i18n.T("sub.merge_editor.changed"))
 	}
 	before, _ := service.ReadMihomoOverridesFrom(original)
 	after, err := service.ReadMihomoOverridesFrom(updated)

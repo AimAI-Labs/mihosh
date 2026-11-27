@@ -76,6 +76,10 @@ func coreActionLabel(action string) string {
 		action = "service"
 	case action == "tun-offline":
 		action = "tun"
+	case action == "connect":
+		action = "external"
+	case action == "release":
+		action = "version"
 	}
 	return i18n.T("core.action." + action)
 }

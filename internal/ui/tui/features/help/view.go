@@ -189,7 +189,7 @@ func buildNodesSections(ctx HelpContext) []section {
 		return []section{{
 			title: i18n.T("help.section.nodes_search"),
 			bindings: []keybinding{
-				{"输入字符", i18n.T("help.nodes_search.append")},
+				{i18n.T("help.key.type_chars"), i18n.T("help.nodes_search.append")},
 				{"Backspace", i18n.T("help.nodes_search.backspace")},
 				{"Ctrl+R", i18n.T("help.nodes_search.regex")},
 				{"Ctrl+F", i18n.T("help.nodes_search.fuzzy")},
@@ -269,7 +269,7 @@ func buildConnectionsSections(ctx HelpContext) []section {
 		return []section{{
 			title: i18n.T("help.section.conns_search"),
 			bindings: []keybinding{
-				{"输入字符", i18n.T("help.conns_search.append")},
+				{i18n.T("help.key.type_chars"), i18n.T("help.conns_search.append")},
 				{"↵", i18n.T("help.conns_search.confirm")},
 				{"Esc", i18n.T("help.conns_search.cancel")},
 			},
@@ -350,7 +350,7 @@ func buildLogsSections(ctx HelpContext) []section {
 		return []section{{
 			title: i18n.T("help.section.logs_search"),
 			bindings: []keybinding{
-				{"输入字符", i18n.T("help.logs_search.append")},
+				{i18n.T("help.key.type_chars"), i18n.T("help.logs_search.append")},
 				{"Backspace", i18n.T("help.logs_search.backspace")},
 				{"↵", i18n.T("help.logs_search.confirm")},
 				{"Esc", i18n.T("help.logs_search.cancel")},
@@ -416,7 +416,7 @@ func buildRulesSections(ctx HelpContext) []section {
 		return []section{{
 			title: i18n.T("help.section.rules_search"),
 			bindings: []keybinding{
-				{"输入字符", i18n.T("help.rules_search.append")},
+				{i18n.T("help.key.type_chars"), i18n.T("help.rules_search.append")},
 				{"Backspace", i18n.T("help.rules_search.backspace")},
 				{"↵", i18n.T("help.rules_search.confirm")},
 				{"Esc", i18n.T("help.rules_search.cancel")},
@@ -478,7 +478,7 @@ func buildSettingsSections(ctx HelpContext) []section {
 		title: i18n.T("help.section.settings"),
 		bindings: []keybinding{
 			{"↑/↓", i18n.T("help.settings.select")},
-			{"Enter / 双击", i18n.T("help.settings.edit")},
+			{i18n.T("help.key.enter_or_double_click"), i18n.T("help.settings.edit")},
 			{"b", i18n.T("help.settings.sync")},
 		},
 	}}
@@ -499,7 +499,7 @@ func buildSubSections(ctx HelpContext) []section {
 		return []section{{
 			title: i18n.T("help.section.sub_search"),
 			bindings: []keybinding{
-				{"输入字符", i18n.T("help.sub_search.append")},
+				{i18n.T("help.key.type_chars"), i18n.T("help.sub_search.append")},
 				{"Backspace", i18n.T("help.sub_search.backspace")},
 				{"↵", i18n.T("help.sub_search.confirm")},
 				{"Esc", i18n.T("help.sub_search.cancel")},
@@ -527,7 +527,7 @@ func buildSubSections(ctx HelpContext) []section {
 			title: i18n.T("help.section.sub"),
 			bindings: []keybinding{
 				{"↑/↓", i18n.T("help.sub.select")},
-				{"Enter / 双击", i18n.T("help.sub.activate")},
+				{i18n.T("help.key.enter_or_double_click"), i18n.T("help.sub.activate")},
 				{"u", i18n.T("help.sub.update")},
 				{"U", i18n.T("help.sub.update_all")},
 				{"m", i18n.T("help.sub.edit_merge")},

@@ -740,3 +740,17 @@ func TestReleaseCatalogueStorageFailuresProduceNotices(t *testing.T) {
 		})
 	}
 }
+
+func TestCoreOperationLabelsResolveInBothLanguages(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("auto") })
+	for _, lang := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(lang)
+		for _, op := range []string{"connect", "release"} {
+			label := coreActionLabel(op)
+			if label == "" || strings.HasPrefix(label, "core.action.") {
+				t.Errorf("%s: action %q has no localized label: %q", lang, op, label)
+			}
+		}
+	}
+}

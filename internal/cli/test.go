@@ -28,7 +28,7 @@ var (
 )
 
 var testCmd = &cobra.Command{
-	Use: "test [node <节点名> | group <策略组名>] [--output json|table|plain]",
+	Use: "test [node <node-name> | group <group-name>] [--output json|table|plain]",
 	Example: `  mihosh test
   mihosh test --output json
   mihosh test node HK --output table

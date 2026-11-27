@@ -124,11 +124,7 @@ func (m Model) applyCoreEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 		if msg.ServiceBinary != "" {
 			m.exitNotice = i18n.Tf("update.service_updated", msg.ServiceBinary)
 		}
-		text := i18n.T("status.update_applied")
-		if text == "status.update_applied" {
-			text = "Update applied, please restart."
-		}
-		m.publishNotice(text, messages.NoticeSuccess)
+		m.publishNotice(i18n.T("status.update_applied"), messages.NoticeSuccess)
 		m.onAppQuit()
 		return m, tea.Quit, true
 

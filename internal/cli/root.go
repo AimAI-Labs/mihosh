@@ -206,6 +206,7 @@ func localizeCommands() {
 	selectCmd.Short = i18n.T("cli.select.short")
 	selectCmd.Long = i18n.T("cli.select.long")
 
+	testCmd.Use = i18n.T("cli.test.use")
 	testCmd.Short = i18n.T("cli.test.short")
 	testCmd.Long = i18n.T("cli.test.long")
 	testGroupCmd.Short = i18n.T("cli.test_group.short")

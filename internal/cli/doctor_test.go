@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -213,5 +214,34 @@ func TestDoctorWebSocketNormalizesWildcardAndUsesAuthorization(t *testing.T) {
 		raw := net.JoinHostPort(host, port)
 		result := checkWebSocketAvailable(config.MihomoEndpoint{ExternalController: raw, Secret: secret})
 		require.Equal(t, doctorStatusOK, result.Status, result.Message)
+	}
+}
+
+func TestEnglishCLIOutputHasNoUntranslatedChinese(t *testing.T) {
+	i18n.Init()
+	i18n.SetLanguageOverride("en-US")
+
+	report := buildDoctorSummary([]doctorCheckResult{
+		checkSecret(""),
+		checkExternalController("ftp://127.0.0.1:9090"),
+		checkProxyAddress(""),
+	})
+	_, formatErr := parseOutputFormat("bad-format")
+	require.Error(t, formatErr)
+	var doctor bytes.Buffer
+	require.NoError(t, renderDoctorReport(&doctor, report, outputFormatPlain))
+	localizeCommands()
+	t.Cleanup(func() {
+		i18n.SetLanguageOverride("auto")
+		localizeCommands()
+	})
+	for _, item := range []struct{ name, text string }{
+		{"doctor", doctor.String()},
+		{"config selector", initialSelectorModel().View()},
+		{"unsupported output format", formatErr.Error()},
+		{"test usage", testCmd.Use},
+	} {
+		assert.NotContains(t, item.text, "cli.", item.name)
+		assert.False(t, strings.ContainsFunc(item.text, func(r rune) bool { return unicode.Is(unicode.Han, r) }), "%s contains untranslated text: %q", item.name, item.text)
 	}
 }

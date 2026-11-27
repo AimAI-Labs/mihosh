@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -25,7 +26,7 @@ type selectorModel struct {
 
 func initialSelectorModel() selectorModel {
 	return selectorModel{
-		choices:  []string{"Mihosh 配置", "Mihomo 配置"},
+		choices:  []string{i18n.T("cli.config.selector.mihosh"), i18n.T("cli.config.selector.mihomo")},
 		selected: 0,
 		choice:   choiceCancel,
 	}
@@ -69,7 +70,7 @@ func (m selectorModel) View() string {
 	}
 
 	var s strings.Builder
-	s.WriteString(lipgloss.NewStyle().Bold(true).Foreground(common.Active()).Render("请选择要编辑的配置文件：") + "\n\n")
+	s.WriteString(lipgloss.NewStyle().Bold(true).Foreground(common.Active()).Render(i18n.T("cli.config.selector.title")) + "\n\n")
 
 	for i, choice := range m.choices {
 		checkbox := "[ ]"
@@ -81,7 +82,7 @@ func (m selectorModel) View() string {
 		s.WriteString(checkbox + " " + renderedChoice + "\n")
 	}
 
-	s.WriteString("\n" + lipgloss.NewStyle().Foreground(common.Muted()).Render("(使用方向键选择，回车确认，Esc/q 退出)") + "\n")
+	s.WriteString("\n" + lipgloss.NewStyle().Foreground(common.Muted()).Render(i18n.T("cli.config.selector.hint")) + "\n")
 
 	return s.String()
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -15,11 +16,11 @@ import (
 // 配置路径缺失或无可用编辑器时返回 ConfigEditFinishedMsg（携带错误）。
 func (s State) openConfigEditor() (State, tea.Cmd) {
 	if strings.TrimSpace(s.configPath) == "" {
-		return s, configEditError(errors.New("未找到 mihomo 配置文件路径，无法打开编辑器"))
+		return s, configEditError(errors.New(i18n.T("rules.editor.no_config")))
 	}
 	fields := utils.SplitEditorCommand(utils.ResolveEditor())
 	if len(fields) == 0 {
-		return s, configEditError(errors.New("未找到可用的编辑器，请在 ~/.bashrc 或 ~/.zshrc 中设置 EDITOR 变量"))
+		return s, configEditError(errors.New(i18n.T("rules.editor.no_editor")))
 	}
 	args := make([]string, 0, len(fields))
 	args = append(args, fields[1:]...)

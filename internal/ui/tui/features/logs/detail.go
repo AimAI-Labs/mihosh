@@ -1,7 +1,6 @@
 package logs
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
@@ -82,11 +81,11 @@ func renderLogDetailPopup(
 	// ── 可见内容 + 滚动提示 ──
 	var output []string
 	if scroll > 0 {
-		output = append(output, common.DimStyle().Render(fmt.Sprintf("↑ 还有 %d 行", scroll)))
+		output = append(output, common.DimStyle().Render(i18n.Tf("logs.detail.more_above", scroll)))
 	}
 	output = append(output, lines[scroll:endIdx]...)
 	if endIdx < totalLines {
-		output = append(output, common.DimStyle().Render(fmt.Sprintf("↓ 还有 %d 行", totalLines-endIdx)))
+		output = append(output, common.DimStyle().Render(i18n.Tf("logs.detail.more_below", totalLines-endIdx)))
 	}
 
 	body := strings.Join(output, "\n")
