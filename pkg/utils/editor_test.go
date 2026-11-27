@@ -17,6 +17,7 @@ func TestParseEditorFromRC(t *testing.T) {
 		{"my_editor_not_matched", "export MY_EDITOR=vim\n", ""},
 		{"no_match", "export PATH=/usr/bin\nalias e=vim\n", ""},
 		{"empty_value_skipped", "export EDITOR=vim\nexport EDITOR=''\n", "vim"},
+		{"blank_value_skipped", "export EDITOR=vim\nexport EDITOR=' \t'\n", "vim"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -49,5 +50,16 @@ func TestSplitEditorCommand(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestResolveEditorSkipsBlankEnvironment(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("VISUAL", " \t")
+	t.Setenv("EDITOR", "  nano  ")
+	if got := ResolveEditor(); got != "nano" {
+		t.Fatalf("ResolveEditor() = %q, want nano", got)
 	}
 }

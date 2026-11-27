@@ -31,3 +31,22 @@ func TestState_EditConfig_NoConfigPath(t *testing.T) {
 		t.Fatal("expected non-nil error when config path is empty")
 	}
 }
+
+func TestRulesEditorReportsBlankEditor(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("PATH", "")
+	t.Setenv("VISUAL", " \t")
+	t.Setenv("EDITOR", "   ")
+
+	_, cmd := State{configPath: "config.yaml"}.Update(keyMsg('e'))
+	if cmd == nil {
+		t.Fatal("expected an editor error command")
+	}
+	msg := cmd()
+	result, ok := msg.(messages.ConfigEditFinishedMsg)
+	if !ok || result.Err == nil {
+		t.Fatalf("expected an editor error, got %#v", msg)
+	}
+}

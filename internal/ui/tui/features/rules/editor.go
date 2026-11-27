@@ -17,11 +17,10 @@ func (s State) openConfigEditor() (State, tea.Cmd) {
 	if strings.TrimSpace(s.configPath) == "" {
 		return s, configEditError(errors.New("未找到 mihomo 配置文件路径，无法打开编辑器"))
 	}
-	editor := utils.ResolveEditor()
-	if editor == "" {
+	fields := utils.SplitEditorCommand(utils.ResolveEditor())
+	if len(fields) == 0 {
 		return s, configEditError(errors.New("未找到可用的编辑器，请在 ~/.bashrc 或 ~/.zshrc 中设置 EDITOR 变量"))
 	}
-	fields := utils.SplitEditorCommand(editor)
 	args := make([]string, 0, len(fields))
 	args = append(args, fields[1:]...)
 	args = append(args, s.configPath)

@@ -33,10 +33,10 @@ func ResolveEditor() string {
 			}
 		}
 	}
-	if v := os.Getenv("VISUAL"); v != "" {
+	if v := strings.TrimSpace(os.Getenv("VISUAL")); v != "" {
 		return v
 	}
-	if v := os.Getenv("EDITOR"); v != "" {
+	if v := strings.TrimSpace(os.Getenv("EDITOR")); v != "" {
 		return v
 	}
 	return DetectDefaultEditor()
@@ -64,7 +64,7 @@ func ParseEditorFromRC(content string) string {
 		default:
 			v = m[3] // 未加引号
 		}
-		if v != "" {
+		if v = strings.TrimSpace(v); v != "" {
 			last = v
 		}
 	}

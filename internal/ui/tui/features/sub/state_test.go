@@ -297,3 +297,22 @@ func TestHandleEditFormCancel_ClosesForm(t *testing.T) {
 	assert.False(t, s.showEditForm, "Esc 应关闭编辑表单")
 	assert.Empty(t, s.editUID)
 }
+
+func TestSubEditorReportsBlankEditor(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("PATH", "")
+	t.Setenv("VISUAL", " \t")
+	t.Setenv("EDITOR", "   ")
+
+	_, cmd := State{}.Update(newRuneKey("m"))
+	if cmd == nil {
+		t.Fatal("expected an editor error command")
+	}
+	msg := cmd()
+	result, ok := msg.(messages.MergeEditFinishedMsg)
+	if !ok || result.Err == nil {
+		t.Fatalf("expected an editor error, got %#v", msg)
+	}
+}

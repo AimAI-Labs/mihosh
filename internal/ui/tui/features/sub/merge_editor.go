@@ -15,13 +15,13 @@ import (
 )
 
 func (s State) openMergeExternalEditor() (State, tea.Cmd) {
-	editor := utils.ResolveEditor()
-	if editor == "" {
+	command := utils.SplitEditorCommand(utils.ResolveEditor())
+	if len(command) == 0 {
 		return s, func() tea.Msg {
 			return messages.MergeEditFinishedMsg{Err: errors.New("未找到可用的编辑器，请设置 EDITOR 变量")}
 		}
 	}
-	cmd := &mergeEditor{command: utils.SplitEditorCommand(editor), activeUID: s.activeUID}
+	cmd := &mergeEditor{command: command, activeUID: s.activeUID}
 	return s, tea.Exec(cmd, func(err error) tea.Msg {
 		return messages.MergeEditFinishedMsg{Err: err, ClearedOverrides: cmd.cleared}
 	})
