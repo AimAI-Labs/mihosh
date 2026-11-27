@@ -8,7 +8,6 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/spf13/cobra"
 )
@@ -26,7 +25,7 @@ var listCmd = &cobra.Command{
 			return wrapParameterError(err)
 		}
 
-		cfg, err := config.Load()
+		cfg, err := loadConfigOrDefault()
 		if err != nil {
 			return wrapConfigError(fmt.Errorf(i18n.T("cli.list.err_load_config")+": %w", err))
 		}

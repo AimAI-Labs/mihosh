@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -87,6 +88,15 @@ func executeRootCommand(root *cobra.Command, stderr io.Writer) int {
 		return exitCodeForError(err)
 	}
 	return exitCodeOK
+}
+
+func loadConfigOrDefault() (*config.Config, error) {
+	cfg, err := config.Load()
+	if errors.Is(err, config.ErrConfigNotFound) {
+		defaults := config.DefaultConfig
+		return &defaults, nil
+	}
+	return cfg, err
 }
 
 // loadClient 统一构造 API Client：从 mihomo 配置文件解析连接信息，

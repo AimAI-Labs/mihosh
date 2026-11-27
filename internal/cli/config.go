@@ -34,8 +34,7 @@ var configShowCmd = &cobra.Command{
 			return wrapParameterError(err)
 		}
 
-		configSvc := service.NewConfigService()
-		cfg, err := configSvc.LoadConfig()
+		cfg, err := loadConfigOrDefault()
 		if err != nil {
 			return wrapConfigError(fmt.Errorf(i18n.T("cli.config.show.err_load")+": %w", err))
 		}
@@ -156,7 +155,7 @@ func runMihomoConfigEdit() error {
 }
 
 func reloadMihomoCore(configPath string) error {
-	cfg, err := config.Load()
+	cfg, err := loadConfigOrDefault()
 	if err != nil {
 		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
 		fmt.Println(warnStyle.Render(i18n.T("cli.config.edit.reload_warn")))

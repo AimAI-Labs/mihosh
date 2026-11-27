@@ -46,7 +46,7 @@ var testCmd = &cobra.Command{
 			return wrapParameterError(err)
 		}
 
-		cfg, err := config.Load()
+		cfg, err := loadConfigOrDefault()
 		if err != nil {
 			return wrapConfigError(fmt.Errorf(i18n.T("cli.test.err_load_config")+": %w", err))
 		}
@@ -77,7 +77,7 @@ var testGroupCmd = &cobra.Command{
 			return wrapParameterError(err)
 		}
 
-		cfg, err := config.Load()
+		cfg, err := loadConfigOrDefault()
 		if err != nil {
 			return wrapConfigError(fmt.Errorf(i18n.T("cli.test.err_load_config")+": %w", err))
 		}
