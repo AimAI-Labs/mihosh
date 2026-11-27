@@ -121,46 +121,48 @@ func explicitManagedFields(merge *yaml.Node) []string {
 
 // GenerateOverrideConfig uses the selected source and falls back to the current
 // file for the controller identity. Cleared fields fall through to the source.
-func GenerateOverrideConfig(uid, path string, cleared []string, managed bool) ([]byte, error) {
+func GenerateOverrideConfig(selected Profile, path string, cleared []string, managed bool) ([]byte, error) {
 	mergeBytes, err := ReadMerge()
 	if err != nil {
 		return nil, err
 	}
-	return GenerateOverrideConfigWithMerge(uid, path, mergeBytes, cleared, managed)
+	return GenerateOverrideConfigWithMerge(selected, path, mergeBytes, cleared, managed)
 }
 
 // GenerateOverrideConfigWithMerge generates candidate config bytes using mergeBytes
 // without requiring merge.yaml to be written first.
-func GenerateOverrideConfigWithMerge(uid, path string, mergeBytes []byte, cleared []string, managed bool) ([]byte, error) {
-	return generateOverrideConfig(uid, path, mergeBytes, cleared, managed, nil, nil, false)
+func GenerateOverrideConfigWithMerge(selected Profile, path string, mergeBytes []byte, cleared []string, managed bool) ([]byte, error) {
+	return generateOverrideConfig(selected, path, mergeBytes, cleared, managed, nil, nil, false)
 }
 
 // GenerateOverrideConfigWithChains generates candidate config bytes using nextChains
 // without requiring chain-edits.yaml to be written first. When uid is empty (standalone
 // local config without raw.yaml), previousChains dialer-proxy assignments are reverted first.
-func GenerateOverrideConfigWithChains(uid, path string, mergeBytes []byte, managed bool, previousChains, nextChains ChainEdits) ([]byte, error) {
-	return generateOverrideConfig(uid, path, mergeBytes, nil, managed, &previousChains, &nextChains, true)
+func GenerateOverrideConfigWithChains(selected Profile, path string, mergeBytes []byte, managed bool, previousChains, nextChains ChainEdits) ([]byte, error) {
+	return generateOverrideConfig(selected, path, mergeBytes, nil, managed, &previousChains, &nextChains, true)
 }
 
-func generateOverrideConfig(uid, path string, mergeBytes []byte, cleared []string, managed bool, previousChains, nextChains *ChainEdits, strictChains bool) ([]byte, error) {
-	var source []byte
+func generateOverrideConfig(selected Profile, path string, mergeBytes []byte, cleared []string, managed bool, previousChains, nextChains *ChainEdits, strictChains bool) ([]byte, error) {
+	raw := &yaml.Node{}
 	var err error
-	if uid != "" {
-		source, err = ReadRawFile(uid)
+	if selected.UID != "" {
+		raw, err = ReadRawForProfile(selected)
+		if err != nil {
+			return nil, err
+		}
 	} else {
-		source, err = os.ReadFile(path)
-	}
-	if err != nil {
-		return nil, err
-	}
-	var raw yaml.Node
-	if len(trimSpaceBytes(source)) > 0 {
-		if err = yaml.Unmarshal(source, &raw); err != nil {
-			return nil, fmt.Errorf("解析配置源文件失败: %w", err)
+		source, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		if len(trimSpaceBytes(source)) > 0 {
+			if err = yaml.Unmarshal(source, raw); err != nil {
+				return nil, fmt.Errorf("解析配置源文件失败: %w", err)
+			}
 		}
 	}
-	if uid == "" && len(cleared) > 0 {
-		if root := topLevelMapping(&raw); root != nil {
+	if selected.UID == "" && len(cleared) > 0 {
+		if root := topLevelMapping(raw); root != nil {
 			for i := len(root.Content) - 2; i >= 0; i -= 2 {
 				for _, key := range cleared {
 					if strings.EqualFold(root.Content[i].Value, key) {
@@ -171,8 +173,8 @@ func generateOverrideConfig(uid, path string, mergeBytes []byte, cleared []strin
 			}
 		}
 	}
-	if uid == "" && previousChains != nil {
-		if err = revertChainDialers(topLevelMapping(&raw), *previousChains); err != nil {
+	if selected.UID == "" && previousChains != nil {
+		if err = revertChainDialers(topLevelMapping(raw), *previousChains); err != nil {
 			return nil, err
 		}
 	}
@@ -183,8 +185,8 @@ func generateOverrideConfig(uid, path string, mergeBytes []byte, cleared []strin
 		}
 	}
 	// The runtime already contains edits, unless native rules replace its list.
-	replay := uid != "" || findMappingValue(topLevelMapping(merge), "rules") != nil
-	final, err := applyProfileMergeWithChains(&raw, merge, replay, nextChains, strictChains)
+	replay := selected.UID != "" || findMappingValue(topLevelMapping(merge), "rules") != nil
+	final, err := applyProfileMergeWithChains(raw, merge, replay, nextChains, strictChains)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +196,7 @@ func generateOverrideConfig(uid, path string, mergeBytes []byte, cleared []strin
 	}
 	delete(fields, "log-level")
 	delete(fields, "allow-lan")
-	if managed && uid != "" {
+	if managed && selected.UID != "" {
 		if fields == nil {
 			fields = make(map[string]*yaml.Node)
 		}

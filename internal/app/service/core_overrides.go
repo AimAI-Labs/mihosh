@@ -181,13 +181,13 @@ func (s *CoreService) applyMergeMutation(ctx context.Context, mutation mergeMuta
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}, err
 	}
-	uid := activeSubUID(cfg)
-	next, err := mutation.prepare(oldMerge, uid, path, true)
+	selected := activeProfile(cfg)
+	next, err := mutation.prepare(oldMerge, selected, path, true)
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}, err
 	}
 	savedOverrides := next.overrides
-	generated, err := next.generate(uid, path, true)
+	generated, err := next.generate(selected, path, true)
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}, err
 	}
@@ -280,16 +280,16 @@ func (s *CoreService) applyMergeMutation(ctx context.Context, mutation mergeMuta
 }
 
 func (s *ConfigService) applyLocalExternalOverrides(cfg *config.Config, client *api.Client, mutation mergeMutation) MihomoOverridesSaveResult {
-	uid := activeSubUID(cfg)
+	selected := activeProfile(cfg)
 	pathFn := s.localExternalPath
 	if pathFn == nil {
 		pathFn = config.GetMihomoConfigPath
 	}
 	path, pathErr := pathFn()
-	if pathErr != nil && uid != "" && s.mihomoConfigPath != nil {
+	if pathErr != nil && selected.UID != "" && s.mihomoConfigPath != nil {
 		path, pathErr = s.mihomoConfigPath()
 	}
-	if pathErr != nil && (mutation.snapshotID == nil || uid != "") {
+	if pathErr != nil && (mutation.snapshotID == nil || selected.UID != "") {
 		return MihomoOverridesSaveResult{Err: pathErr}
 	}
 
@@ -301,7 +301,7 @@ func (s *ConfigService) applyLocalExternalOverrides(cfg *config.Config, client *
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
 	}
-	next, err := mutation.prepare(oldMerge, uid, path, false)
+	next, err := mutation.prepare(oldMerge, selected, path, false)
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
 	}
@@ -316,10 +316,10 @@ func (s *ConfigService) applyLocalExternalOverrides(cfg *config.Config, client *
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
 	}
-	if uid == "" && !configExisted {
+	if selected.UID == "" && !configExisted {
 		return MihomoOverridesSaveResult{Err: os.ErrNotExist}
 	}
-	data, err := next.generate(uid, path, false)
+	data, err := next.generate(selected, path, false)
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
 	}
@@ -417,11 +417,11 @@ func (s *ConfigService) applyLocalExternalOverrides(cfg *config.Config, client *
 }
 
 func (s *ConfigService) applyRemoteExternalOverrides(cfg *config.Config, client *api.Client, mutation mergeMutation) MihomoOverridesSaveResult {
-	uid := activeSubUID(cfg)
-	if mutation.rule != nil && uid == "" {
+	selected := activeProfile(cfg)
+	if mutation.rule != nil && selected.UID == "" {
 		return MihomoOverridesSaveResult{Remote: true, Err: ErrRemoteRuleEditRequiresSubscription}
 	}
-	if mutation.chain != nil && uid == "" {
+	if mutation.chain != nil && selected.UID == "" {
 		return MihomoOverridesSaveResult{Remote: true, Err: ErrRemoteChainEditRequiresSubscription}
 	}
 	mergePath, err := profile.MergePath()
@@ -432,15 +432,15 @@ func (s *ConfigService) applyRemoteExternalOverrides(cfg *config.Config, client 
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
 	}
-	next, err := mutation.prepare(oldMerge, uid, "", false)
+	next, err := mutation.prepare(oldMerge, selected, "", false)
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
 	}
 	savedOverrides := next.overrides
 	identityPending := identityRequestedForRemote(savedOverrides, cfg.Core.ExternalController, cfg.Core.ExternalSecret)
 
-	if uid != "" {
-		data, genErr := next.generate(uid, "", false)
+	if selected.UID != "" {
+		data, genErr := next.generate(selected, "", false)
 		if genErr != nil {
 			return MihomoOverridesSaveResult{Remote: true, Err: genErr}
 		}
@@ -571,16 +571,16 @@ func (c *managedConfigReplacement) restore() error {
 	return err
 }
 
-func activeSubUID(cfg *config.Config) string {
+func activeProfile(cfg *config.Config) profile.Profile {
 	if cfg == nil || cfg.ActiveSub == "" {
-		return ""
+		return profile.Profile{}
 	}
 	for _, p := range cfg.Subs {
 		if p.UID == cfg.ActiveSub {
-			return cfg.ActiveSub
+			return p
 		}
 	}
-	return ""
+	return profile.Profile{}
 }
 
 func readOptionalFile(path string) ([]byte, bool, error) {

@@ -186,7 +186,7 @@ mode: rule
 
 	// 1. Managed + active sub + empty merge: keeps controller/secret/mixed-port from current file,
 	// enforces safe allow-lan: false (ignoring untrusted sub's allow-lan: true), and lets log-level fall through to raw.
-	out, err := GenerateOverrideConfigWithMerge(uid, currentPath, nil, []string{"allow-lan", "log-level"}, true)
+	out, err := GenerateOverrideConfigWithMerge(Profile{UID: uid}, currentPath, nil, []string{"allow-lan", "log-level"}, true)
 	require.NoError(t, err)
 	var m map[string]any
 	require.NoError(t, yaml.Unmarshal(out, &m))
@@ -198,7 +198,7 @@ mode: rule
 
 	// 2. Managed + active sub + explicit allow-lan: true and new controller/secret in merge: explicit overrides win.
 	mergeBytes := []byte("external-controller: 127.0.0.1:9099\nsecret: override-secret\nallow-lan: true\nlog-level: error\n")
-	out, err = GenerateOverrideConfigWithMerge(uid, currentPath, mergeBytes, nil, true)
+	out, err = GenerateOverrideConfigWithMerge(Profile{UID: uid}, currentPath, mergeBytes, nil, true)
 	require.NoError(t, err)
 	m = nil
 	require.NoError(t, yaml.Unmarshal(out, &m))
@@ -209,7 +209,7 @@ mode: rule
 	assert.Equal(t, "error", m["log-level"])
 
 	// 3. External + active sub + empty allow-lan/log-level: falls through to raw.yaml (allow-lan: true, log-level: warning).
-	out, err = GenerateOverrideConfigWithMerge(uid, currentPath, nil, []string{"allow-lan", "log-level"}, false)
+	out, err = GenerateOverrideConfigWithMerge(Profile{UID: uid}, currentPath, nil, []string{"allow-lan", "log-level"}, false)
 	require.NoError(t, err)
 	m = nil
 	require.NoError(t, yaml.Unmarshal(out, &m))
@@ -218,14 +218,14 @@ mode: rule
 	assert.Equal(t, "127.0.0.1:9090", m["external-controller"])
 
 	// 4. External + active sub + explicit allow-lan: false overrides raw.yaml's allow-lan: true.
-	out, err = GenerateOverrideConfigWithMerge(uid, currentPath, []byte("allow-lan: false\n"), nil, false)
+	out, err = GenerateOverrideConfigWithMerge(Profile{UID: uid}, currentPath, []byte("allow-lan: false\n"), nil, false)
 	require.NoError(t, err)
 	m = nil
 	require.NoError(t, yaml.Unmarshal(out, &m))
 	assert.Equal(t, false, m["allow-lan"])
 
 	// 5. No active sub (uid == ""): cleared log-level/allow-lan are removed from current config file.
-	out, err = GenerateOverrideConfigWithMerge("", currentPath, []byte("mixed-port: 7899\n"), []string{"log-level", "allow-lan"}, false)
+	out, err = GenerateOverrideConfigWithMerge(Profile{}, currentPath, []byte("mixed-port: 7899\n"), []string{"log-level", "allow-lan"}, false)
 	require.NoError(t, err)
 	m = nil
 	require.NoError(t, yaml.Unmarshal(out, &m))
@@ -235,7 +235,7 @@ mode: rule
 	assert.NotContains(t, m, "allow-lan")
 
 	// 6. Remote-only (path == "") with active sub uses raw.yaml + merge.
-	out, err = GenerateOverrideConfigWithMerge(uid, "", []byte("allow-lan: false\nlog-level: silent\n"), nil, false)
+	out, err = GenerateOverrideConfigWithMerge(Profile{UID: uid}, "", []byte("allow-lan: false\nlog-level: silent\n"), nil, false)
 	require.NoError(t, err)
 	m = nil
 	require.NoError(t, yaml.Unmarshal(out, &m))

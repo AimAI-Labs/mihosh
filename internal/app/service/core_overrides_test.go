@@ -553,3 +553,49 @@ func TestRemoteOnlyExternalOverridesPayloadPatchAndRollback(t *testing.T) {
 		assert.Equal(t, oldMerge, afterMerge)
 	})
 }
+
+func TestCoreMutationsRejectRawFromPreviousSubscriptionSource(t *testing.T) {
+	for _, name := range []string{"overrides", "rule", "chain"} {
+		t.Run(name, func(t *testing.T) {
+			core, uid, _ := prepareManagedProfile(t)
+			profileSvc := NewProfileService(nil, core)
+			require.NoError(t, profileSvc.SetActiveSub(uid))
+			p, err := profileSvc.findProfile(uid)
+			require.NoError(t, err)
+			require.NoError(t, profile.WriteRawForSource(p, []byte(testChainConfigYAML)))
+			_, err = core.ApplyProfile(context.Background(), uid, false)
+			require.NoError(t, err)
+			path, err := config.ManagedMihomoConfigPath()
+			require.NoError(t, err)
+			before, err := os.ReadFile(path)
+			require.NoError(t, err)
+
+			source := profile.SubSource{Kind: profile.SourceRemote, URL: "https://subscription.example.test/changed"}
+			require.NoError(t, profileSvc.EditProfile(uid, p.Name, source))
+			cfgSvc := NewConfigService()
+			apply := func() MihomoOverridesSaveResult {
+				ctx := context.Background()
+				switch name {
+				case "overrides":
+					return cfgSvc.ApplyMihomoOverrides(ctx, core, nil, map[string]string{"log-level": "debug"})
+				case "rule":
+					return cfgSvc.ApplyRuleEdit(ctx, core, nil, profile.RuleEdit{Rule: "DOMAIN,fixture.example,DIRECT", Index: 1})
+				default:
+					return cfgSvc.ApplyProxyChain(ctx, core, nil, profile.ProxyChain{Group: "PROXY", Nodes: []string{"Entry-HK", "Exit-US"}, Enabled: true})
+				}
+			}
+			result := apply()
+			require.ErrorIs(t, result.Err, profile.ErrStaleRaw, "mutation must wait for a snapshot from the new source")
+			require.False(t, result.WriteOK)
+			after, err := os.ReadFile(path)
+			require.NoError(t, err)
+			require.Equal(t, before, after)
+
+			p.Source = source
+			require.NoError(t, profile.WriteRawForSource(p, []byte(testChainConfigYAML)))
+			result = apply()
+			require.NoError(t, result.Err)
+			require.True(t, result.WriteOK)
+		})
+	}
+}

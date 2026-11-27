@@ -27,13 +27,13 @@ type preparedMerge struct {
 	chainEdits *profileFileRecovery
 }
 
-func (change mergeMutation) prepare(old []byte, uid, path string, managed bool) (preparedMerge, error) {
+func (change mergeMutation) prepare(old []byte, selected profile.Profile, path string, managed bool) (preparedMerge, error) {
 	var next preparedMerge
 	if change.rule != nil {
-		return change.prepareRuleEdit(old, uid, path, managed)
+		return change.prepareRuleEdit(old, selected, path, managed)
 	}
 	if change.chain != nil {
-		return change.prepareChainEdit(old, uid, path, managed)
+		return change.prepareChainEdit(old, selected, path, managed)
 	}
 	if change.snapshotID != nil {
 		data, err := profile.ReadSnapshot(profile.SnapshotMerge, "", *change.snapshotID)
@@ -50,7 +50,7 @@ func (change mergeMutation) prepare(old []byte, uid, path string, managed bool) 
 		}
 		return preparedMerge{data: data, overrides: after, cleared: profile.ClearedOverrideKeys(before, after)}, nil
 	}
-	native, err := profile.NormalizeLegacyMerge(old, uid, func() (string, error) {
+	native, err := profile.NormalizeLegacyMerge(old, selected.UID, func() (string, error) {
 		if path == "" {
 			return "", os.ErrNotExist
 		}
@@ -75,9 +75,9 @@ func (change mergeMutation) prepare(old []byte, uid, path string, managed bool) 
 	return next, err
 }
 
-func (change mergeMutation) prepareRuleEdit(merge []byte, uid, path string, managed bool) (preparedMerge, error) {
+func (change mergeMutation) prepareRuleEdit(merge []byte, selected profile.Profile, path string, managed bool) (preparedMerge, error) {
 	var next preparedMerge
-	effective, err := readRuleEditBase(uid, path, merge, managed)
+	effective, err := readRuleEditBase(selected, path, merge, managed)
 	if err != nil {
 		return next, err
 	}
@@ -86,8 +86,8 @@ func (change mergeMutation) prepareRuleEdit(merge []byte, uid, path string, mana
 		return next, err
 	}
 	edit := *change.rule
-	if uid != "" && path != "" && edit.Match != "" && edit.Rule != "" {
-		base, err := profile.GenerateOverrideConfigWithMerge(uid, path, merge, nil, managed)
+	if selected.UID != "" && path != "" && edit.Match != "" && edit.Rule != "" {
+		base, err := profile.GenerateOverrideConfigWithMerge(selected, path, merge, nil, managed)
 		if err != nil {
 			return next, err
 		}
@@ -120,7 +120,7 @@ func (change mergeMutation) prepareRuleEdit(merge []byte, uid, path string, mana
 	return next, err
 }
 
-func (change mergeMutation) prepareChainEdit(merge []byte, uid, path string, managed bool) (preparedMerge, error) {
+func (change mergeMutation) prepareChainEdit(merge []byte, selected profile.Profile, path string, managed bool) (preparedMerge, error) {
 	var next preparedMerge
 	var err error
 	next.chainPath, err = profile.ChainEditsPath()
@@ -142,7 +142,7 @@ func (change mergeMutation) prepareChainEdit(merge []byte, uid, path string, man
 	if err = nextEdits.SetGroupChain(*change.chain); err != nil {
 		return next, err
 	}
-	next.candidate, err = profile.GenerateOverrideConfigWithChains(uid, path, merge, managed, prevEdits, nextEdits)
+	next.candidate, err = profile.GenerateOverrideConfigWithChains(selected, path, merge, managed, prevEdits, nextEdits)
 	if err != nil {
 		return next, err
 	}
@@ -181,25 +181,30 @@ func (next preparedMerge) restore(mergePath string, mergeExisted bool, oldMerge 
 	return restoreMergeFile(mergePath, mergeExisted, oldMerge)
 }
 
-func (next preparedMerge) generate(uid, path string, managed bool) ([]byte, error) {
+func (next preparedMerge) generate(selected profile.Profile, path string, managed bool) ([]byte, error) {
 	if next.candidate != nil {
 		return next.candidate, nil
 	}
-	return profile.GenerateOverrideConfigWithMerge(uid, path, next.data, next.cleared, managed)
+	return profile.GenerateOverrideConfigWithMerge(selected, path, next.data, next.cleared, managed)
 }
 
-func readRuleEditBase(uid, path string, old []byte, managed bool) ([]byte, error) {
+func readRuleEditBase(selected profile.Profile, path string, old []byte, managed bool) ([]byte, error) {
 	if path != "" {
 		// Keep runtime-only rules when editing a rule displayed by the local core.
 		effective, err := os.ReadFile(path)
 		if err == nil {
+			if selected.UID != "" {
+				if err := profile.VerifyRawSource(selected); errors.Is(err, profile.ErrStaleRaw) {
+					return nil, err
+				}
+			}
 			return effective, nil
 		}
-		if !os.IsNotExist(err) || uid == "" {
+		if !os.IsNotExist(err) || selected.UID == "" {
 			return nil, err
 		}
 	}
-	return profile.GenerateOverrideConfigWithMerge(uid, path, old, nil, managed)
+	return profile.GenerateOverrideConfigWithMerge(selected, path, old, nil, managed)
 }
 
 func (change mergeMutation) controlRequest() coreControlRequest {

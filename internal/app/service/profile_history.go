@@ -57,7 +57,7 @@ func (s *ProfileService) RollbackSnapshot(kind profile.SnapshotKind, uid, snapsh
 		if err != nil {
 			return nil, err
 		}
-		active := activeSubUID(cfg) != ""
+		active := activeProfile(cfg).UID != ""
 		if active && cfg.Core.Mode != "managed" && s.client == nil {
 			return nil, errors.New(i18n.T("sub.err.activation_no_client"))
 		}

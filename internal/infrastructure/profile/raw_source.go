@@ -101,6 +101,20 @@ func BindLegacyRawSource(p Profile) error {
 
 // ReadRawForProfile accepts legacy data and verifies recorded origins before an apply.
 func ReadRawForProfile(p Profile) (*yaml.Node, error) {
+	raw, err := readVerifiedRaw(p)
+	if err != nil {
+		return nil, err
+	}
+	return decodeRaw(raw)
+}
+
+// VerifyRawSource checks the origin of the cached subscription bytes.
+func VerifyRawSource(p Profile) error {
+	_, err := readVerifiedRaw(p)
+	return err
+}
+
+func readVerifiedRaw(p Profile) ([]byte, error) {
 	path, err := rawStoragePath(p.UID)
 	if err != nil {
 		return nil, err
@@ -112,7 +126,7 @@ func ReadRawForProfile(p Profile) (*yaml.Node, error) {
 	if err := verifyRawOrigin(path, raw, p.Source); err != nil {
 		return nil, err
 	}
-	return decodeRaw(raw)
+	return raw, nil
 }
 
 func verifyRawOrigin(path string, raw []byte, source SubSource) error {

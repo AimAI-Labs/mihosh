@@ -152,7 +152,7 @@ func TestChainEditsReplayInGenerateForUID(t *testing.T) {
 	// Updating chain via GenerateOverrideConfigWithChains reflects cleared chain before disk write.
 	prev, err := ReadChainEdits()
 	require.NoError(t, err)
-	clearedBytes, err := GenerateOverrideConfigWithChains("sub-chain", "", nil, false, prev, ChainEdits{})
+	clearedBytes, err := GenerateOverrideConfigWithChains(Profile{UID: "sub-chain"}, "", nil, false, prev, ChainEdits{})
 	require.NoError(t, err)
 	dialers = extractProxyDialers(t, clearedBytes)
 	require.Equal(t, "", dialers["US-Exit"])
@@ -161,7 +161,7 @@ func TestChainEditsReplayInGenerateForUID(t *testing.T) {
 	// Standalone config path (uid == "") also works with GenerateOverrideConfigWithChains.
 	standalonePath := filepath.Join(t.TempDir(), "config.yaml")
 	require.NoError(t, os.WriteFile(standalonePath, generated.Data, 0600))
-	standaloneCleared, err := GenerateOverrideConfigWithChains("", standalonePath, nil, false, prev, ChainEdits{})
+	standaloneCleared, err := GenerateOverrideConfigWithChains(Profile{}, standalonePath, nil, false, prev, ChainEdits{})
 	require.NoError(t, err)
 	dialers = extractProxyDialers(t, standaloneCleared)
 	require.Equal(t, "", dialers["US-Exit"])
