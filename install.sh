@@ -62,8 +62,11 @@ do_install() {
     # 2. Get Latest Version
     echo_info "Checking latest version..."
     LATEST_RELEASE_URL="https://api.github.com/repos/AimAI-Labs/mihosh/releases/latest"
-    VERSION=$(curl -s $LATEST_RELEASE_URL | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-
+    if ! RELEASE=$(curl -fsSL "$LATEST_RELEASE_URL"); then
+        echo_error "Failed to fetch latest version info."
+        exit 1
+    fi
+    VERSION=$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' <<< "$RELEASE")
     if [ -z "$VERSION" ]; then
         echo_error "Failed to fetch latest version info."
         exit 1
@@ -87,22 +90,15 @@ do_install() {
 
     # 4. Download and Install
     TMP_DIR=$(mktemp -d)
+    trap 'rm -rf -- "$TMP_DIR"' EXIT
     ARCHIVE_FILE="${TMP_DIR}/${BINARY_NAME}.tar.gz"
-    LOCAL_ARCHIVE="${BINARY_NAME}.tar.gz"
 
-    if [ -f "$LOCAL_ARCHIVE" ]; then
-        echo_info "Found local archive $LOCAL_ARCHIVE. Skipping download."
-        cp "$LOCAL_ARCHIVE" "$ARCHIVE_FILE"
-    else
-        echo_info "Downloading ${BINARY_NAME} from ${DOWNLOAD_URL}..."
-        if curl -L -o "$ARCHIVE_FILE" --fail "$DOWNLOAD_URL"; then
-            echo_info "Download successful."
-        else
-            echo_error "Download failed. Please check your internet connection or if the asset exists for your architecture."
-            rm -rf "$TMP_DIR"
-            exit 1
-        fi
+    echo_info "Downloading ${BINARY_NAME} from ${DOWNLOAD_URL}..."
+    if ! curl -L -o "$ARCHIVE_FILE" --fail "$DOWNLOAD_URL"; then
+        echo_error "Download failed. Please check your internet connection or if the asset exists for your architecture."
+        exit 1
     fi
+    echo_info "Download successful."
 
     echo_info "Extracting archive..."
     tar -xzf "$ARCHIVE_FILE" -C "$TMP_DIR"
@@ -116,21 +112,22 @@ do_install() {
 
     if [ -z "$EXTRACTED_BINARY" ]; then
         echo_error "Could not find binary in the downloaded archive."
-        rm -rf "$TMP_DIR"
         exit 1
     fi
 
     chmod +x "$EXTRACTED_BINARY"
 
     echo_info "Installing to ${INSTALL_DIR}/${TARGET_NAME}..."
+    if [ ! -d "$INSTALL_DIR" ] && ! mkdir -p "$INSTALL_DIR" 2>/dev/null; then
+        echo_info "Sudo permission required to create ${INSTALL_DIR}"
+        sudo mkdir -p "$INSTALL_DIR"
+    fi
     if [ -w "$INSTALL_DIR" ]; then
         mv -f "$EXTRACTED_BINARY" "${INSTALL_DIR}/${TARGET_NAME}"
     else
         echo_info "Sudo permission required to install to ${INSTALL_DIR}"
         sudo mv -f "$EXTRACTED_BINARY" "${INSTALL_DIR}/${TARGET_NAME}"
     fi
-
-    rm -rf "$TMP_DIR"
 
     echo_info "Installation completed successfully!"
     echo_info "Run 'mihosh' to start."
