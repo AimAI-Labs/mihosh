@@ -10,7 +10,25 @@ Welcome to contribute to Mihosh! Below is a guide for setting up your developmen
 - Go 1.25 or higher
 - [mise](https://mise.jdx.dev/) (Optional, for environment management)
 
-Use `dev` for ongoing development and open development pull requests against it. Promote verified changes to `main` for a stable release. Tag the verified `main` commit for a stable release. The release workflow updates the Homebrew formula on `main`, which also serves the installation script.
+## Branching & Release Model (`main` vs `dev`)
+
+| Item | Stable (`main`) | Development (`dev`) |
+| --- | --- | --- |
+| **Role** | Stable release source of truth | Ongoing development & integration |
+| **PR & Dependabot Target** | Verified promotions from `dev` only | Feature/fix PRs and Dependabot PRs |
+| **Tag Format** | `vX.Y.Z` (must point to commits on `main`) | `vX.Y.Z-alpha.N` / `-beta.N` / `-rc.N` |
+| **GitHub Release Type** | Latest stable release (`prerelease: false`) | Prerelease (`prerelease: true`) |
+| **Homebrew Formula (`Formula/mihosh.rb`)** | Updated on stable tags and pushed to `main` | Not modified |
+| **Install Script (`install.sh`)** | Served from `refs/heads/main/install.sh` | Not served to stable installer |
+| **Docs Site Deploy (`deploy-docs.yml`)** | Triggered on stable tags (`v*`, excluding `v*-*`) | Not triggered by prerelease tags |
+| **In-App Self-Update** | Prompts stable users for newer `vX.Y.Z` releases | Ignored for stable users |
+| **CI / Lint / CodeQL** | Runs on push & PR | Runs on push & PR |
+
+### Release Workflow
+
+1. Land all day-to-day features, bug fixes, and dependency updates on `dev`.
+2. Tag prereleases (`vX.Y.Z-rc.N`) on `dev` when needed for wider testing.
+3. Promote verified commits from `dev` to `main`, confirm CI/Lint/CodeQL pass on `main`, and push the stable `vX.Y.Z` tag on `main` to publish binaries, update `Formula/mihosh.rb`, and deploy the docs site.
 
 ## Fetch & Build
 

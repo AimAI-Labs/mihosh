@@ -7,11 +7,16 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 Mihosh 支持 Linux 和 macOS 系统 (amd64 和 arm64 架构)。
 
-下方安装方式使用稳定版分支 `main` 或正式发布包。构建开发版时，请切换到 `dev`。
+## 版本通道：稳定版（`main`）与开发版（`dev`）
 
-## 安装方法
+| 通道 | 分支 | 标签格式 | 安装方式 | 自动更新行为 | 适用对象 |
+| --- | --- | --- | --- | --- | --- |
+| **稳定版** | `main` | `vX.Y.Z` | 一键脚本（`install.sh`）、Homebrew、GitHub Latest Release、`main` 源码编译 | 仅检查并升级到正式版（`vX.Y.Z`），自动忽略预发布版 | 绝大多数日常用户 |
+| **开发版** | `dev` | `vX.Y.Z-alpha.N` / `-beta.N` / `-rc.N` | GitHub 预发布版压缩包、`dev` 源码编译 | 预发布版不会覆盖 Homebrew Formula，也不会推送给稳定版用户 | 贡献者与尝鲜测试用户 |
 
-我们提供多种安装方式，请根据你的系统环境选择最适合的一种：
+## 安装稳定版（`main`）
+
+我们为稳定版提供多种安装方式，请根据你的系统环境选择最适合的一种：
 
 <Tabs items={['脚本安装 (推荐)', 'Homebrew (macOS / Linux)', '源码编译']}>
   <Tab value="脚本安装 (推荐)">
@@ -38,6 +43,19 @@ Mihosh 支持 Linux 和 macOS 系统 (amd64 和 arm64 架构)。
     ```
   </Tab>
 </Tabs>
+
+## 安装开发版与预发布版（`dev`）
+
+如果你希望提前体验最新特性或测试预发布版本（`vX.Y.Z-rc.N` / `-beta.N` / `-alpha.N`），可以通过以下方式获取：
+
+1. **下载预发布版压缩包：** 前往 [GitHub Releases](https://github.com/AimAI-Labs/mihosh/releases) 选择带有预发布标记的版本，下载对应系统架构的 `.tar.gz` 解压后放入 `PATH`。
+2. **从 `dev` 分支源码编译**（要求已安装 Go 1.25+）：
+   ```bash
+   git clone --branch dev https://github.com/AimAI-Labs/mihosh.git
+   cd mihosh
+   make build
+   # 编译后的二进制文件位于当前目录的 mihosh
+   ```
 
 ## 验证安装
 

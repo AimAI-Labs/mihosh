@@ -22,13 +22,18 @@ A terminal UI and CLI for mihomo. Manage proxy nodes, connections, logs, subscri
 
 See the [online documentation](https://aimai-labs.github.io/mihosh/) for setup, usage, configuration, and development.
 
-## Release Branches
+## Release Channels (`main` vs `dev`)
 
-`main` holds stable releases and the Homebrew formula. Active development and prerelease builds use `dev`. Both branches run CI and lint checks.
+| Channel | Branch | Tag Format | Distribution & Audience |
+| --- | --- | --- | --- |
+| **Stable** | `main` | `vX.Y.Z` | General users. Serves Homebrew (`Formula/mihosh.rb`), `install.sh`, `/releases/latest`, and in-app self-updates. |
+| **Development** | `dev` | `vX.Y.Z-alpha.N` / `-beta.N` / `-rc.N` | Contributors & testers. Holds daily development, PRs, and prerelease builds (ignored by stable self-updates). |
+
+Both branches run CI, `golangci-lint`, and CodeQL checks.
 
 ## Quick Installation
 
-Supports Linux and macOS on amd64 and arm64.
+Supports Linux and macOS on amd64 and arm64. The Homebrew formula, install script, and latest releases below come from the **stable (`main`)** channel.
 
 ### Homebrew
 
@@ -69,6 +74,16 @@ Extract the archive and install the binary into a directory in your `PATH`. Repl
 tar -xzf mihosh-linux-amd64.tar.gz
 sudo install -m 755 mihosh /usr/local/bin/mihosh
 mihosh version
+```
+
+### Development / Prerelease (`dev`)
+
+To test upcoming changes or prereleases (`vX.Y.Z-rc.N` / `-beta.N` / `-alpha.N`), download a prerelease archive from [GitHub Releases](https://github.com/AimAI-Labs/mihosh/releases) or build directly from `dev`:
+
+```bash
+git clone --branch dev https://github.com/AimAI-Labs/mihosh.git
+cd mihosh
+make build
 ```
 
 Run `mihosh` to launch the TUI.

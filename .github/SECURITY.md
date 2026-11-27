@@ -4,8 +4,9 @@
 
 | Version | Status |
 | --- | --- |
-| Latest Release | ✅ Supported |
-| Development (main) | ⚠️ Bug fixes only |
+| Latest Stable Release (`main`) | ✅ Supported |
+| Development / Prereleases (`dev`) | ⚠️ Best-effort / active development |
+| Older Releases | ❌ Unsupported |
 
 ## Reporting a Vulnerability
 

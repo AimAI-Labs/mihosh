@@ -7,11 +7,16 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 Mihosh supports Linux and macOS systems (amd64 and arm64 architectures).
 
-The installation instructions below use the stable `main` branch and stable releases. For development builds, check out `dev`.
+## Release Channels: Stable (`main`) vs Development (`dev`)
 
-## Installation Methods
+| Channel | Branch | Tag Format | Install Methods | Auto-Update Behavior | Audience |
+| --- | --- | --- | --- | --- | --- |
+| **Stable** | `main` | `vX.Y.Z` | Script (`install.sh`), Homebrew, GitHub Latest Release, source on `main` | Checks and applies stable releases (`vX.Y.Z`); ignores prereleases | General users |
+| **Development** | `dev` | `vX.Y.Z-alpha.N` / `-beta.N` / `-rc.N` | GitHub Prerelease archives, source on `dev` | Prereleases do not overwrite Homebrew or trigger stable auto-updates | Contributors & testers |
 
-We provide multiple installation methods, please choose the one that best suits your system environment:
+## Stable Installation (`main`)
+
+We provide multiple installation methods for the stable channel, please choose the one that best suits your system environment:
 
 <Tabs items={['Script Installation (Recommended)', 'Homebrew (macOS / Linux)', 'Build from Source']}>
   <Tab value="Script Installation (Recommended)">
@@ -38,6 +43,19 @@ We provide multiple installation methods, please choose the one that best suits 
     ```
   </Tab>
 </Tabs>
+
+## Development & Prerelease Installation (`dev`)
+
+If you want to try upcoming features or test prerelease builds (`vX.Y.Z-rc.N`, `-beta.N`, `-alpha.N`), use one of the following options:
+
+1. **Download a prerelease archive:** Pick a prerelease tag from [GitHub Releases](https://github.com/AimAI-Labs/mihosh/releases), extract the archive for your OS/architecture, and install the `mihosh` binary into your `PATH`.
+2. **Build from the `dev` branch** (requires Go 1.25+):
+   ```bash
+   git clone --branch dev https://github.com/AimAI-Labs/mihosh.git
+   cd mihosh
+   make build
+   # The compiled binary file is located in the current directory as mihosh
+   ```
 
 ## Verify Installation
 

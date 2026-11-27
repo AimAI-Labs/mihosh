@@ -4,13 +4,13 @@ Thank you for your interest in Mihosh! Here's how to get involved.
 
 ## Development Environment
 
-- **Go**: 1.24+
-- **OS**: Windows / Linux / macOS
-- **Mihomo**: A running Mihomo proxy service is required for debugging
+- **Go**: 1.25+
+- **OS**: Linux / macOS (Windows managed core experimental)
+- **Mihomo**: A running Mihomo proxy service is required for external-controller debugging
 
 ```bash
-# Clone the repository
-git clone https://github.com/AimAI-Labs/mihosh.git
+# Clone the development branch
+git clone --branch dev https://github.com/AimAI-Labs/mihosh.git
 cd mihosh
 
 # Install dependencies
@@ -23,6 +23,11 @@ make check
 go build .
 ./mihosh
 ```
+
+## Branch Strategy
+
+- **`dev`**: Active development branch. Create feature/fix branches from `dev` and open Pull Requests against `dev`. Prerelease tags (`vX.Y.Z-alpha.N`, `-beta.N`, `-rc.N`) are cut from `dev`.
+- **`main`**: Stable release branch. Only verified changes from `dev` are promoted to `main`. Stable release tags (`vX.Y.Z`), `install.sh`, `Formula/mihosh.rb`, and production docs deployments follow `main`.
 
 ## Code Standards
 
@@ -86,12 +91,12 @@ docs: update installation guide for macOS
 
 ## Pull Request Workflow
 
-1. **Fork** this repository and create your branch (`git checkout -b feat/amazing-feature`)
+1. **Fork** this repository and create your branch from `dev` (`git checkout -b feat/amazing-feature origin/dev`)
 2. Make your changes and ensure tests pass
 3. Run `make check` or the equivalent Go commands
 4. Commit following the convention above
 5. Push to your fork (`git push origin feat/amazing-feature`)
-6. Open a Pull Request and fill in the PR template
+6. Open a Pull Request targeting the **`dev`** branch and fill in the PR template
 
 ## Reporting Bugs
 

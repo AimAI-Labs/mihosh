@@ -10,7 +10,25 @@ description: 如何参与 Mihosh 的开发
 - Go 1.25 或更高版本
 - [mise](https://mise.jdx.dev/) (可选，用于环境管理)
 
-开发工作和开发 PR 使用 `dev` 分支。发布稳定版时，将已验收的变更同步到 `main`，在 `main` 上为已验证的提交打正式标签。安装脚本从 `main` 提供，发布工作流也将 Homebrew Formula 写回 `main`。
+## 分支与发布模型（`main` 与 `dev`）
+
+| 维度 | 稳定版（`main`） | 开发版（`dev`） |
+| --- | --- | --- |
+| **定位** | 稳定发布基线分支 | 日常开发与集成主分支 |
+| **PR 与 Dependabot 目标** | 仅接收来自 `dev` 的已验收同步 | 功能/修复 PR 与 Dependabot 自动依赖更新 |
+| **标签格式** | `vX.Y.Z`（发布流水线强制校验提交必须属于 `main`） | `vX.Y.Z-alpha.N` / `-beta.N` / `-rc.N` |
+| **GitHub Release 类型** | 正式版（`prerelease: false`，更新 `/releases/latest`） | 预发布版（`prerelease: true`） |
+| **Homebrew Formula（`Formula/mihosh.rb`）** | 仅在正式标签发布时更新并回推 `main` | 不修改 Formula |
+| **一键安装脚本（`install.sh`）** | 由 `refs/heads/main/install.sh` 提供 | 不面向稳定版安装脚本分发 |
+| **文档站点部署（`deploy-docs.yml`）** | 仅在正式标签（`v*` 且不含 `-`）触发部署 | 预发布标签不触发生产文档部署 |
+| **应用内自更新** | 仅向稳定版用户提示更新到更新的 `vX.Y.Z` | 稳定版用户自动忽略预发布版 |
+| **CI / Lint / CodeQL** | 推送与 PR 均触发检查 | 推送与 PR 均触发检查 |
+
+### 标准发版流程
+
+1. 日常功能开发、缺陷修复和依赖升级均合入 `dev` 分支。
+2. 需要公开测试时，在 `dev` 分支打预发布标签（如 `vX.Y.Z-rc.N`）生成 Prerelease 构件。
+3. 验收全部通过后，将 `dev` 同步至 `main` 并确认 checks 通过，再于 `main` 上打 `vX.Y.Z` 正式标签，触发正式版发布、Homebrew Formula 更新与文档站部署。
 
 ## 获取与构建
 
