@@ -57,23 +57,13 @@ func renderRuleList(rules []filteredRule, selectedIdx, scrollTop, maxLines, widt
 	// 检测 Domain 和 DomainSuffix 是否共享相同颜色，如果是则应用颜色区分
 	adjustedColors := detectAndAdjustDomainColors(colorAdjustLight, colorAdjustDark)
 
-	// 调整滚动位置确保选中项可见
-	if selectedIdx < scrollTop {
-		scrollTop = selectedIdx
-	}
-	if selectedIdx >= scrollTop+maxLines {
-		scrollTop = selectedIdx - maxLines + 1
-	}
-
-	endIdx := scrollTop + maxLines
-	if endIdx > len(rules) {
-		endIdx = len(rules)
-	}
+	window := common.ResolveListWindow(len(rules), selectedIdx, scrollTop, maxLines)
+	selectedIdx, scrollTop = window.Selected, window.Start
 
 	// 渲染规则行（预留滚动条宽度）
 	listWidth := width - rulesScrollWidth
 	var lines []string
-	for i := scrollTop; i < endIdx; i++ {
+	for i := scrollTop; i < window.End; i++ {
 		fr := rules[i]
 		line := renderRuleEntry(fr.Rule, fr.Index, i == selectedIdx, listWidth, adjustedColors)
 		lines = append(lines, line)

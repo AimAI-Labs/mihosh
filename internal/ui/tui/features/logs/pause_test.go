@@ -80,11 +80,11 @@ func TestLogsClickPauseButtonInLevelBarTogglesPause(t *testing.T) {
 		t.Fatalf("pause button %q not found in level bar: %q", btn, lines[1])
 	}
 	x := ansi.StringWidth(lines[1][:idx])
-	next, _ := s.HandleMouseLeft(1, x, width)
+	next, _ := s.HandleMouseLeft(1, x, width, 30)
 	if !next.Paused() {
 		t.Fatal("clicking pause button in level bar did not pause")
 	}
-	next, _ = next.HandleMouseLeft(1, x, width)
+	next, _ = next.HandleMouseLeft(1, x, width, 30)
 	if next.Paused() {
 		t.Fatal("clicking pause button again did not resume")
 	}

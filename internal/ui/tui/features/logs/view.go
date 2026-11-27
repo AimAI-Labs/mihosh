@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	logsFixedLines       = 10 // 级别栏(3) + 间距(1) + 搜索框(1) + 间距(1) + 统计(1) + 间隔(1) + 底部(2)
+	logsHeaderLines      = logsModeSwitchHeight + 5
+	logsFixedLines       = logsHeaderLines + 2
 	logsMinHeight        = 5
 	logsDefaultPadding   = 20
 	logsLevelWidth       = 8
@@ -112,10 +113,7 @@ func RenderLogsPage(state PageState) string {
 	sections = append(sections, "")
 
 	// 计算可显示的日志行数 (级别栏 + 搜索框 + 统计 + 间隔)
-	availableHeight := state.Height - logsFixedLines
-	if availableHeight < logsMinHeight {
-		availableHeight = logsMinHeight
-	}
+	availableHeight := logListHeight(state.Height)
 
 	// 渲染日志列表
 	logList := renderLogList(filteredLogs, state.SelectedLog, state.ScrollTop, availableHeight, state.Width, state.HScrollOffset)
@@ -319,6 +317,10 @@ func renderLogSearchBox(filterText string, filterMode bool) string {
 	return label + input
 }
 
+func logListHeight(pageHeight int) int {
+	return max(logsMinHeight, pageHeight-logsFixedLines)
+}
+
 // renderLogList 渲染日志列表
 func renderLogList(logs []model.LogEntry, selectedIdx, scrollTop, maxLines, width, hOffset int) string {
 	if len(logs) == 0 {
@@ -327,22 +329,11 @@ func renderLogList(logs []model.LogEntry, selectedIdx, scrollTop, maxLines, widt
 
 	var lines []string
 
-	// 调整滚动位置确保选中项可见
-	if selectedIdx < scrollTop {
-		scrollTop = selectedIdx
-	}
-	if selectedIdx >= scrollTop+maxLines {
-		scrollTop = selectedIdx - maxLines + 1
-	}
+	window := common.ResolveListWindow(len(logs), selectedIdx, scrollTop, maxLines)
 
-	endIdx := scrollTop + maxLines
-	if endIdx > len(logs) {
-		endIdx = len(logs)
-	}
-
-	for i := scrollTop; i < endIdx; i++ {
+	for i := window.Start; i < window.End; i++ {
 		log := logs[i]
-		line := RenderLogEntry(log, i == selectedIdx, width, hOffset)
+		line := RenderLogEntry(log, i == window.Selected, width, hOffset)
 		lines = append(lines, line)
 	}
 

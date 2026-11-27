@@ -250,16 +250,8 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 	now := time.Now()
 	isDouble := s.ruleListDC.IsDoubleClick(struct{}{}, idx, now)
 
-	// 单击：选中规则
 	s.selectedRule = idx
-	// 确保选中项可见
-	if s.selectedRule < s.ruleScrollTop {
-		s.ruleScrollTop = s.selectedRule
-	}
-	availableHeight := ruleListHeight(pageState)
-	if s.selectedRule >= s.ruleScrollTop+availableHeight {
-		s.ruleScrollTop = s.selectedRule - availableHeight + 1
-	}
+	s.ruleScrollTop = ruleListWindow(pageState).Start
 
 	// 双击：打开编辑
 	if isDouble {

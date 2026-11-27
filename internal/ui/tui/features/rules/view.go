@@ -277,34 +277,21 @@ func RenderRulesHeaderComponent(stats string, searchBox string, width int) strin
 
 // ResolveMouseHit 根据 pageContent 内的 Y 坐标定位命中的规则行。
 func ResolveMouseHit(state PageState, pageY int) int {
-	// 计算规则列表起始行：
-	// - 头部组件占 rulesHeaderHeight (3) 行（包括边框）
-	// - 然后有一个空行
 	typeRows, _ := typeFilterLayout(state)
-	listStartY := rulesHeaderHeight + 1 + len(typeRows)
-
-	if pageY < listStartY {
+	offset := pageY - rulesHeaderHeight - 1 - len(typeRows)
+	if offset < 0 || pageY >= state.Height {
 		return -1
 	}
-
-	// 计算规则在列表中的相对偏移
-	ruleOffset := pageY - listStartY
-	if ruleOffset < 0 {
+	window := ruleListWindow(state)
+	index := window.Start + offset
+	if index >= window.End {
 		return -1
 	}
+	return index
+}
 
-	// 计算可用的规则行数
-	availableHeight := ruleListHeight(state)
-
-	// 检查是否在规则可见范围内
-	numFiltered := len(state.FilteredRuleIndices)
-	visibleRuleIdx := state.ScrollTop + ruleOffset
-
-	if visibleRuleIdx < 0 || visibleRuleIdx >= numFiltered || ruleOffset >= availableHeight {
-		return -1
-	}
-
-	return visibleRuleIdx
+func ruleListWindow(state PageState) common.ListWindow {
+	return common.ResolveListWindow(len(state.FilteredRuleIndices), state.SelectedRule, state.ScrollTop, ruleListHeight(state))
 }
 
 func ruleListHeight(state PageState) int {

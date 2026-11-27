@@ -232,7 +232,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	case messages.PageMouseScrollMsg:
 		return s.HandleMouseScroll(msg.Up, msg.Height), nil
 	case messages.PageMouseClickMsg:
-		return s.HandleMouseLeft(msg.Y, msg.X, msg.Width)
+		return s.HandleMouseLeft(msg.Y, msg.X, msg.Width, msg.Height)
 	case tea.KeyMsg:
 		// 继续处理按键
 		// 详情模式拦截所有按键
@@ -384,7 +384,7 @@ func (s State) ApplyIPResolved(ip string, resolved *model.ResolvedIP) State {
 }
 
 // HandleMouseLeft 处理日志页面鼠标左键（含双击检测和级别栏点击）
-func (s State) HandleMouseLeft(pageY int, pageX int, pageWidth int) (State, tea.Cmd) {
+func (s State) HandleMouseLeft(pageY, pageX, pageWidth, pageHeight int) (State, tea.Cmd) {
 	if s.detailMode {
 		// 详情模式下点击关闭弹窗
 		s.detailMode = false
@@ -418,13 +418,15 @@ func (s State) HandleMouseLeft(pageY int, pageX int, pageWidth int) (State, tea.
 		return s, nil
 	}
 
-	const headerLines = 8 // levelBar(3) + space(1) + search(1) + space(1) + stats(1) + space(1)
-	clickedIndex := (pageY - headerLines) + s.logScrollTop
-	if clickedIndex < 0 || clickedIndex >= len(s.filteredLogIndices) {
+	offset := pageY - logsHeaderLines
+	window := common.ResolveListWindow(len(s.filteredLogIndices), s.selectedLog, s.logScrollTop, logListHeight(pageHeight))
+	clickedIndex := window.Start + offset
+	if offset < 0 || pageY >= pageHeight || clickedIndex >= window.End {
 		return s, nil
 	}
 
 	s.selectedLog = clickedIndex
+	s.logScrollTop = window.Start
 
 	// 双击检测
 	now := time.Now()
@@ -458,10 +460,9 @@ func (s State) HandleMouseScroll(up bool, pageHeight int) State {
 		return s
 	}
 
-	maxLines := pageHeight - logsFixedLines
-	if maxLines < logsMinHeight {
-		maxLines = logsMinHeight
-	}
+	maxLines := logListHeight(pageHeight)
+	window := common.ResolveListWindow(count, s.selectedLog, s.logScrollTop, maxLines)
+	s.selectedLog, s.logScrollTop = window.Selected, window.Start
 
 	// 每次滚动 3 行，更符合常见的鼠标滚轮习惯
 	step := 3
