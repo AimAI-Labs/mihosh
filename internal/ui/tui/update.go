@@ -92,6 +92,9 @@ func (m Model) Close() {
 	}
 }
 
+// ExitNotice is printed after Bubble Tea restores the terminal.
+func (m Model) ExitNotice() string { return m.exitNotice }
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:

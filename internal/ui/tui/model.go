@@ -82,6 +82,7 @@ type Model struct {
 	updateInfo       *model.UpdateInfo
 	hasUpdate        bool
 	showUpdateDialog bool
+	exitNotice       string
 	isUpdating       bool
 	updateError      error
 }

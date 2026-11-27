@@ -36,6 +36,9 @@ var rootCmd = &cobra.Command{
 		finalModel, err := p.Run()
 		if fm, ok := finalModel.(tui.Model); ok {
 			fm.Close()
+			if text := fm.ExitNotice(); text != "" {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), text)
+			}
 		} else {
 			m.Close()
 		}

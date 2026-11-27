@@ -424,7 +424,8 @@ type UpdateCheckedMsg struct {
 }
 
 type UpdateAppliedMsg struct {
-	Err error
+	ServiceBinary string
+	Err           error
 }
 
 // ========= UI Events =========

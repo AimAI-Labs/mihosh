@@ -19,6 +19,9 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/fsutil"
 	"golang.org/x/mod/semver"
 )
 
@@ -144,77 +147,81 @@ func isHomebrewUpdateTarget(target string) bool {
 }
 
 // DownloadAndApplyUpdate verifies the release archive before replacing the running executable.
-func DownloadAndApplyUpdate(info model.UpdateInfo) error {
+// It returns the Linux service executable path if the update also replaced it.
+func DownloadAndApplyUpdate(info model.UpdateInfo) (string, error) {
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
-		return errors.New("automatic updates are unavailable on this platform")
+		return "", errors.New("automatic updates are unavailable on this platform")
 	}
 	if !isTrustedUpdateURL(info.DownloadURL) {
-		return errors.New("untrusted update download URL")
+		return "", errors.New("untrusted update download URL")
 	}
 	target, err := os.Executable()
 	if err != nil {
-		return err
+		return "", err
 	}
 	client := &http.Client{Timeout: 60 * time.Second}
 	return applyReleaseUpdate(client, info, target)
 }
 
-func applyReleaseUpdate(client *http.Client, info model.UpdateInfo, target string) error {
+func applyReleaseUpdate(client *http.Client, info model.UpdateInfo, target string) (string, error) {
 	digest := decodeUpdateDigest(info.DownloadSHA256)
 	if info.DownloadURL == "" || digest == nil {
-		return errors.New("no verified update archive available")
+		return "", errors.New("no verified update archive available")
 	}
 	target, err := filepath.EvalSymlinks(target)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if isHomebrewUpdateTarget(target) {
-		return errors.New("Homebrew manages this installation. Run brew upgrade mihosh")
+		return "", errors.New("Homebrew manages this installation. Run brew upgrade mihosh")
 	}
 	staged, err := os.CreateTemp(filepath.Dir(target), ".mihosh-update-*")
 	if err != nil {
 		if errors.Is(err, os.ErrPermission) {
-			return fmt.Errorf("cannot write to the install directory. Please rerun the installer with the required permissions: %w", err)
+			return "", fmt.Errorf("cannot write to the install directory. Please rerun the installer with the required permissions: %w", err)
 		}
-		return err
+		return "", err
 	}
 	defer func() { _ = os.Remove(staged.Name()) }()
 	defer func() { _ = staged.Close() }()
 
 	resp, err := client.Get(info.DownloadURL)
 	if err != nil {
-		return fmt.Errorf("download failed: %w", err)
+		return "", fmt.Errorf("download failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code during download: %d", resp.StatusCode)
+		return "", fmt.Errorf("unexpected status code during download: %d", resp.StatusCode)
 	}
 
 	archive, err := os.CreateTemp("", "mihosh-update-*.tar.gz")
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer func() { _ = os.Remove(archive.Name()) }()
 	defer func() { _ = archive.Close() }()
 	hash := sha256.New()
 	size, err := io.Copy(io.MultiWriter(archive, hash), io.LimitReader(resp.Body, maxUpdateSize+1))
 	if err != nil {
-		return fmt.Errorf("read update archive: %w", err)
+		return "", fmt.Errorf("read update archive: %w", err)
 	}
 	if size > maxUpdateSize {
-		return errors.New("update archive exceeds size limit")
+		return "", errors.New("update archive exceeds size limit")
 	}
 	if !bytes.Equal(hash.Sum(nil), digest) {
-		return errors.New("update archive SHA-256 mismatch")
+		return "", errors.New("update archive SHA-256 mismatch")
 	}
 	if _, err := archive.Seek(0, io.SeekStart); err != nil {
-		return err
+		return "", err
 	}
-	return replaceFromUpdateArchive(archive, staged, target)
+	if err := stageUpdateExecutable(archive, staged, target); err != nil {
+		return "", err
+	}
+	return installUpdatedExecutables(staged, target)
 }
 
-func replaceFromUpdateArchive(archive io.Reader, staged *os.File, target string) error {
+func stageUpdateExecutable(archive io.Reader, staged *os.File, target string) error {
 	gz, err := gzip.NewReader(archive)
 	if err != nil {
 		return fmt.Errorf("open update archive: %w", err)
@@ -243,11 +250,78 @@ func replaceFromUpdateArchive(archive io.Reader, staged *os.File, target string)
 	if err := staged.Chmod(current.Mode().Perm()); err != nil {
 		return err
 	}
-	if err := staged.Sync(); err != nil {
-		return err
+	return staged.Sync()
+}
+
+func installUpdatedExecutables(staged *os.File, target string) (string, error) {
+	replacePrimary := func() error {
+		if err := staged.Close(); err != nil {
+			return err
+		}
+		return os.Rename(staged.Name(), target)
 	}
-	if err := staged.Close(); err != nil {
-		return err
+	if runtime.GOOS != "linux" {
+		return "", replacePrimary()
 	}
-	return os.Rename(staged.Name(), target)
+	root, err := config.GetConfigDir()
+	if err != nil {
+		return "", err
+	}
+	serviceBinary := filepath.Join(root, "bin", "mihosh")
+	if _, err := os.Lstat(serviceBinary); os.IsNotExist(err) {
+		return "", replacePrimary()
+	} else if err != nil {
+		return "", err
+	}
+	runtimeDir := filepath.Join(root, "runtime")
+	if err := os.MkdirAll(runtimeDir, 0700); err != nil {
+		return "", err
+	}
+	unlock, err := coreinfra.LockRuntime(filepath.Join(runtimeDir, "config.lock"))
+	if err != nil {
+		return "", err
+	}
+	defer unlock()
+	resolvedService, err := filepath.EvalSymlinks(serviceBinary)
+	if err != nil {
+		return "", err
+	}
+	if resolvedService == target {
+		if err := replacePrimary(); err != nil {
+			return "", err
+		}
+		return serviceBinary, nil
+	}
+	if _, err := staged.Seek(0, io.SeekStart); err != nil {
+		return "", err
+	}
+	// Keep the old inode, including any file capabilities, until both paths are replaced.
+	backupDir, err := os.MkdirTemp(filepath.Dir(serviceBinary), ".mihosh-update-backup-*")
+	if err != nil {
+		return "", err
+	}
+	keepBackup := false
+	defer func() {
+		if !keepBackup {
+			_ = os.RemoveAll(backupDir)
+		}
+	}()
+	backup := filepath.Join(backupDir, "mihosh")
+	if err := os.Link(serviceBinary, backup); err != nil {
+		return "", err
+	}
+	if err := fsutil.WriteStreamAtomic(serviceBinary, fsutil.WriteOptions{Perm: 0700}, func(w io.Writer) error {
+		_, err := io.Copy(w, staged)
+		return err
+	}); err != nil {
+		return "", fmt.Errorf("update service executable: %w", err)
+	}
+	if err := replacePrimary(); err != nil {
+		if restoreErr := os.Rename(backup, serviceBinary); restoreErr != nil {
+			keepBackup = true
+			return "", errors.Join(err, fmt.Errorf("restore service executable from %s: %w", backup, restoreErr))
+		}
+		return "", err
+	}
+	return serviceBinary, nil
 }

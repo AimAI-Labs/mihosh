@@ -118,6 +118,9 @@ func (m Model) applyCoreEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 			m.isUpdating = false
 			return m, nil, true
 		}
+		if msg.ServiceBinary != "" {
+			m.exitNotice = i18n.Tf("update.service_updated", msg.ServiceBinary)
+		}
 		text := i18n.T("status.update_applied")
 		if text == "status.update_applied" {
 			text = "Update applied, please restart."

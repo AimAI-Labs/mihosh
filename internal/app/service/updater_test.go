@@ -90,15 +90,27 @@ func TestApplyReleaseUpdatePreservesRunnableTargetOnFailure(t *testing.T) {
 	for _, tc := range []struct {
 		name, digest, version, wantError string
 		archive                          []byte
+		skipService                      bool
 	}{
-		{"success", archiveDigest, wantVersion, "", archive},
-		{"missing asset", "", "old version", "no verified update archive", nil},
-		{"wrong digest", strings.Repeat("0", 64), "old version", "SHA-256 mismatch", archive},
-		{"truncated gzip", fmt.Sprintf("%x", sha256.Sum256(truncated)), "old version", "incomplete or oversized gzip", truncated},
+		{"success", archiveDigest, wantVersion, "", archive, false},
+		{"success without service", archiveDigest, wantVersion, "", archive, true},
+		{"missing asset", "", "old version", "no verified update archive", nil, false},
+		{"wrong digest", strings.Repeat("0", 64), "old version", "SHA-256 mismatch", archive, false},
+		{"truncated gzip", fmt.Sprintf("%x", sha256.Sum256(truncated)), "old version", "incomplete or oversized gzip", truncated, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			target := filepath.Join(t.TempDir(), "installed-mihosh")
+			root := t.TempDir()
+			t.Setenv("MIHOSH_CONFIG_DIR", root)
+			target := filepath.Join(root, "installed-mihosh")
 			write(target, "#!/bin/sh\necho old version\n")
+			serviceBinary := filepath.Join(root, "bin", "mihosh")
+			hasService := runtime.GOOS == "linux" && !tc.skipService
+			if hasService {
+				if err := os.Mkdir(filepath.Dir(serviceBinary), 0700); err != nil {
+					t.Fatal(err)
+				}
+				write(serviceBinary, "#!/bin/sh\necho old version\n")
+			}
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if tc.archive == nil {
 					t.Error("manual update must not download a release page")
@@ -110,13 +122,32 @@ func TestApplyReleaseUpdatePreservesRunnableTargetOnFailure(t *testing.T) {
 			if tc.archive != nil {
 				info.DownloadURL = srv.URL
 			}
-			err := applyReleaseUpdate(srv.Client(), info, target)
+			updatedService, err := applyReleaseUpdate(srv.Client(), info, target)
 			if tc.wantError == "" && err != nil || tc.wantError != "" && (err == nil || !strings.Contains(err.Error(), tc.wantError)) {
 				t.Fatalf("apply error = %v, want %q", err, tc.wantError)
+			}
+			wantService := ""
+			if hasService && tc.wantError == "" {
+				wantService = serviceBinary
+			}
+			if updatedService != wantService {
+				t.Fatalf("updated service path = %q, want %q", updatedService, wantService)
 			}
 			out, err := exec.Command(target, "version").CombinedOutput()
 			if err != nil || strings.TrimSpace(string(out)) != tc.version {
 				t.Fatalf("installed executable version: %s (%v), want %q", out, err, tc.version)
+			}
+			if hasService {
+				out, err := exec.Command(serviceBinary, "version").CombinedOutput()
+				if err != nil || strings.TrimSpace(string(out)) != tc.version {
+					t.Fatalf("service executable version: %s (%v), want %q", out, err, tc.version)
+				}
+				if tc.wantError == "" {
+					stat, err := os.Stat(serviceBinary)
+					if err != nil || stat.Mode().Perm() != 0700 {
+						t.Fatalf("service executable mode: %v (%v), want 0700", stat, err)
+					}
+				}
 			}
 		})
 	}
@@ -178,7 +209,7 @@ func TestApplyReleaseUpdateRejectsUnavailableTargetsBeforeDownload(t *testing.T)
 			t.Fatalf("expected manual Homebrew update info, got %+v", update)
 		}
 		before := requests.Load()
-		err := applyReleaseUpdate(server.Client(), info, link)
+		_, err := applyReleaseUpdate(server.Client(), info, link)
 		if err == nil || !strings.Contains(err.Error(), "brew upgrade mihosh") || requests.Load() != before {
 			t.Fatalf("expected Homebrew guidance before download, got %v and %d requests", err, requests.Load()-before)
 		}
@@ -201,7 +232,7 @@ func TestApplyReleaseUpdateRejectsUnavailableTargetsBeforeDownload(t *testing.T)
 			}
 		})
 		before := requests.Load()
-		err := applyReleaseUpdate(server.Client(), info, target)
+		_, err := applyReleaseUpdate(server.Client(), info, target)
 		if !errors.Is(err, os.ErrPermission) || !strings.Contains(err.Error(), "rerun the installer") {
 			t.Fatalf("expected install permissions error, got %v", err)
 		}
@@ -209,4 +240,39 @@ func TestApplyReleaseUpdateRejectsUnavailableTargetsBeforeDownload(t *testing.T)
 			t.Fatal("read-only target must be rejected before download")
 		}
 	})
+}
+
+func TestInstallUpdatedExecutablesRestoresServiceOnPrimaryFailure(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("background service is only supported on Linux")
+	}
+	root := t.TempDir()
+	t.Setenv("MIHOSH_CONFIG_DIR", root)
+	serviceBinary := filepath.Join(root, "bin", "mihosh")
+	if err := os.Mkdir(filepath.Dir(serviceBinary), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(serviceBinary, []byte("old"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	old, err := os.Stat(serviceBinary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	staged, err := os.CreateTemp(root, "staged-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = staged.Close() }()
+	if _, err := staged.WriteString("new"); err != nil {
+		t.Fatal(err)
+	}
+	path, err := installUpdatedExecutables(staged, filepath.Join(root, "missing", "mihosh"))
+	if path != "" || !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected primary install failure, got %q and %v", path, err)
+	}
+	current, err := os.Stat(serviceBinary)
+	if err != nil || !os.SameFile(old, current) {
+		t.Fatalf("expected original service file after rollback, got %v and %v", current, err)
+	}
 }

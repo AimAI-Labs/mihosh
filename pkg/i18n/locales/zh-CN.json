@@ -1310,6 +1310,7 @@
   "update.release_page": "发布页面",
   "update.manual_install": "此版本没有可验证的自动更新包，请从发布页面手动安装。 [Esc] 关闭",
   "update.homebrew_install": "此安装由 Homebrew 管理，请执行 brew upgrade mihosh。 [Esc] 关闭",
+  "update.service_updated": "Mihosh 及其后台服务可执行文件已更新。如果使用 TUN，请先用 setcap 恢复 %s 的文件能力，再运行 mihosh core service restart。",
   "update.title": "发现新版本",
   "update.downloading": "正在下载并更新中，请稍候...",
   "update.failed": "更新失败: %s",

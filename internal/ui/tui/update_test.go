@@ -75,6 +75,22 @@ func TestHomebrewUpdateDialogShowsManualUpgrade(t *testing.T) {
 	}
 }
 
+func TestServiceUpdateLeavesRestartNotice(t *testing.T) {
+	i18n.Init()
+	const executable = "/tmp/service/bin/mihosh"
+	updated, quit, handled := (Model{}).applyCoreEvent(messages.UpdateAppliedMsg{ServiceBinary: executable})
+	text := updated.ExitNotice()
+	if !strings.Contains(text, executable) || !strings.Contains(text, "setcap") || !strings.Contains(text, "mihosh core service restart") {
+		t.Fatalf("expected restart and capability instructions, got %q", text)
+	}
+	if !handled || quit == nil {
+		t.Fatal("expected update to quit the TUI")
+	}
+	if _, ok := quit().(tea.QuitMsg); !ok {
+		t.Fatal("expected a quit message")
+	}
+}
+
 func TestUpdate_MouseMessages(t *testing.T) {
 	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
 	client := api.NewClient(config.MihomoEndpoint{}, 2000)
