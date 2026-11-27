@@ -17,7 +17,7 @@ const (
 // ProfileFiles contains the portable profile overlays. A nil file is omitted unless
 // its corresponding Remove* flag is set.
 type ProfileFiles struct {
-	Merge, Rules, Chains            []byte
+	Merge, Rules, Chains                   []byte
 	RemoveMerge, RemoveRules, RemoveChains bool
 }
 
