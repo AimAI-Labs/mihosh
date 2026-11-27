@@ -64,6 +64,7 @@ type State struct {
 
 	SysStatus      SysStatusState
 	syncModal      SyncModalState
+	themeModal     ThemeModalState
 	uninstallModal UninstallModalState
 
 	configSvc    *service.ConfigService
@@ -209,6 +210,7 @@ func (s State) ToPageState(cfg *service.Config, sysLogs []model.LogEntry) PageSt
 		SysStatus:       s.SysStatus,
 		SysLogs:         sysLogs,
 		SyncModal:       s.syncModal,
+		ThemeModal:      s.themeModal,
 		UninstallModal:  s.uninstallModal,
 	}
 }
@@ -220,6 +222,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		if s.uninstallModal.Open {
 			return s, nil
 		}
+		if s.themeModal.Open {
+			return s.handleThemeModalScroll(msg.Up), nil
+		}
 		if s.syncModal.Open {
 			return s.handleSyncModalScroll(msg.Up), nil
 		}
@@ -230,6 +235,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		if s.uninstallModal.Open {
 			return s.handleUninstallModalClick(msg.X, msg.Y, msg.Width, msg.Height)
 		}
+		if s.themeModal.Open {
+			return s.handleThemeModalClick(msg.X, msg.Y, msg.Width, msg.Height)
+		}
 		if s.syncModal.Open {
 			return s.handleSyncModalClick(msg.X, msg.Y, msg.Width, msg.Height)
 		}
@@ -238,6 +246,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	case tea.KeyMsg:
 		if s.uninstallModal.Open {
 			return s.handleUninstallModalKey(msg)
+		}
+		if s.themeModal.Open {
+			return s.handleThemeModalKey(msg)
 		}
 		if s.syncModal.Open {
 			return s.handleSyncModalKey(msg)
@@ -287,6 +298,9 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 			}
 			if s.activeTab == 0 && s.activeKeys()[s.selectedSetting] == "border-style" {
 				return s.toggleBorderStyle()
+			}
+			if s.activeTab == 0 && s.activeKeys()[s.selectedSetting] == "theme" {
+				return s.OpenThemeModal(), nil
 			}
 			s.editMode = true
 			s.editValue = s.getEditValue(s.Config, s.activeKeys()[s.selectedSetting])
@@ -352,19 +366,6 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 				return s, noticeCmd(i18n.T("settings.toast.save_failed"), messages.NoticeError)
 			}
 		}
-		if s.selectedSetting == ThemeSettingIndex() && settingIdx == s.selectedSetting {
-			if t, ok := resolveThemeMouseTarget(pageX, pageY, pageWidth); ok {
-				if s.configSvc != nil && s.configSvc.SetConfigValue("theme", t) == nil {
-					s.reloadConfig()
-					theme.SetTheme(t)
-					s.editMode = false
-					s.editValue = ""
-					s.editCursor = 0
-					return s, tea.Batch(func() tea.Msg { return messages.ThemeChangedMsg{} }, noticeCmd(i18n.T("settings.toast.save_success_theme"), messages.NoticeSuccess))
-				}
-				return s, noticeCmd(i18n.T("settings.toast.save_failed"), messages.NoticeError)
-			}
-		}
 
 		// 编辑模式下点击空白处退出编辑
 		if settingIdx < 0 || settingIdx >= len(s.activeKeys()) {
@@ -401,18 +402,17 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		}
 	}
 	if s.activeTab == 0 && settingIdx == ThemeSettingIndex() {
-		if t, ok := resolveThemeMouseTarget(pageX, pageY, pageWidth); ok {
-			if s.configSvc != nil && s.configSvc.SetConfigValue("theme", t) == nil {
-				s.reloadConfig()
-				theme.SetTheme(t)
-				return s, tea.Batch(func() tea.Msg { return messages.ThemeChangedMsg{} }, noticeCmd(i18n.T("settings.toast.save_success_theme"), messages.NoticeSuccess))
-			}
-			feedback = noticeCmd(i18n.T("settings.toast.save_failed"), messages.NoticeError)
+		valueStartX := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingLabelWidth(pageWidth)
+		if pageX >= valueStartX {
+			return s.OpenThemeModal(), nil
 		}
 	}
 
 	now := time.Now()
 	if s.doubleClickDetector.IsDoubleClick(struct{}{}, settingIdx, now) {
+		if s.activeTab == 0 && settingIdx == ThemeSettingIndex() {
+			return s.OpenThemeModal(), nil
+		}
 		s.editMode = true
 		s.editValue = s.getEditValue(s.Config, s.activeKeys()[settingIdx])
 		s.editCursor = len([]rune(s.editValue))
@@ -695,13 +695,6 @@ func saveErrorNotice(err error) tea.Cmd {
 
 func resolveMouseSettingIndex(s State, pageY, width int) int {
 	settingIdx := pageY - settingsMouseRowsOffset
-	if s.activeTab == 0 && settingIdx >= ThemeSettingIndex() {
-		_, rows := themeButtonLayout(width)
-		if settingIdx < ThemeSettingIndex()+len(rows) {
-			return ThemeSettingIndex()
-		}
-		settingIdx -= len(rows) - 1
-	}
 	if settingIdx < 0 || settingIdx >= len(s.activeKeys()) {
 		return -1
 	}
@@ -836,15 +829,6 @@ func prevTheme(t string) string {
 		}
 	}
 	return themes[0]
-}
-
-func resolveThemeMouseTarget(pageX, pageY, width int) (string, bool) {
-	labelWidth, rows := themeButtonLayout(width)
-	row := pageY - settingsMouseRowsOffset - ThemeSettingIndex()
-	if row < 0 || row >= len(rows) {
-		return "", false
-	}
-	return resolveEnumMouseTarget(pageX+settingsLabelWidth-labelWidth, rows[row])
 }
 
 func resolveLanguageMouseTarget(pageX int) (string, bool) {
@@ -1159,7 +1143,7 @@ func (s State) SyncSysStatus(width, height int, cfg *service.Config, sysLogs []m
 func (s State) InputCapture() common.InputCapture {
 	textInput := s.editMode || (s.syncModal.Open && s.syncModal.Mode != syncModeMenu)
 	return common.InputCapture{
-		Active:    s.editMode || s.syncModal.Open || s.uninstallModal.Open,
+		Active:    s.editMode || s.syncModal.Open || s.themeModal.Open || s.uninstallModal.Open,
 		Help:      textInput || s.uninstallModal.Open,
 		Interrupt: (textInput && !s.syncModal.Busy) || s.uninstallModal.Busy,
 	}

@@ -17,8 +17,13 @@ func TestBuiltinThemesComplete(t *testing.T) {
 		if !ok {
 			t.Errorf("theme %q in Names() but not in builtinThemes", name)
 		}
-		if th.Name == "" || th.Foreground == "" || th.Background == "" || th.Primary == "" {
-			t.Errorf("theme %q has empty required fields", name)
+		if th.Name != name ||
+			th.Foreground == "" || th.Muted == "" || th.Dim == "" || th.Bright == "" ||
+			th.Background == "" || th.Surface == "" || th.Overlay == "" || th.Selected == "" ||
+			th.Primary == "" || th.Secondary == "" ||
+			th.Success == "" || th.Warning == "" || th.Danger == "" || th.Info == "" ||
+			th.Orange == "" || th.Purple == "" || th.Border == "" || th.Active == "" {
+			t.Errorf("theme %q has empty or mismatched fields", name)
 		}
 	}
 }
@@ -65,7 +70,26 @@ func TestIsValid(t *testing.T) {
 }
 
 func TestNamesStableOrder(t *testing.T) {
-	want := []string{"tokyo-night", "catppuccin", "gruvbox", "nord", "dracula", "kanagawa", "solarized-light"}
+	want := []string{
+		"tokyo-night",
+		"dark",
+		"light",
+		"solarized-dark",
+		"solarized-light",
+		"colorblind-dark",
+		"colorblind-light",
+		"terminal",
+		"catppuccin",
+		"catppuccin-latte",
+		"gruvbox",
+		"gruvbox-light",
+		"nord",
+		"dracula",
+		"kanagawa",
+		"one-dark",
+		"rose-pine",
+		"everforest",
+	}
 	got := Names()
 	if len(got) != len(want) {
 		t.Fatalf("Names() len = %d, want %d", len(got), len(want))
@@ -74,6 +98,36 @@ func TestNamesStableOrder(t *testing.T) {
 		if got[i] != n {
 			t.Fatalf("Names()[%d] = %q, want %q", i, got[i], n)
 		}
+	}
+}
+
+func TestGetReturnsPaletteWithoutMutatingCurrent(t *testing.T) {
+	defer SetTheme("tokyo-night")
+	SetTheme("tokyo-night")
+
+	got, ok := Get("solarized-dark")
+	if !ok {
+		t.Fatal("Get(solarized-dark) returned ok=false")
+	}
+	if got.Name != "solarized-dark" || got.Background != lipgloss.Color("#002B36") {
+		t.Fatalf("unexpected palette from Get(solarized-dark): %+v", got)
+	}
+	if CurrentName() != "tokyo-night" {
+		t.Fatalf("Get() mutated current theme to %q", CurrentName())
+	}
+
+	if _, ok := Get("nonexistent"); ok {
+		t.Fatal("Get(nonexistent) returned ok=true")
+	}
+}
+
+func TestTerminalThemeUsesNativeANSIColors(t *testing.T) {
+	th, ok := Get("terminal")
+	if !ok {
+		t.Fatal("Get(terminal) returned ok=false")
+	}
+	if Resolve(th.Primary) != th.Primary || Resolve(th.Background) != th.Background {
+		t.Fatalf("expected terminal ANSI colors to pass through Resolve unchanged")
 	}
 }
 

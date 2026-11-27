@@ -138,26 +138,35 @@ func TestSettingsThemeMouseClickClearsScreen(t *testing.T) {
 		height:        30,
 	}
 
-	const pageX = 48 // originally 40, shifted by 4 due to label width increase, +4 to be safe
+	const pageX = 48 // right value column of the theme setting row
 	const pageY = 9
 
 	msg := messages.PageMouseClickMsg{X: pageX, Y: pageY, Width: model.width, Height: model.height - layout.TopNavHeight}
-	next, cmd := model.dispatchToPage(msg)
+	next, _ := model.dispatchToPage(msg)
+	model = next.(Model)
+	if !model.settingsState.ThemeModalOpen() {
+		t.Fatalf("expected clicking theme row to open theme picker modal")
+	}
+
+	// Move down to the second theme ("dark") and apply with Enter.
+	next, _ = model.dispatchToPage(tea.KeyMsg{Type: tea.KeyDown})
+	model = next.(Model)
+	next, cmd := model.dispatchToPage(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd == nil {
 		nextModel := next.(Model)
 		gotTheme := "<nil>"
 		if nextModel.config != nil {
 			gotTheme = nextModel.config.Theme
 		}
-		t.Fatalf("expected clear screen cmd after theme mouse change, config theme=%q current theme=%q", gotTheme, theme.CurrentName())
+		t.Fatalf("expected clear screen cmd after theme modal apply, config theme=%q current theme=%q", gotTheme, theme.CurrentName())
 	}
 	model = next.(Model)
 
-	if model.config.Theme != "catppuccin" {
-		t.Fatalf("expected model theme catppuccin, got %q", model.config.Theme)
+	if model.config.Theme != "dark" {
+		t.Fatalf("expected model theme dark, got %q", model.config.Theme)
 	}
-	if got := theme.CurrentName(); got != "catppuccin" {
-		t.Fatalf("expected current theme catppuccin, got %q", got)
+	if got := theme.CurrentName(); got != "dark" {
+		t.Fatalf("expected current theme dark, got %q", got)
 	}
 }
 

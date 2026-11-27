@@ -81,6 +81,7 @@ type PageState struct {
 	SysStatus       SysStatusState
 	SysLogs         []model.LogEntry
 	SyncModal       SyncModalState
+	ThemeModal      ThemeModalState
 	UninstallModal  UninstallModalState
 }
 
@@ -273,6 +274,8 @@ func renderSettingsPage(state PageState, width, height int, standalone bool) str
 	if standalone {
 		if state.UninstallModal.Open {
 			mainContent = buildUninstallModal(state, width, height).Overlay(mainContent, true)
+		} else if state.ThemeModal.Open {
+			mainContent = buildThemeModal(state, width, height).Overlay(mainContent, true)
 		} else if state.SyncModal.Open {
 			mainContent = buildSyncModal(state, width, height).Overlay(mainContent, true)
 		}
@@ -283,7 +286,7 @@ func renderSettingsPage(state PageState, width, height int, standalone bool) str
 
 func (s State) InlineHelpHints() []common.InlineHelpHint {
 	return buildSettingsInlineHelpHints(PageState{
-		ActiveTab: s.activeTab, SelectedSetting: s.selectedSetting, EditMode: s.editMode, SyncModal: s.syncModal, UninstallModal: s.uninstallModal,
+		ActiveTab: s.activeTab, SelectedSetting: s.selectedSetting, EditMode: s.editMode, SyncModal: s.syncModal, ThemeModal: s.themeModal, UninstallModal: s.uninstallModal,
 	})
 }
 
@@ -324,7 +327,7 @@ func overlayVersionAtBottomLeft(page, versionText string, width, height int) str
 
 // buildSettingsInlineHelpHints 根据设置页上下文构建内联帮助条目
 func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
-	if state.SyncModal.Open || state.UninstallModal.Open {
+	if state.SyncModal.Open || state.ThemeModal.Open || state.UninstallModal.Open {
 		return nil
 	}
 	// 编辑模式：根据是否语言项分流
@@ -397,10 +400,6 @@ func renderSettingItem(state PageState, index int, key string, label string, wid
 	width = max(24, width)
 	value := GetSettingValue(state, key)
 	labelWidth := settingLabelWidth(width)
-	var themeRows [][]string
-	if key == "theme" {
-		labelWidth, themeRows = themeButtonLayout(width)
-	}
 	label = ansi.Truncate(label+":", max(1, labelWidth-1), "…")
 
 	// 密钥特殊处理
@@ -456,16 +455,9 @@ func renderSettingItem(state PageState, index int, key string, label string, wid
 		}
 		renderedValue = renderLanguageTabs(valToRender, state.EditMode && index == state.SelectedSetting)
 	} else if key == "theme" {
-		// 主题选项使用 Tab 组件渲染
-		valToRender := value
-		if state.EditMode && index == state.SelectedSetting {
-			valToRender = state.EditValue
-		}
-		var rows []string
-		for _, names := range themeRows {
-			rows = append(rows, renderEnumTabs(valToRender, names, state.EditMode && index == state.SelectedSetting))
-		}
-		renderedValue = strings.Join(rows, "\n")
+		// 主题选项单行展示当前主题与色块摘要，Enter/点击打开主题选择弹窗
+		maxValWidth := max(1, width-4-settingsRowPaddingLeft-labelWidth)
+		renderedValue = renderThemeSummary(value, maxValWidth)
 	} else if key == "border-style" {
 		renderedValue = renderEnumTabs(i18n.T("settings.border."+value), borderStyleOptions(), false)
 	} else if key == "allow-lan" {
@@ -514,15 +506,10 @@ func renderSettingItem(state PageState, index int, key string, label string, wid
 	// 拼装每行的内容
 	lineInner := lipgloss.JoinHorizontal(lipgloss.Top, renderedLabel, renderedValue)
 	rowWidth := max(1, width-4)
-	if key != "theme" {
-		lineInner = ansi.Truncate(lineInner, max(1, rowWidth-settingsRowPaddingLeft), "")
-	}
+	lineInner = ansi.Truncate(lineInner, max(1, rowWidth-settingsRowPaddingLeft), "")
 
 	// 定义单行块的样式
-	rowStyle := lipgloss.NewStyle().Width(rowWidth).PaddingLeft(1)
-	if key != "theme" {
-		rowStyle = rowStyle.MaxHeight(1)
-	}
+	rowStyle := lipgloss.NewStyle().Width(rowWidth).PaddingLeft(1).MaxHeight(1)
 	if index == state.SelectedSetting {
 		rowStyle = rowStyle.Inherit(selectedBg)
 	}
@@ -537,31 +524,6 @@ func settingLabelWidth(width int) int {
 
 func borderStyleOptions() []string {
 	return []string{i18n.T("settings.border.rounded"), i18n.T("settings.border.square")}
-}
-
-func themeButtonLayout(width int) (labelWidth int, rows [][]string) {
-	names := theme.Names()
-	longest := 0
-	for _, name := range names {
-		longest = max(longest, settingsTabDisplayWidth(name))
-	}
-	room := max(24, width) - 4 - settingsRowPaddingLeft
-	labelWidth = min(settingsLabelWidth, max(1, room-longest))
-	available := room - labelWidth
-	start, used := 0, 0
-	for i, name := range names {
-		// The separator takes one column between adjacent buttons.
-		buttonWidth := settingsTabDisplayWidth(name)
-		if i > start && used+1+buttonWidth > available {
-			rows = append(rows, names[start:i])
-			start, used = i, 0
-		}
-		if i > start {
-			used++
-		}
-		used += buttonWidth
-	}
-	return labelWidth, append(rows, names[start:])
 }
 
 func enumTabsWindow(current string, labels []string, width int) (offset, visible int) {

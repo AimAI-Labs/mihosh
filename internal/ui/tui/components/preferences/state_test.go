@@ -601,20 +601,22 @@ func TestThemeSettingIndex(t *testing.T) {
 }
 
 func TestThemeTabSwitchNext(t *testing.T) {
-	if nextTheme("tokyo-night") != "catppuccin" {
-		t.Errorf("expected catppuccin, got %q", nextTheme("tokyo-night"))
+	names := theme.Names()
+	if nextTheme(names[0]) != names[1] {
+		t.Errorf("expected %q, got %q", names[1], nextTheme(names[0]))
 	}
-	if nextTheme("solarized-light") != "tokyo-night" {
-		t.Errorf("expected tokyo-night (wrap), got %q", nextTheme("solarized-light"))
+	if nextTheme(names[len(names)-1]) != names[0] {
+		t.Errorf("expected %q (wrap), got %q", names[0], nextTheme(names[len(names)-1]))
 	}
 }
 
 func TestThemeTabSwitchPrev(t *testing.T) {
-	if prevTheme("catppuccin") != "tokyo-night" {
-		t.Errorf("expected tokyo-night, got %q", prevTheme("catppuccin"))
+	names := theme.Names()
+	if prevTheme(names[1]) != names[0] {
+		t.Errorf("expected %q, got %q", names[0], prevTheme(names[1]))
 	}
-	if prevTheme("tokyo-night") != "solarized-light" {
-		t.Errorf("expected solarized-light (wrap), got %q", prevTheme("tokyo-night"))
+	if prevTheme(names[0]) != names[len(names)-1] {
+		t.Errorf("expected %q (wrap), got %q", names[len(names)-1], prevTheme(names[0]))
 	}
 }
 

@@ -529,7 +529,7 @@ func TestReleaseRowColorsDistinguishVersionStatesAcrossThemes(t *testing.T) {
 			if at < 0 {
 				t.Fatal("colored version is missing")
 			}
-			codes := regexp.MustCompile(`\x1b\[38;2;[0-9;]+m`).FindAllString(row[:at], -1)
+			codes := regexp.MustCompile(`\x1b\[(?:38;2;[0-9;]+|38;5;[0-9]+|3[0-7]|9[0-7])m`).FindAllString(row[:at], -1)
 			if len(codes) == 0 {
 				t.Fatal("version row is not colored")
 			}

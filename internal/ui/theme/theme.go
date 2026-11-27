@@ -55,6 +55,12 @@ func init() {
 // Current 返回当前主题的副本（每次渲染时调用）
 func Current() Theme { return *current.Load() }
 
+// Get 按名称返回内置主题的副本（供预览渲染等场景无副作用读取）
+func Get(name string) (Theme, bool) {
+	t, ok := builtinThemes[name]
+	return t, ok
+}
+
 // SetTheme 切换当前主题，成功返回 true
 func SetTheme(name string) bool {
 	t, ok := builtinThemes[name]
