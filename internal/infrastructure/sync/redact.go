@@ -3,6 +3,7 @@ package sync
 import (
 	"bytes"
 	"net/url"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -140,19 +141,11 @@ func isSensitiveQueryKey(key string) bool {
 }
 
 func looksLikePathToken(seg string) bool {
-	if uuidPattern.MatchString(seg) || hexTokenPattern.MatchString(seg) {
-		return true
+	switch ext := path.Ext(seg); strings.ToLower(ext) {
+	case ".yaml", ".yml", ".json", ".txt", ".conf", ".list":
+		seg = strings.TrimSuffix(seg, ext)
 	}
-	// Avoid redacting normal filenames like subscribe.yaml or clash-config.yml
-	if strings.Contains(seg, ".") {
-		lower := strings.ToLower(seg)
-		for _, ext := range []string{".yaml", ".yml", ".json", ".txt", ".conf", ".list"} {
-			if strings.HasSuffix(lower, ext) {
-				return false
-			}
-		}
-	}
-	return opaqueTokenPattern.MatchString(seg) && hasMixedTokenChars(seg)
+	return looksLikeSecretValue(seg)
 }
 
 func looksLikeSecretValue(val string) bool {

@@ -254,3 +254,21 @@ func TestRedactDSNDoesNotExposeMalformedURIPassword(t *testing.T) {
 	}
 	require.Equal(t, "host=db.example password=[REDACTED]", RedactDSN("host=db.example password='part://other'"))
 }
+
+func TestRedactURLIdentifiesTokensInConfigFilenames(t *testing.T) {
+	const prefix = "https://sub.example.com/clash/"
+	for _, name := range []string{
+		"550e8400-e29b-41d4-a716-446655440000.yaml",
+		"0123456789abcdef0123456789abcdef.yml",
+		"ExampleOpaqueKeyNumber12345.JSON",
+	} {
+		got, changed := RedactURL(prefix + name)
+		require.True(t, changed, name)
+		require.Equal(t, prefix+RedactedPlaceholder, got)
+	}
+	for _, name := range []string{"subscribe.yaml", "clash-config.yml"} {
+		got, changed := RedactURL(prefix + name)
+		require.False(t, changed, name)
+		require.Equal(t, prefix+name, got)
+	}
+}
