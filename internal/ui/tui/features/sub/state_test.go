@@ -316,3 +316,22 @@ func TestSubEditorReportsBlankEditor(t *testing.T) {
 		t.Fatalf("expected an editor error, got %#v", msg)
 	}
 }
+
+func TestSubscriptionReopeningSearchRestoresAllRows(t *testing.T) {
+	for _, exit := range []tea.KeyType{tea.KeyEsc, tea.KeyEnter} {
+		t.Run(exit.String(), func(t *testing.T) {
+			s := State{}.ApplySubs(sampleSubs(), "")
+			s, _ = s.Update(newRuneKey("/"))
+			for _, char := range "Group" {
+				s, _ = s.Update(newRuneKey(string(char)))
+			}
+			s, _ = s.Update(tea.KeyMsg{Type: tea.KeyEnter})
+			require.Equal(t, []int{2}, s.filteredIdx)
+			s, _ = s.Update(newRuneKey("/"))
+			s, _ = s.Update(tea.KeyMsg{Type: exit})
+			require.False(t, s.filterMode)
+			require.Empty(t, s.filter)
+			require.Equal(t, []int{0, 1, 2}, s.filteredIdx)
+		})
+	}
+}

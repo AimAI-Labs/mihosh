@@ -297,6 +297,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case msg.String() == "/":
 			s.filterMode = true
 			s.filter = ""
+			s.updateFiltered()
 		case key.Matches(msg, common.Keys.Refresh):
 			return s, RefreshSubs(s.svc)
 		case key.Matches(msg, common.Keys.Escape):
