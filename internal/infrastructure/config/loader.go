@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -29,11 +30,12 @@ var systemctlStatusRunner = func() ([]byte, error) {
 	return runMihomoDiscovery("systemctl", "status", "mihomo")
 }
 
-// processListRunner 列出系统进程（pid + 完整命令行），用于发现手动启动的 mihomo。
-// -eww 保证长命令行不被终端宽度截断。
+// ps only selects candidate PIDs. Read each candidate's original argv separately.
 var processListRunner = func() ([]byte, error) {
-	return runMihomoDiscovery("ps", "-eww", "-o", "pid=,args=")
+	return runMihomoDiscovery("ps", "-Aww", "-o", "pid=,args=")
 }
+
+var processArgumentsReader = readProcessArguments
 
 func runMihomoDiscovery(name string, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -60,8 +62,8 @@ func GetConfigDir() (string, error) {
 }
 
 // GetMihomoConfigPath 获取 mihomo 配置文件的默认路径。
-// Linux 下优先从 systemctl status 解析 -d 参数（运行时实际生效的配置），
-// 再降级搜索已知目录；其他平台直接搜索已知目录。
+// Linux 优先查找 systemd 服务，Linux 和 macOS 都可从运行进程发现配置，
+// 找不到时再搜索已知目录。
 func GetMihomoConfigPath() (string, error) {
 	cfg, _ := Load()
 	return resolveMihomoConfigPath(cfg)
@@ -76,8 +78,8 @@ func resolveMihomoConfigPath(cfg *Config) (string, error) {
 			return "", ErrExternalConfig
 		}
 	}
-	// 优先：从运行中的 mihomo 进程解析 -d 参数（最权威的实际配置路径）
-	if runtime.GOOS != "windows" {
+	// 优先从运行中的 mihomo 进程解析实际配置路径。
+	if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
 		if configFile, err := GetMihomoConfigPathFromProcess(); err == nil {
 			return configFile, nil
 		}
@@ -120,35 +122,57 @@ func GetDefaultMihomoConfigPath() (string, error) {
 // GetMihomoConfigPathFromProcess 从运行中的 mihomo 进程定位配置文件。
 // 先查 systemd 服务（系统服务场景），再扫描进程命令行（手动启动场景）。
 func GetMihomoConfigPathFromProcess() (string, error) {
-	if configFile := mihomoConfigPathFromSystemd(); configFile != "" {
-		return configFile, nil
+	var hasServiceCommand bool
+	if runtime.GOOS == "linux" {
+		var configFile string
+		configFile, hasServiceCommand = mihomoConfigPathFromSystemd()
+		if configFile != "" {
+			return configFile, nil
+		}
 	}
 	if configFile := mihomoConfigPathFromRunningProcess(); configFile != "" {
 		return configFile, nil
 	}
+	if hasServiceCommand {
+		if configFile := searchFallbackDirectories(); configFile != "" {
+			return configFile, nil
+		}
+	}
 	return "", buildMihomoConfigPathNotFoundError()
 }
 
-func mihomoConfigPathFromSystemd() string {
+func mihomoConfigPathFromSystemd() (string, bool) {
 	output, err := systemctlStatusRunner()
 	if err != nil {
-		return ""
+		return "", false
 	}
-
-	cmdLine := parseSystemctlStatus(string(output))
-	if cmdLine == "" {
-		return ""
+	status := string(output)
+	var args []string
+	var cwd string
+	for _, line := range strings.Split(status, "\n") {
+		mainPID, ok := strings.CutPrefix(strings.TrimSpace(line), "Main PID:")
+		if !ok {
+			continue
+		}
+		fields := strings.Fields(mainPID)
+		if len(fields) > 0 {
+			if pid, err := strconv.Atoi(fields[0]); err == nil && pid > 0 {
+				args, cwd = processArgumentsReader(pid)
+			}
+		}
+		break
 	}
-
-	configDir := extractConfigDirFromCommandLine(cmdLine)
-	if configDir == "" {
-		return ""
+	if len(args) == 0 || !isMihomoExecutable(args[0]) {
+		args, cwd = splitSystemdCommand(parseSystemctlStatus(status)), ""
 	}
-
-	if configFile := findConfigFileInDirectory(configDir); configFile != "" {
-		return configFile
+	if len(args) == 0 {
+		return "", false
 	}
-	return searchFallbackDirectories()
+	configFile, configDir := parseMihomoProcessArgs(args[1:])
+	if configFile == "" && configDir == "" {
+		configDir = filepath.Dir(args[0])
+	}
+	return resolveProcessConfigPath(configFile, configDir, cwd), true
 }
 
 func mihomoConfigPathFromRunningProcess() string {
@@ -159,39 +183,50 @@ func mihomoConfigPathFromRunningProcess() string {
 	return parseMihomoConfigFromProcessList(string(output))
 }
 
-// parseMihomoConfigFromProcessList 从 ps 输出中查找 mihomo 进程的启动参数。
-// 优先采用 -f 指定的配置文件；未指定时用 -d 目录下的 config.yaml。
-// 手动启动（非 systemd）的 mihomo 只能通过命令行发现。
+// parseMihomoConfigFromProcessList reads original argv for candidate Mihomo PIDs.
 func parseMihomoConfigFromProcessList(output string) string {
 	for _, line := range strings.Split(output, "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
+		line = strings.TrimSpace(line)
+		end := strings.IndexAny(line, " \t")
+		if end < 0 || !strings.Contains(line[end:], "mihomo") {
 			continue
 		}
-
-		pid, executable := fields[0], fields[1]
-		if !strings.Contains(filepath.Base(executable), "mihomo") {
+		pid, err := strconv.Atoi(line[:end])
+		if err != nil || pid <= 0 {
 			continue
 		}
-
-		configFile, configDir := parseMihomoProcessArgs(fields[2:])
-		if configFile != "" {
-			if !filepath.IsAbs(configFile) {
-				if cwd, err := os.Readlink(filepath.Join("/proc", pid, "cwd")); err == nil {
-					configFile = filepath.Join(cwd, configFile)
-				}
-			}
-			if info, err := os.Stat(configFile); err == nil && !info.IsDir() {
-				return configFile
-			}
+		args, cwd := processArgumentsReader(pid)
+		if len(args) == 0 || !isMihomoExecutable(args[0]) {
+			continue
 		}
-		if configDir != "" {
-			if configFile := findConfigFileInDirectory(configDir); configFile != "" {
-				return configFile
-			}
+		file, dir := parseMihomoProcessArgs(args[1:])
+		if configFile := resolveProcessConfigPath(file, dir, cwd); configFile != "" {
+			return configFile
 		}
 	}
 	return ""
+}
+
+func resolveProcessConfigPath(file, dir, cwd string) string {
+	if file = resolveProcessPath(file, cwd); file != "" {
+		if info, err := os.Stat(file); err == nil && !info.IsDir() {
+			return file
+		}
+	}
+	if dir = resolveProcessPath(dir, cwd); dir != "" {
+		return findConfigFileInDirectory(dir)
+	}
+	return ""
+}
+
+func resolveProcessPath(path, cwd string) string {
+	if path == "" || filepath.IsAbs(path) {
+		return path
+	}
+	if !filepath.IsAbs(cwd) {
+		return ""
+	}
+	return filepath.Join(cwd, path)
 }
 
 // parseMihomoProcessArgs 解析 mihomo 的 -f/-d 参数，兼容 -f path 与 -f=path 两种写法。
@@ -229,43 +264,22 @@ func parseSystemctlStatus(output string) string {
 			}
 		}
 
-		if !strings.Contains(trimmed, "/mihomo") || !strings.Contains(trimmed, "-d ") {
+		treeLine := strings.TrimLeft(trimmed, "│├└─ \t")
+		if treeLine == trimmed {
 			continue
 		}
-
-		for _, field := range strings.Fields(trimmed) {
-			if strings.Contains(field, "/mihomo") {
-				idx := strings.Index(trimmed, field)
-				if idx >= 0 {
-					return strings.TrimSpace(trimmed[idx:])
-				}
+		end := strings.IndexAny(treeLine, " \t")
+		if end < 0 {
+			continue
+		}
+		if _, err := strconv.Atoi(treeLine[:end]); err == nil {
+			cmd := strings.TrimSpace(treeLine[end:])
+			if strings.Contains(cmd, "mihomo") {
+				return cmd
 			}
 		}
 	}
 	return ""
-}
-
-func extractConfigDirFromCommandLine(cmdLine string) string {
-	parts := strings.Fields(cmdLine)
-	if len(parts) == 0 {
-		return ""
-	}
-	cleaned := make([]string, len(parts))
-	for i, part := range parts {
-		cleaned[i] = strings.Trim(part, "\"'")
-	}
-	cfgFile, cfgDir := parseMihomoProcessArgs(cleaned[1:])
-	if cfgDir != "" {
-		return cfgDir
-	}
-	if cfgFile != "" {
-		return filepath.Dir(cfgFile)
-	}
-	execPath := cleaned[0]
-	if absPath, err := filepath.Abs(execPath); err == nil {
-		return filepath.Dir(absPath)
-	}
-	return filepath.Dir(execPath)
 }
 
 func findConfigFileInDirectory(dir string) string {

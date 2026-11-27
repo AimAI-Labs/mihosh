@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/binary"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -84,6 +85,9 @@ func TestGetMihomoConfigPathForWriteReturnsDefaultWhenNotExists(t *testing.T) {
 }
 
 func TestGetMihomoConfigPathFromProcessFindsConfigInSystemctlDirectory(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("systemd is a Linux discovery path")
+	}
 	homeDir := t.TempDir()
 	serviceDir := t.TempDir()
 	configPath := serviceDir + string(os.PathSeparator) + "config.yaml"
@@ -111,18 +115,30 @@ func TestGetMihomoConfigPathFromProcessFindsConfigInSystemctlDirectory(t *testin
 // TestGetMihomoConfigPathFromProcessFindsManuallyStartedInstance 验证无 systemd 服务时，
 // 通过进程命令行发现手动启动的 mihomo（-d 目录 + -f 自定义配置文件）。
 func TestGetMihomoConfigPathFromProcessFindsManuallyStartedInstance(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	fallbackDir := filepath.Join(home, ".config", "mihomo")
+	require.NoError(t, os.MkdirAll(fallbackDir, 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(fallbackDir, "config.yaml"), []byte("mixed-port: 7892\n"), 0600))
+
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "COCODUCK.yaml")
 	require.NoError(t, os.WriteFile(configPath, []byte("mixed-port: 7890\n"), 0644))
 
 	originalSystemctl := systemctlStatusRunner
+	missing := filepath.Join(t.TempDir(), "missing service config")
 	systemctlStatusRunner = func() ([]byte, error) {
-		return []byte("mihomo.service could not be found"), nil
+		if runtime.GOOS != "linux" {
+			t.Fatal("attempted systemd discovery on a platform without systemd")
+		}
+		return []byte("Process: 120 ExecStart=/usr/local/bin/mihomo -d \"" + missing + "\""), nil
 	}
 	t.Cleanup(func() {
 		systemctlStatusRunner = originalSystemctl
 	})
 
+	stubMihomoProcessArguments(t, "-d", dir, "-f", configPath)
 	originalProcessList := processListRunner
 	processListRunner = func() ([]byte, error) {
 		return []byte(" 123 /usr/local/bin/mihomo -d " + dir + " -f " + configPath + "\n"), nil
@@ -144,6 +160,7 @@ func TestParseMihomoConfigFromProcessListPrefersConfigFile(t *testing.T) {
 	require.NoError(t, os.WriteFile(defaultConfig, []byte("mixed-port: 7890\n"), 0644))
 	require.NoError(t, os.WriteFile(customConfig, []byte("mixed-port: 7891\n"), 0644))
 
+	stubMihomoProcessArguments(t, "-d", dir, "-f", customConfig)
 	output := " 123 /usr/local/bin/mihomo -d " + dir + " -f " + customConfig + "\n"
 	assert.Equal(t, customConfig, parseMihomoConfigFromProcessList(output))
 }
@@ -154,6 +171,7 @@ func TestParseMihomoConfigFromProcessListUsesDirectory(t *testing.T) {
 	configPath := filepath.Join(dir, "config.yml")
 	require.NoError(t, os.WriteFile(configPath, []byte("mixed-port: 7890\n"), 0644))
 
+	stubMihomoProcessArguments(t, "-d", dir)
 	output := " 123 /usr/local/bin/mihomo -d " + dir + "\n"
 	assert.Equal(t, configPath, parseMihomoConfigFromProcessList(output))
 }
@@ -164,6 +182,7 @@ func TestParseMihomoConfigFromProcessListSupportsEqualsSyntax(t *testing.T) {
 	configPath := filepath.Join(dir, "custom.yaml")
 	require.NoError(t, os.WriteFile(configPath, []byte("mixed-port: 7890\n"), 0644))
 
+	stubMihomoProcessArguments(t, "-f="+configPath)
 	output := " 123 /usr/local/bin/mihomo -f=" + configPath + "\n"
 	assert.Equal(t, configPath, parseMihomoConfigFromProcessList(output))
 }
@@ -249,11 +268,63 @@ func TestSearchKnownMihomoDirectoriesFindsLegacyClashVerge(t *testing.T) {
 	assert.Equal(t, configPath, got, "应发现上游 Clash Verge 的 config.yaml")
 }
 
-func TestExtractConfigDirFromCommandLine_FlagsAndEmpty(t *testing.T) {
-	assert.Equal(t, "", extractConfigDirFromCommandLine(""))
-	assert.Equal(t, "/etc/mihomo", extractConfigDirFromCommandLine("/usr/bin/mihomo -d=/etc/mihomo"))
-	assert.Equal(t, "/etc/mihomo", extractConfigDirFromCommandLine("/usr/bin/mihomo -d \"/etc/mihomo\""))
-	assert.Equal(t, "/opt/mihomo", extractConfigDirFromCommandLine("/usr/bin/mihomo -f /opt/mihomo/config.yaml"))
-	// -debug must not be misparsed as -d with dir "ebug"
-	assert.NotEqual(t, "ebug", extractConfigDirFromCommandLine("/usr/bin/mihomo -debug"))
+func TestSplitSystemdCommand(t *testing.T) {
+	assert.Empty(t, splitSystemdCommand(""))
+	assert.Empty(t, splitSystemdCommand(`/usr/bin/mihomo -d "unclosed`))
+	args := splitSystemdCommand(`"/opt/Clash Verge/mihomo" -d '/etc/mihomo config' -f="/opt/config files/config.yaml"`)
+	assert.Equal(t, []string{"/opt/Clash Verge/mihomo", "-d", "/etc/mihomo config", "-f=/opt/config files/config.yaml"}, args)
+}
+
+func stubMihomoProcessArguments(t *testing.T, args ...string) {
+	t.Helper()
+	saved := processArgumentsReader
+	processArgumentsReader = func(pid int) ([]string, string) {
+		if pid != 123 {
+			return nil, ""
+		}
+		return append([]string{"/usr/local/bin/mihomo"}, args...), ""
+	}
+	t.Cleanup(func() { processArgumentsReader = saved })
+}
+
+func TestDarwinDiscoveryKeepsArgumentBoundaries(t *testing.T) {
+	configDir := filepath.Join(t.TempDir(), "Library", "Application Support", "mihomo")
+	require.NoError(t, os.MkdirAll(configDir, 0700))
+	configFile := filepath.Join(configDir, "config.yaml")
+	require.NoError(t, os.WriteFile(configFile, []byte("mixed-port: 7890\n"), 0600))
+	executable := "/Applications/Clash Verge.app/Contents/MacOS/verge-mihomo"
+	buf := binary.NativeEndian.AppendUint32(nil, 4)
+	buf = append(buf, executable+"\x00\x00\x00"+executable+"\x00-d\x00"+configDir+"\x00\x00-f=ignored-env\x00"...)
+	argv := parseDarwinProcessArguments(buf)
+	require.Equal(t, []string{executable, "-d", configDir, ""}, argv)
+	assert.Empty(t, parseDarwinProcessArguments([]byte{1, 2, 3}))
+	assert.Empty(t, parseDarwinProcessArguments(binary.NativeEndian.AppendUint32(nil, 70)))
+
+	saved := processArgumentsReader
+	processArgumentsReader = func(int) ([]string, string) { return argv, "" }
+	t.Cleanup(func() { processArgumentsReader = saved })
+	ps := " 126 " + executable + " -d " + configDir + "\n"
+	require.Equal(t, configFile, parseMihomoConfigFromProcessList(ps))
+}
+
+func TestSystemdDiscoveryKeepsExplicitConfigFile(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("systemd is a Linux discovery path")
+	}
+	t.Setenv("HOME", t.TempDir())
+	stubEmptyProcessList(t)
+	dir := filepath.Join(t.TempDir(), "active configuration")
+	require.NoError(t, os.Mkdir(dir, 0700))
+	configFile := filepath.Join(dir, "custom config.yaml")
+	require.NoError(t, os.WriteFile(configFile, []byte("mixed-port: 7891\n"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "config.yaml"), []byte("mixed-port: 7892\n"), 0600))
+	restore := systemctlStatusRunner
+	systemctlStatusRunner = func() ([]byte, error) {
+		return []byte("  Process: 123 ExecStart=/usr/local/bin/mihomo -d \"" + dir + "\" -f=\"" + configFile + "\""), nil
+	}
+	t.Cleanup(func() { systemctlStatusRunner = restore })
+
+	got, err := GetMihomoConfigPathFromProcess()
+	require.NoError(t, err)
+	assert.Equal(t, configFile, got)
 }
