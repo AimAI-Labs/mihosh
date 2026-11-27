@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -102,7 +103,7 @@ func OpenPostgres(ctx context.Context, dsn string) (Store, error) {
 	}
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("open postgres (%s): %w", RedactDSN(dsn), err)
+		return nil, postgresConnectionError("open", dsn, err)
 	}
 	db.SetMaxOpenConns(2)
 	db.SetMaxIdleConns(1)
@@ -112,9 +113,18 @@ func OpenPostgres(ctx context.Context, dsn string) (Store, error) {
 	defer cancel()
 	if err := db.PingContext(pingCtx); err != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("connect postgres (%s): %w", RedactDSN(dsn), err)
+		return nil, postgresConnectionError("connect", dsn, err)
 	}
 	return &PostgresStore{db: db}, nil
+}
+
+func postgresConnectionError(stage, dsn string, cause error) error {
+	var parseError *url.Error
+	if errors.As(cause, &parseError) {
+		// A driver URL error can contain the entire unredacted DSN.
+		cause = errors.New("invalid PostgreSQL connection URI")
+	}
+	return fmt.Errorf("%s postgres (%s): %w", stage, RedactDSN(dsn), cause)
 }
 
 // EnsureSchema creates the mihosh_sync_snapshots table if it does not already exist.

@@ -19,7 +19,6 @@ var (
 	hexTokenPattern    = regexp.MustCompile(`(?i)^[0-9a-f]{16,}$`)
 	opaqueTokenPattern = regexp.MustCompile(`^[A-Za-z0-9._~-]{24,}$`)
 	dsnKVPassword      = regexp.MustCompile(`(?i)(\b(?:ssl)?password\s*=\s*)('(?:\\'|[^'])*'|"(?:\\"|[^"])*"|\S+)`)
-	dsnURIPassword     = regexp.MustCompile(`(://[^/@\s]*:)([^/@\s]+)(@)`)
 )
 
 var sensitiveQueryKeys = []string{
@@ -183,43 +182,44 @@ func RedactDSN(dsn string) string {
 	if trimmed == "" {
 		return ""
 	}
-	if strings.Contains(trimmed, "://") {
-		if u, err := url.Parse(trimmed); err == nil {
-			changed := false
-			if u.User != nil {
-				username := u.User.Username()
-				if _, hasPass := u.User.Password(); hasPass {
-					if username != "" {
-						u.User = url.UserPassword(username, RedactedPlaceholder)
-					} else {
-						u.User = url.User(RedactedPlaceholder)
-					}
-					changed = true
-				}
-			}
-			if u.RawQuery != "" {
-				q := u.Query()
-				for key := range q {
-					lower := strings.ToLower(key)
-					if lower == "password" || lower == "sslpassword" {
-						q.Set(key, RedactedPlaceholder)
-						changed = true
-					}
-				}
-				if changed {
-					u.RawQuery = q.Encode()
-				}
-			}
-			if changed {
-				return strings.ReplaceAll(u.String(), "%5BREDACTED%5D", RedactedPlaceholder)
-			}
-			return trimmed
-		}
-		// Fallback for URIs that fail url.Parse (e.g. unescaped '%' in password).
-		redacted := dsnURIPassword.ReplaceAllString(trimmed, "${1}"+RedactedPlaceholder+"${3}")
-		return dsnKVPassword.ReplaceAllString(redacted, "${1}"+RedactedPlaceholder)
+	scheme, _, uri := strings.Cut(trimmed, "://")
+	if !uri || strings.ContainsAny(scheme, "= \t\r\n") {
+		return dsnKVPassword.ReplaceAllString(trimmed, "${1}"+RedactedPlaceholder)
 	}
-	return dsnKVPassword.ReplaceAllString(trimmed, "${1}"+RedactedPlaceholder)
+	u, err := url.Parse(trimmed)
+	if err != nil {
+		return RedactedPlaceholder
+	}
+	// An unescaped slash can place part of the password in the parsed path.
+	if u.User == nil && u.Port() != "" && strings.Contains(u.EscapedPath(), "@") {
+		return RedactedPlaceholder
+	}
+	query, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		return RedactedPlaceholder
+	}
+	changed := false
+	if u.User != nil {
+		if _, hasPass := u.User.Password(); hasPass {
+			if username := u.User.Username(); username != "" {
+				u.User = url.UserPassword(username, RedactedPlaceholder)
+			} else {
+				u.User = url.User(RedactedPlaceholder)
+			}
+			changed = true
+		}
+	}
+	for key := range query {
+		if strings.EqualFold(key, "password") || strings.EqualFold(key, "sslpassword") {
+			query.Set(key, RedactedPlaceholder)
+			changed = true
+		}
+	}
+	if !changed {
+		return trimmed
+	}
+	u.RawQuery = query.Encode()
+	return strings.ReplaceAll(u.String(), "%5BREDACTED%5D", RedactedPlaceholder)
 }
 
 func isSensitiveYAMLKey(key string) bool {

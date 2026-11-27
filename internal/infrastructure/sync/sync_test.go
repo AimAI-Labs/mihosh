@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -202,7 +203,7 @@ func TestRestoreRedactedYAML_NamedSequenceDoesNotLeakAcrossProxies(t *testing.T)
 }
 
 func TestRedactDSN_FallbackAndQueryParams(t *testing.T) {
-	// Invalid percent escape in password fails url.Parse; fallback regex must still mask it.
+	// A malformed URI must never be returned as display text.
 	badURI := "postgres://admin:p%ss@db.example:5432/app"
 	redactedBad := RedactDSN(badURI)
 	require.NotContains(t, redactedBad, "p%ss")
@@ -228,4 +229,28 @@ func TestDecodeArchive_RejectsDuplicateEntries(t *testing.T) {
 	_ = gz.Close()
 	_, err := DecodeTarGz(buf.Bytes())
 	require.ErrorIs(t, err, ErrInvalidArchive)
+}
+
+func TestOpenPostgresDoesNotExposeMalformedURIPassword(t *testing.T) {
+	for _, password := range []string{"p%ss", "p%ss/part@tail"} {
+		dsn := "postgres://admin:" + password + "@127.0.0.1:1/app"
+		store, err := OpenPostgres(context.Background(), dsn)
+		require.Nil(t, store)
+		require.Error(t, err)
+		require.NotContains(t, err.Error(), password)
+		require.NotContains(t, err.Error(), dsn)
+		require.Contains(t, err.Error(), "postgres")
+	}
+}
+
+func TestRedactDSNDoesNotExposeMalformedURIPassword(t *testing.T) {
+	for _, dsn := range []string{
+		"postgres://admin:p%ss/part@tail@db.example:5432/app",
+		"postgresql://admin:p%ss@second@db.example:5432/app",
+		"postgres://admin:123/part@db.example:5432/app",
+		"postgres://db.example:5432/app?password=p%ss",
+	} {
+		require.Equal(t, RedactedPlaceholder, RedactDSN(dsn))
+	}
+	require.Equal(t, "host=db.example password=[REDACTED]", RedactDSN("host=db.example password='part://other'"))
 }
