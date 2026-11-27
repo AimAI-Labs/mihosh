@@ -150,7 +150,7 @@ Managed TUN reserves its own interface name, routing table and rule range after 
 
 Regular `go test ./...` never mutates real system services or desktop proxies. `scripts/test-managed-core-linux.sh` accepts `isolated`, `service`, `tun` or `proxy`, followed by verified local kernel and Mihosh paths. TUN tests create their test uplink in a separate user/network namespace. Native desktop proxy tests require `MIHOSH_ALLOW_NETWORK_CHANGES=1`.
 
-`scripts/test-managed-core-container.sh` provides an isolated Linux environment with TUN, D-Bus and GNOME settings. It mounts no host directories and publishes no ports. The container is removed after testing unless `--keep` is supplied. Run `test-managed-core-linux.sh service` separately for native systemd lifecycle coverage: it creates only an independently named temporary unit with a 256 MiB memory limit and no system proxy or TUN. Actual results are recorded in the proposal.
+`scripts/test-managed-core-container.sh` provides an isolated Linux environment with TUN, D-Bus and GNOME settings. It mounts no host directories and publishes no ports. The container is removed after testing unless `--keep` is supplied. Run `test-managed-core-linux.sh service` separately for native systemd lifecycle coverage: it creates only an independently named temporary unit with a 256 MiB memory limit and no system proxy or TUN.
 
 ## Download fallback and verification
 
@@ -182,7 +182,7 @@ External API connections retain their original installation method. Explicit ext
 
 Profile activation validates a candidate before applying it and restores the previous configuration and active profile on failure. Managed imports preserve local controller and proxy settings, apply the explicit Core TUN choice and remove additional subscription-provided listeners. Imported data cannot enable TUN by itself. Interrupted version changes and configuration transactions are recovered during startup.
 
-Asset selection covers Linux/Windows amd64 compatible and arm64. Linux amd64 has real-core integration coverage; see implementation records in the proposal for build and runtime verification of other targets.
+Asset selection covers Linux/Windows amd64 compatible and arm64. Linux amd64 has real-core integration coverage; other targets are covered by CI builds and unit tests.
 
 ## Mihomo configuration
 
