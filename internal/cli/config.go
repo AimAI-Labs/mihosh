@@ -220,7 +220,7 @@ var (
 )
 
 func detectEditor() string {
-	return utils.DetectDefaultEditor()
+	return utils.ResolveEditor()
 }
 
 func runEditor(editor, path string) error {
@@ -297,13 +297,7 @@ func editConfigFileWithEditor(path, preferredEditor string) error {
 		return err
 	}
 
-	editor := preferredEditor
-	if editor == "" {
-		editor = os.Getenv("VISUAL")
-		if editor == "" {
-			editor = os.Getenv("EDITOR")
-		}
-	}
+	editor := strings.TrimSpace(preferredEditor)
 	if editor == "" {
 		editor = detectEditorFn()
 	}

@@ -2,7 +2,7 @@ package utils
 
 // editor.go — 外部编辑器解析（rules 页与 sub 页共用）。
 //
-// 解析顺序：~/.bashrc → ~/.zshrc → VISUAL → EDITOR → 默认编辑器。
+// 解析顺序：VISUAL → EDITOR → 当前 shell 的 rc 文件 → 默认编辑器。
 
 import (
 	"os"
@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"unicode"
 )
 
 // EditorRCRe 从 shell 启动文件中匹配 EDITOR 赋值。
@@ -18,28 +19,30 @@ import (
 // 多行匹配取最后一个有效值（与 shell 语义一致）。
 var EditorRCRe = regexp.MustCompile(`(?m)^\s*(?:export\s+)?EDITOR=(?:"([^"]*)"|'([^']*)'|([^\s#]+))`)
 
-// ResolveEditor 按优先级解析编辑器：
-//  1. ~/.bashrc 中的 EDITOR
-//  2. ~/.zshrc 中的 EDITOR
-//  3. VISUAL / EDITOR 环境变量（通常由 shell rc 导出）
-//  4. 默认编辑器（Unix: vim→vi→nano；Windows: notepad）
-//
-// 返回值为编辑器命令（可能含参数，如 "code --wait"）；全部失败时返回空串。
+// ResolveEditor 依次查找环境变量、当前 shell 的 rc 文件和默认编辑器。
 func ResolveEditor() string {
-	if home, err := os.UserHomeDir(); err == nil && home != "" {
-		for _, name := range []string{".bashrc", ".zshrc"} {
-			if v := ParseEditorFromRCFile(filepath.Join(home, name)); v != "" {
-				return v
+	for _, name := range []string{"VISUAL", "EDITOR"} {
+		if value := literalEditor(os.Getenv(name)); value != "" {
+			return value
+		}
+	}
+	shell := strings.TrimSuffix(strings.ToLower(filepath.Base(os.Getenv("SHELL"))), ".exe")
+	if shell == "bash" || shell == "zsh" {
+		if home, err := os.UserHomeDir(); err == nil && home != "" {
+			if value := ParseEditorFromRCFile(filepath.Join(home, "."+shell+"rc")); value != "" {
+				return value
 			}
 		}
 	}
-	if v := strings.TrimSpace(os.Getenv("VISUAL")); v != "" {
-		return v
-	}
-	if v := strings.TrimSpace(os.Getenv("EDITOR")); v != "" {
-		return v
-	}
 	return DetectDefaultEditor()
+}
+
+func literalEditor(value string) string {
+	value = strings.TrimSpace(value)
+	if strings.ContainsAny(value, "$`") {
+		return ""
+	}
+	return value
 }
 
 // ParseEditorFromRCFile 读取并解析单个 shell rc 文件中的 EDITOR 赋值。
@@ -64,7 +67,7 @@ func ParseEditorFromRC(content string) string {
 		default:
 			v = m[3] // 未加引号
 		}
-		if v = strings.TrimSpace(v); v != "" {
+		if v = literalEditor(v); v != "" {
 			last = v
 		}
 	}
@@ -93,5 +96,65 @@ func DefaultEditorCandidates() []string {
 // SplitEditorCommand 把编辑器命令字符串拆分为程序与参数切片。
 // 例如 "code --wait" → ["code", "--wait"]。
 func SplitEditorCommand(editor string) []string {
-	return strings.Fields(editor)
+	editor = strings.TrimSpace(editor)
+	if filepath.IsAbs(editor) {
+		if info, err := os.Stat(editor); err == nil && info.Mode().IsRegular() {
+			return []string{editor}
+		}
+	}
+	args := SplitCommandLine(editor)
+	if len(args) == 0 || args[0] == "" {
+		return nil
+	}
+	return args
+}
+
+// SplitCommandLine separates an executable and arguments using quoted fields.
+// It preserves backslashes in paths and does not evaluate shell expressions.
+func SplitCommandLine(line string) []string {
+	var args []string
+	var field strings.Builder
+	var quote rune
+	started := false
+	runes := []rune(line)
+	for i := 0; i < len(runes); i++ {
+		char := runes[i]
+		if char == '\\' && quote != '\'' && i+1 < len(runes) {
+			next := runes[i+1]
+			if (next == '\\' && runtime.GOOS != "windows") || next == quote ||
+				(quote == 0 && (next == '\'' || next == '"' || unicode.IsSpace(next))) {
+				field.WriteRune(next)
+				started = true
+				i++
+				continue
+			}
+		}
+		switch {
+		case quote != 0:
+			if char == quote {
+				quote = 0
+			} else {
+				field.WriteRune(char)
+			}
+		case char == '"' || char == '\'':
+			quote = char
+			started = true
+		case unicode.IsSpace(char):
+			if started {
+				args = append(args, field.String())
+				field.Reset()
+				started = false
+			}
+		default:
+			field.WriteRune(char)
+			started = true
+		}
+	}
+	if quote != 0 {
+		return nil
+	}
+	if started {
+		args = append(args, field.String())
+	}
+	return args
 }

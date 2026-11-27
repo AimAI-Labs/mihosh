@@ -14,6 +14,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
+	"github.com/AimAI-Labs/mihosh/pkg/utils"
 	"github.com/spf13/viper"
 )
 
@@ -163,7 +164,7 @@ func mihomoConfigPathFromSystemd() (string, bool) {
 		break
 	}
 	if len(args) == 0 || !isMihomoExecutable(args[0]) {
-		args, cwd = splitSystemdCommand(parseSystemctlStatus(status)), ""
+		args, cwd = utils.SplitCommandLine(parseSystemctlStatus(status)), ""
 	}
 	if len(args) == 0 {
 		return "", false

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync/atomic"
 	"testing"
 
@@ -293,4 +294,21 @@ func TestRunMihomoConfigEditUsesExternalEditorFlow(t *testing.T) {
 	err = runMihomoConfigEdit()
 	require.NoError(t, err)
 	assert.True(t, called)
+}
+
+func TestConfigEditRunsEditorWithQuotedPathAndArguments(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell fixture requires Unix")
+	}
+	dir := t.TempDir()
+	editor := filepath.Join(dir, "sample editor")
+	script := "#!/bin/sh\n[ \"$1\" = '--wait' ] || exit 1\nprintf 'mode: rule\\n' >> \"$2\"\n"
+	require.NoError(t, os.WriteFile(editor, []byte(script), 0700))
+	path := filepath.Join(dir, "edited config.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("mixed-port: 7890\n"), 0600))
+
+	require.NoError(t, editConfigFileWithEditor(path, "\""+editor+"\" --wait"))
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Contains(t, string(content), "mode: rule")
 }

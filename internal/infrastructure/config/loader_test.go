@@ -268,13 +268,6 @@ func TestSearchKnownMihomoDirectoriesFindsLegacyClashVerge(t *testing.T) {
 	assert.Equal(t, configPath, got, "应发现上游 Clash Verge 的 config.yaml")
 }
 
-func TestSplitSystemdCommand(t *testing.T) {
-	assert.Empty(t, splitSystemdCommand(""))
-	assert.Empty(t, splitSystemdCommand(`/usr/bin/mihomo -d "unclosed`))
-	args := splitSystemdCommand(`"/opt/Clash Verge/mihomo" -d '/etc/mihomo config' -f="/opt/config files/config.yaml"`)
-	assert.Equal(t, []string{"/opt/Clash Verge/mihomo", "-d", "/etc/mihomo config", "-f=/opt/config files/config.yaml"}, args)
-}
-
 func stubMihomoProcessArguments(t *testing.T, args ...string) {
 	t.Helper()
 	saved := processArgumentsReader

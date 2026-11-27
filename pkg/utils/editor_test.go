@@ -1,6 +1,11 @@
 package utils
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"slices"
+	"testing"
+)
 
 func TestParseEditorFromRC(t *testing.T) {
 	cases := []struct {
@@ -61,5 +66,59 @@ func TestResolveEditorSkipsBlankEnvironment(t *testing.T) {
 	t.Setenv("EDITOR", "  nano  ")
 	if got := ResolveEditor(); got != "nano" {
 		t.Fatalf("ResolveEditor() = %q, want nano", got)
+	}
+}
+
+func TestResolveEditorPrefersEnvironmentAndMatchingShell(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	for name, contents := range map[string]string{
+		".bashrc": "export EDITOR=bash-editor\n",
+		".zshrc":  "EDITOR=zsh-editor\nexport EDITOR=\"$VISUAL\"\n",
+	} {
+		if err := os.WriteFile(filepath.Join(home, name), []byte(contents), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("SHELL", "/bin/zsh")
+	t.Setenv("VISUAL", " visual-editor ")
+	t.Setenv("EDITOR", "env-editor")
+	if got := ResolveEditor(); got != "visual-editor" {
+		t.Errorf("ResolveEditor with VISUAL = %q", got)
+	}
+	t.Setenv("VISUAL", "")
+	if got := ResolveEditor(); got != "env-editor" {
+		t.Errorf("ResolveEditor with EDITOR = %q", got)
+	}
+	t.Setenv("EDITOR", "")
+	if got := ResolveEditor(); got != "zsh-editor" {
+		t.Errorf("ResolveEditor for zsh = %q", got)
+	}
+	t.Setenv("SHELL", "/usr/bin/bash")
+	if got := ResolveEditor(); got != "bash-editor" {
+		t.Errorf("ResolveEditor for bash = %q", got)
+	}
+}
+
+func TestSplitEditorCommandKeepsPathsAndArguments(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "Editor With Space")
+	if err := os.WriteFile(path, nil, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		command string
+		want    []string
+	}{
+		{path, []string{path}},
+		{`"` + path + `" --wait "argument with spaces"`, []string{path, "--wait", "argument with spaces"}},
+		{`/opt/Editor\ Folder/editor --wait`, []string{"/opt/Editor Folder/editor", "--wait"}},
+		{`"C:\Program Files\Editor\editor.exe" --wait`, []string{`C:\Program Files\Editor\editor.exe`, "--wait"}},
+		{`vim -c ""`, []string{"vim", "-c", ""}},
+		{`vim "unterminated`, nil},
+	} {
+		if got := SplitEditorCommand(test.command); !slices.Equal(got, test.want) {
+			t.Errorf("SplitEditorCommand(%q) = %q, want %q", test.command, got, test.want)
+		}
 	}
 }

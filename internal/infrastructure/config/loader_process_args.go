@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"path/filepath"
 	"strings"
-	"unicode"
 )
 
 // parseDarwinProcessArguments decodes argc, the saved exec path, padding and
@@ -34,44 +33,4 @@ func parseDarwinProcessArguments(raw []byte) []string {
 
 func isMihomoExecutable(executable string) bool {
 	return strings.Contains(filepath.Base(executable), "mihomo")
-}
-
-// splitSystemdCommand handles quoted ExecStart arguments when a live process
-// is unavailable. Running processes are read with their original argv.
-func splitSystemdCommand(line string) []string {
-	var args []string
-	var field strings.Builder
-	var quote rune
-	escaped := false
-	for _, char := range line {
-		switch {
-		case escaped:
-			field.WriteRune(char)
-			escaped = false
-		case char == '\\' && quote != '\'':
-			escaped = true
-		case quote != 0:
-			if char == quote {
-				quote = 0
-			} else {
-				field.WriteRune(char)
-			}
-		case char == '"' || char == '\'':
-			quote = char
-		case unicode.IsSpace(char):
-			if field.Len() != 0 {
-				args = append(args, field.String())
-				field.Reset()
-			}
-		default:
-			field.WriteRune(char)
-		}
-	}
-	if quote != 0 || escaped {
-		return nil
-	}
-	if field.Len() != 0 {
-		args = append(args, field.String())
-	}
-	return args
 }
