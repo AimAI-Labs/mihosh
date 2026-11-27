@@ -81,6 +81,9 @@ func (m Model) applyWSMessage(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m.applyWSMessage(msg.Payload)
 
+	case tea.BatchMsg:
+		return m, tea.Batch(msg...)
+
 	case messages.CoreWSBatchMsg:
 		if m.wsClient != nil && msg.Generation == m.wsClient.Generation() {
 			m.applyStreamBatch(msg)

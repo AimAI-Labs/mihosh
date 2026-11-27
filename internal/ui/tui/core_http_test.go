@@ -215,3 +215,40 @@ func TestBatchResultsKeepTargetOwnershipAcrossReconnects(t *testing.T) {
 		})
 	}
 }
+
+func TestSelectProxyRefreshesNodesForCurrentTarget(t *testing.T) {
+	var selected atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPut && r.URL.Path == "/proxies/group":
+			selected.Store(true)
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodGet && r.URL.Path == "/proxies" && selected.Load():
+			_, _ = w.Write([]byte(`{"proxies":{"group":{"name":"group","type":"Selector","all":["node"],"now":"node"},"node":{"name":"node","type":"Direct"}}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	m, _ := targetTestModel(t)
+	m.client = api.NewClient(config.MihomoEndpoint{ExternalController: server.URL}, 1000)
+	completion := nodes.SelectProxy(m.client, "group", "node")()
+	require.True(t, selected.Load())
+	_, refresh := m.Update(completion)
+	require.NotNil(t, refresh)
+	batch, ok := refresh().(tea.BatchMsg)
+	require.True(t, ok)
+	require.Len(t, batch, 2)
+
+	for _, cmd := range batch {
+		updated, _ := m.Update(cmd())
+		m = updated.(Model)
+	}
+	require.Equal(t, "node", m.nodesState.Groups["group"].Now)
+	require.Contains(t, m.nodesState.Proxies, "node")
+
+	m.client.UpdateEndpoint(server.URL, "changed-generation")
+	_, staleRefresh := m.Update(completion)
+	require.Nil(t, staleRefresh)
+}
