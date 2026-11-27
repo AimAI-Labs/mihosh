@@ -272,3 +272,22 @@ func TestRedactURLIdentifiesTokensInConfigFilenames(t *testing.T) {
 		require.Equal(t, prefix+name, got)
 	}
 }
+
+func TestRedactYAMLKeepsSkipAuthPrefixesOnRestore(t *testing.T) {
+	original := []byte("skip-auth-prefixes: [127.0.0.1/8, '::1/128']\nauthentication: ['user:password']\nsecret: private\n")
+	redacted, count, err := RedactYAML(original)
+	require.NoError(t, err)
+	require.Equal(t, 2, count)
+	require.Contains(t, string(redacted), "127.0.0.1/8")
+	require.Contains(t, string(redacted), "::1/128")
+	require.NotContains(t, string(redacted), "user:password")
+	require.NotContains(t, string(redacted), "private")
+
+	restored, count, err := RestoreRedactedYAML(redacted, original)
+	require.NoError(t, err)
+	require.Equal(t, 2, count)
+	require.Contains(t, string(restored), "127.0.0.1/8")
+	require.Contains(t, string(restored), "::1/128")
+	require.Contains(t, string(restored), "user:password")
+	require.Contains(t, string(restored), "private")
+}

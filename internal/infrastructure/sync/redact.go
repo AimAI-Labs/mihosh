@@ -217,6 +217,9 @@ func RedactDSN(dsn string) string {
 
 func isSensitiveYAMLKey(key string) bool {
 	norm := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(key), "_", "-"))
+	if norm == "skip-auth-prefixes" {
+		return false
+	}
 	for _, s := range sensitiveYAMLKeys {
 		if norm == s || strings.Contains(norm, s) {
 			return true
