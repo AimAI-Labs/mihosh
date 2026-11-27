@@ -118,6 +118,17 @@ jobs:
         with:
           merge-multiple: true
 
+      - name: Determine release channel
+        id: channel
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME%%+*}"
+          if [[ "$version" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
@@ -125,8 +136,10 @@ jobs:
             mihosh-*.tar.gz
             mihosh-*.zip
           generate_release_notes: true
+          prerelease: ${{ steps.channel.outputs.prerelease }}
 
       - name: Update Homebrew formula
+        if: steps.channel.outputs.prerelease == 'false'
         env:
           VERSION: ${{ github.ref_name }}
           REPOSITORY: ${{ github.repository }}
@@ -182,6 +195,7 @@ jobs:
           EOF
 
       - name: Push Homebrew formula
+        if: steps.channel.outputs.prerelease == 'false'
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |

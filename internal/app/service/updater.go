@@ -33,8 +33,10 @@ const (
 
 // githubRelease represents the JSON structure of a GitHub release.
 type githubRelease struct {
-	TagName string `json:"tag_name"`
-	Assets  []struct {
+	TagName    string `json:"tag_name"`
+	Draft      bool   `json:"draft"`
+	Prerelease bool   `json:"prerelease"`
+	Assets     []struct {
 		Name               string `json:"name"`
 		BrowserDownloadURL string `json:"browser_download_url"`
 		Digest             string `json:"digest"`
@@ -45,7 +47,11 @@ type githubRelease struct {
 // It returns an UpdateInfo if a newer version is found, or nil if no update is needed or on error.
 func CheckUpdate(currentVersion string) (*model.UpdateInfo, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest("GET", githubAPIURL, nil)
+	return checkUpdate(client, githubAPIURL, currentVersion)
+}
+
+func checkUpdate(client *http.Client, endpoint, currentVersion string) (*model.UpdateInfo, error) {
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request failed: %w", err)
 	}
@@ -65,7 +71,8 @@ func CheckUpdate(currentVersion string) (*model.UpdateInfo, error) {
 		return nil, fmt.Errorf("decode json failed: %w", err)
 	}
 
-	if release.TagName == "" {
+	latest := "v" + strings.TrimPrefix(release.TagName, "v")
+	if release.Draft || release.Prerelease || !semver.IsValid(latest) || semver.Prerelease(latest) != "" {
 		return nil, nil
 	}
 
@@ -73,16 +80,9 @@ func CheckUpdate(currentVersion string) (*model.UpdateInfo, error) {
 	// dev/unknown/空 = 本地开发构建，始终展示最新 release 以便测试。
 	isDev := currentVersion == "" || currentVersion == "dev" || currentVersion == "unknown"
 	if !isDev {
-		v1 := currentVersion
-		if !strings.HasPrefix(v1, "v") {
-			v1 = "v" + v1
-		}
-		v2 := release.TagName
-		if !strings.HasPrefix(v2, "v") {
-			v2 = "v" + v2
-		}
+		current := "v" + strings.TrimPrefix(currentVersion, "v")
 		// 仅当远程版本严格大于本地版本时才提示更新
-		if !semver.IsValid(v1) || !semver.IsValid(v2) || semver.Compare(v1, v2) >= 0 {
+		if !semver.IsValid(current) || semver.Compare(current, latest) >= 0 {
 			return nil, nil
 		}
 	}

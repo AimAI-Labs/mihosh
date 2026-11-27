@@ -47,6 +47,33 @@ func TestUpdateSelectsExactVerifiedReleaseAsset(t *testing.T) {
 	}
 }
 
+func TestCheckUpdateOnlyOffersStableReleases(t *testing.T) {
+	for _, tc := range []struct {
+		name, current, latest   string
+		draft, prerelease, want bool
+	}{
+		{"draft", "v2.0.0", "v2.1.0", true, false, false},
+		{"flagged prerelease", "v2.0.0", "v2.1.0", false, true, false},
+		{"unflagged prerelease", "v2.0.0", "v2.1.0-rc.1", false, false, false},
+		{"dev ignores prereleases", "dev", "v2.1.0-rc.1", false, false, false},
+		{"RC to stable", "v2.0.0-rc.4", "v2.0.0", false, false, true},
+		{"stable metadata", "2.0.0", "v2.1.0+ci-build.1", false, false, true},
+		{"no downgrade", "v2.0.0", "v1.0.0", false, false, false},
+		{"invalid dev update", "dev", "invalid", false, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = fmt.Fprintf(w, `{"tag_name":%q,"draft":%t,"prerelease":%t}`, tc.latest, tc.draft, tc.prerelease)
+			}))
+			defer server.Close()
+			info, err := checkUpdate(server.Client(), server.URL, tc.current)
+			if err != nil || (info != nil) != tc.want {
+				t.Fatalf("checkUpdate() = %+v, %v, want update: %t", info, err, tc.want)
+			}
+		})
+	}
+}
+
 func TestApplyReleaseUpdatePreservesRunnableTargetOnFailure(t *testing.T) {
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		t.Skip("release workflow packages Unix binaries")
