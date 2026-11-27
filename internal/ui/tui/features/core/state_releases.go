@@ -1,10 +1,10 @@
 package core
 
 import (
-	"errors"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -134,22 +134,28 @@ func (s State) loadReleasePage(page int) (State, tea.Cmd) {
 
 func (s State) openTab(tab int) (State, tea.Cmd) {
 	s = s.selectTab(tab)
+	var cacheNotice tea.Cmd
 	if s.isDownloadsPage() {
 		if !s.catalog.loaded && s.svc != nil {
 			if page, ok := service.CachedReleasePage(1); ok {
 				s = s.applyReleasePage(page)
+				if s.catalog.failed && s.Err != nil {
+					notice, _ := s.OperationNotice(messages.CoreOperationMsg{Action: "releases"})
+					cacheNotice = func() tea.Msg { return notice }
+					s.Err = nil
+				}
 			}
 		}
 		if !s.Busy && (!s.catalog.loaded || (!s.catalog.firstPageFetched.IsZero() && !service.ReleasePageIsFresh(s.catalog.firstPageFetched))) {
 			s.catalog.forceRefresh = false
 			next, cmd := s.loadReleasePage(1)
-			return next, tea.Batch(cmd, next.Refresh())
+			return next, tea.Batch(cacheNotice, cmd, next.Refresh())
 		}
 	}
 	if s.tab == 4 && s.svc == nil {
 		return s, s.editor.Refresh()
 	}
-	return s, s.Refresh()
+	return s, tea.Batch(cacheNotice, s.Refresh())
 }
 
 func (s State) applyReleasePage(page service.ReleasePage) State {
@@ -254,9 +260,9 @@ func (s State) releaseAction(action string) (State, tea.Cmd) {
 				return s, nil
 			}
 			if _, err := r.TrustedDigest(r.Assets[0], service.PinnedDigests()); err != nil {
-				s.Err = errors.New(i18n.T("core.catalog.unverified"))
-				s.task = "install"
-				return s, nil
+				return s, func() tea.Msg {
+					return messages.NoticeMsg{Text: i18n.T("core.catalog.unverified"), Level: messages.NoticeError}
+				}
 			}
 		} else if !installed || (s.Status.Mode == "managed" && s.Status.Version == r.Version()) {
 			return s, nil

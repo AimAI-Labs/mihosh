@@ -96,13 +96,22 @@ func TestVersionListInstalledAndChecksumGuards(t *testing.T) {
 	if err := s.catalog.store.put(1, r); err != nil {
 		t.Fatal(err)
 	}
-	s, cmd = s.releaseAction("install")
-	if s.Busy || cmd != nil || s.Err == nil {
-		t.Fatal("untrusted mirror checksum allowed installation")
+	s, cmd = s.Update(coreKey("enter"))
+	if s.Busy || s.Err != nil || s.task != "" || cmd == nil {
+		t.Fatal("untrusted mirror checksum must report an error without starting a task")
+	}
+	notice, ok := cmd().(messages.NoticeMsg)
+	if !ok || notice.Level != messages.NoticeError || notice.Text != i18n.T("core.catalog.unverified") {
+		t.Fatalf("unexpected checksum notice: %+v", notice)
 	}
 	r.Trusted = true
 	if err := s.catalog.store.put(1, r); err != nil {
 		t.Fatal(err)
+	}
+	next, cmd := s.Update(coreKey("enter"))
+	defer next.Close()
+	if !next.Busy || next.task != "install" || cmd == nil {
+		t.Fatal("Enter after the checksum notice did not start the verified install")
 	}
 	s.Status.Installed = append(s.Status.Installed, r.Tag)
 	s, cmd = s.releaseAction("activate")
@@ -697,5 +706,37 @@ func TestOpenReleasesTabUsesDiskCacheWhileRefreshBypassesIt(t *testing.T) {
 	s, refreshCmd := s.releaseAction("refresh")
 	if refreshCmd == nil || !s.catalog.forceRefresh {
 		t.Fatalf("releaseAction(refresh) must bypass cache: cmd=%v forceRefresh=%v", refreshCmd != nil, s.catalog.forceRefresh)
+	}
+}
+
+func TestReleaseCatalogueStorageFailuresProduceNotices(t *testing.T) {
+	for _, tc := range []struct {
+		action string
+		level  messages.NoticeLevel
+	}{
+		{"releases", messages.NoticeWarning},
+		{"release", messages.NoticeError},
+	} {
+		t.Run(tc.action, func(t *testing.T) {
+			s := releaseFixture(t)
+			r, _ := s.selectedRelease()
+			if err := os.Mkdir(filepath.Join(s.catalog.store.root, "0.json.tmp"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			result := messages.CoreOperationMsg{Action: tc.action, ID: s.OperationID()}
+			if tc.action == "releases" {
+				result.Releases = &coreinfra.ReleasePage{Page: 2, Releases: []coreinfra.Release{r}}
+			} else {
+				result.Release = &r
+			}
+			s, _ = s.Update(result)
+			if s.Err == nil {
+				t.Fatal("expected catalogue write failure")
+			}
+			notice, ok := s.OperationNotice(result)
+			if !ok || notice.Level != tc.level || !strings.Contains(notice.Detail, "0.json.tmp") {
+				t.Fatalf("catalogue write failure did not surface: %+v", notice)
+			}
+		})
 	}
 }

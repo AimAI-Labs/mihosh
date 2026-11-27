@@ -82,6 +82,9 @@ func coreActionLabel(action string) string {
 
 // OperationNotice converts a finished CoreOperationMsg into a global notice.
 func (s State) OperationNotice(msg messages.CoreOperationMsg) (messages.NoticeMsg, bool) {
+	if msg.Err == nil {
+		msg.Err = s.Err
+	}
 	if msg.Action == "releases" {
 		if msg.Err != nil {
 			caption := i18n.T("core.catalog.load_failed")
