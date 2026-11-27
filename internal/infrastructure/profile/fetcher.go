@@ -10,6 +10,7 @@ package profile
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -20,6 +21,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -127,7 +129,7 @@ func fetchRemoteContext(ctx context.Context, source SubSource, opts DownloadOpti
 			}
 			parsedProxy, err := url.Parse(proxyRaw)
 			if err != nil {
-				return nil, nil, fmt.Errorf(i18n.T("profile.fetcher.err_build_req"), err)
+				return nil, nil, fmt.Errorf(i18n.T("profile.fetcher.err_build_req"), errors.New(i18n.T("profile.fetcher.err_invalid_address")))
 			}
 			transport.Proxy = http.ProxyURL(parsedProxy)
 		} else {
@@ -144,7 +146,7 @@ func fetchRemoteContext(ctx context.Context, source SubSource, opts DownloadOpti
 	client := &http.Client{Timeout: fetchTimeout, Transport: transport}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, subURL, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf(i18n.T("profile.fetcher.err_build_req"), err)
+		return nil, nil, fmt.Errorf(i18n.T("profile.fetcher.err_build_req"), errors.New(i18n.T("profile.fetcher.err_invalid_address")))
 	}
 	ua := strings.TrimSpace(source.UserAgent)
 	if ua == "" {
@@ -154,7 +156,7 @@ func fetchRemoteContext(ctx context.Context, source SubSource, opts DownloadOpti
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, nil, fmt.Errorf(i18n.T("profile.fetcher.err_fetch"), err)
+		return nil, nil, fmt.Errorf(i18n.T("profile.fetcher.err_fetch"), subscriptionTransportError(err))
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -167,12 +169,26 @@ func fetchRemoteContext(ctx context.Context, source SubSource, opts DownloadOpti
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, MaxRemoteSubscriptionBytes+1))
 	if err != nil {
-		return nil, nil, fmt.Errorf(i18n.T("profile.fetcher.err_read_resp"), err)
+		return nil, nil, fmt.Errorf(i18n.T("profile.fetcher.err_read_resp"), subscriptionTransportError(err))
 	}
 	if len(body) > MaxRemoteSubscriptionBytes {
 		return nil, nil, fmt.Errorf("%s", i18n.Tf("profile.fetcher.err_size_limit", MaxRemoteSubscriptionBytes>>20))
 	}
 	return body, subscriptionUsage(resp.Header), nil
+}
+
+// HTTP and proxy errors may carry request URLs and redirect locations.
+func subscriptionTransportError(err error) error {
+	var requestErr *url.Error
+	if errors.As(err, &requestErr) {
+		err = requestErr.Err
+	}
+	for _, cause := range []error{context.Canceled, context.DeadlineExceeded, syscall.ECONNREFUSED, io.ErrUnexpectedEOF} {
+		if errors.Is(err, cause) {
+			return cause
+		}
+	}
+	return errors.New(i18n.T("profile.fetcher.err_transport"))
 }
 
 func subscriptionUsage(headers http.Header) *SubscriptionUsage {

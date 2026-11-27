@@ -62,7 +62,8 @@ func NewFetcher() *Fetcher {
 	return &Fetcher{Accelerators: DefaultAccelerators(), envProxy: http.ProxyFromEnvironment}
 }
 
-func validProxy(raw string) (*url.URL, error) {
+// ParseDownloadProxy parses an HTTP(S) proxy used for downloads.
+func ParseDownloadProxy(raw string) (*url.URL, error) {
 	u, err := url.Parse(raw)
 	if err != nil || u.Hostname() == "" || (u.Scheme != "http" && u.Scheme != "https") || u.Path != "" && u.Path != "/" || u.RawQuery != "" || u.Fragment != "" {
 		return nil, errors.New("invalid HTTP(S) download proxy")
@@ -124,7 +125,7 @@ func (f *Fetcher) routes(raw string, metadata bool) ([]Route, error) {
 		routes = append(routes, Route{Name: "proxy:" + p.Host, Proxy: p})
 	}
 	if f.Proxy != "" {
-		p, err := validProxy(f.Proxy)
+		p, err := ParseDownloadProxy(f.Proxy)
 		if err != nil {
 			return nil, err
 		}
@@ -134,13 +135,13 @@ func (f *Fetcher) routes(raw string, metadata bool) ([]Route, error) {
 		req, _ := http.NewRequest(http.MethodGet, raw, nil)
 		p, err := f.envProxy(req)
 		if err == nil && p != nil {
-			if p, err = validProxy(p.String()); err == nil {
+			if p, err = ParseDownloadProxy(p.String()); err == nil {
 				addProxy(p)
 			}
 		}
 	}
 	if f.RunningProxy != "" {
-		p, err := validProxy(f.RunningProxy)
+		p, err := ParseDownloadProxy(f.RunningProxy)
 		if err == nil {
 			addProxy(p)
 		}

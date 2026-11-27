@@ -237,7 +237,7 @@ func TestReleaseListDoesNotTruncateOlderHistoryAtAnArbitraryPage(t *testing.T) {
 }
 
 func TestReleasePaginationDoesNotRelaxProxyOrAcceleratorValidation(t *testing.T) {
-	if _, err := validProxy("http://localhost:8888/?token=secret"); err == nil {
+	if _, err := ParseDownloadProxy("http://localhost:8888/?token=secret"); err == nil {
 		t.Fatal("proxy query string was accepted")
 	}
 	f := NewFetcher()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -67,5 +68,27 @@ func TestDownloadWithOptionsCustomUserAgentProxyAndSkipTLS(t *testing.T) {
 		InsecureSkipVerify: true,
 	}, DownloadOptions{}); err != nil {
 		t.Fatalf("expected InsecureSkipVerify=true to succeed, got %v", err)
+	}
+}
+
+func TestSubscriptionRequestErrorsHideCredentialComponents(t *testing.T) {
+	const marker = "private-fixture-value"
+	for _, tc := range []struct {
+		name, address, proxy string
+	}{
+		{name: "malformed subscription URL", address: "https://subscription.example.test/config?token=" + marker + "\ninvalid"},
+		{name: "malformed proxy URL", address: "https://subscription.example.test/config", proxy: "http://user:" + marker + "@proxy.example.test\ninvalid"},
+		{name: "connection failure", address: "http://127.0.0.1:0/config?token=" + marker},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			source := SubSource{Kind: SourceRemote, URL: tc.address, UseProxy: tc.proxy != ""}
+			_, _, err := DownloadWithOptions(context.Background(), source, DownloadOptions{ProxyURL: tc.proxy})
+			if err == nil {
+				t.Fatal("expected subscription request failure")
+			}
+			if strings.Contains(err.Error(), marker) {
+				t.Fatal("subscription request error exposes credential components")
+			}
+		})
 	}
 }

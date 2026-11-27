@@ -317,6 +317,8 @@
   "profile.fetcher.err_empty_url": "订阅 URL 不能为空",
   "profile.fetcher.err_only_http": "仅支持 http/https 协议的订阅 URL",
   "profile.fetcher.err_build_req": "构造请求失败: %w",
+  "profile.fetcher.err_invalid_address": "订阅或代理地址无效",
+  "profile.fetcher.err_transport": "网络或代理请求失败",
   "profile.fetcher.err_fetch": "拉取订阅失败: %w",
   "profile.fetcher.err_status_code": "订阅服务器返回非成功状态码: %d",
   "profile.fetcher.err_read_resp": "读取订阅响应失败: %w",

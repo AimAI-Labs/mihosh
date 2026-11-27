@@ -110,7 +110,7 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.updateError = nil
 				info := *m.updateInfo
 				return m, func() tea.Msg {
-					serviceBinary, err := service.DownloadAndApplyUpdate(info)
+					serviceBinary, err := service.DownloadAndApplyUpdate(m.wsCtx, info)
 					return messages.UpdateAppliedMsg{ServiceBinary: serviceBinary, Err: err}
 				}
 			}

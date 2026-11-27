@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -13,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -45,20 +47,21 @@ type githubRelease struct {
 
 // CheckUpdate checks the GitHub API for the latest release.
 // It returns an UpdateInfo if a newer version is found, or nil if no update is needed or on error.
-func CheckUpdate(currentVersion string) (*model.UpdateInfo, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
-	return checkUpdate(client, githubAPIURL, currentVersion)
+func CheckUpdate(ctx context.Context, currentVersion string) (*model.UpdateInfo, error) {
+	client := configuredUpdateHTTPClient(10 * time.Second)
+	defer client.CloseIdleConnections()
+	return checkUpdate(ctx, client, githubAPIURL, currentVersion)
 }
 
-func checkUpdate(client *http.Client, endpoint, currentVersion string) (*model.UpdateInfo, error) {
-	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+func checkUpdate(ctx context.Context, client updateRequestClient, endpoint, currentVersion string) (*model.UpdateInfo, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request failed: %w", err)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return nil, fmt.Errorf("request failed: %w", safeUpdateRequestError(err))
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -131,11 +134,18 @@ func decodeUpdateDigest(digest string) []byte {
 }
 
 func isTrustedUpdateURL(raw string) bool {
-	if !strings.HasPrefix(raw, releaseBase+"download/") {
+	relative, ok := strings.CutPrefix(raw, releaseBase+"download/")
+	if !ok {
 		return false
 	}
 	u, err := url.Parse(raw)
-	return err == nil && u.Scheme == "https" && u.Host == "github.com" && u.User == nil
+	if err != nil || u.Scheme != "https" || u.Host != "github.com" || u.User != nil ||
+		u.RawQuery != "" || u.ForceQuery || strings.Contains(raw, "#") ||
+		u.EscapedPath() != u.Path || path.Clean(u.Path) != u.Path {
+		return false
+	}
+	tag, asset, ok := strings.Cut(relative, "/")
+	return ok && tag != "" && asset != "" && !strings.Contains(asset, "/")
 }
 
 func isHomebrewUpdateTarget(target string) bool {
@@ -148,7 +158,7 @@ func isHomebrewUpdateTarget(target string) bool {
 
 // DownloadAndApplyUpdate verifies the release archive before replacing the running executable.
 // It returns the Linux service executable path if the update also replaced it.
-func DownloadAndApplyUpdate(info model.UpdateInfo) (string, error) {
+func DownloadAndApplyUpdate(ctx context.Context, info model.UpdateInfo) (string, error) {
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		return "", errors.New("automatic updates are unavailable on this platform")
 	}
@@ -159,11 +169,12 @@ func DownloadAndApplyUpdate(info model.UpdateInfo) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	client := &http.Client{Timeout: 60 * time.Second}
-	return applyReleaseUpdate(client, info, target)
+	client := configuredUpdateHTTPClient(60 * time.Second)
+	defer client.CloseIdleConnections()
+	return applyReleaseUpdate(ctx, client, info, target)
 }
 
-func applyReleaseUpdate(client *http.Client, info model.UpdateInfo, target string) (string, error) {
+func applyReleaseUpdate(ctx context.Context, client updateRequestClient, info model.UpdateInfo, target string) (string, error) {
 	digest := decodeUpdateDigest(info.DownloadSHA256)
 	if info.DownloadURL == "" || digest == nil {
 		return "", errors.New("no verified update archive available")
@@ -185,9 +196,13 @@ func applyReleaseUpdate(client *http.Client, info model.UpdateInfo, target strin
 	defer func() { _ = os.Remove(staged.Name()) }()
 	defer func() { _ = staged.Close() }()
 
-	resp, err := client.Get(info.DownloadURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, info.DownloadURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("download failed: %w", err)
+		return "", err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("download failed: %w", safeUpdateRequestError(err))
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -216,6 +231,9 @@ func applyReleaseUpdate(client *http.Client, info model.UpdateInfo, target strin
 		return "", err
 	}
 	if err := stageUpdateExecutable(archive, staged, target); err != nil {
+		return "", err
+	}
+	if err := ctx.Err(); err != nil {
 		return "", err
 	}
 	return installUpdatedExecutables(staged, target)

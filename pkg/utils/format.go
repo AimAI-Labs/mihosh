@@ -25,10 +25,10 @@ func MaskSecret(secret string) string {
 		return ""
 	}
 	runes := []rune(secret)
-	if len(runes) <= 6 {
+	if len(runes) <= 8 {
 		return "****"
 	}
-	return string(runes[:3]) + "****" + string(runes[len(runes)-3:])
+	return string(runes[:2]) + "****" + string(runes[len(runes)-2:])
 }
 
 // FormatDuration 格式化连接时长

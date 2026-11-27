@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -14,8 +15,10 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 )
 
 func TestUpdateSelectsExactVerifiedReleaseAsset(t *testing.T) {
@@ -66,7 +69,7 @@ func TestCheckUpdateOnlyOffersStableReleases(t *testing.T) {
 				_, _ = fmt.Fprintf(w, `{"tag_name":%q,"draft":%t,"prerelease":%t}`, tc.latest, tc.draft, tc.prerelease)
 			}))
 			defer server.Close()
-			info, err := checkUpdate(server.Client(), server.URL, tc.current)
+			info, err := checkUpdate(context.Background(), server.Client(), server.URL, tc.current)
 			if err != nil || (info != nil) != tc.want {
 				t.Fatalf("checkUpdate() = %+v, %v, want update: %t", info, err, tc.want)
 			}
@@ -149,7 +152,7 @@ func TestApplyReleaseUpdatePreservesRunnableTargetOnFailure(t *testing.T) {
 			if tc.archive != nil {
 				info.DownloadURL = srv.URL
 			}
-			updatedService, err := applyReleaseUpdate(srv.Client(), info, target)
+			updatedService, err := applyReleaseUpdate(context.Background(), srv.Client(), info, target)
 			if tc.wantError == "" && err != nil || tc.wantError != "" && (err == nil || !strings.Contains(err.Error(), tc.wantError)) {
 				t.Fatalf("apply error = %v, want %q", err, tc.wantError)
 			}
@@ -236,7 +239,7 @@ func TestApplyReleaseUpdateRejectsUnavailableTargetsBeforeDownload(t *testing.T)
 			t.Fatalf("expected manual Homebrew update info, got %+v", update)
 		}
 		before := requests.Load()
-		_, err := applyReleaseUpdate(server.Client(), info, link)
+		_, err := applyReleaseUpdate(context.Background(), server.Client(), info, link)
 		if err == nil || !strings.Contains(err.Error(), "brew upgrade mihosh") || requests.Load() != before {
 			t.Fatalf("expected Homebrew guidance before download, got %v and %d requests", err, requests.Load()-before)
 		}
@@ -259,7 +262,7 @@ func TestApplyReleaseUpdateRejectsUnavailableTargetsBeforeDownload(t *testing.T)
 			}
 		})
 		before := requests.Load()
-		_, err := applyReleaseUpdate(server.Client(), info, target)
+		_, err := applyReleaseUpdate(context.Background(), server.Client(), info, target)
 		if !errors.Is(err, os.ErrPermission) || !strings.Contains(err.Error(), "rerun the installer") {
 			t.Fatalf("expected install permissions error, got %v", err)
 		}
@@ -301,5 +304,86 @@ func TestInstallUpdatedExecutablesRestoresServiceOnPrimaryFailure(t *testing.T) 
 	current, err := os.Stat(serviceBinary)
 	if err != nil || !os.SameFile(old, current) {
 		t.Fatalf("expected original service file after rollback, got %v and %v", current, err)
+	}
+}
+
+func TestUpdateDownloadURLRequiresCanonicalReleaseAsset(t *testing.T) {
+	asset := releaseBase + "download/v2.0.0/mihosh-linux-amd64.tar.gz"
+	for _, raw := range []string{
+		asset + "?tracking=fixture",
+		asset + "#asset",
+		asset + "?",
+		asset + "#",
+		releaseBase + "download//v2.0.0/mihosh-linux-amd64.tar.gz",
+		releaseBase + "download/v2.0.0",
+	} {
+		if isTrustedUpdateURL(raw) {
+			t.Errorf("noncanonical release asset URL was accepted: %q", raw)
+		}
+	}
+}
+
+func TestUpdateRedirectRejectsUnencryptedHops(t *testing.T) {
+	for _, trial := range []struct {
+		target string
+		hops   int
+		want   bool
+	}{
+		{"https://assets.example.test/release?signature=fixture", 1, true},
+		{"http://assets.example.test/release", 1, false},
+		{"https://user@assets.example.test/release", 1, false},
+		{"https://assets.example.test/release", 10, false},
+	} {
+		req, err := http.NewRequest(http.MethodGet, trial.target, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = checkUpdateRedirect(req, make([]*http.Request, trial.hops)); (err == nil) != trial.want {
+			t.Errorf("unexpected redirect policy for %s after %d hops: %v", trial.target, trial.hops, err)
+		}
+	}
+}
+
+func TestUpdateRequestFallsBackToConfiguredProxyAndHonorsCancellation(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	var directCalls, proxyCalls atomic.Int32
+	direct := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		directCalls.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer direct.Close()
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		proxyCalls.Add(1)
+		if req.URL.Host == "" {
+			t.Error("expected an HTTP proxy request")
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer proxy.Close()
+	cfg := config.DefaultConfig
+	cfg.Core.Proxy = proxy.URL
+	if err := config.Save(&cfg); err != nil {
+		t.Fatal(err)
+	}
+	client := configuredUpdateHTTPClient(4 * time.Second)
+	defer client.CloseIdleConnections()
+
+	req, err := http.NewRequest(http.MethodGet, direct.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || directCalls.Load() != 1 || proxyCalls.Load() != 1 {
+		t.Fatalf("unexpected fallback status=%d direct=%d proxy=%d", resp.StatusCode, directCalls.Load(), proxyCalls.Load())
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err = client.Do(req.WithContext(ctx)); !errors.Is(err, context.Canceled) || proxyCalls.Load() != 1 {
+		t.Fatalf("canceled request reached the fallback: calls=%d, err=%v", proxyCalls.Load(), err)
 	}
 }
