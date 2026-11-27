@@ -20,7 +20,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -229,7 +233,7 @@ func (s *ProfileService) FetchProfileContext(ctx context.Context, uid string) er
 func fetchProfile(ctx context.Context, p profile.Profile) error {
 	var opts profile.DownloadOptions
 	if p.Source.UseProxy {
-		opts.ProxyURL = config.MixedPortToProxyURL(config.ResolveMihomoEndpoint().MixedPort)
+		opts.ProxyURL = subscriptionProxyURL(config.ResolveMihomoEndpoint())
 	}
 	raw, usage, err := profile.DownloadWithOptions(ctx, p.Source, opts)
 	if err != nil {
@@ -258,6 +262,20 @@ func fetchProfile(ctx context.Context, p profile.Profile) error {
 		}
 		return ErrSubNotFound
 	})
+}
+
+func subscriptionProxyURL(endpoint config.MihomoEndpoint) string {
+	local := config.MixedPortToProxyURL(endpoint.MixedPort)
+	controller, err := url.Parse(api.ControllerHTTPURL(endpoint.ExternalController))
+	if err != nil {
+		return local
+	}
+	host := controller.Hostname()
+	ip := net.ParseIP(host)
+	if host == "" || strings.EqualFold(strings.TrimSuffix(host, "."), "localhost") || ip.IsLoopback() || ip.IsUnspecified() {
+		return local
+	}
+	return (&url.URL{Scheme: "http", Host: net.JoinHostPort(host, strconv.Itoa(endpoint.MixedPort))}).String()
 }
 
 func snapshotForActivation(ctx context.Context, p profile.Profile) (*yaml.Node, error) {

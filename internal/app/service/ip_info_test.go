@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -210,4 +211,27 @@ func TestFetchCurrentIPInfo_ContextCanceled(t *testing.T) {
 		{name: "p1", endpoint: "http://127.0.0.1:1", parse: parseIPSBInfo},
 	})
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestIPInfoProviderTimeoutLeavesTimeForFallback(t *testing.T) {
+	var fallbackCalls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path == "/slow" {
+			<-req.Context().Done()
+			return
+		}
+		fallbackCalls.Add(1)
+		_, _ = w.Write([]byte(`{"ip":"203.0.113.42"}`))
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	info, err := fetchCurrentIPInfoWithProviders(ctx, server.Client(), []ipInfoProvider{
+		{name: "slow", endpoint: server.URL + "/slow", parse: parseIPSBInfo},
+		{name: "backup", endpoint: server.URL + "/backup", parse: parseIPSBInfo},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "203.0.113.42", info.IP)
+	require.EqualValues(t, 1, fallbackCalls.Load())
 }

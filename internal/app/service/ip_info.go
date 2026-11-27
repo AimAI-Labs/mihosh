@@ -76,11 +76,15 @@ func fetchCurrentIPInfoWithProviders(ctx context.Context, client *http.Client, p
 		return nil, errors.New("no IP info providers configured")
 	}
 	var lastErr error
-	for _, provider := range providers {
+	for i, provider := range providers {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		reqCtx, cancel := context.WithTimeout(ctx, ipInfoProviderTimeout)
+		timeout := ipInfoProviderTimeout
+		if deadline, ok := ctx.Deadline(); ok {
+			timeout = min(timeout, time.Until(deadline)/time.Duration(len(providers)-i))
+		}
+		reqCtx, cancel := context.WithTimeout(ctx, timeout)
 		info, err := queryIPInfoProvider(reqCtx, client, provider)
 		cancel()
 		if err == nil && info != nil {

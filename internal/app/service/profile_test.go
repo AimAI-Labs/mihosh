@@ -575,3 +575,23 @@ func TestProfileService_FirstStartup(t *testing.T) {
 	assert.Len(t, subsAfter, 1)
 	assert.Equal(t, imported.UID, subsAfter[0].UID)
 }
+
+func TestSubscriptionProxyURLUsesControllerHostAndMixedPort(t *testing.T) {
+	for _, trial := range []struct {
+		controller, want string
+	}{
+		{"https://controller.example.test:9443", "http://controller.example.test:7888"},
+		{"[2001:db8::1]:9090", "http://[2001:db8::1]:7888"},
+		{":9090", "http://127.0.0.1:7888"},
+		{"https://LOCALHOST.:9090", "http://127.0.0.1:7888"},
+		{"https://0.0.0.0:9090", "http://127.0.0.1:7888"},
+		{"http://[::1]:9090", "http://127.0.0.1:7888"},
+	} {
+		t.Run(trial.controller, func(t *testing.T) {
+			require.Equal(t, trial.want, subscriptionProxyURL(config.MihomoEndpoint{
+				ExternalController: trial.controller,
+				MixedPort:          7888,
+			}))
+		})
+	}
+}
