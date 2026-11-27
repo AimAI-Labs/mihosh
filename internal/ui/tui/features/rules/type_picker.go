@@ -101,8 +101,12 @@ func typePickerDialog(state PageState) (dialog.Dialog, []ruleTypeChoice) {
 	choices := typeChoices(input.Value(), state.AvailableTypes)
 	count := min(len(choices), 8, max(1, state.Height-4))
 	cursor := max(0, min(form.typePickerCursor, len(choices)-1))
-	start := max(0, cursor-count+1)
-	visible := choices[start : start+count]
+	var start int
+	var visible []ruleTypeChoice
+	if count > 0 {
+		start = max(0, cursor-count+1)
+		visible = choices[start : start+count]
+	}
 
 	rows := []string{input.View()}
 	for i, choice := range visible {
