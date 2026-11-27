@@ -173,7 +173,7 @@ func applyReleaseUpdate(client *http.Client, info model.UpdateInfo, target strin
 		return "", err
 	}
 	if isHomebrewUpdateTarget(target) {
-		return "", errors.New("Homebrew manages this installation. Run brew upgrade mihosh")
+		return "", errors.New("use brew upgrade mihosh for Homebrew installations")
 	}
 	staged, err := os.CreateTemp(filepath.Dir(target), ".mihosh-update-*")
 	if err != nil {
