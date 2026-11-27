@@ -147,8 +147,15 @@ func (m *Model) onPageChange() tea.Cmd {
 }
 
 func (m *Model) refreshMenu() tea.Cmd {
-	if m.connectionChecked && !m.connectionReady && m.currentPage != layout.PageCore && m.currentPage != layout.PageSub && m.currentPage != layout.PageSettings && m.currentPage != layout.PageLogs {
-		return m.checkCoreConnection(true)
+	if m.currentPage == layout.PageLogs {
+		m.syncProcessLogs()
+	}
+	if m.coreUnavailable() {
+		reconnect := m.checkCoreConnection(true)
+		if m.currentPage == layout.PageSub {
+			return tea.Batch(reconnect, sub.RefreshSubs(m.profileSvc))
+		}
+		return reconnect
 	}
 	switch m.currentPage {
 	case layout.PageCore:
@@ -160,8 +167,6 @@ func (m *Model) refreshMenu() tea.Cmd {
 		return m.fetchNodes()
 	case layout.PageConnections:
 		return connections.FetchConnections(m.client)
-	case layout.PageLogs:
-		m.syncProcessLogs()
 	case layout.PageRules:
 		return rules.FetchRules(m.client)
 	case layout.PageSub:

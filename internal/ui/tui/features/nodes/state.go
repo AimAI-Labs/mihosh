@@ -626,6 +626,9 @@ func (s State) ApplyGroups(Groups map[string]model.Group, orderedNames []string)
 // ApplyProxies 应用节点数据
 func (s State) ApplyProxies(Proxies map[string]model.Proxy) State {
 	s.Proxies = Proxies
+	if s.ProxySortOrder == SortOrderDelayAsc || s.ProxySortOrder == SortOrderAvailable {
+		return s.ApplyGroups(s.Groups, s.GroupNames)
+	}
 	return s
 }
 

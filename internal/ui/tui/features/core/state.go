@@ -271,6 +271,11 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	case messages.MihomoVersionMsg:
 		s.editor = s.editor.ApplyMihomoVersion(msg.Version)
 		return s, nil
+	case messages.CoreTargetChangedMsg:
+		if msg.Reset || msg.Invalidate {
+			s.editor = s.editor.ClearActionStates()
+		}
+		return s, nil
 	case messages.CoreActionDoneMsg, messages.CoreActionErrorMsg:
 		s.editor = s.editor.ClearActionStates()
 		return s, nil

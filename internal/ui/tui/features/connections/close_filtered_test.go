@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
@@ -65,18 +66,7 @@ func TestCloseFilteredActiveConnectionsClosesOnlyMatchedIDs(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected command for closing matched connections")
 	}
-	batch, ok := cmd().(tea.BatchMsg)
-	if !ok {
-		t.Fatalf("expected BatchMsg, got %T", cmd())
-	}
-	var resultMsg messages.FilteredConnectionsClosedMsg
-	var gotFilteredMsg bool
-	for _, c := range batch {
-		if msg, ok := c().(messages.FilteredConnectionsClosedMsg); ok {
-			resultMsg = msg
-			gotFilteredMsg = true
-		}
-	}
+	resultMsg, gotFilteredMsg := runCloseSequence(t, cmd).closed.(messages.FilteredConnectionsClosedMsg)
 	if !gotFilteredMsg || resultMsg.Closed != 2 || resultMsg.Failed != 0 {
 		t.Fatalf("expected FilteredConnectionsClosedMsg{Closed:2, Failed:0}, got ok=%t %+v", gotFilteredMsg, resultMsg)
 	}
@@ -131,12 +121,14 @@ func TestCloseFilteredActiveConnectionsWithZeroMatchesSendsNoDeletes(t *testing.
 
 func TestCloseAllActiveConnectionsWithoutFilterUsesBulkEndpoint(t *testing.T) {
 	i18n.Init()
-	closeAllHit := false
+	var closeAllHit atomic.Bool
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete && r.URL.Path == "/connections" {
-			closeAllHit = true
+			closeAllHit.Store(true)
+			w.WriteHeader(http.StatusNoContent)
+			return
 		}
-		w.WriteHeader(http.StatusNoContent)
+		_, _ = w.Write([]byte(`{"connections":[]}`))
 	}))
 	defer srv.Close()
 
@@ -150,10 +142,8 @@ func TestCloseAllActiveConnectionsWithoutFilterUsesBulkEndpoint(t *testing.T) {
 	}
 
 	_, cmd := s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("X")})
-	for _, c := range cmd().(tea.BatchMsg) {
-		_ = c()
-	}
-	if !closeAllHit {
+	runCloseSequence(t, cmd)
+	if !closeAllHit.Load() {
 		t.Fatal("expected DELETE /connections when no filter is active")
 	}
 }

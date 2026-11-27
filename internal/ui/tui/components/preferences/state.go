@@ -995,6 +995,9 @@ func resolveMihomoApplyButtonClick(pageX int, saving bool) bool {
 }
 
 func (s State) RunCoreAction(action string) (State, tea.Cmd) {
+	if s.client == nil {
+		return s, nil
+	}
 	switch action {
 	case "upgrade_auto":
 		if !s.IsCoreUpgrading {
@@ -1036,7 +1039,7 @@ func (s State) RunCoreAction(action string) (State, tea.Cmd) {
 
 // Core Actions
 func UpgradeCoreCmd(client *service.Client, channel string) tea.Cmd {
-	return func() tea.Msg {
+	return coreActionRequest(client, func(client *service.Client) tea.Msg {
 		if cfg, err := service.Load(); err == nil && cfg.Core.Mode == "managed" {
 			return messages.CoreActionErrorMsg{Action: i18n.T("menu.core"), Err: fmt.Errorf("%s", i18n.T("core.manage_here"))}
 		}
@@ -1045,11 +1048,11 @@ func UpgradeCoreCmd(client *service.Client, channel string) tea.Cmd {
 			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.upgrade_auto"), Err: err}
 		}
 		return messages.CoreActionDoneMsg{Action: i18n.T("settings.action.upgrade_auto"), NeedReloadAll: true}
-	}
+	})
 }
 
 func RestartCoreCmd(client *service.Client) tea.Cmd {
-	return func() tea.Msg {
+	return coreActionRequest(client, func(client *service.Client) tea.Msg {
 		if cfg, err := service.Load(); err == nil && cfg.Core.Mode == "managed" {
 			return messages.CoreActionErrorMsg{Action: i18n.T("menu.core"), Err: fmt.Errorf("%s", i18n.T("core.manage_here"))}
 		}
@@ -1058,43 +1061,50 @@ func RestartCoreCmd(client *service.Client) tea.Cmd {
 			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.restart"), Err: err}
 		}
 		return messages.CoreActionDoneMsg{Action: i18n.T("settings.action.restart"), NeedReloadAll: true, DelayMs: 500}
-	}
+	})
 }
 
 func ReloadConfigsCmd(client *service.Client) tea.Cmd {
-	return func() tea.Msg {
+	return coreActionRequest(client, func(client *service.Client) tea.Msg {
 		if err := client.ReloadConfigsAPI(); err != nil {
 			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.reload"), Err: err}
 		}
 		return messages.CoreActionDoneMsg{Action: i18n.T("settings.action.reload"), NeedReloadAll: true}
-	}
+	})
 }
 
 func UpdateGeoDataCmd(client *service.Client) tea.Cmd {
-	return func() tea.Msg {
+	return coreActionRequest(client, func(client *service.Client) tea.Msg {
 		if err := client.UpdateGeoData(); err != nil {
 			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.update_geo"), Err: err}
 		}
 		return messages.CoreActionDoneMsg{Action: i18n.T("settings.action.update_geo"), NeedReloadAll: true}
-	}
+	})
 }
 
 func FlushDNSCacheCmd(client *service.Client) tea.Cmd {
-	return func() tea.Msg {
+	return coreActionRequest(client, func(client *service.Client) tea.Msg {
 		if err := client.FlushDNSCache(); err != nil {
 			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.flush_dns"), Err: err}
 		}
 		return messages.CoreActionDoneMsg{Action: i18n.T("settings.action.flush_dns"), NeedReloadAll: false}
-	}
+	})
 }
 
 func FlushFakeIPCmd(client *service.Client) tea.Cmd {
-	return func() tea.Msg {
+	return coreActionRequest(client, func(client *service.Client) tea.Msg {
 		if err := client.FlushFakeIP(); err != nil {
 			return messages.CoreActionErrorMsg{Action: i18n.T("settings.action.flush_fakeip"), Err: err}
 		}
 		return messages.CoreActionDoneMsg{Action: i18n.T("settings.action.flush_fakeip"), NeedReloadAll: false}
+	})
+}
+
+func coreActionRequest(client *service.Client, action func(*service.Client) tea.Msg) tea.Cmd {
+	if client == nil {
+		return nil
 	}
+	return messages.CoreRequest(client, action)
 }
 
 // Clear action states

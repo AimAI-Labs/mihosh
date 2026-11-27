@@ -106,6 +106,7 @@ func (m *Model) updateCoreTarget(target service.MihomoTarget, update coreTargetA
 		}
 	}
 	changed := messages.CoreTargetChangedMsg{Reset: reset, Invalidate: invalidate, ConfigPath: target.ConfigPath, ProxyURL: service.MixedPortToProxyURL(endpoint.MixedPort)}
+	m.coreState, _ = m.coreState.Update(changed)
 	m.rulesState, _ = m.rulesState.Update(changed)
 	m.connsState, _ = m.connsState.Update(changed)
 	m.nodesState, _ = m.nodesState.Update(changed)

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -108,4 +110,13 @@ func TestPlaceholderSwallowsPageInput(t *testing.T) {
 	m := placeholderModel(layout.PageRules)
 	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
 	require.False(t, next.(Model).rulesState.ShowAddForm(), "page shortcuts must not open hidden dialogs")
+}
+
+func TestRefreshingLogsAndSubscriptionsPlaceholderReconnects(t *testing.T) {
+	for _, page := range []layout.PageType{layout.PageLogs, layout.PageSub} {
+		m := placeholderModel(page)
+		m.client = api.NewClient(config.MihomoEndpoint{ExternalController: "127.0.0.1:9090"}, 1000)
+		require.NotNil(t, m.refreshMenu())
+		require.True(t, m.connectionChecking, "page %d did not request a connection check", page)
+	}
 }

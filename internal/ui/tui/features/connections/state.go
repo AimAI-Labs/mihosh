@@ -503,7 +503,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 				if conn != nil {
 					id := conn.ID
 					s.removeFrozenConnection(id)
-					return s, tea.Batch(
+					return s, tea.Sequence(
 						CloseConnection(s.client, id),
 						FetchConnections(s.client),
 					)
@@ -527,7 +527,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 					}
 					s.removeFrozenConnections(ids)
 					s.filterList.SetItemCount(s.filteredConnCount())
-					return s, tea.Batch(
+					return s, tea.Sequence(
 						CloseConnectionsByIDs(s.client, ids),
 						FetchConnections(s.client),
 					)
@@ -536,7 +536,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 					s.frozenConnections.Connections = nil
 					s.filterList.SetItemCount(0)
 				}
-				return s, tea.Batch(
+				return s, tea.Sequence(
 					CloseAllConnections(s.client),
 					FetchConnections(s.client),
 				)

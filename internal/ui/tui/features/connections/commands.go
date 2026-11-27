@@ -16,6 +16,9 @@ import (
 )
 
 func FetchConnections(client *service.Client) tea.Cmd {
+	if client == nil {
+		return nil
+	}
 	return messages.CoreRequest(client, func(client *service.Client) tea.Msg {
 		conns, err := client.GetConnections()
 		if err != nil {
@@ -53,6 +56,9 @@ func CloseAllConnections(client *service.Client) tea.Cmd {
 
 // CloseConnectionsByIDs 按活跃连接 ID 批量关闭筛选命中的连接（限制并发为 model.TestConcurrency）
 func CloseConnectionsByIDs(client *service.Client, ids []string) tea.Cmd {
+	if client == nil {
+		return nil
+	}
 	unique := make([]string, 0, len(ids))
 	seen := make(map[string]struct{}, len(ids))
 	for _, id := range ids {
@@ -65,8 +71,8 @@ func CloseConnectionsByIDs(client *service.Client, ids []string) tea.Cmd {
 		seen[id] = struct{}{}
 		unique = append(unique, id)
 	}
-	return func() tea.Msg {
-		if client == nil || len(unique) == 0 {
+	return messages.CoreRequest(client, func(client *service.Client) tea.Msg {
+		if len(unique) == 0 {
 			return messages.FilteredConnectionsClosedMsg{}
 		}
 		sem := make(chan struct{}, model.TestConcurrency)
@@ -77,10 +83,10 @@ func CloseConnectionsByIDs(client *service.Client, ids []string) tea.Cmd {
 			failed int
 		)
 		for _, id := range unique {
+			sem <- struct{}{}
 			wg.Add(1)
 			go func(connID string) {
 				defer wg.Done()
-				sem <- struct{}{}
 				defer func() { <-sem }()
 				err := client.CloseConnection(connID)
 				mu.Lock()
@@ -94,7 +100,7 @@ func CloseConnectionsByIDs(client *service.Client, ids []string) tea.Cmd {
 		}
 		wg.Wait()
 		return messages.FilteredConnectionsClosedMsg{Closed: closed, Failed: failed}
-	}
+	})
 }
 
 // FetchIPInfo 获取IP地理位置信息

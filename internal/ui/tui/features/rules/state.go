@@ -108,6 +108,12 @@ func (s State) SetConfigPath(path string) State {
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.CoreTargetChangedMsg:
+		if msg.Reset {
+			next := NewState(s.client, s.configSvc, s.coreSvc)
+			next.FilterEngine = s.FilterEngine
+			next.ColorAdjustLight, next.ColorAdjustDark = s.ColorAdjustLight, s.ColorAdjustDark
+			s = next
+		}
 		return s.SetConfigPath(msg.ConfigPath), nil
 
 	case messages.PageMouseScrollMsg:

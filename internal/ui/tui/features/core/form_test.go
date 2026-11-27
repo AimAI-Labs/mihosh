@@ -6,8 +6,10 @@ import (
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/preferences"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
@@ -414,8 +416,9 @@ func TestStopAndRestartShortcutsRequireConfirmation(t *testing.T) {
 
 func TestMaintenanceAPIActionsRequireConfirmation(t *testing.T) {
 	i18n.Init()
+	client := api.NewClient(config.DefaultMihomoEndpoint, 1000)
 	for _, mode := range []string{"managed", "external"} {
-		initial := State{tab: 2, connected: true, Status: service.CoreStatus{Mode: mode}}
+		initial := State{tab: 2, connected: true, Status: service.CoreStatus{Mode: mode}, editor: preferences.NewState(nil, client)}
 		for index, item := range initial.actions() {
 			id, ok := strings.CutPrefix(item.action, "api:")
 			if !ok {
@@ -443,5 +446,18 @@ func TestMaintenanceAPIActionsRequireConfirmation(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestInvalidatingCoreTargetClearsPendingMaintenanceActions(t *testing.T) {
+	client := api.NewClient(config.DefaultMihomoEndpoint, 1000)
+	s := State{editor: preferences.NewState(nil, client)}
+	s.editor, _ = s.editor.RunCoreAction("restart")
+	if !s.editor.IsCoreRestarting {
+		t.Fatal("restart was not pending")
+	}
+	s, _ = s.Update(messages.CoreTargetChangedMsg{Invalidate: true})
+	if s.editor.IsCoreRestarting {
+		t.Fatal("restart remained pending on the new target generation")
 	}
 }
