@@ -24,7 +24,8 @@ var configCmd = &cobra.Command{
 }
 
 var configShowCmd = &cobra.Command{
-	Use: "show [--output json|table|plain]",
+	Use:  "show [--output json|table|plain]",
+	Args: cobra.NoArgs,
 	Example: `  mihosh config show
   mihosh config show --output table
   mihosh config show --output json`,
@@ -49,28 +50,40 @@ var configShowCmd = &cobra.Command{
 	},
 }
 
-var configSetCmd = &cobra.Command{
-	Use:  "set <key> <value>",
-	Args: cobra.ExactArgs(2),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		key := args[0]
-		value := args[1]
+var configSetCmd = newConfigSetCommand()
 
-		configSvc := service.NewConfigService()
-		if err := configSvc.SetConfigValue(key, value); err != nil {
-			if isConfigSetValidationError(err) {
-				return wrapParameterError(fmt.Errorf(i18n.T("cli.config.set.err_set")+": %w", err))
+func newConfigSetCommand() *cobra.Command {
+	var output string
+	cmd := &cobra.Command{
+		Use:  "set <key> <value>",
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			format, err := parseOutputFormat(output)
+			if err != nil {
+				return wrapParameterError(err)
 			}
-			return wrapConfigError(fmt.Errorf(i18n.T("cli.config.set.err_set")+": %w", err))
-		}
+			key := args[0]
+			value := args[1]
 
-		fmt.Println(i18n.Tf("cli.config.set.success", key, value))
-		return nil
-	},
+			configSvc := service.NewConfigService()
+			if err := configSvc.SetConfigValue(key, value); err != nil {
+				if isConfigSetValidationError(err) {
+					return wrapParameterError(fmt.Errorf(i18n.T("cli.config.set.err_set")+": %w", err))
+				}
+				return wrapConfigError(fmt.Errorf(i18n.T("cli.config.set.err_set")+": %w", err))
+			}
+
+			return writeFieldResult(cmd.OutOrStdout(), format, i18n.Tf("cli.config.set.success", key, value),
+				outputField{"key", key}, outputField{"value", value})
+		},
+	}
+	cmd.Flags().StringVarP(&output, "output", "o", "plain", "plain|table|json")
+	return cmd
 }
 
 var configEditCmd = &cobra.Command{
-	Use: "edit",
+	Use:  "edit",
+	Args: cobra.NoArgs,
 	Example: `  mihosh config edit
   mihosh config edit --editor vim`,
 	RunE: func(cmd *cobra.Command, args []string) error {

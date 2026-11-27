@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"text/tabwriter"
@@ -39,4 +40,36 @@ func writeJSON(w io.Writer, data interface{}) error {
 
 func newTabWriter(w io.Writer) *tabwriter.Writer {
 	return tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+}
+
+type outputField struct {
+	name, value string
+}
+
+func writeFieldResult(w io.Writer, format outputFormat, plain string, fields ...outputField) error {
+	switch format {
+	case outputFormatJSON:
+		record := make(map[string]string, len(fields))
+		for _, field := range fields {
+			record[field.name] = field.value
+		}
+		return writeJSON(w, record)
+	case outputFormatTable:
+		var columns, values []string
+		for _, field := range fields {
+			columns = append(columns, strings.ToUpper(field.name))
+			values = append(values, field.value)
+		}
+		table := newTabWriter(w)
+		if _, err := fmt.Fprintln(table, strings.Join(columns, "\t")); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(table, strings.Join(values, "\t")); err != nil {
+			return err
+		}
+		return table.Flush()
+	default:
+		_, err := fmt.Fprintln(w, plain)
+		return err
+	}
 }

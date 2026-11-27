@@ -81,12 +81,14 @@ func proxyHintStyle() lipgloss.Style {
 
 var proxyOnCmd = &cobra.Command{
 	Use:     "on",
+	Args:    cobra.NoArgs,
 	Example: `  eval "$(mihosh on)"`,
 	RunE:    runProxyOn,
 }
 
 var proxyOffCmd = &cobra.Command{
 	Use:     "off",
+	Args:    cobra.NoArgs,
 	Example: `  eval "$(mihosh off)"`,
 	RunE:    runProxyOff,
 }

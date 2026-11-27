@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -71,8 +72,8 @@ func newServiceActionCommand(action, short string, sudo bool, opts *serviceOptio
 					return nil, svc.ServiceAction(ctx, action)
 				})
 			}
-			if _, err := parseOutputFormat(opts.output); err != nil {
-				return wrapParameterError(err)
+			if err := validateSystemCommandFormat(opts.output); err != nil {
+				return err
 			}
 			if err := ensureLinuxSystemd(); err != nil {
 				return err
@@ -99,6 +100,9 @@ func newServiceLogsCommand(opts *serviceOptions) *cobra.Command {
 		Use:  "logs",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateSystemCommandFormat(opts.output); err != nil {
+				return err
+			}
 			if err := ensureLinuxSystemd(); err != nil {
 				return err
 			}
@@ -130,6 +134,17 @@ func newServiceLogsCommand(opts *serviceOptions) *cobra.Command {
 	cmd.Flags().IntVarP(&opts.lines, "lines", "n", 200, "")
 	cmd.Flags().BoolVarP(&opts.follow, "follow", "f", false, "")
 	return cmd
+}
+
+func validateSystemCommandFormat(raw string) error {
+	format, err := parseOutputFormat(raw)
+	if err != nil {
+		return wrapParameterError(err)
+	}
+	if format == outputFormatJSON {
+		return wrapParameterError(errors.New(i18n.T("cli.service.err_system_json")))
+	}
+	return nil
 }
 
 func managedServiceTarget(cmd *cobra.Command) bool {

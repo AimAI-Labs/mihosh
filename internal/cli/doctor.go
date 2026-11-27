@@ -25,7 +25,8 @@ const doctorProbeTimeout = 2 * time.Second
 var doctorOutput string
 
 var doctorCmd = &cobra.Command{
-	Use: "doctor [--output json|table|plain]",
+	Use:  "doctor [--output json|table|plain]",
+	Args: cobra.NoArgs,
 	Example: `  mihosh doctor
   mihosh doctor --output table
   mihosh doctor --output json`,

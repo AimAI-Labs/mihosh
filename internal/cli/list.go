@@ -15,7 +15,8 @@ import (
 var listOutput string
 
 var listCmd = &cobra.Command{
-	Use: "list [--output json|table|plain]",
+	Use:  "list [--output json|table|plain]",
+	Args: cobra.NoArgs,
 	Example: `  mihosh list
   mihosh list --output table
   mihosh list --output json`,

@@ -9,42 +9,50 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var modeCmd = &cobra.Command{
-	Use: "mode [rule|global|direct]",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := loadConfigOrDefault()
-		if err != nil {
-			return wrapConfigError(fmt.Errorf(i18n.T("cli.mode.err_load_config")+": %w", err))
-		}
+var modeCmd = newModeCommand()
 
-		client := loadClient(cfg)
-
-		if len(args) == 0 {
-			// Get configs
-			configs, err := client.GetConfigs()
+func newModeCommand() *cobra.Command {
+	var output string
+	cmd := &cobra.Command{
+		Use:  "mode [rule|global|direct]",
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			format, err := parseOutputFormat(output)
 			if err != nil {
-				return wrapNetworkError(fmt.Errorf(i18n.T("cli.mode.err_get")+": %w", err))
+				return wrapParameterError(err)
 			}
-			if _, err := fmt.Fprintln(cmd.OutOrStdout(), i18n.Tf("cli.mode.current", configs.Mode)); err != nil {
-				return err
+			cfg, err := loadConfigOrDefault()
+			if err != nil {
+				return wrapConfigError(fmt.Errorf(i18n.T("cli.mode.err_load_config")+": %w", err))
 			}
-			return nil
-		}
 
-		// Set mode
-		mode := strings.ToLower(args[0])
-		if mode != "rule" && mode != "global" && mode != "direct" {
-			return wrapParameterError(fmt.Errorf(i18n.T("cli.mode.err_unknown"), mode))
-		}
+			client := loadClient(cfg)
 
-		err = client.UpdateConfig(model.UpdateConfigRequest{Mode: mode})
-		if err != nil {
-			return wrapNetworkError(fmt.Errorf(i18n.T("cli.mode.err_set")+": %w", err))
-		}
+			if len(args) == 0 {
+				// Get configs
+				configs, err := client.GetConfigs()
+				if err != nil {
+					return wrapNetworkError(fmt.Errorf(i18n.T("cli.mode.err_get")+": %w", err))
+				}
+				return writeFieldResult(cmd.OutOrStdout(), format, i18n.Tf("cli.mode.current", configs.Mode),
+					outputField{"mode", configs.Mode})
+			}
 
-		if _, err := fmt.Fprintln(cmd.OutOrStdout(), i18n.Tf("cli.mode.switched", mode)); err != nil {
-			return err
-		}
-		return nil
-	},
+			// Set mode
+			mode := strings.ToLower(args[0])
+			if mode != "rule" && mode != "global" && mode != "direct" {
+				return wrapParameterError(fmt.Errorf(i18n.T("cli.mode.err_unknown"), mode))
+			}
+
+			err = client.UpdateConfig(model.UpdateConfigRequest{Mode: mode})
+			if err != nil {
+				return wrapNetworkError(fmt.Errorf(i18n.T("cli.mode.err_set")+": %w", err))
+			}
+
+			return writeFieldResult(cmd.OutOrStdout(), format, i18n.Tf("cli.mode.switched", mode),
+				outputField{"mode", mode})
+		},
+	}
+	cmd.Flags().StringVarP(&output, "output", "o", "plain", "plain|table|json")
+	return cmd
 }

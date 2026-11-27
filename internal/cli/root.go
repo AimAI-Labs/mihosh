@@ -246,6 +246,9 @@ func localizeCommands() {
 	proxyOffCmd.Long = i18n.T("cli.proxy.off.long")
 
 	// Set flag descriptions
+	for _, cmd := range []*cobra.Command{modeCmd, selectCmd, configSetCmd} {
+		cmd.Flags().Lookup("output").Usage = i18n.T("cli.status.flag_output")
+	}
 	if f := statusCmd.Flags().Lookup("output"); f != nil {
 		f.Usage = i18n.T("cli.status.flag_output")
 	}

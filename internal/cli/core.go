@@ -23,9 +23,14 @@ func newCoreCommand() *cobra.Command {
 	for _, action := range []string{"status", "releases", "install", "import", "configure", "start", "restart", "stop", "upgrade", "rollback", "activate"} {
 		var version, source, digest string
 		child := &cobra.Command{Use: action, Short: i18n.T("core.action." + action), Args: cobra.NoArgs}
-		child.Flags().StringVar(&version, "version", "", i18n.T("cli.core.version"))
-		child.Flags().StringVar(&source, "file", "", i18n.T("cli.core.file"))
-		child.Flags().StringVar(&digest, "sha256", "", i18n.T("cli.core.sha256"))
+		switch action {
+		case "releases", "install", "upgrade", "import", "activate":
+			child.Flags().StringVar(&version, "version", "", i18n.T("cli.core.version"))
+		}
+		if action == "import" {
+			child.Flags().StringVar(&source, "file", "", i18n.T("cli.core.file"))
+			child.Flags().StringVar(&digest, "sha256", "", i18n.T("cli.core.sha256"))
+		}
 		child.RunE = func(cmd *cobra.Command, args []string) (commandErr error) {
 			format, err := parseOutputFormat(output)
 			if err != nil {
@@ -36,6 +41,9 @@ func newCoreCommand() *cobra.Command {
 					_ = writeJSON(cmd.OutOrStdout(), map[string]string{"action": action, "stage": "failed", "result": "error", "error": commandErr.Error()})
 				}
 			}()
+			if action == "activate" && strings.TrimSpace(version) == "" {
+				return wrapParameterError(errors.New(i18n.T("cli.core.activate_requires_version")))
+			}
 			svc := service.NewCoreService()
 			defer svc.Close()
 			ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)

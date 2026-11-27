@@ -12,7 +12,8 @@ import (
 var versionOutput string
 
 var versionCmd = &cobra.Command{
-	Use: "version",
+	Use:  "version",
+	Args: cobra.NoArgs,
 	Example: `  mihosh version
   mihosh version --output json`,
 	RunE: func(cmd *cobra.Command, args []string) error {

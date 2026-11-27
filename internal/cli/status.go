@@ -14,7 +14,8 @@ import (
 var statusOutput string
 
 var statusCmd = &cobra.Command{
-	Use: "status [--output json|table|plain]",
+	Use:  "status [--output json|table|plain]",
+	Args: cobra.NoArgs,
 	Example: `  mihosh status
   mihosh status --output json`,
 	RunE: func(cmd *cobra.Command, args []string) error {

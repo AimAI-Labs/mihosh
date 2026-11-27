@@ -15,7 +15,8 @@ import (
 var connectionsOutput string
 
 var connectionsCmd = &cobra.Command{
-	Use: "connections [--output json|table|plain]",
+	Use:  "connections [--output json|table|plain]",
+	Args: cobra.NoArgs,
 	Example: `  mihosh connections
   mihosh connections --output table
   mihosh connections --output json`,
