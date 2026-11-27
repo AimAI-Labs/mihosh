@@ -21,6 +21,9 @@ var rootCmd = &cobra.Command{
 	Version:       model.Version,
 	SilenceErrors: true,
 	SilenceUsage:  true,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		return wrapParameterError(cobra.NoArgs(cmd, args))
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// 默认行为：启动TUI界面。
 		// 配置缺失（含首次启动）直接用默认值继续，不在启动期写文件；
