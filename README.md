@@ -37,7 +37,7 @@ brew install AimAI-Labs/mihosh/mihosh
 ### Install Script
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AimAI-Labs/mihosh/refs/heads/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/AimAI-Labs/mihosh/HEAD/install.sh | bash
 ```
 
 ### Manual Installation
