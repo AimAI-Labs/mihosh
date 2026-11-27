@@ -32,7 +32,7 @@ var rootCmd = &cobra.Command{
 
 		m := tui.NewModel(app)
 
-		p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithoutCatchPanics())
+		p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 		finalModel, err := p.Run()
 		if fm, ok := finalModel.(tui.Model); ok {
 			fm.Close()
