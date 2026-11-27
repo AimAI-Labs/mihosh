@@ -182,3 +182,47 @@ func TestServiceHandoffRecoveryRestoresSessionEvenIfStopErrors(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEqual(t, "service", cfg.Core.Runtime)
 }
+
+func TestServiceHandoffCanSwitchToExternal(t *testing.T) {
+	for _, tc := range []struct {
+		name, controller, secret string
+		mixedPort                int
+		apply                    func(*CoreService) error
+		failStop                 bool
+	}{
+		{name: "default discovery", apply: (*CoreService).UseExternal},
+		{
+			name: "explicit controller", controller: "https://external.example:9090",
+			secret: "fixture-secret", mixedPort: 7890,
+			apply: func(s *CoreService) error {
+				return s.ConnectExternal("https://external.example:9090/", "fixture-secret", 7890)
+			},
+		},
+		{name: "stop failure", apply: (*CoreService).UseExternal, failStop: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, manager, _ := serviceHandoffFixture(t)
+			manager.state.Installed = true
+			require.NoError(t, s.ServiceAction(context.Background(), "start"))
+			require.True(t, manager.state.Running)
+			manager.failStop = tc.failStop
+
+			err := tc.apply(s)
+			cfg, loadErr := config.Load()
+			require.NoError(t, loadErr)
+			if tc.failStop {
+				require.ErrorContains(t, err, "unit not loaded")
+				require.Equal(t, "managed", cfg.Core.Mode)
+				require.True(t, manager.state.Running)
+				return
+			}
+			require.NoError(t, err)
+			require.False(t, manager.state.Running)
+			require.Nil(t, manager.owner.process)
+			require.Equal(t, "external", cfg.Core.Mode)
+			require.Equal(t, tc.controller, cfg.Core.ExternalController)
+			require.Equal(t, tc.secret, cfg.Core.ExternalSecret)
+			require.Equal(t, tc.mixedPort, cfg.Core.ExternalMixedPort)
+		})
+	}
+}

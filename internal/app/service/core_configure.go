@@ -1,12 +1,14 @@
 package service
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -115,31 +117,9 @@ func (s *CoreService) SaveNetwork(proxy string, accelerators []coreinfra.Acceler
 	})
 }
 func (s *CoreService) UseExternal() error {
-	if !s.mu.TryLock() {
-		return errors.New("another core operation is active")
-	}
-	defer s.mu.Unlock()
-	rootForLock, lockErr := config.GetConfigDir()
-	if lockErr != nil {
-		return lockErr
-	}
-	releaseMutation, lockErr := s.lockCoreMutation(rootForLock)
-	if lockErr != nil {
-		return lockErr
-	}
-	defer releaseMutation()
-
-	if err := s.stopLocked(); err != nil {
-		return err
-	}
-	return config.Update(func(latest *config.Config) error {
-		latest.Core.Mode = "external"
-		latest.Core.ExternalController = ""
-		latest.Core.ExternalSecret = ""
-		latest.Core.ExternalMixedPort = 0
-		return nil
-	})
+	return s.switchToExternal("", "", 0)
 }
+
 func (s *CoreService) ConnectExternal(address, secret string, mixedPort int) error {
 	address = strings.TrimSpace(address)
 	normalized := address
@@ -159,34 +139,57 @@ func (s *CoreService) ConnectExternal(address, secret string, mixedPort int) err
 	if mixedPort < 1 || mixedPort > 65535 {
 		return errors.New("invalid mixed proxy port")
 	}
+	return s.switchToExternal(strings.TrimRight(normalized, "/"), secret, mixedPort)
+}
+
+func (s *CoreService) switchToExternal(address, secret string, mixedPort int) (resultErr error) {
 	if !s.mu.TryLock() {
 		return errors.New("another core operation is active")
 	}
 	defer s.mu.Unlock()
-	rootForLock, lockErr := config.GetConfigDir()
-	if lockErr != nil {
-		return lockErr
-	}
-	releaseMutation, lockErr := s.lockCoreMutation(rootForLock)
-	if lockErr != nil {
-		return lockErr
-	}
-	defer releaseMutation()
-
-	if err = s.stopLocked(); err != nil {
+	root, err := config.GetConfigDir()
+	if err != nil {
 		return err
 	}
-	if err = config.Update(func(latest *config.Config) error {
+	if runtime.GOOS == "linux" && s.usesService() {
+		manager := s.serviceManager(root)
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		state, err := manager.Status(ctx)
+		if err != nil {
+			return err
+		}
+		if state.Running {
+			// The background owner must release the process lock before the mutation.
+			if err := manager.Action(ctx, "stop"); err != nil {
+				return err
+			}
+			defer func() {
+				if resultErr != nil && s.usesService() {
+					ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+					defer cancel()
+					resultErr = errors.Join(resultErr, manager.Action(ctx, "start"))
+				}
+			}()
+		}
+	}
+	releaseMutation, err := s.lockCoreMutation(root)
+	if err != nil {
+		return err
+	}
+	defer releaseMutation()
+	if err := s.stopLocked(); err != nil {
+		return err
+	}
+	return config.Update(func(latest *config.Config) error {
 		latest.Core.Mode = "external"
-		latest.Core.ExternalController = strings.TrimRight(normalized, "/")
+		latest.Core.ExternalController = address
 		latest.Core.ExternalSecret = secret
 		latest.Core.ExternalMixedPort = mixedPort
 		return nil
-	}); err != nil {
-		return err
-	}
-	return nil
+	})
 }
+
 func (s *CoreService) SetPorts(controllerPort, mixedPort int) error {
 	if controllerPort < 1 || controllerPort > 65535 || mixedPort < 1 || mixedPort > 65535 || controllerPort == mixedPort {
 		return errors.New("choose different controller/proxy ports between 1 and 65535")
