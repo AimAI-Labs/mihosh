@@ -59,7 +59,7 @@ func TestCLIOutputAndArgumentContracts(t *testing.T) {
 	}
 	for _, args := range [][]string{
 		{"version"}, {"status"}, {"list"}, {"connections"}, {"doctor"},
-		{"config", "show"}, {"config", "edit"}, {"on"}, {"off"},
+		{"config", "show"}, {"config", "edit"}, {"on"}, {"off"}, {"uninstall"},
 	} {
 		child, _, err := rootCmd.Find(args)
 		if err != nil {
@@ -76,6 +76,11 @@ func TestCLIOutputAndArgumentContracts(t *testing.T) {
 		if flag := cmd.Flags().Lookup("output"); flag == nil || flag.Shorthand != "o" {
 			t.Errorf("%s is missing -o/--output", cmd.Name())
 		}
+	}
+	if uCmd, _, err := rootCmd.Find([]string{"uninstall"}); err != nil {
+		t.Fatal(err)
+	} else if flag := uCmd.Flags().Lookup("output"); flag == nil || flag.Shorthand != "o" {
+		t.Errorf("uninstall is missing -o/--output")
 	}
 }
 

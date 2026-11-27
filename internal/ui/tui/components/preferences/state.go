@@ -62,14 +62,16 @@ type State struct {
 	IsConfigReloading bool
 	IsGeoUpdating     bool
 
-	SysStatus SysStatusState
-	syncModal SyncModalState
+	SysStatus      SysStatusState
+	syncModal      SyncModalState
+	uninstallModal UninstallModalState
 
-	configSvc *service.ConfigService
-	coreSvc   *service.CoreService
-	syncSvc   *service.SyncService
-	client    *service.Client
-	Config    *service.Config
+	configSvc    *service.ConfigService
+	coreSvc      *service.CoreService
+	syncSvc      *service.SyncService
+	uninstallSvc *service.UninstallService
+	client       *service.Client
+	Config       *service.Config
 }
 
 // NewState 创建新的设置页面状态
@@ -207,6 +209,7 @@ func (s State) ToPageState(cfg *service.Config, sysLogs []model.LogEntry) PageSt
 		SysStatus:       s.SysStatus,
 		SysLogs:         sysLogs,
 		SyncModal:       s.syncModal,
+		UninstallModal:  s.uninstallModal,
 	}
 }
 
@@ -214,6 +217,9 @@ func (s State) ToPageState(cfg *service.Config, sysLogs []model.LogEntry) PageSt
 func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.PageMouseScrollMsg:
+		if s.uninstallModal.Open {
+			return s, nil
+		}
 		if s.syncModal.Open {
 			return s.handleSyncModalScroll(msg.Up), nil
 		}
@@ -221,12 +227,18 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		newState, cmd := s.HandleMouseScroll(msg.Up, msg.Y, msg.Height, 18)
 		return newState, cmd
 	case messages.PageMouseClickMsg:
+		if s.uninstallModal.Open {
+			return s.handleUninstallModalClick(msg.X, msg.Y, msg.Width, msg.Height)
+		}
 		if s.syncModal.Open {
 			return s.handleSyncModalClick(msg.X, msg.Y, msg.Width, msg.Height)
 		}
 		newState, cmd := s.HandleMouseLeft(msg.X, msg.Y, msg.Width, msg.Height)
 		return newState, cmd
 	case tea.KeyMsg:
+		if s.uninstallModal.Open {
+			return s.handleUninstallModalKey(msg)
+		}
 		if s.syncModal.Open {
 			return s.handleSyncModalKey(msg)
 		}
@@ -264,6 +276,10 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 		case msg.String() == "b":
 			if s.activeTab == 0 {
 				return s.OpenSyncModal(), nil
+			}
+		case msg.String() == "u":
+			if s.activeTab == 0 {
+				return s.OpenUninstallModal()
 			}
 		case key.Matches(msg, common.Keys.Enter):
 			if s.activeTab == 1 && s.selectedSetting == mihomoApplyIndex {
@@ -1143,8 +1159,8 @@ func (s State) SyncSysStatus(width, height int, cfg *service.Config, sysLogs []m
 func (s State) InputCapture() common.InputCapture {
 	textInput := s.editMode || (s.syncModal.Open && s.syncModal.Mode != syncModeMenu)
 	return common.InputCapture{
-		Active:    s.editMode || s.syncModal.Open,
-		Help:      textInput,
-		Interrupt: textInput && !s.syncModal.Busy,
+		Active:    s.editMode || s.syncModal.Open || s.uninstallModal.Open,
+		Help:      textInput || s.uninstallModal.Open,
+		Interrupt: (textInput && !s.syncModal.Busy) || s.uninstallModal.Busy,
 	}
 }

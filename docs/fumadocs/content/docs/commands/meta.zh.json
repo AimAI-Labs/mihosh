@@ -16,6 +16,7 @@
     "doctor",
     "sysproxy",
     "completion",
-    "version"
+    "version",
+    "uninstall"
   ]
 }

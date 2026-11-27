@@ -166,34 +166,34 @@ func shellProxyStartupFile(shell string) (string, error) {
 	}
 }
 
+const (
+	shellProxyBlockBegin = "# >>> mihosh proxy >>>"
+	shellProxyBlockEnd   = "# <<< mihosh proxy <<<"
+)
+
 func installShellProxyStartup(startup, activation string) (func() error, error) {
 	// Follow dotfile symlinks so an atomic replacement keeps the user's dotfile layout.
-	if info, err := os.Lstat(startup); err == nil && info.Mode()&os.ModeSymlink != 0 {
-		target, err := filepath.EvalSymlinks(startup)
-		if err != nil {
-			return nil, err
-		}
-		startup = target
-	} else if err != nil && !os.IsNotExist(err) {
+	target, err := resolveDotfileTarget(startup)
+	if err != nil {
 		return nil, err
 	}
+	startup = target
 	data, existed, err := readOptionalFile(startup)
 	if err != nil {
 		return nil, err
 	}
-	const begin, end = "# >>> mihosh proxy >>>", "# <<< mihosh proxy <<<"
 	text := string(data)
 	newline := "\n"
 	if strings.Contains(text, "\r\n") {
 		newline = "\r\n"
 	}
-	block := strings.Join([]string{begin, activation, end}, newline)
-	start, finish := strings.Index(text, begin), strings.Index(text, end)
+	block := strings.Join([]string{shellProxyBlockBegin, activation, shellProxyBlockEnd}, newline)
+	start, finish := strings.Index(text, shellProxyBlockBegin), strings.Index(text, shellProxyBlockEnd)
 	if start >= 0 || finish >= 0 {
-		if start < 0 || finish < start || strings.Count(text, begin) != 1 || strings.Count(text, end) != 1 {
+		if start < 0 || finish < start || strings.Count(text, shellProxyBlockBegin) != 1 || strings.Count(text, shellProxyBlockEnd) != 1 {
 			return nil, errors.New("invalid Mihosh proxy block in shell startup file")
 		}
-		text = text[:start] + block + text[finish+len(end):]
+		text = text[:start] + block + text[finish+len(shellProxyBlockEnd):]
 	} else {
 		if len(text) > 0 && !strings.HasSuffix(text, "\n") {
 			text += newline
@@ -221,4 +221,112 @@ func installShellProxyStartup(startup, activation string) (func() error, error) 
 		}
 		return fsutil.WriteFileAtomic(startup, data, opts)
 	}, nil
+}
+
+func resolveDotfileTarget(path string) (string, error) {
+	info, err := os.Lstat(path)
+	if err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return filepath.EvalSymlinks(path)
+	}
+	if err != nil && !os.IsNotExist(err) {
+		return "", err
+	}
+	return path, nil
+}
+
+func shellProxyStartupCandidates(home string) []string {
+	var raw []string
+	if home != "" {
+		raw = append(raw, filepath.Join(home, ".bashrc"), filepath.Join(home, ".zshrc"))
+	}
+	if dir := os.Getenv("ZDOTDIR"); dir != "" {
+		raw = append(raw, filepath.Join(dir, ".zshrc"))
+	}
+	seen := make(map[string]bool, len(raw))
+	var out []string
+	for _, candidate := range raw {
+		cleaned := filepath.Clean(candidate)
+		key := cleaned
+		if target, err := resolveDotfileTarget(cleaned); err == nil {
+			key = filepath.Clean(target)
+		}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, cleaned)
+	}
+	return out
+}
+
+// FindShellProxyStartupFiles returns bash/zsh startup files that contain a Mihosh proxy block.
+func FindShellProxyStartupFiles(home string) []string {
+	var found []string
+	for _, candidate := range shellProxyStartupCandidates(home) {
+		target, err := resolveDotfileTarget(candidate)
+		if err != nil {
+			continue
+		}
+		data, existed, err := readOptionalFile(target)
+		if err != nil || !existed {
+			continue
+		}
+		text := string(data)
+		if strings.Contains(text, shellProxyBlockBegin) || strings.Contains(text, shellProxyBlockEnd) {
+			found = append(found, candidate)
+		}
+	}
+	return found
+}
+
+// RemoveShellProxyStartupInHome removes the managed Mihosh proxy block from bash/zsh startup files.
+func RemoveShellProxyStartupInHome(home string) ([]string, error) {
+	var cleaned []string
+	var errs []error
+	for _, candidate := range shellProxyStartupCandidates(home) {
+		removed, err := removeShellProxyStartup(candidate)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", candidate, err))
+			continue
+		}
+		if removed {
+			cleaned = append(cleaned, candidate)
+		}
+	}
+	return cleaned, errors.Join(errs...)
+}
+
+func removeShellProxyStartup(startup string) (bool, error) {
+	target, err := resolveDotfileTarget(startup)
+	if err != nil {
+		return false, err
+	}
+	data, existed, err := readOptionalFile(target)
+	if err != nil || !existed {
+		return false, err
+	}
+	text := string(data)
+	start, finish := strings.Index(text, shellProxyBlockBegin), strings.Index(text, shellProxyBlockEnd)
+	if start < 0 && finish < 0 {
+		return false, nil
+	}
+	if start < 0 || finish < start || strings.Count(text, shellProxyBlockBegin) != 1 || strings.Count(text, shellProxyBlockEnd) != 1 {
+		return false, errors.New("invalid Mihosh proxy block in shell startup file")
+	}
+	after := finish + len(shellProxyBlockEnd)
+	switch {
+	case strings.HasPrefix(text[after:], "\r\n"):
+		after += 2
+	case strings.HasPrefix(text[after:], "\n"):
+		after++
+	}
+	updated := text[:start] + text[after:]
+	info, err := os.Stat(target)
+	if err != nil {
+		return false, err
+	}
+	if err := fsutil.WriteFileAtomic(target, []byte(updated), fsutil.WriteOptions{Perm: info.Mode().Perm()}); err != nil {
+		return false, err
+	}
+	return true, nil
 }

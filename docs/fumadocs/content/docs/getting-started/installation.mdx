@@ -64,3 +64,17 @@ After the installation is complete, you can verify whether the installation was 
 ```bash
 mihosh version
 ```
+
+## Uninstall
+
+Mihosh includes a built-in one-click uninstaller that stops managed cores/services, cleans shell proxy hooks, and optionally preserves your configuration:
+
+```bash
+# Interactive uninstall (prompts to confirm and choose whether to keep config)
+mihosh uninstall
+
+# Unattended uninstall while keeping ~/.mihosh (or $MIHOSH_CONFIG_DIR)
+mihosh uninstall --yes --keep-config
+```
+
+You can also press `u` on the **Settings** page in the TUI to uninstall with a confirmation modal. For Homebrew installations, run `brew uninstall mihosh` after cleaning configs/hooks.

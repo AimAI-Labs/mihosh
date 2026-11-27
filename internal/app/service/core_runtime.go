@@ -334,6 +334,25 @@ func (s *CoreService) StopContext(ctx context.Context) error {
 	s.failure = nil
 	return s.stopLocked()
 }
+
+// StopManagedForUninstall stops an owned session core or signals an active local core owner
+// without going through systemd service routing.
+func (s *CoreService) StopManagedForUninstall(ctx context.Context) (bool, error) {
+	s.mu.Lock()
+	if s.process != nil || s.stop != nil {
+		err := s.stopLocked()
+		s.mu.Unlock()
+		return true, err
+	}
+	s.mu.Unlock()
+	if err := s.Control(ctx, "stop", ""); err != nil {
+		if errors.Is(err, ErrNoCoreOwner) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
 func (s *CoreService) Restart(ctx context.Context) error {
 	if s.usesService() {
 		return s.ServiceAction(ctx, "restart")

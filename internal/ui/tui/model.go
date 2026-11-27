@@ -125,7 +125,7 @@ func NewModel(app *bootstrap.App) Model {
 		logsState:            logs.NewState(app.IPResolver),
 		rulesState:           rules.NewState(client, app.ConfigSvc, app.CoreSvc).SetConfigPath(app.Target.ConfigPath),
 		subState:             sub.NewState(app.ProfileSvc),
-		settingsState:        settings.NewState(app.ConfigSvc, client),
+		settingsState:        settings.NewState(app.ConfigSvc, client).SetCoreService(app.CoreSvc),
 		autoRefreshRemaining: cfg.AutoRefreshInterval,
 	}
 }

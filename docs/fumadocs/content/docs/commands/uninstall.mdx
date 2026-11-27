@@ -1,0 +1,53 @@
+---
+title: "mihosh uninstall"
+description: One-click uninstall of Mihosh with optional configuration preservation.
+---
+
+`mihosh uninstall` stops Mihosh-managed Mihomo processes and background systemd user services, recovers pending system proxy or TUN settings, removes shell proxy hooks from `~/.bashrc` / `~/.zshrc` (and `$ZDOTDIR/.zshrc`), optionally removes or preserves the configuration directory (`~/.mihosh` or `$MIHOSH_CONFIG_DIR`), and removes the `mihosh` binary.
+
+## Usage
+
+```bash
+mihosh uninstall [flags]
+```
+
+## Flags
+
+| Flag | Shorthand | Default | Description |
+| --- | --- | --- | --- |
+| `--keep-config` | | `false` | Preserve configuration, subscriptions, and override files (`~/.mihosh` or `$MIHOSH_CONFIG_DIR`) |
+| `--yes` | `-y` | `false` | Skip interactive confirmation prompts |
+| `--dry-run` | | `false` | Preview uninstall actions without modifying any files |
+| `--output` | `-o` | `plain` | Output format: `plain`, `table`, or `json` |
+
+## Interactive vs Non-Interactive Behavior
+
+- **Interactive terminal** (without `--yes`):
+  1. Shows detected binary, background service, shell startup files, and configuration directory.
+  2. Prompts `Proceed with uninstalling Mihosh? [y/N]`.
+  3. Unless `--keep-config` was explicitly passed, prompts `Keep configuration directory (...)? [Y/n]` (defaults to keeping configuration).
+- **Non-interactive / `--output json`**:
+  - Requires `--yes` (or `--dry-run`). Without `--yes`, exits with code `2`.
+  - When `--yes` is passed, `--keep-config` defaults to `false` unless explicitly set.
+
+## Special Installation Cases
+
+- **Homebrew installations**: Mihosh cleans services, shell hooks, and (unless `--keep-config` is set) configuration data, then prints `brew uninstall mihosh` instead of deleting files inside Homebrew's Cellar directly.
+- **Permission-protected binary (e.g. `/usr/local/bin/mihosh`)**: In an interactive CLI session, Mihosh tries `sudo -n` and falls back to `sudo` if needed; otherwise (or in TUI), it prints the exact `sudo rm -f ...` command to run manually.
+- **TUI shortcut**: You can also press `u` on the **Settings** tab in the TUI to open the Uninstall confirmation modal (defaults to keeping configuration).
+
+## Examples
+
+```bash
+# Interactive uninstall (prompts to confirm and choose whether to keep config)
+mihosh uninstall
+
+# Preview uninstall actions without deleting anything
+mihosh uninstall --dry-run --output table
+
+# Unattended uninstall while keeping subscriptions and config
+mihosh uninstall --yes --keep-config
+
+# Unattended full uninstall with JSON output
+mihosh uninstall --yes --output json
+```

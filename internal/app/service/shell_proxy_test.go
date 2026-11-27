@@ -339,3 +339,71 @@ func TestStableShellProxyExecutablePrefersHomebrewLink(t *testing.T) {
 	require.NoError(t, os.WriteFile(stable, []byte("other executable"), 0755))
 	require.Equal(t, installed, stableShellProxyExecutable(installed))
 }
+
+func TestRemoveShellProxyStartupInHome(t *testing.T) {
+	home := t.TempDir()
+	zdotdir := t.TempDir()
+	t.Setenv("ZDOTDIR", zdotdir)
+
+	// 1. Block at end of .bashrc (LF)
+	bashrc := filepath.Join(home, ".bashrc")
+	require.NoError(t, os.WriteFile(bashrc, []byte("export FOO=1\n"), 0640))
+	_, err := installShellProxyStartup(bashrc, "eval \"$(mihosh activate bash)\"")
+	require.NoError(t, err)
+
+	// 2. Block in middle of .zshrc with CRLF line endings
+	zshrc := filepath.Join(home, ".zshrc")
+	require.NoError(t, os.WriteFile(zshrc, []byte("export BEFORE=1\r\n"+shellProxyBlockBegin+"\r\neval stuff\r\n"+shellProxyBlockEnd+"\r\nexport AFTER=2\r\n"), 0600))
+
+	// 3. Block as the only content in ZDOTDIR/.zshrc (symlinked)
+	zdotLink := filepath.Join(zdotdir, ".zshrc")
+	zdotTarget := filepath.Join(t.TempDir(), "real-zshrc")
+	if runtime.GOOS != "windows" {
+		require.NoError(t, os.WriteFile(zdotTarget, []byte(shellProxyBlockBegin+"\neval z\n"+shellProxyBlockEnd+"\n"), 0640))
+		require.NoError(t, os.Symlink(zdotTarget, zdotLink))
+	} else {
+		require.NoError(t, os.WriteFile(zdotLink, []byte(shellProxyBlockBegin+"\neval z\n"+shellProxyBlockEnd+"\n"), 0640))
+	}
+
+	found := FindShellProxyStartupFiles(home)
+	require.Len(t, found, 3)
+
+	cleaned, err := RemoveShellProxyStartupInHome(home)
+	require.NoError(t, err)
+	require.Len(t, cleaned, 3)
+	require.Empty(t, FindShellProxyStartupFiles(home))
+
+	data, err := os.ReadFile(bashrc)
+	require.NoError(t, err)
+	require.Equal(t, "export FOO=1\n", string(data))
+
+	data, err = os.ReadFile(zshrc)
+	require.NoError(t, err)
+	require.Equal(t, "export BEFORE=1\r\nexport AFTER=2\r\n", string(data))
+
+	data, err = os.ReadFile(zdotLink)
+	require.NoError(t, err)
+	require.Equal(t, "", string(data))
+
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(bashrc)
+		require.NoError(t, err)
+		require.Equal(t, os.FileMode(0640), info.Mode().Perm())
+		linkTarget, err := os.Readlink(zdotLink)
+		require.NoError(t, err)
+		require.Equal(t, zdotTarget, linkTarget)
+		zinfo, err := os.Stat(zdotTarget)
+		require.NoError(t, err)
+		require.Equal(t, os.FileMode(0640), zinfo.Mode().Perm())
+	}
+
+	// Malformed markers must return an error without modifying the file.
+	malformed := shellProxyBlockBegin + "\nunclosed\n"
+	require.NoError(t, os.WriteFile(bashrc, []byte(malformed), 0600))
+	cleaned, err = RemoveShellProxyStartupInHome(home)
+	require.Error(t, err)
+	require.Empty(t, cleaned)
+	after, err := os.ReadFile(bashrc)
+	require.NoError(t, err)
+	require.Equal(t, malformed, string(after))
+}

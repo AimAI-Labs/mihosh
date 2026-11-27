@@ -81,6 +81,7 @@ type PageState struct {
 	SysStatus       SysStatusState
 	SysLogs         []model.LogEntry
 	SyncModal       SyncModalState
+	UninstallModal  UninstallModalState
 }
 
 func (p PageState) activeKeys() []string {
@@ -270,7 +271,9 @@ func renderSettingsPage(state PageState, width, height int, standalone bool) str
 	}
 
 	if standalone {
-		if state.SyncModal.Open {
+		if state.UninstallModal.Open {
+			mainContent = buildUninstallModal(state, width, height).Overlay(mainContent, true)
+		} else if state.SyncModal.Open {
 			mainContent = buildSyncModal(state, width, height).Overlay(mainContent, true)
 		}
 		return mainContent
@@ -280,7 +283,7 @@ func renderSettingsPage(state PageState, width, height int, standalone bool) str
 
 func (s State) InlineHelpHints() []common.InlineHelpHint {
 	return buildSettingsInlineHelpHints(PageState{
-		ActiveTab: s.activeTab, SelectedSetting: s.selectedSetting, EditMode: s.editMode, SyncModal: s.syncModal,
+		ActiveTab: s.activeTab, SelectedSetting: s.selectedSetting, EditMode: s.editMode, SyncModal: s.syncModal, UninstallModal: s.uninstallModal,
 	})
 }
 
@@ -321,7 +324,7 @@ func overlayVersionAtBottomLeft(page, versionText string, width, height int) str
 
 // buildSettingsInlineHelpHints 根据设置页上下文构建内联帮助条目
 func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
-	if state.SyncModal.Open {
+	if state.SyncModal.Open || state.UninstallModal.Open {
 		return nil
 	}
 	// 编辑模式：根据是否语言项分流
@@ -378,11 +381,12 @@ func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
 		}
 	}
 
-	// 普通模式：切换标签 + 选择 + 编辑 + 同步/备份 + 刷新 + 帮助
+	// 普通模式：切换标签 + 选择 + 编辑 + 同步/备份 + 卸载 + 刷新 + 帮助
 	return []common.InlineHelpHint{
 		{Key: "↑↓", Desc: i18n.T("help.settings.hint_select")},
 		{Key: "↵", Desc: i18n.T("help.settings.hint_edit")},
 		{Key: "b", Desc: i18n.T("help.settings.hint_sync"), Tone: common.InlineHelpToneInfo},
+		{Key: "u", Desc: i18n.T("help.settings.hint_uninstall"), Tone: common.InlineHelpToneDanger},
 		{Key: "r", Desc: i18n.T("help.settings.hint_refresh")},
 		{Key: "?", Desc: i18n.T("core.inline.help")},
 	}

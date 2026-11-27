@@ -55,6 +55,20 @@ func (m Model) applyConfigEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 		}
 		return m, nil, true
 
+	case messages.UninstallPlanMsg:
+		m.settingsState = m.settingsState.ApplyUninstallPlan(msg)
+		return m, nil, true
+
+	case messages.UninstallDoneMsg:
+		if msg.Err != nil {
+			m.settingsState = m.settingsState.CompleteUninstall(msg)
+			m.publishError(msg.Err)
+			return m, nil, true
+		}
+		m.exitNotice = service.FormatUninstallSummary(msg.Result)
+		m.onAppQuit()
+		return m, tea.Quit, true
+
 	case messages.ProxyChainAppliedMsg:
 		m.nodesState = m.nodesState.ApplyChainResult(msg)
 		if msg.Err != nil {

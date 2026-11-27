@@ -1,0 +1,53 @@
+---
+title: mihosh uninstall
+description: 一键卸载 Mihosh，支持选择保留配置文件与订阅数据。
+---
+
+`mihosh uninstall` 用于一键卸载 Mihosh：停止托管的 Mihomo 内核与 Linux systemd 用户后台服务，恢复遗留的系统代理或 TUN 网络设置，清理 `~/.bashrc`、`~/.zshrc`（及 `$ZDOTDIR/.zshrc`）中的 shell 代理钩子，按需保留或删除配置目录（`~/.mihosh` 或 `$MIHOSH_CONFIG_DIR`），并移除 `mihosh` 可执行文件。
+
+## 用法
+
+```bash
+mihosh uninstall [选项]
+```
+
+## 选项
+
+| 选项 | 简写 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--keep-config` | | `false` | 保留配置、订阅与覆写目录（`~/.mihosh` 或 `$MIHOSH_CONFIG_DIR`） |
+| `--yes` | `-y` | `false` | 跳过交互式确认提示 |
+| `--dry-run` | | `false` | 仅预览即将执行的卸载动作，不实际修改或删除文件 |
+| `--output` | `-o` | `plain` | 输出格式，支持 `plain`、`table`、`json` |
+
+## 交互模式与自动化行为
+
+- **交互式终端**（未传 `--yes`）：
+  1. 展示检测到的可执行文件、后台服务、shell 启动文件与配置目录。
+  2. 提示 `确认卸载 Mihosh？[y/N]`。
+  3. 若未显式传入 `--keep-config`，进一步询问 `是否保留配置目录 (...)? [Y/n]`（默认保留配置）。
+- **非交互式终端或 `--output json`**：
+  - 必须传入 `--yes`（或 `--dry-run`），否则返回退出码 `2`。
+  - 使用 `--yes` 时，默认会删除配置目录；如需保留请同时传入 `--keep-config`。
+
+## 特殊安装场景说明
+
+- **Homebrew 安装**：会先清理服务、shell 钩子及（未指定 `--keep-config` 时的）配置目录，但不会直接删除 Homebrew Cellar 中的文件，而是提示执行 `brew uninstall mihosh`。
+- **受权限保护的安装路径（如 `/usr/local/bin/mihosh`）**：在交互式 CLI 中会先尝试非交互 `sudo -n` 或交互式 `sudo` 删除；若无法提权或在 TUI 中触发，将输出可直接执行的 `sudo rm -f ...` 命令。
+- **TUI 一键卸载**：在 TUI 的 **设置（Settings）** 页面按 `u` 可打开卸载确认弹窗（默认勾选保留配置，可通过 `Space` 切换）。
+
+## 示例
+
+```bash
+# 交互式卸载（可交互选择是否保留配置）
+mihosh uninstall
+
+# 预览卸载内容而不实际删除文件
+mihosh uninstall --dry-run --output table
+
+# 非交互卸载并保留配置与订阅
+mihosh uninstall --yes --keep-config
+
+# 非交互彻底卸载并以 JSON 输出结果
+mihosh uninstall --yes --output json
+```

@@ -73,6 +73,7 @@ func init() {
 	rootCmd.AddCommand(newActivateCommand(), newProxyCommand())
 	rootCmd.AddCommand(newDNSCommand())
 	rootCmd.AddCommand(newSyncCommand())
+	rootCmd.AddCommand(newUninstallCommand())
 }
 
 // Execute 执行命令
@@ -178,6 +179,22 @@ func localizeCommands() {
 					f.Usage = i18n.T("cli.sync.flag_no_redact")
 				}
 			}
+		}
+	}
+	if uninstallCmd, _, err := rootCmd.Find([]string{"uninstall"}); err == nil && uninstallCmd != nil {
+		uninstallCmd.Short = i18n.T("cli.uninstall.short")
+		uninstallCmd.Long = i18n.T("cli.uninstall.long")
+		if f := uninstallCmd.Flags().Lookup("keep-config"); f != nil {
+			f.Usage = i18n.T("cli.uninstall.flag_keep_config")
+		}
+		if f := uninstallCmd.Flags().Lookup("yes"); f != nil {
+			f.Usage = i18n.T("cli.uninstall.flag_yes")
+		}
+		if f := uninstallCmd.Flags().Lookup("dry-run"); f != nil {
+			f.Usage = i18n.T("cli.uninstall.flag_dry_run")
+		}
+		if f := uninstallCmd.Flags().Lookup("output"); f != nil {
+			f.Usage = i18n.T("cli.uninstall.flag_output")
 		}
 	}
 	rootCmd.Short = i18n.T("cli.root.short")

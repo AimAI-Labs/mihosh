@@ -480,6 +480,7 @@ func buildSettingsSections(ctx HelpContext) []section {
 			{"↑/↓", i18n.T("help.settings.select")},
 			{i18n.T("help.key.enter_or_double_click"), i18n.T("help.settings.edit")},
 			{"b", i18n.T("help.settings.sync")},
+			{"u", i18n.T("help.settings.uninstall")},
 		},
 	}}
 }

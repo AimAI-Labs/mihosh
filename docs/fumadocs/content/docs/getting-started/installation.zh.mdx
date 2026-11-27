@@ -64,3 +64,17 @@ Mihosh 支持 Linux 和 macOS 系统 (amd64 和 arm64 架构)。
 ```bash
 mihosh version
 ```
+
+## 卸载 Mihosh
+
+Mihosh 内置一键卸载功能，可自动停止托管内核与后台服务、清理 shell 代理配置，并支持选择是否保留配置与订阅数据：
+
+```bash
+# 交互式卸载（可选择是否保留配置）
+mihosh uninstall
+
+# 非交互卸载并保留配置目录（~/.mihosh 或 $MIHOSH_CONFIG_DIR）
+mihosh uninstall --yes --keep-config
+```
+
+也可以在 TUI 的 **设置（Settings）** 页面按 `u` 打开卸载确认弹窗。如果是通过 Homebrew 安装，在清理配置与服务后执行 `brew uninstall mihosh` 即可。
