@@ -9,6 +9,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 const (
@@ -297,6 +298,8 @@ func RenderConnModeSwitchComponent(viewMode int, width int, inlineMode bool, pau
 		content += strings.Repeat(" ", innerWidth-contentWidth-pauseWidth-1-toggleWidth) + pauseStr + " " + toggleStr
 	} else if contentWidth+toggleWidth <= innerWidth {
 		content += strings.Repeat(" ", innerWidth-contentWidth-toggleWidth) + toggleStr
+	} else {
+		content = common.PadString(ansi.Truncate(content, innerWidth, ""), innerWidth)
 	}
 
 	// 渲染带边框的模式切换栏

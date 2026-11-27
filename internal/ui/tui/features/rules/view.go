@@ -8,6 +8,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 const (
@@ -252,22 +253,20 @@ func RenderRulesHeaderComponent(stats string, searchBox string, width int) strin
 	statsText := statsStyle.Render(stats)
 	searchW := lipgloss.Width(searchBox)
 	statsW := lipgloss.Width(statsText)
-	gap := innerWidth - searchW - statsW
-	if gap < 1 {
-		gap = 1
+	var rowContent string
+	switch {
+	case searchW+1+statsW <= innerWidth:
+		gap := innerWidth - searchW - statsW
+		rowContent = searchBox + strings.Repeat(" ", gap) + statsText
+	case innerWidth-statsW-1 >= 4:
+		searchBox = ansi.Truncate(searchBox, innerWidth-statsW-1, "…")
+		gap := max(1, innerWidth-lipgloss.Width(searchBox)-statsW)
+		rowContent = searchBox + strings.Repeat(" ", gap) + statsText
+	default:
+		rowContent = ansi.Truncate(searchBox, innerWidth, "…")
 	}
-	searchRow := borderStyle.Render("│") +
-		searchBox + strings.Repeat(" ", gap) + statsText +
-		borderStyle.Render("│")
-
-	// 填充行宽（应对极窄情况）
-	rowContentWidth := lipgloss.Width(searchBox) + gap + statsW
-	if rowContentWidth < innerWidth {
-		searchRow = borderStyle.Render("│") +
-			searchBox + strings.Repeat(" ", gap) + statsText +
-			strings.Repeat(" ", innerWidth-rowContentWidth) +
-			borderStyle.Render("│")
-	}
+	rowContent = common.PadString(ansi.Truncate(rowContent, innerWidth, ""), innerWidth)
+	searchRow := borderStyle.Render("│") + rowContent + borderStyle.Render("│")
 
 	topLine := borderStyle.Render(theme.Frame().TopLeft + strings.Repeat("─", innerWidth) + theme.Frame().TopRight)
 	bottomLine := borderStyle.Render(theme.Frame().BottomLeft + strings.Repeat("─", innerWidth) + theme.Frame().BottomRight)

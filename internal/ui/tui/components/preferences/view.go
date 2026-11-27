@@ -187,7 +187,7 @@ func buildSettingsLayoutBase(state PageState, width int) (parts []string, descRo
 	versionText = fmt.Sprintf("%s | Built: %s | %s", mihoshLink, model.Date, mihomoLink)
 
 	// 描述行：左侧警告（如果有），右侧描述，与配置框同宽
-	rowWidth := width - 2
+	rowWidth := max(1, width-2)
 	var warningPart string
 	if warningText != "" {
 		warningPart = lipgloss.NewStyle().
@@ -392,14 +392,12 @@ func buildSettingsInlineHelpHints(state PageState) []common.InlineHelpHint {
 func renderSettingItem(state PageState, index int, key string, label string, width int) string {
 	width = max(24, width)
 	value := GetSettingValue(state, key)
-	labelWidth := settingsLabelWidth
+	labelWidth := settingLabelWidth(width)
 	var themeRows [][]string
 	if key == "theme" {
 		labelWidth, themeRows = themeButtonLayout(width)
-		label = ansi.Truncate(label+":", labelWidth-1, "…")
-	} else {
-		label += ":"
 	}
+	label = ansi.Truncate(label+":", max(1, labelWidth-1), "…")
 
 	// 密钥特殊处理
 	if state.ActiveTab == 1 && key == "secret" && value != "" {
@@ -505,15 +503,19 @@ func renderSettingItem(state PageState, index int, key string, label string, wid
 	} else if state.ActiveTab == 1 && value == "" {
 		renderedValue = lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render(i18n.T("settings.mihomo.empty"))
 	} else {
-		maxValWidth := max(1, width-4-settingsRowPaddingLeft-settingsLabelWidth)
+		maxValWidth := max(1, width-4-settingsRowPaddingLeft-labelWidth)
 		renderedValue = valueStyle.Render(ansi.Truncate(value, maxValWidth, "…"))
 	}
 
 	// 拼装每行的内容
 	lineInner := lipgloss.JoinHorizontal(lipgloss.Top, renderedLabel, renderedValue)
+	rowWidth := max(1, width-4)
+	if key != "theme" {
+		lineInner = ansi.Truncate(lineInner, max(1, rowWidth-settingsRowPaddingLeft), "")
+	}
 
 	// 定义单行块的样式
-	rowStyle := lipgloss.NewStyle().Width(width - 4).PaddingLeft(1)
+	rowStyle := lipgloss.NewStyle().Width(rowWidth).PaddingLeft(1)
 	if key != "theme" {
 		rowStyle = rowStyle.MaxHeight(1)
 	}
@@ -522,6 +524,11 @@ func renderSettingItem(state PageState, index int, key string, label string, wid
 	}
 
 	return rowStyle.Render(lineInner)
+}
+
+func settingLabelWidth(width int) int {
+	room := max(24, width) - 4 - settingsRowPaddingLeft
+	return min(settingsLabelWidth, max(1, room-12))
 }
 
 func borderStyleOptions() []string {
@@ -554,7 +561,7 @@ func themeButtonLayout(width int) (labelWidth int, rows [][]string) {
 }
 
 func enumTabsWindow(current string, labels []string, width int) (offset, visible int) {
-	visible = max(0, width-4-settingsRowPaddingLeft-settingsLabelWidth)
+	visible = max(1, max(24, width)-4-settingsRowPaddingLeft-settingLabelWidth(width))
 	end := 0
 	for _, name := range labels {
 		end += settingsTabDisplayWidth(name)
@@ -615,8 +622,9 @@ func renderLogLevelTabs(current string, editMode bool, width int) string {
 }
 
 func renderMihomoApplyRow(state PageState, width int) string {
+	labelWidth := settingLabelWidth(width)
 	labelSpacer := lipgloss.NewStyle().
-		Width(settingsLabelWidth).
+		Width(labelWidth).
 		PaddingRight(1).
 		Render("")
 
@@ -636,11 +644,8 @@ func renderMihomoApplyRow(state PageState, width int) string {
 	}
 	renderedBtn := btnStyle.Render(" " + btnLabel + " ")
 
-	rowWidth := width - 4
-	if rowWidth < settingsMinRowWidth {
-		rowWidth = settingsMinRowWidth
-	}
-	availHint := max(0, rowWidth-settingsRowPaddingLeft-settingsLabelWidth-lipgloss.Width(renderedBtn))
+	rowWidth := max(1, max(24, width)-4)
+	availHint := max(0, rowWidth-settingsRowPaddingLeft-labelWidth-lipgloss.Width(renderedBtn))
 	var renderedHint string
 	if !state.MihomoSaving && availHint > 2 {
 		hintText := i18n.T("settings.mihomo.apply_hint")
@@ -652,7 +657,7 @@ func renderMihomoApplyRow(state PageState, width int) string {
 		renderedHint = hintStyle.Render(ansi.Truncate("  "+hintText, availHint, "…"))
 	}
 
-	lineInner := lipgloss.JoinHorizontal(lipgloss.Top, labelSpacer, renderedBtn, renderedHint)
+	lineInner := ansi.Truncate(lipgloss.JoinHorizontal(lipgloss.Top, labelSpacer, renderedBtn, renderedHint), max(1, rowWidth-settingsRowPaddingLeft), "")
 	rowStyle := lipgloss.NewStyle().Width(rowWidth).PaddingLeft(1)
 	if state.SelectedSetting == mihomoApplyIndex {
 		rowStyle = rowStyle.Inherit(lipgloss.NewStyle().Background(common.TokyoSelected()))
@@ -699,6 +704,10 @@ func renderSettingsTabBar(labels []string, active int, width int) string {
 
 	// 内容已自带标签内 padding（" Mihosh "），直接填充至内边框宽度
 	contentWidth := lipgloss.Width(content)
+	if contentWidth > innerWidth {
+		content = ansi.Truncate(content, innerWidth, "…")
+		contentWidth = lipgloss.Width(content)
+	}
 	if contentWidth < innerWidth {
 		content += strings.Repeat(" ", innerWidth-contentWidth)
 	}

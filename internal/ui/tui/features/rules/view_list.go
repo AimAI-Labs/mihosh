@@ -8,6 +8,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // renderRuleSearchBox 渲染搜索框
@@ -61,7 +62,7 @@ func renderRuleList(rules []filteredRule, selectedIdx, scrollTop, maxLines, widt
 	selectedIdx, scrollTop = window.Selected, window.Start
 
 	// 渲染规则行（预留滚动条宽度）
-	listWidth := width - rulesScrollWidth
+	listWidth := max(1, width-rulesScrollWidth)
 	var lines []string
 	for i := scrollTop; i < window.End; i++ {
 		fr := rules[i]
@@ -116,30 +117,47 @@ func buildScrollbar(viewHeight, total, scrollTop int) string {
 func renderRuleEntry(rule model.Rule, index int, selected bool, width int, adjustedColors map[string]lipgloss.Color) string {
 	// 获取规则类型颜色（可能已被调整）
 	color := getAdjustedRuleTypeColor(rule.Type, adjustedColors)
+	prefixWidth := common.DisplayWidth(common.SymbolSelectInactive)
+
+	indexColWidth := 6
+	typeColWidth := 16
+	noResolveColWidth := 12
+	payloadWidth := max(20, width-65)
+	if width < 65 {
+		indexColWidth = 4
+		typeColWidth = 10
+		noResolveColWidth = 0
+		if rule.NoResolve {
+			noResolveColWidth = 10
+		}
+		gaps := 3
+		if noResolveColWidth > 0 {
+			gaps = 4
+		}
+		proxyBudget := min(common.DisplayWidth(rule.Proxy), max(6, width/5))
+		payloadWidth = max(4, width-prefixWidth-indexColWidth-typeColWidth-noResolveColWidth-proxyBudget-gaps)
+	}
 
 	// 序号
-	indexStyle := lipgloss.NewStyle().Foreground(common.Success()).Width(6)
+	indexStyle := lipgloss.NewStyle().Foreground(common.Success()).Width(indexColWidth)
 	indexStr := indexStyle.Render(fmt.Sprintf("%d.", index+1))
 
 	// 类型标签
-	typeStyle := lipgloss.NewStyle().Foreground(color).Bold(true).Width(16)
-	typeStr := typeStyle.Render(rule.Type)
+	typeStyle := lipgloss.NewStyle().Foreground(color).Bold(true).Width(typeColWidth)
+	typeStr := typeStyle.Render(common.TruncateDisplay(rule.Type, typeColWidth))
 
-	// no-resolve 标签 (固定列宽以保持对齐)
-	noResolveColWidth := 12
-	noResolveStyle := lipgloss.NewStyle().Width(noResolveColWidth)
+	// no-resolve 标签
 	var noResolveStr string
-	if rule.NoResolve {
-		noResolveStr = noResolveStyle.Foreground(common.Warning()).Render("no-resolve")
-	} else {
-		noResolveStr = noResolveStyle.Render("")
+	if noResolveColWidth > 0 {
+		noResolveStyle := lipgloss.NewStyle().Width(noResolveColWidth)
+		if rule.NoResolve {
+			noResolveStr = noResolveStyle.Foreground(common.Warning()).Render("no-resolve")
+		} else {
+			noResolveStr = noResolveStyle.Render("")
+		}
 	}
 
-	// Payload (减少宽度以为 no-resolve 列腾出空间)
-	payloadWidth := width - 65
-	if payloadWidth < 20 {
-		payloadWidth = 20
-	}
+	// Payload
 	payloadStyle := lipgloss.NewStyle().Foreground(common.Secondary())
 	payload := common.TruncateDisplay(rule.Payload, payloadWidth)
 	payloadStr := payloadStyle.Width(payloadWidth).Render(payload)
@@ -148,16 +166,22 @@ func renderRuleEntry(rule model.Rule, index int, selected bool, width int, adjus
 	proxyStyle := lipgloss.NewStyle().Foreground(common.Bright())
 	proxyStr := proxyStyle.Render(rule.Proxy)
 
-	// 构建行 (顺序: 序号 类型 Payload no-resolve 代理)
-	line := fmt.Sprintf("%s %s %s %s %s", indexStr, typeStr, payloadStr, noResolveStr, proxyStr)
+	// 构建行 (顺序: 序号 类型 Payload [no-resolve] 代理)
+	var line string
+	if noResolveColWidth > 0 {
+		line = fmt.Sprintf("%s %s %s %s %s", indexStr, typeStr, payloadStr, noResolveStr, proxyStr)
+	} else {
+		line = fmt.Sprintf("%s %s %s %s", indexStr, typeStr, payloadStr, proxyStr)
+	}
+	line = ansi.Truncate(line, max(1, width-prefixWidth), "")
 
 	// 选中样式
 	if selected {
 		line = lipgloss.NewStyle().
 			Background(common.Highlight()).
-			Render(common.SymbolSelectActive + line)
+			Render(ansi.Truncate(common.SymbolSelectActive+line, max(1, width), ""))
 	} else {
-		line = common.SymbolSelectInactive + line
+		line = ansi.Truncate(common.SymbolSelectInactive+line, max(1, width), "")
 	}
 
 	return line

@@ -23,7 +23,7 @@ func (s State) Render(width, height int) string {
 		dialogWidth = 50
 	}
 	if dialogWidth > width-4 {
-		dialogWidth = width - 4
+		dialogWidth = max(1, width-4)
 	}
 
 	titleStyle := lipgloss.NewStyle().
@@ -129,5 +129,5 @@ func (s State) Render(width, height int) string {
 		Width(dialogWidth).
 		Render(body)
 
-	return dialog.New(dialogBox, width, height).View()
+	return dialog.New(dialogBox, width, height).Clipped().View()
 }

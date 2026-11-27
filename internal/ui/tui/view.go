@@ -156,11 +156,11 @@ func overlayErrorPopup(base string, width, height int, errText string) string {
 		popupWidth = 80
 	}
 	if popupWidth > width {
-		popupWidth = width
+		popupWidth = max(1, width)
 	}
 
 	// ── 2. 内容换行与截断 ──
-	contentWidth := popupWidth - 4 // border 2 + padding 2
+	contentWidth := max(1, popupWidth-4) // border 2 + padding 2
 	wrappedErr := lipgloss.NewStyle().Width(contentWidth).Render(errText)
 	errLines := strings.Split(wrappedErr, "\n")
 
@@ -179,7 +179,7 @@ func overlayErrorPopup(base string, width, height int, errText string) string {
 	popup := common.RenderBorderedPanel(title, body, popupWidth, common.TokyoRed(), common.TokyoRed())
 
 	// ── 3. 弹窗居中合并 ──
-	return dialog.New(popup, width, height).Overlay(base, true)
+	return dialog.New(popup, width, height).Clipped().Overlay(base, true)
 }
 
 // overlayUpdateDialog 将更新弹窗完整弹窗居中叠加在 base 页面之上
@@ -193,11 +193,11 @@ func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo,
 		popupWidth = 80
 	}
 	if popupWidth > width {
-		popupWidth = width
+		popupWidth = max(1, width)
 	}
 
 	// ── 2. 构建弹窗内容 ──
-	contentWidth := popupWidth - 4 // border 2 + padding 2
+	contentWidth := max(1, popupWidth-4) // border 2 + padding 2
 
 	var body string
 	if isUpdating {
@@ -218,9 +218,9 @@ func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo,
 			leftBtn := lipgloss.NewStyle().Foreground(common.TokyoGreen()).Render(i18n.T("update.apply_now"))
 			rightBtn := lipgloss.NewStyle().Foreground(common.TokyoMuted()).Render(i18n.T("update.later"))
 
-			halfWidth := contentWidth / 2
+			halfWidth := max(1, contentWidth/2)
 			leftHalf := lipgloss.NewStyle().Width(halfWidth).Align(lipgloss.Right).Render(leftBtn + "  ")
-			rightHalf := lipgloss.NewStyle().Width(contentWidth - halfWidth).Align(lipgloss.Left).Render("  " + rightBtn)
+			rightHalf := lipgloss.NewStyle().Width(max(1, contentWidth-halfWidth)).Align(lipgloss.Left).Render("  " + rightBtn)
 			buttons := lipgloss.JoinHorizontal(lipgloss.Top, leftHalf, rightHalf)
 
 			body += buttons
@@ -248,5 +248,5 @@ func overlayUpdateDialog(base string, width, height int, info *model.UpdateInfo,
 	popup := common.RenderBorderedPanel(title, finalBody, popupWidth, borderColor, borderColor)
 
 	// ── 3. 弹窗居中合并 ──
-	return dialog.New(popup, width, height).Overlay(base, true)
+	return dialog.New(popup, width, height).Clipped().Overlay(base, true)
 }

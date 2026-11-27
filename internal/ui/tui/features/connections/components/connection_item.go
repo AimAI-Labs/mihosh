@@ -49,7 +49,24 @@ func calcColumnWidths(pageWidth int) columnWidths {
 
 	available := pageWidth - prefixWidth - fixedTotal - colGap
 	if available < elasticMinTotal {
-		available = elasticMinTotal
+		if available < 4 {
+			available = 4
+		}
+		totalRatio := 10.0
+		hostW := max(1, int(float64(available)*4.0/totalRatio))
+		typeW := max(1, int(float64(available)*1.5/totalRatio))
+		ruleW := max(1, int(float64(available)*2.0/totalRatio))
+		chainW := max(1, available-hostW-typeW-ruleW)
+		return columnWidths{
+			Close: ColWidthClose,
+			Host:  hostW,
+			Type:  typeW,
+			Rule:  ruleW,
+			Chain: chainW,
+			DL:    ColWidthDL,
+			UL:    ColWidthUL,
+			Time:  ColWidthTime,
+		}
 	}
 
 	// 按比例分配弹性列（主机:类型:规则:代理链 = 4:1.5:2:2.5）
@@ -89,6 +106,7 @@ func RenderTableHeader(style lipgloss.Style, pageWidth int) string {
 		alignRight(i18n.T("conns.col_ul"), cols.UL),
 		alignRight(i18n.T("conns.col_time"), cols.Time),
 	}, " ")
+	header = utils.TruncateString(header, max(1, pageWidth))
 	return style.Render(header)
 }
 
@@ -142,6 +160,7 @@ func RenderConnectionRow(conn model.Connection, style lipgloss.Style, prefix str
 		alignRight(upload, cols.UL),
 		alignRight(duration, cols.Time),
 	}, " ")
+	row = utils.TruncateString(row, max(1, pageWidth))
 
 	return style.Render(row)
 }

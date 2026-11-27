@@ -10,6 +10,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // connectionListLayout owns the visible window and page-local row coordinates.
@@ -69,7 +70,7 @@ func layoutConnectionList(state PageState) connectionListLayout {
 	q := resolvePageQuery(state)
 	parts := []string{RenderConnModeSwitchComponent(state.ViewMode, state.Width, state.InlineMode, state.Paused, state.PausedUpdates), ""}
 	if bar := renderQuerySummary(state, q); bar != "" {
-		parts = append(parts, bar)
+		parts = append(parts, ansi.Truncate(bar, max(1, state.Width), "…"))
 	}
 	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(common.TokyoBlue())
 	parts = append(parts, components.RenderTableHeader(headerStyle, state.Width),

@@ -19,7 +19,7 @@ func OverlayLogDetailPopup(
 	width, height, scroll int,
 ) string {
 	popup := renderLogDetailPopup(log, parsed, resolved, sourcePrivate, width, height, scroll)
-	return dialog.New(popup, width, height).Overlay(base, true)
+	return dialog.New(popup, width, height).Clipped().Overlay(base, true)
 }
 
 // renderLogDetailPopup 渲染日志详情模态弹窗（单列布局）
@@ -38,10 +38,10 @@ func renderLogDetailPopup(
 		popupWidth = 120
 	}
 	if popupWidth > width-4 {
-		popupWidth = width - 4
+		popupWidth = max(1, width-4)
 	}
 
-	innerW := popupWidth - 4 // RenderTokyoPanel 内部会减2（边框）再减2（padding）
+	innerW := max(1, min(popupWidth, width)-4) // RenderTokyoPanel 内部会减2（边框）再减2（padding）
 
 	innerH := height - 8
 	maxInnerH := height - 6

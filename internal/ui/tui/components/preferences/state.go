@@ -324,7 +324,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 
 	if s.editMode {
 		if s.activeTab == 0 && s.selectedSetting == LanguageSettingIndex() {
-			if lang, ok := resolveLanguageMouseTarget(pageX); ok {
+			if lang, ok := resolveLanguageMouseTarget(pageX + settingsLabelWidth - settingLabelWidth(pageWidth)); ok {
 				if s.configSvc != nil && s.configSvc.SetConfigValue(s.activeKeys()[s.selectedSetting], lang) == nil {
 					s.reloadConfig()
 					i18n.SetLanguageOverride(lang)
@@ -365,7 +365,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 
 	s.selectedSetting = settingIdx
 	if s.activeKeys()[settingIdx] == "border-style" {
-		if choice, ok := resolveEnumMouseTarget(pageX, borderStyleOptions()); ok {
+		if choice, ok := resolveEnumMouseTarget(pageX+settingsLabelWidth-settingLabelWidth(pageWidth), borderStyleOptions()); ok {
 			style := "rounded"
 			if choice == i18n.T("settings.border.square") {
 				style = "square"
@@ -375,7 +375,7 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		return s, nil
 	}
 	if s.activeTab == 0 && settingIdx == LanguageSettingIndex() {
-		if lang, ok := resolveLanguageMouseTarget(pageX); ok {
+		if lang, ok := resolveLanguageMouseTarget(pageX + settingsLabelWidth - settingLabelWidth(pageWidth)); ok {
 			if s.configSvc != nil && s.configSvc.SetConfigValue(s.activeKeys()[settingIdx], lang) == nil {
 				s.reloadConfig()
 				i18n.SetLanguageOverride(lang)
@@ -411,7 +411,7 @@ func (s State) handleMihomoMouseLeft(pageX, pageY, pageWidth int) (State, tea.Cm
 	}
 	if pageY == mihomoApplyButtonRowY {
 		if s.editMode {
-			if resolveMihomoApplyButtonClick(pageX, s.overridesSaving) {
+			if resolveMihomoApplyButtonClick(pageX, pageWidth, s.overridesSaving) {
 				next, err := s.commitCurrentEditDraft()
 				if err != nil {
 					return next, saveErrorNotice(err)
@@ -424,7 +424,7 @@ func (s State) handleMihomoMouseLeft(pageX, pageY, pageWidth int) (State, tea.Cm
 			return s, nil
 		}
 		s.selectedSetting = mihomoApplyIndex
-		if resolveMihomoApplyButtonClick(pageX, s.overridesSaving) {
+		if resolveMihomoApplyButtonClick(pageX, pageWidth, s.overridesSaving) {
 			return s.submitMihomoOverrides()
 		}
 		return s, nil
@@ -963,13 +963,14 @@ func overrideOptionLabels(values []string) []string {
 }
 
 func resolveVisibleEnumMouseTarget(pageX, pageWidth int, current string, values []string) (string, bool) {
-	const start = settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth
+	labelWidth := settingLabelWidth(pageWidth)
+	start := settingsContainerLeft + 2 + settingsRowPaddingLeft + labelWidth
 	labels := overrideOptionLabels(values)
 	offset, visible := enumTabsWindow(overrideOptionLabel(current), labels, pageWidth)
 	if pageX < start || pageX >= start+visible {
 		return "", false
 	}
-	label, ok := resolveEnumMouseTarget(pageX+offset, labels)
+	label, ok := resolveEnumMouseTarget(pageX+settingsLabelWidth-labelWidth+offset, labels)
 	if !ok {
 		return "", false
 	}
@@ -988,8 +989,8 @@ func mihomoApplyButtonLabel(saving bool) string {
 	return i18n.T("settings.mihomo.apply_button")
 }
 
-func resolveMihomoApplyButtonClick(pageX int, saving bool) bool {
-	const start = settingsContainerLeft + 2 + settingsRowPaddingLeft + settingsLabelWidth
+func resolveMihomoApplyButtonClick(pageX, pageWidth int, saving bool) bool {
+	start := settingsContainerLeft + 2 + settingsRowPaddingLeft + settingLabelWidth(pageWidth)
 	width := settingsTabDisplayWidth(mihomoApplyButtonLabel(saving))
 	return pageX >= start && pageX < start+width
 }
