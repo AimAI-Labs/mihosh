@@ -42,7 +42,7 @@ func (m *Model) requestCoreTarget(action coreTargetAction, opts coreTargetOption
 	m.targetPending = &coreTargetRequest{action: action, coreTargetOptions: opts}
 	request := m.targetRequest
 	return func() tea.Msg {
-		cfg, err, target := bootstrap.DiscoverTarget()
+		cfg, target, err := bootstrap.DiscoverTarget()
 		if err != nil {
 			cfg = nil
 		}

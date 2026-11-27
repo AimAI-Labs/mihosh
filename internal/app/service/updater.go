@@ -170,8 +170,8 @@ func applyReleaseUpdate(client *http.Client, info model.UpdateInfo, target strin
 	if err != nil {
 		return err
 	}
-	defer os.Remove(archive.Name())
-	defer archive.Close()
+	defer func() { _ = os.Remove(archive.Name()) }()
+	defer func() { _ = archive.Close() }()
 	hash := sha256.New()
 	size, err := io.Copy(io.MultiWriter(archive, hash), io.LimitReader(resp.Body, maxUpdateSize+1))
 	if err != nil {
@@ -194,7 +194,7 @@ func replaceFromUpdateArchive(archive io.Reader, target string) error {
 	if err != nil {
 		return fmt.Errorf("open update archive: %w", err)
 	}
-	defer gz.Close()
+	defer func() { _ = gz.Close() }()
 	uncompressed := &io.LimitedReader{R: gz, N: maxUpdateSize + (64 << 10)}
 	contents := tar.NewReader(uncompressed)
 	header, err := contents.Next()
@@ -209,8 +209,8 @@ func replaceFromUpdateArchive(archive io.Reader, target string) error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(staged.Name())
-	defer staged.Close()
+	defer func() { _ = os.Remove(staged.Name()) }()
+	defer func() { _ = staged.Close() }()
 	if _, err := io.Copy(staged, contents); err != nil {
 		return fmt.Errorf("extract update executable: %w", err)
 	}

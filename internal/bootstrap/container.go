@@ -23,14 +23,14 @@ type App struct {
 
 // NewApp wires a complete runtime container with a freshly resolved Mihomo API client.
 func NewApp() *App {
-	cfg, err, target := DiscoverTarget()
+	cfg, target, err := DiscoverTarget()
 	return newApp(cfg, err, target, api.NewClient(target.Endpoint, clientTimeout(cfg)))
 }
 
 // NewAppWithClient wires a complete runtime container bound to the caller-provided client
 // (preserving a nil client for offline or unit-test callers).
 func NewAppWithClient(client *api.Client) *App {
-	cfg, err, target := DiscoverTarget()
+	cfg, target, err := DiscoverTarget()
 	if client != nil {
 		current := client.EndpointSnapshot()
 		target.Endpoint.ExternalController, target.Endpoint.Secret = current.ExternalController, current.Secret
@@ -39,13 +39,13 @@ func NewAppWithClient(client *api.Client) *App {
 }
 
 // DiscoverTarget is shared by the initial composition and runtime controller discovery.
-func DiscoverTarget() (*config.Config, error, config.MihomoTarget) {
+func DiscoverTarget() (*config.Config, config.MihomoTarget, error) {
 	cfg, err := config.Load()
 	if err != nil || cfg == nil {
 		defaultCfg := config.DefaultConfig
 		cfg = &defaultCfg
 	}
-	return cfg, err, config.ResolveMihomoTarget(cfg)
+	return cfg, config.ResolveMihomoTarget(cfg), err
 }
 
 func newApp(cfg *config.Config, cfgErr error, target config.MihomoTarget, client *api.Client) *App {

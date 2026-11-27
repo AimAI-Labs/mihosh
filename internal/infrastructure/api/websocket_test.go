@@ -117,7 +117,7 @@ func TestWSClient_Reconnection(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		if r.URL.Path == "/memory" {
 			if active.Add(1) != 1 {
 				t.Error("memory endpoint had overlapping connections")
@@ -194,7 +194,7 @@ func TestWSClientSwitchThenParentCancellationClosesReadLoops(t *testing.T) {
 			if err != nil {
 				return
 			}
-			defer conn.Close()
+			defer func() { _ = conn.Close() }()
 			connected <- r.URL.Path
 			if r.URL.Path == "/memory" {
 				_ = conn.WriteJSON(MemoryData{Inuse: value})

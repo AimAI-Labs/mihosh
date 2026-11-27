@@ -168,7 +168,7 @@ func backupRestoreFile(path, backup string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer old.Close()
+	defer func() { _ = old.Close() }()
 	return true, writeConfigAtomically(backup, info.Mode().Perm(), func(w io.Writer) error {
 		_, err := io.Copy(w, old)
 		return err

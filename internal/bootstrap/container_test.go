@@ -31,7 +31,7 @@ func TestNewAppBindsHTTPAndWebSocketToSameConfiguredTarget(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		if r.URL.Path == "/memory" {
 			_ = conn.WriteJSON(api.MemoryData{Inuse: 818})
 		}

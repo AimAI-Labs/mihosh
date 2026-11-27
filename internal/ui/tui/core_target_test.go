@@ -48,7 +48,7 @@ func targetTestModel(t *testing.T) (Model, string) {
 func resolvedTestTarget(t *testing.T, m Model) (Model, tea.Cmd) {
 	t.Helper()
 	require.NotNil(t, m.targetPending)
-	cfg, err, target := bootstrap.DiscoverTarget()
+	cfg, target, err := bootstrap.DiscoverTarget()
 	require.NoError(t, err)
 	next, cmd := m.Update(messages.CoreTargetResolvedMsg{Request: m.targetRequest, Target: target, Config: cfg})
 	return next.(Model), cmd

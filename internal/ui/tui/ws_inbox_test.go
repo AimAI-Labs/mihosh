@@ -30,7 +30,7 @@ func TestWebSocketLogBurstKeepsNewestSnapshotsAndExposesDrops(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		for i := 1; i <= total; i++ {
 			switch r.URL.Path {
 			case "/memory":

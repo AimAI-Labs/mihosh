@@ -153,16 +153,11 @@ func ResolveFormFieldAt(state PageState, pageX, pageY, width, height int) int {
 
 	// index 行
 	rowToField[currentRow] = addFieldIndex
-	currentRow++
 
 	// no-resolve 行（仅 IP 类型，渲染在分隔行 2 之前）
 	if form.isIPType() {
-		rowToField[currentRow] = addFieldNoResolve
-		currentRow++
+		rowToField[currentRow+1] = addFieldNoResolve
 	}
-
-	// 分隔行 2
-	currentRow++
 
 	// 检查点击落在哪个字段行
 	if fieldIdx, ok := rowToField[relY]; ok {

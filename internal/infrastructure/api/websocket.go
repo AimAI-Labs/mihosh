@@ -302,12 +302,12 @@ func readWSStream[T any](ctx context.Context, wsURL string, generation uint64, r
 		defer stopClose()
 	}
 	if resp != nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 	}
 	if err != nil {
 		return false
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	conn.SetReadLimit(readLimit)
 	for ctx.Err() == nil {
 		_, message, err := conn.ReadMessage()
