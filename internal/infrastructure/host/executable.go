@@ -42,7 +42,7 @@ func localController(controller string) ([]net.IP, int) {
 	if err != nil || port < 1 || port > 65535 {
 		return nil, 0
 	}
-	if strings.EqualFold(u.Hostname(), "localhost") {
+	if (u.Hostname() == "" && u.Port() != "") || strings.EqualFold(u.Hostname(), "localhost") {
 		return []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback}, port
 	}
 	ip := net.ParseIP(u.Hostname())

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -85,18 +86,24 @@ func (c *Client) Generation() uint64 {
 // ControllerHTTPURL 为 baseURL 补 http:// 前缀（若无 http:///https://），去掉末尾斜杠，
 // 并将通配监听地址（如 ":9090"、"0.0.0.0:9090"、"[::]:9090"）归一为可拨号的 127.0.0.1。
 func ControllerHTTPURL(baseURL string) string {
-	trimmed := strings.TrimRight(strings.TrimSpace(baseURL), "/")
-	if !strings.HasPrefix(trimmed, "http://") && !strings.HasPrefix(trimmed, "https://") {
-		if strings.HasPrefix(trimmed, ":") {
-			trimmed = "127.0.0.1" + trimmed
-		} else if strings.HasPrefix(trimmed, "0.0.0.0:") {
-			trimmed = "127.0.0.1" + strings.TrimPrefix(trimmed, "0.0.0.0")
-		} else if strings.HasPrefix(trimmed, "[::]:") {
-			trimmed = "127.0.0.1" + strings.TrimPrefix(trimmed, "[::]")
-		}
-		return "http://" + trimmed
+	raw := strings.TrimSpace(baseURL)
+	if !strings.Contains(raw, "://") {
+		raw = "http://" + raw
 	}
-	return trimmed
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return raw
+	}
+	host, port := u.Hostname(), u.Port()
+	if host == "" || net.ParseIP(host).IsUnspecified() {
+		u.Host = "127.0.0.1"
+		if port != "" {
+			u.Host = net.JoinHostPort(u.Host, port)
+		}
+	}
+	u.Path = strings.TrimRight(u.Path, "/")
+	u.RawPath = strings.TrimRight(u.RawPath, "/")
+	return u.String()
 }
 
 // DoRequest 执行 HTTP 请求（导出供 endpoints 使用）

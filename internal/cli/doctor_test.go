@@ -211,9 +211,11 @@ func TestDoctorWebSocketNormalizesWildcardAndUsesAuthorization(t *testing.T) {
 	_, port, err := net.SplitHostPort(server.Listener.Addr().String())
 	require.NoError(t, err)
 	for _, host := range []string{"0.0.0.0", "::", ""} {
-		raw := net.JoinHostPort(host, port)
-		result := checkWebSocketAvailable(config.MihomoEndpoint{ExternalController: raw, Secret: secret})
-		require.Equal(t, doctorStatusOK, result.Status, result.Message)
+		addr := net.JoinHostPort(host, port)
+		for _, raw := range []string{addr, "http://" + addr} {
+			result := checkWebSocketAvailable(config.MihomoEndpoint{ExternalController: raw, Secret: secret})
+			require.Equal(t, doctorStatusOK, result.Status, result.Message)
+		}
 	}
 }
 

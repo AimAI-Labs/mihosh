@@ -280,3 +280,15 @@ func TestConfiguredDownloadBudgetScalesStagesAndRejectsInvalidLimits(t *testing.
 		t.Fatal("negative download timeout accepted")
 	}
 }
+
+func TestAcceleratorRedirectIgnoresHostnameCase(t *testing.T) {
+	for _, target := range []string{"https://gh-proxy.org/file", "https://GH-Proxy.COM/file"} {
+		u, err := url.Parse(target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !allowedRedirect(u, Route{Gateway: "https://GH-PROXY.ORG/"}) {
+			t.Errorf("configured accelerator redirect rejected: %s", target)
+		}
+	}
+}

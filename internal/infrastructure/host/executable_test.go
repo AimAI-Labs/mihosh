@@ -9,7 +9,7 @@ func TestLocalControllerRejectsRemoteAndInvalidTargets(t *testing.T) {
 			t.Fatalf("remote or invalid address was treated as local: %s", address)
 		}
 	}
-	for _, address := range []string{"127.0.0.1:9090", "http://localhost:9090", "http://[::1]:9090", "0.0.0.0:9090"} {
+	for _, address := range []string{"127.0.0.1:9090", "http://localhost:9090", "http://[::1]:9090", "0.0.0.0:9090", ":9090", "http://:9090"} {
 		ips, port := localController(address)
 		if len(ips) == 0 || port != 9090 {
 			t.Fatalf("local target was rejected: %s", address)

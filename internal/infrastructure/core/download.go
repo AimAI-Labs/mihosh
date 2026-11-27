@@ -174,11 +174,15 @@ func allowedRedirect(u *url.URL, route Route) bool {
 		return true
 	}
 	if route.Gateway != "" {
-		base, _ := url.Parse(route.Gateway)
-		if host == base.Hostname() {
+		base, err := url.Parse(route.Gateway)
+		if err != nil {
+			return false
+		}
+		baseHost := strings.ToLower(base.Hostname())
+		if host == baseHost {
 			return true
 		}
-		if (base.Hostname() == "gh-proxy.org" || base.Hostname() == "gh-proxy.com") && (host == "gh-proxy.org" || host == "gh-proxy.com") {
+		if (baseHost == "gh-proxy.org" || baseHost == "gh-proxy.com") && (host == "gh-proxy.org" || host == "gh-proxy.com") {
 			return true
 		}
 	}

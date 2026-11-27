@@ -92,3 +92,20 @@ func TestWSClient_IgnoresEnvProxy(t *testing.T) {
 		t.Fatal("超时未收到 WebSocket 消息，疑因受环境变量代理影响连接失败")
 	}
 }
+
+func TestControllerHTTPURLNormalizesListenAddresses(t *testing.T) {
+	for _, tc := range []struct {
+		raw, want string
+	}{
+		{" :9090 ", "http://127.0.0.1:9090"},
+		{"http://:9090", "http://127.0.0.1:9090"},
+		{"http://0.0.0.0:9090/", "http://127.0.0.1:9090"},
+		{"https://[::]:9443/controller/", "https://127.0.0.1:9443/controller"},
+		{"HTTPS://Controller.example.test:9443/", "https://Controller.example.test:9443"},
+		{"ftp://controller.example.test", "ftp://controller.example.test"},
+	} {
+		if got := ControllerHTTPURL(tc.raw); got != tc.want {
+			t.Errorf("ControllerHTTPURL(%q) = %q, want %q", tc.raw, got, tc.want)
+		}
+	}
+}
