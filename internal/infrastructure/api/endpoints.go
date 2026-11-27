@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 )
@@ -50,7 +51,7 @@ func (c *Client) SelectProxy(group, proxy string) error {
 func (c *Client) TestProxyDelay(name, testURL string, timeout int) (int, error) {
 	path := fmt.Sprintf("/proxies/%s/delay?url=%s&timeout=%d",
 		url.PathEscape(name), url.QueryEscape(testURL), timeout)
-	data, err := c.DoRequest("GET", path, nil)
+	data, err := c.requestDelay(path, timeout)
 	if err != nil {
 		return 0, err
 	}
@@ -65,10 +66,21 @@ func (c *Client) TestProxyDelay(name, testURL string, timeout int) (int, error) 
 
 // TestGroupDelay 测试策略组内所有节点延迟
 func (c *Client) TestGroupDelay(group, testURL string, timeout int) error {
-	path := fmt.Sprintf("/proxies/%s/delay?url=%s&timeout=%d",
+	path := fmt.Sprintf("/group/%s/delay?url=%s&timeout=%d",
 		url.PathEscape(group), url.QueryEscape(testURL), timeout)
-	_, err := c.DoRequest("GET", path, nil)
+	_, err := c.requestDelay(path, timeout)
 	return err
+}
+
+func (c *Client) requestDelay(path string, timeout int) ([]byte, error) {
+	snapshot := c.Snapshot()
+	client := *snapshot.httpClient
+	budget := time.Duration(timeout)*time.Millisecond + 2*time.Second
+	if client.Timeout > 0 && client.Timeout < budget {
+		client.Timeout = budget
+	}
+	snapshot.httpClient = &client
+	return snapshot.DoRequest("GET", path, nil)
 }
 
 // GetGroups 获取所有策略组，返回策略组map和按配置文件顺序排列的组名列表
