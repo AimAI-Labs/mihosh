@@ -10,9 +10,10 @@ import (
 )
 
 type mergeMutation struct {
-	overrides map[string]string
-	rule      *profile.RuleEdit
-	chain     *profile.ProxyChain
+	overrides  map[string]string
+	rule       *profile.RuleEdit
+	chain      *profile.ProxyChain
+	snapshotID *string
 }
 
 type preparedMerge struct {
@@ -33,6 +34,21 @@ func (change mergeMutation) prepare(old []byte, uid, path string, managed bool) 
 	}
 	if change.chain != nil {
 		return change.prepareChainEdit(old, uid, path, managed)
+	}
+	if change.snapshotID != nil {
+		data, err := profile.ReadSnapshot(profile.SnapshotMerge, "", *change.snapshotID)
+		if err != nil {
+			return next, err
+		}
+		if err := profile.ValidateMergeWrite(data); err != nil {
+			return next, err
+		}
+		before, _ := profile.ReadMihomoOverridesFrom(old)
+		after, err := profile.ReadMihomoOverridesFrom(data)
+		if err != nil {
+			return next, err
+		}
+		return preparedMerge{data: data, overrides: after, cleared: profile.ClearedOverrideKeys(before, after)}, nil
 	}
 	native, err := profile.NormalizeLegacyMerge(old, uid, func() (string, error) {
 		if path == "" {
@@ -192,6 +208,9 @@ func (change mergeMutation) controlRequest() coreControlRequest {
 	}
 	if change.chain != nil {
 		return coreControlRequest{Action: "chain-edit", ChainEdit: change.chain}
+	}
+	if change.snapshotID != nil {
+		return coreControlRequest{Action: "merge-snapshot", Version: *change.snapshotID}
 	}
 	return coreControlRequest{Action: "overrides", Overrides: change.overrides}
 }

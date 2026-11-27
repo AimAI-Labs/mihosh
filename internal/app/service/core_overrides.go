@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
@@ -70,12 +71,14 @@ func (s *ConfigService) ApplyProxyChain(ctx context.Context, coreSvc *CoreServic
 	return res
 }
 
+var mergeMutationMu sync.Mutex
+
 func (s *ConfigService) applyMergeMutation(ctx context.Context, coreSvc *CoreService, client *api.Client, change mergeMutation) MihomoOverridesSaveResult {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	s.mergeMu.Lock()
-	defer s.mergeMu.Unlock()
+	mergeMutationMu.Lock()
+	defer mergeMutationMu.Unlock()
 	cfg, err := loadCoreConfig()
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}
@@ -282,14 +285,12 @@ func (s *ConfigService) applyLocalExternalOverrides(cfg *config.Config, client *
 	if pathFn == nil {
 		pathFn = config.GetMihomoConfigPath
 	}
-	path, err := pathFn()
-	if err != nil {
-		if uid != "" && s.mihomoConfigPath != nil {
-			path, err = s.mihomoConfigPath()
-		}
-		if err != nil {
-			return MihomoOverridesSaveResult{Err: err}
-		}
+	path, pathErr := pathFn()
+	if pathErr != nil && uid != "" && s.mihomoConfigPath != nil {
+		path, pathErr = s.mihomoConfigPath()
+	}
+	if pathErr != nil && (mutation.snapshotID == nil || uid != "") {
+		return MihomoOverridesSaveResult{Err: pathErr}
 	}
 
 	mergePath, err := profile.MergePath()
@@ -305,6 +306,12 @@ func (s *ConfigService) applyLocalExternalOverrides(cfg *config.Config, client *
 		return MihomoOverridesSaveResult{Err: err}
 	}
 	savedOverrides := next.overrides
+	if pathErr != nil {
+		if err := next.write(); err != nil {
+			return MihomoOverridesSaveResult{Err: err}
+		}
+		return MihomoOverridesSaveResult{Overrides: savedOverrides, WriteOK: true}
+	}
 	oldConfig, configExisted, err := readOptionalFile(path)
 	if err != nil {
 		return MihomoOverridesSaveResult{Err: err}

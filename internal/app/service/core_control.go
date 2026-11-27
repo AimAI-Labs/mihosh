@@ -124,6 +124,8 @@ func (s *CoreService) startControl(root string) error {
 			activation, err = s.UseBasicConfig(r.Context())
 		case "overrides":
 			overrideRes, err = s.ApplyOverrides(r.Context(), request.Overrides)
+		case "merge-snapshot":
+			overrideRes, err = s.applyMergeMutation(r.Context(), mergeMutation{snapshotID: &request.Version})
 		case "rule-edit":
 			if request.RuleEdit == nil {
 				http.Error(w, "missing rule edit", http.StatusBadRequest)
@@ -168,7 +170,8 @@ func (s *CoreService) startControl(root string) error {
 			Applied:         overrideRes.Applied,
 			EndpointChanged: overrideRes.EndpointChanged,
 		}
-		if request.Action == "overrides" || request.Action == "rule-edit" || request.Action == "chain-edit" {
+		switch request.Action {
+		case "overrides", "merge-snapshot", "rule-edit", "chain-edit":
 			response.BackupName = overrideRes.BackupName
 			response.Restarted = overrideRes.Restarted
 		}

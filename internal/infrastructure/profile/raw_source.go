@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -129,17 +130,72 @@ func WriteRawForSource(p Profile, data []byte) error {
 	return writeRaw(p.UID, data, rawOrigin(p.Source))
 }
 
-func RestoreRawSnapshot(p Profile, id string) error {
+// RestoreRawSnapshot publishes the requested raw data and returns an undo
+// operation. Call both under the same configuration lock as subscription writes.
+func RestoreRawSnapshot(p Profile, id string) (func() error, error) {
 	data, err := ReadSnapshot(SnapshotRaw, p.UID, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	dir, err := snapshotDir(SnapshotRaw, p.UID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := verifyRawOrigin(filepath.Join(dir, id), data, p.Source); err != nil {
-		return err
+		return nil, err
 	}
-	return WriteRawForSource(p, data)
+	path, err := rawStoragePath(p.UID)
+	if err != nil {
+		return nil, err
+	}
+	restore, err := backupRawFiles(path)
+	if err != nil {
+		return nil, err
+	}
+	if err := WriteRawForSource(p, data); err != nil {
+		return nil, errors.Join(err, restore())
+	}
+	return func() error {
+		current, err := readRawAt(path)
+		if err != nil {
+			return err
+		}
+		origin, err := readRawOrigin(path, current)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(current, data) || origin != rawOrigin(p.Source) {
+			return errors.New("subscription snapshot changed during rollback")
+		}
+		return restore()
+	}, nil
+}
+
+func backupRawFiles(path string) (func() error, error) {
+	files := [...]struct {
+		path    string
+		data    []byte
+		existed bool
+	}{{path: path}, {path: path + ".source.json"}}
+	for i := range files {
+		data, err := os.ReadFile(files[i].path)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		files[i].data, files[i].existed = data, true
+	}
+	return func() error {
+		var restored error
+		for _, file := range files {
+			if file.existed {
+				restored = errors.Join(restored, atomicWrite(file.path, file.data, 0600))
+			} else if err := os.Remove(file.path); err != nil && !os.IsNotExist(err) {
+				restored = errors.Join(restored, err)
+			}
+		}
+		return restored
+	}, nil
 }

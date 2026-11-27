@@ -16,6 +16,17 @@ var ErrConfigBusy = errors.New("application configuration is busy")
 // Update applies a field-scoped mutation to freshly loaded configuration. Callbacks
 // must not call other config functions; the configuration mutex is held throughout.
 func Update(change func(*Config) error) error {
+	return WithLockedConfig(func(cfg *Config) error {
+		if err := change(cfg); err != nil {
+			return err
+		}
+		return saveLocked(cfg)
+	})
+}
+
+// WithLockedConfig runs an operation against fresh configuration while holding its locks.
+// Use Update to persist changes to configuration fields.
+func WithLockedConfig(run func(*Config) error) error {
 	mu.Lock()
 	defer mu.Unlock()
 	unlock, err := lockAppConfig()
@@ -27,10 +38,7 @@ func Update(change func(*Config) error) error {
 	if err != nil {
 		return err
 	}
-	if err = change(cfg); err != nil {
-		return err
-	}
-	return saveLocked(cfg)
+	return run(cfg)
 }
 
 func lockAppConfig() (func(), error) {

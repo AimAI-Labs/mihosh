@@ -411,7 +411,10 @@ func (s *ProfileService) ApplyActiveMerge(uid string, cleared []string) (Activat
 func (s *ProfileService) activate(uid string, cleared []string) (ActivateResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.activateLocked(uid, cleared)
+}
 
+func (s *ProfileService) activateLocked(uid string, cleared []string) (ActivateResult, error) {
 	p, err := s.findProfile(uid)
 	if err != nil {
 		return ActivateResult{}, err

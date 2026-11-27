@@ -1,11 +1,19 @@
 package service
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/profile"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProfileServiceHistoryDiffAndRollback(t *testing.T) {
@@ -72,4 +80,86 @@ func TestProfileServiceHistoryDiffAndRollback(t *testing.T) {
 	if err != nil || string(curMerge) != "log-level: info\n" {
 		t.Fatalf("expected merge.yaml restored to info, got %q err=%v", string(curMerge), err)
 	}
+}
+
+func TestRawHistoryRollbackRestoresCurrentFilesWhenActivationFails(t *testing.T) {
+	core, uid, _ := prepareManagedProfile(t)
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	p, err := profileByUID(cfg, uid)
+	require.NoError(t, err)
+	require.NoError(t, config.Update(func(cfg *config.Config) error {
+		cfg.ActiveSub = uid
+		return nil
+	}))
+	current := []byte("mixed-port: 7890\nproxies: []\n")
+	require.NoError(t, profile.WriteRawForSource(p, []byte("invalid YAML: [\n")))
+	require.NoError(t, profile.WriteRawForSource(p, current))
+	rawPath, err := profile.RawPath(uid)
+	require.NoError(t, err)
+	bindingPath := rawPath + ".source.json"
+	beforeBinding, err := os.ReadFile(bindingPath)
+	require.NoError(t, err)
+	snapshots, err := profile.ListSnapshots(profile.SnapshotRaw, uid)
+	require.NoError(t, err)
+	require.NotEmpty(t, snapshots)
+
+	_, err = NewProfileService(nil, core).RollbackSnapshot(profile.SnapshotRaw, uid, snapshots[0].ID)
+	require.Error(t, err)
+	raw, err := profile.ReadRawFile(uid)
+	require.NoError(t, err)
+	require.Equal(t, current, raw)
+	binding, err := os.ReadFile(bindingPath)
+	require.NoError(t, err)
+	require.Equal(t, beforeBinding, binding)
+}
+
+func TestMergeHistoryRollbackUsesManagedRecoveryWithoutActiveSubscription(t *testing.T) {
+	core, _, _ := prepareManagedProfile(t)
+	root, err := config.GetConfigDir()
+	require.NoError(t, err)
+	require.NoError(t, config.Update(func(cfg *config.Config) error {
+		cfg.ActiveSub = ""
+		return nil
+	}))
+	journal := filepath.Join(root, "runtime", "profile-recovery.json")
+	var seen atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/configs":
+			data, err := os.ReadFile(journal)
+			if err != nil || !strings.Contains(string(data), `"has_merge":true`) {
+				t.Error("merge recovery journal missing when applying the snapshot")
+			}
+			seen.Store(true)
+			w.WriteHeader(http.StatusNoContent)
+		case "/version":
+			_, _ = w.Write([]byte(`{"version":"fixture"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	path, err := config.ManagedMihomoConfigPath()
+	require.NoError(t, err)
+	require.NoError(t, config.WriteMihomoField(path, "external-controller", strings.TrimPrefix(server.URL, "http://")))
+	snapshot, err := profile.SaveMergeSnapshot([]byte("log-level: debug\n"), 10)
+	require.NoError(t, err)
+	require.NoError(t, profile.WriteMerge([]byte("log-level: info\n")))
+	core.process = &exec.Cmd{}
+	defer func() { core.process = nil }()
+	require.NoError(t, core.startControl(root))
+	caller := NewCoreService()
+	defer caller.Close()
+
+	result, err := NewProfileService(nil, caller).RollbackSnapshot(profile.SnapshotMerge, "", snapshot.ID)
+	require.NoError(t, err)
+	require.True(t, seen.Load(), "rollback did not apply the snapshot to the running core")
+	require.True(t, result.CoreApplied)
+	require.NotEmpty(t, result.BackupName)
+	runtimeConfig, err := config.ReadMihomoYAML(path)
+	require.NoError(t, err)
+	require.Equal(t, "debug", runtimeConfig["log-level"])
+	_, err = os.Stat(journal)
+	require.ErrorIs(t, err, os.ErrNotExist)
 }

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -44,63 +45,73 @@ func (s *ProfileService) DiffSnapshotWithCurrent(kind profile.SnapshotKind, uid,
 }
 
 // RollbackSnapshot restores a historical raw.yaml or merge.yaml snapshot and re-applies
-// the active subscription configuration when affected.
+// the active configuration when affected.
 func (s *ProfileService) RollbackSnapshot(kind profile.SnapshotKind, uid, snapshotID string) (*ActivateResult, error) {
-	_, activeUID, err := s.ListProfiles()
-	if err != nil {
-		return nil, err
-	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	switch kind {
 	case profile.SnapshotRaw:
-		if err := config.Update(func(cfg *config.Config) error {
-			p, err := profileByUID(cfg, uid)
-			if err != nil {
-				return err
-			}
-			return profile.RestoreRawSnapshot(p, snapshotID)
-		}); err != nil {
-			if errors.Is(err, profile.ErrStaleRaw) {
-				return nil, errors.New(i18n.T("sub.err.snapshot_source_changed"))
-			}
-			return nil, err
-		}
-		if activeUID != "" && activeUID == uid {
-			res, actErr := s.Activate(uid)
-			if actErr != nil {
-				return &res, actErr
-			}
-			return &res, nil
-		}
-		return &ActivateResult{}, nil
+		return s.rollbackRawSnapshot(uid, snapshotID)
 	case profile.SnapshotMerge:
-		data, err := profile.ReadSnapshot(kind, uid, snapshotID)
+		cfg, err := loadCoreConfig()
 		if err != nil {
 			return nil, err
 		}
-		mergePath, err := profile.MergePath()
-		if err != nil {
-			return nil, err
+		active := activeSubUID(cfg) != ""
+		if active && cfg.Core.Mode != "managed" && s.client == nil {
+			return nil, errors.New(i18n.T("sub.err.activation_no_client"))
 		}
-		before, beforeExisted, err := readOptionalFile(mergePath)
-		if err != nil {
-			return nil, err
-		}
-		beforeOverrides, _ := profile.ReadMihomoOverridesFrom(before)
-		afterOverrides, _ := profile.ReadMihomoOverridesFrom(data)
-		cleared := profile.ClearedOverrideKeys(beforeOverrides, afterOverrides)
-		if err := profile.WriteMerge(data); err != nil {
-			return nil, err
-		}
-		if activeUID != "" {
-			res, applyErr := s.ApplyActiveMerge(activeUID, cleared)
-			if applyErr != nil {
-				restoreErr := restoreMergeFile(mergePath, beforeExisted, before)
-				return &res, errors.Join(applyErr, restoreErr)
-			}
-			return &res, nil
-		}
-		return &ActivateResult{}, nil
+		res := NewConfigService().applyMergeMutation(context.Background(), s.core, s.client, mergeMutation{snapshotID: &snapshotID})
+		return &ActivateResult{
+			BackupName:    res.BackupName,
+			Restarted:     res.Restarted,
+			NeedsRestart:  res.NeedsRestart,
+			Remote:        res.Remote,
+			ConfigWritten: res.WriteOK && !res.Remote,
+			CoreApplied:   res.Applied,
+			ActiveSaved:   active && res.Err == nil,
+		}, res.Err
 	default:
 		return nil, fmt.Errorf("unsupported snapshot kind: %q", kind)
 	}
+}
+
+func (s *ProfileService) rollbackRawSnapshot(uid, snapshotID string) (*ActivateResult, error) {
+	var before profile.Profile
+	var restore func() error
+	var active bool
+	err := config.WithLockedConfig(func(cfg *config.Config) error {
+		var err error
+		before, err = profileByUID(cfg, uid)
+		if err != nil {
+			return err
+		}
+		active = cfg.ActiveSub == uid
+		restore, err = profile.RestoreRawSnapshot(before, snapshotID)
+		return err
+	})
+	if errors.Is(err, profile.ErrStaleRaw) {
+		return nil, errors.New(i18n.T("sub.err.snapshot_source_changed"))
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !active {
+		return &ActivateResult{}, nil
+	}
+	result, err := s.activateLocked(uid, nil)
+	if err != nil {
+		restoreErr := config.WithLockedConfig(func(cfg *config.Config) error {
+			current, readErr := profileByUID(cfg, uid)
+			if readErr != nil {
+				return readErr
+			}
+			if !current.Source.SameOrigin(before.Source) {
+				return profile.ErrStaleRaw
+			}
+			return restore()
+		})
+		return &result, errors.Join(err, restoreErr)
+	}
+	return &result, nil
 }
