@@ -342,3 +342,37 @@ func TestSyncStatusMatchesLegacyShellProxyFlag(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "in_sync", status.State)
 }
+
+func TestRestoreBundlePreservesCredentialsOnlyForMatchingSources(t *testing.T) {
+	seedSyncDevice(t, t.TempDir())
+	const localURL = "https://sub.example.com/get?flag=meta&token=local-secret"
+	stablePath := filepath.Join(t.TempDir(), "same.yaml")
+	oldPath := filepath.Join(t.TempDir(), "old.yaml")
+	require.NoError(t, config.Update(func(cfg *config.Config) error {
+		cfg.Subs = []profile.Profile{
+			{UID: "same-url", Source: profile.SubSource{Kind: profile.SourceRemote, URL: localURL}},
+			{UID: "changed-url", Source: profile.SubSource{Kind: profile.SourceRemote, URL: localURL}},
+			{UID: "same-path", Source: profile.SubSource{Kind: profile.SourceLocal, Path: stablePath}},
+			{UID: "changed-path", Source: profile.SubSource{Kind: profile.SourceLocal, Path: oldPath}},
+		}
+		return nil
+	}))
+
+	svc := NewSyncService()
+	incoming, err := svc.CollectLocalBundle(true)
+	require.NoError(t, err)
+	newURL, redacted := syncinfra.RedactURL("https://new.example.com/v2?token=new-secret")
+	require.True(t, redacted)
+	incoming.Config.Subs[1].Source.URL = newURL
+	incoming.Config.Subs[3].Source.Path = "new.yaml"
+	_, err = svc.RestoreBundle(incoming, "test", "")
+	require.NoError(t, err)
+
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	require.Len(t, cfg.Subs, 4)
+	require.Equal(t, localURL, cfg.Subs[0].Source.URL)
+	require.Equal(t, newURL, cfg.Subs[1].Source.URL)
+	require.Equal(t, stablePath, cfg.Subs[2].Source.Path)
+	require.Equal(t, "new.yaml", cfg.Subs[3].Source.Path)
+}

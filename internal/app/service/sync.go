@@ -273,12 +273,15 @@ func (s *SyncService) RestoreBundle(bundle syncinfra.Bundle, source, profileKey 
 			}
 			mergedSub := incoming
 			if local, ok := existingByUID[incoming.UID]; ok {
-				if mergedSub.Source.URL != "" && syncinfra.ContainsRedacted(mergedSub.Source.URL) &&
-					local.Source.URL != "" && !syncinfra.ContainsRedacted(local.Source.URL) {
-					mergedSub.Source.URL = local.Source.URL
-					res.PreservedSecrets++
+				if syncinfra.ContainsRedacted(mergedSub.Source.URL) && !syncinfra.ContainsRedacted(local.Source.URL) {
+					redactedLocal, _ := syncinfra.RedactURL(local.Source.URL)
+					if redactedLocal == mergedSub.Source.URL {
+						mergedSub.Source.URL = local.Source.URL
+						res.PreservedSecrets++
+					}
 				}
-				if mergedSub.Source.Kind == profile.SourceLocal && !filepath.IsAbs(mergedSub.Source.Path) && filepath.IsAbs(local.Source.Path) {
+				if mergedSub.Source.Kind == profile.SourceLocal && local.Source.Kind == profile.SourceLocal &&
+					filepath.IsAbs(local.Source.Path) && mergedSub.Source.Path == filepath.Base(local.Source.Path) {
 					mergedSub.Source.Path = local.Source.Path
 				}
 				if !mergedSub.Source.SameOrigin(local.Source) {
