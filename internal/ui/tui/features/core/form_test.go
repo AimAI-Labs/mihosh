@@ -461,3 +461,104 @@ func TestInvalidatingCoreTargetClearsPendingMaintenanceActions(t *testing.T) {
 		t.Fatal("restart remained pending on the new target generation")
 	}
 }
+
+func TestCoreDialogsRenderHintsAtBottomRightNotInsideBox(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	if err := config.Save(&config.DefaultConfig); err != nil {
+		t.Fatal(err)
+	}
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	svc := service.NewCoreService()
+	defer svc.Close()
+
+	forms := []string{"stop", "restart", "recover", "configure", "basic-config", "api:reload", "geo-update", "external", "network", "version", "import", "details"}
+	for _, language := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(language)
+		cancelHint := "Esc " + i18n.T("core.inline.cancel")
+		runHint := "Enter " + i18n.T("core.inline.run")
+		saveHint := "Enter " + i18n.T("core.inline.save")
+		tabHint := "Tab " + i18n.T("core.inline.field")
+		scrollHint := "↑↓ " + i18n.T("core.inline.scroll")
+
+		for _, form := range forms {
+			for _, width := range []int{24, 40, 80, 120} {
+				for _, height := range []int{8, 16, 30} {
+					s := NewState(svc, nil, nil).selectTab(2)
+					s.connected = true
+					s.Status = service.CoreStatus{
+						Mode:       "managed",
+						Version:    "v1.2.3",
+						Running:    true,
+						BinaryPath: "/core/mihomo",
+						ConfigPath: "/runtime/config.yaml",
+						Controller: "127.0.0.1:9090",
+						MixedPort:  7890,
+					}
+					s.geoFiles = []service.GeoDataFile{{Key: "mmdb", Name: "Country.mmdb", Updatable: true}}
+					s, _ = s.editForm(form)
+
+					page, _ := s.formDialog(width, height)
+					strippedBox := ansi.Strip(page.content)
+					for _, hintText := range []string{cancelHint, runHint, saveHint, tabHint, scrollHint} {
+						if strings.Contains(strippedBox, hintText) {
+							t.Fatalf("%s %s %dx%d: dialog box should not contain bottom hint %q:\n%s", language, form, width, height, hintText, strippedBox)
+						}
+					}
+
+					hints := s.InlineHelpHints()
+					if len(hints) == 0 || hints[len(hints)-1].Key != "Esc" {
+						t.Fatalf("%s %s: expected Esc hint at end of InlineHelpHints, got %+v", language, form, hints)
+					}
+
+					_, _, _, bottom := formDialogPlacement(page.content, width, height).Bounds()
+					if bottom > max(1, height-1) {
+						t.Fatalf("%s %s %dx%d: dialog bottom %d overlaps bottom hint row %d", language, form, width, height, bottom, height-1)
+					}
+
+					rendered := ansi.Strip(s.Render(width, height))
+					lines := strings.Split(rendered, "\n")
+					if len(lines) != height {
+						t.Fatalf("%s %s %dx%d: got %d lines", language, form, width, height, len(lines))
+					}
+					for _, line := range lines {
+						if lipgloss.Width(line) > width {
+							t.Fatalf("%s %s %dx%d: line overflow %q", language, form, width, height, line)
+						}
+					}
+					if !strings.HasSuffix(lines[height-1], cancelHint) || lipgloss.Width(lines[height-1]) > width-1 {
+						t.Fatalf("%s %s %dx%d: bottom-right row missing %q: %q", language, form, width, height, cancelHint, lines[height-1])
+					}
+
+					if isChoiceForm(form) && width >= 40 && height >= 16 {
+						if len(page.controls) < 2 {
+							t.Fatalf("%s %s: missing choice controls: %+v", language, form, page.controls)
+						}
+						confirmHit := page.controls[0].actionHit
+						cancelHit := page.controls[1].actionHit
+						gotConfirm := strings.TrimSpace(ansi.Cut(lines[confirmHit.y], confirmHit.x, confirmHit.x+confirmHit.width))
+						gotCancel := strings.TrimSpace(ansi.Cut(lines[cancelHit.y], cancelHit.x, cancelHit.x+cancelHit.width))
+						if gotConfirm != i18n.T("core.dialog.confirm") || gotCancel != i18n.T("core.dialog.cancel") {
+							t.Fatalf("%s %s %dx%d: choice hitboxes mismatch rendered buttons: got (%q, %q)", language, form, width, height, gotConfirm, gotCancel)
+						}
+					}
+				}
+			}
+		}
+
+		// Verify clicking either the field label or input row focuses that form field.
+		s, _ := NewState(svc, nil, nil).editForm("external")
+		page, _ := s.formDialog(80, 24)
+		if len(page.actions) < 2 || page.actions[1].height != 2 {
+			t.Fatalf("%s: expected external field hitbox height 2, got %+v", language, page.actions)
+		}
+		for _, dy := range []int{0, 1} {
+			testState := s
+			hit := page.actions[1]
+			testState, _ = testState.Update(messages.PageMouseClickMsg{X: hit.x + 1, Y: hit.y + dy, Width: 80, Height: 24})
+			if testState.focus != 1 {
+				t.Fatalf("%s dy=%d: clicking field row did not focus field 1 (got %d)", language, dy, testState.focus)
+			}
+		}
+	}
+}

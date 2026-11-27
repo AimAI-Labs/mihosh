@@ -10,11 +10,14 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
 	coreinfra "github.com/AimAI-Labs/mihosh/internal/infrastructure/core"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/layout"
 	corepage "github.com/AimAI-Labs/mihosh/internal/ui/tui/features/core"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestOfflineStartupRoutesToCoreWithoutStartingStreams(t *testing.T) {
@@ -295,5 +298,106 @@ func TestCoreMihomoServiceFocusFromTabAndFooter(t *testing.T) {
 	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	if next.(Model).currentPage != (layout.PageCore+1)%layout.PageCount {
 		t.Fatal("Tab did not navigate globally when no service card was present")
+	}
+}
+
+func TestCoreDialogsRenderAndClickBottomRightFooterHints(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	svc := service.NewCoreService()
+	defer svc.Close()
+
+	clickFooterHint := func(t *testing.T, m Model, keyLabel string) (Model, tea.Cmd) {
+		t.Helper()
+		page := m.mainPageLayout()
+		view := strings.Split(ansi.Strip(m.View()), "\n")
+		for y := page.noticeRow() + 1; y < page.statusRow(); y++ {
+			if at := strings.Index(view[y], keyLabel); at >= 0 {
+				x := lipgloss.Width(view[y][:at])
+				next, cmd := m.Update(tea.MouseMsg{X: x, Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+				return next.(Model), cmd
+			}
+		}
+		t.Fatalf("footer hint %q not found in:\n%s", keyLabel, strings.Join(view, "\n"))
+		return m, nil
+	}
+
+	for _, language := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(language)
+		for _, size := range [][2]int{{120, 30}, {32, 24}} {
+			for _, tc := range []struct {
+				shortcut string
+				wantHint string
+			}{
+				{"x", "Enter " + i18n.T("core.inline.run")},
+				{"u", "Tab " + i18n.T("core.inline.field")},
+				{"enter", "↑↓ " + i18n.T("core.inline.scroll")},
+			} {
+				s := corepage.NewState(svc, nil, nil)
+				s.Status = service.CoreStatus{Mode: "managed", Version: "v1.2.3", Running: true}
+				s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("1")})
+				m := Model{currentPage: layout.PageCore, coreSvc: svc, coreState: s, width: size[0], height: size[1]}
+				var key tea.Msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(tc.shortcut)}
+				if tc.shortcut == "enter" {
+					key = tea.KeyMsg{Type: tea.KeyEnter}
+				}
+				next, _ := m.Update(key)
+				m = next.(Model)
+				if !m.coreState.Editing {
+					t.Fatalf("%s %v %s: dialog did not open", language, size, tc.shortcut)
+				}
+
+				page := m.mainPageLayout()
+				if len(page.help) == 0 {
+					t.Fatalf("%s %v %s: expected dialog hints in mainPageLayout", language, size, tc.shortcut)
+				}
+				rows := strings.Split(ansi.Strip(m.View()), "\n")
+				aboveNotice := strings.Join(rows[:page.noticeRow()], "\n")
+				cancelLabel := "Esc " + i18n.T("core.inline.cancel")
+				if strings.Contains(aboveNotice, cancelLabel) {
+					t.Fatalf("%s %v %s: dialog hints must not render inside the dialog box above notice row:\n%s", language, size, tc.shortcut, aboveNotice)
+				}
+				footerBlock := strings.Join(rows[page.noticeRow()+1:page.statusRow()], "\n")
+				if !strings.Contains(footerBlock, cancelLabel) || !strings.Contains(footerBlock, tc.wantHint) {
+					t.Fatalf("%s %v %s: bottom-right footer missing hints (%q, %q):\n%s", language, size, tc.shortcut, tc.wantHint, cancelLabel, footerBlock)
+				}
+				for i, hints := range page.help {
+					y := page.noticeRow() + 1 + i
+					want := ansi.Strip(common.FormatInlineHintRow(hints))
+					if !strings.HasSuffix(strings.TrimRight(rows[y], " "), strings.TrimRight(want, " ")) {
+						t.Fatalf("%s %v %s row %d not right-aligned: %q", language, size, tc.shortcut, y, rows[y])
+					}
+				}
+
+				// Clicking Esc in the bottom-right footer closes the dialog.
+				closed, cmd := clickFooterHint(t, m, cancelLabel)
+				if closed.coreState.Editing || cmd != nil {
+					t.Fatalf("%s %v %s: clicking Esc footer hint did not dismiss dialog", language, size, tc.shortcut)
+				}
+			}
+		}
+
+		// Clicking Enter in the bottom-right footer on the stop dialog executes stop.
+		s := corepage.NewState(svc, nil, nil)
+		s.Status = service.CoreStatus{Mode: "managed", Version: "v1.2.3", Running: true}
+		m := Model{currentPage: layout.PageCore, coreSvc: svc, coreState: s, width: 120, height: 30}
+		next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+		m = next.(Model)
+		confirmed, cmd := clickFooterHint(t, m, "Enter "+i18n.T("core.inline.run"))
+		if confirmed.coreState.Editing || !confirmed.coreState.Busy || cmd == nil {
+			t.Fatalf("%s: clicking Enter footer hint on stop dialog did not run action", language)
+		}
+		confirmed.coreState.Close()
+
+		// Clicking Tab in the bottom-right footer on the external form moves focus to field 2.
+		s2 := corepage.NewState(svc, nil, nil)
+		m2 := Model{currentPage: layout.PageCore, coreSvc: svc, coreState: s2, width: 120, height: 30}
+		next, _ = m2.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("u")})
+		m2 = next.(Model)
+		tabbed, _ := clickFooterHint(t, m2, "Tab "+i18n.T("core.inline.field"))
+		if !strings.Contains(ansi.Strip(tabbed.View()), "▸ "+i18n.T("core.secret")) {
+			t.Fatalf("%s: clicking Tab footer hint did not move focus to secret field:\n%s", language, ansi.Strip(tabbed.View()))
+		}
 	}
 }

@@ -72,32 +72,42 @@ func (s State) inlineHelpHints() []common.InlineHelpHint {
 		}
 	}
 	if s.Editing {
-		hints = []common.InlineHelpHint{
-			{Key: "Tab", Desc: i18n.T("core.inline.field")},
-			{Key: "Enter", Desc: i18n.T("core.inline.save")},
-			{Key: "Esc", Desc: i18n.T("core.inline.cancel")},
-		}
-		switch s.form {
-		case "details":
-			hints = []common.InlineHelpHint{
+		switch {
+		case s.form == "details":
+			return []common.InlineHelpHint{
 				{Key: "↑↓", Desc: i18n.T("core.inline.scroll")},
 				{Key: "Esc", Desc: i18n.T("core.inline.cancel")},
 			}
-		default:
-			if isChoiceForm(s.form) {
-				hints = hints[1:]
-				hints[0].Desc = i18n.T("core.inline.run")
+		case isChoiceForm(s.form):
+			if s.Busy {
+				return []common.InlineHelpHint{
+					{Key: "…", Desc: i18n.T("core.inline.wait")},
+					{Key: "Esc", Desc: i18n.T("core.inline.cancel")},
+				}
 			}
+			return []common.InlineHelpHint{
+				{Key: "Enter", Desc: i18n.T("core.inline.run"), Tone: choiceHintTone(s.form)},
+				{Key: "Esc", Desc: i18n.T("core.inline.cancel")},
+			}
+		default:
+			if s.Busy && s.form != "network" {
+				return []common.InlineHelpHint{
+					{Key: "…", Desc: i18n.T("core.inline.wait")},
+					{Key: "Esc", Desc: i18n.T("core.inline.cancel")},
+				}
+			}
+			var formHints []common.InlineHelpHint
+			if len(s.fields) > 1 {
+				formHints = append(formHints, common.InlineHelpHint{Key: "Tab", Desc: i18n.T("core.inline.field")})
+			}
+			return append(formHints,
+				common.InlineHelpHint{Key: "Enter", Desc: i18n.T("core.inline.save"), Tone: common.InlineHelpToneSuccess},
+				common.InlineHelpHint{Key: "Esc", Desc: i18n.T("core.inline.cancel")},
+			)
 		}
 	}
 	help := common.InlineHelpHint{Key: "?", Desc: i18n.T("core.inline.help")}
-	if s.Editing {
-		help = common.InlineHelpHint{Key: "Esc", Desc: i18n.T("core.inline.cancel")}
-		hints = hints[:max(0, len(hints)-1)]
-		if s.Busy && s.form != "network" {
-			hints = []common.InlineHelpHint{{Key: "…", Desc: i18n.T("core.inline.wait")}}
-		}
-	} else if s.Busy {
+	if s.Busy {
 		hints = []common.InlineHelpHint{{Key: "←→", Desc: i18n.T("core.inline.sections")}, {Key: "↑↓", Desc: i18n.T("core.inline.select")}}
 		help = s.cancelHint()
 	} else if s.task != "" || s.Err != nil {
@@ -105,6 +115,17 @@ func (s State) inlineHelpHints() []common.InlineHelpHint {
 		help = common.InlineHelpHint{Key: "Enter/Esc", Desc: i18n.T("core.inline.dismiss")}
 	}
 	return append(hints, help)
+}
+
+func choiceHintTone(form string) common.InlineHelpTone {
+	switch form {
+	case "stop":
+		return common.InlineHelpToneDanger
+	case "restart", "recover":
+		return common.InlineHelpToneWarning
+	default:
+		return common.InlineHelpTonePrimary
+	}
 }
 
 func (s State) inlineHelp(width int) string {

@@ -166,6 +166,9 @@ func (s State) controllerUnavailable() bool {
 }
 
 func (s State) coreDetails(width int) string {
+	t := theme.Current()
+	innerWidth := max(1, width-4)
+	mutedStyle := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted))
 	value := func(text string) string {
 		if text == "" {
 			return i18n.T("core.unknown_version")
@@ -181,50 +184,57 @@ func (s State) coreDetails(width int) string {
 		binaryPath = i18n.T("core.path_unavailable")
 	}
 	var rows []string
+	appendDetail := func(labelKey, val string, valColor lipgloss.Color) {
+		line := mutedStyle.Render(i18n.T(labelKey)+": ") + lipgloss.NewStyle().Foreground(theme.Resolve(valColor)).Render(val)
+		rows = append(rows, wrap(line, innerWidth))
+	}
 	for _, field := range []struct{ key, value string }{
 		{"core.version", version},
 		{"core.binary_path", binaryPath},
 		{"core.config_path", value(s.Status.ConfigPath)},
 		{"core.controller_address", value(s.Status.Controller)},
 	} {
-		rows = append(rows, wrap(i18n.T(field.key)+": "+field.value, width-4))
+		appendDetail(field.key, field.value, t.Foreground)
 	}
 	if s.Status.MixedPort > 0 {
-		rows = append(rows, i18n.T("core.mixed_port_label")+": "+fmt.Sprint(s.Status.MixedPort))
+		appendDetail("core.mixed_port_label", fmt.Sprint(s.Status.MixedPort), t.Foreground)
 	}
 	if s.Status.Mode == "managed" {
 		runtime := "core.runtime.session"
 		if s.Status.Runtime == "service" {
 			runtime = "core.runtime.service"
 		}
-		rows = append(rows, i18n.T("core.runtime")+": "+i18n.T(runtime))
+		appendDetail("core.runtime", i18n.T(runtime), t.Foreground)
 		if s.Status.Runtime == "service" {
-			state := "core.service.status_not_installed"
+			stateKey, stateColor := "core.service.status_not_installed", t.Muted
 			if s.Status.ServiceInstalled {
-				state = "core.service.status_stopped"
+				stateKey, stateColor = "core.service.status_stopped", t.Warning
 				if s.Status.ServiceRunning {
-					state = "core.service.status_running"
+					stateKey, stateColor = "core.service.status_running", t.Success
 				}
 			}
-			rows = append(rows, wrap(i18n.T("settings.sys_status.panel_title")+": "+i18n.T(state), width-4))
-			autoStart := "core.disabled"
+			appendDetail("settings.sys_status.panel_title", i18n.T(stateKey), stateColor)
+			autoStart, autoColor := "core.disabled", t.Muted
 			if s.Status.AutoStart {
-				autoStart = "core.enabled"
+				autoStart, autoColor = "core.enabled", t.Success
 			}
-			rows = append(rows, wrap(i18n.T("core.autostart")+": "+i18n.T(autoStart), width-4))
+			appendDetail("core.autostart", i18n.T(autoStart), autoColor)
 		}
 	} else if s.editor.SysStatus.LastOutput != "" {
-		rows = append(rows, "", wrap(s.editor.SysStatus.LastOutput, width-4))
+		rows = append(rows, "", wrap(s.editor.SysStatus.LastOutput, innerWidth))
 	}
-	t := theme.Current()
 	warning := lipgloss.NewStyle().Foreground(theme.Resolve(t.Warning))
+	hasWarning := s.controllerUnavailable() || s.Status.RecoveryPending
+	if hasWarning {
+		rows = append(rows, lipgloss.NewStyle().Foreground(theme.Resolve(t.Border)).Render(strings.Repeat("─", innerWidth)))
+	}
 	if s.controllerUnavailable() {
-		rows = append(rows, warning.Render(wrap(i18n.T("core.connection_unavailable"), width-4)))
+		rows = append(rows, warning.Render(wrap(i18n.T("core.connection_unavailable"), innerWidth)))
 	}
 	if s.Status.RecoveryPending {
-		rows = append(rows, warning.Render(wrap(i18n.T("core.hint.recovery"), width-4)))
+		rows = append(rows, warning.Render(wrap(i18n.T("core.hint.recovery"), innerWidth)))
 	}
-	return panel(i18n.T("core.action.details"), strings.Join(rows, "\n"), width)
+	return common.RenderBorderedPanel(i18n.T("core.action.details"), strings.Join(rows, "\n"), width, common.TokyoBlue(), common.TokyoForeground())
 }
 
 func (s State) layout(width, height int) pageLayout {
@@ -515,29 +525,49 @@ func renderCoreTabRow(width, y, selected int, items []coreTabItem) (string, []ac
 
 func (s State) formLayout(width int) pageLayout {
 	t := theme.Current()
+	innerWidth := max(1, width-4)
 	labels := map[string][]string{
 		"network":  {"core.proxy", "core.accelerators", "core.download_timeout"},
 		"version":  {"core.version_input"},
 		"import":   {"cli.core.file", "core.version_input", "cli.core.sha256"},
 		"external": {"core.controller", "core.secret", "core.mixed_port"},
 	}[s.form]
-	lines := strings.Split(wrap(i18n.T("core.desc."+s.form), width-4), "\n")
-	lines = append(lines, "")
+	var lines []string
+	for _, line := range strings.Split(wrap(i18n.T("core.desc."+s.form), innerWidth), "\n") {
+		lines = append(lines, common.TokyoMutedStyle().Render(line))
+	}
+	lines = append(lines, lipgloss.NewStyle().Foreground(theme.Resolve(t.Border)).Render(strings.Repeat("─", innerWidth)))
 	focusY := 0
 	var hits []actionHit
+	activeLabelStyle := lipgloss.NewStyle().Foreground(theme.Resolve(t.Info)).Bold(true)
+	mutedLabelStyle := common.TokyoMutedStyle()
+	selectedInputStyle := lipgloss.NewStyle().Background(theme.Resolve(t.Selected))
 	for i, key := range labels {
-		if i == s.focus {
+		focused := i == s.focus
+		labelText := ansi.Truncate(i18n.T(key), max(1, innerWidth-2), "…")
+		var labelRow string
+		if focused {
 			focusY = len(lines) + 2
+			labelRow = activeLabelStyle.Render("▸ " + labelText)
+		} else {
+			labelRow = mutedLabelStyle.Render("  " + labelText)
 		}
 		field := s.fields[i]
-		field.Width = max(1, width-8)
-		hits = append(hits, actionHit{x: 2, y: len(lines) + 2, width: width - 4, height: 1, index: i})
-		lines = append(lines, i18n.T(key), field.View(), "")
+		field.Width = max(1, innerWidth-4)
+		inputRow := common.PadString(ansi.Truncate(field.View(), innerWidth, ""), innerWidth)
+		if focused {
+			inputRow = selectedInputStyle.Render(inputRow)
+		}
+		hits = append(hits, actionHit{x: 2, y: len(lines) + 1, width: innerWidth, height: 2, index: i})
+		lines = append(lines, labelRow, inputRow)
+		if i < len(labels)-1 {
+			lines = append(lines, "")
+		}
 	}
 	if s.formErr != nil {
-		lines = append(lines, lipgloss.NewStyle().Foreground(theme.Resolve(t.Danger)).Render(wrap(s.formErr.Error(), width-4)))
+		lines = append(lines, "", lipgloss.NewStyle().Foreground(theme.Resolve(t.Danger)).Render(wrap("✗ "+s.formErr.Error(), innerWidth)))
 	}
-	return pageLayout{content: panel(i18n.T("core.action."+s.form), strings.Join(lines, "\n"), width), focusY: focusY, actions: hits}
+	return pageLayout{content: common.RenderBorderedPanel(i18n.T("core.action."+s.form), strings.Join(lines, "\n"), width, common.TokyoBlue(), common.TokyoForeground()), focusY: focusY, actions: hits}
 }
 
 func (s State) viewportOffset(page pageLayout, height int) int {
@@ -586,7 +616,11 @@ func (s State) render(width, height int, showHelp bool) string {
 		background := s
 		background.Editing, background.Err = false, nil
 		background.selected, background.scroll = s.formSelection, s.formScroll
-		return s.overlayForm(background.render(width, height, showHelp), width, height)
+		overlaid := s.overlayForm(background.render(width, height, false), width, height)
+		if showHelp {
+			return common.OverlayHelpAtBottomRight(overlaid, s.inlineHelp(width), width, height)
+		}
+		return overlaid
 	}
 	footer := s.footer(width, height, showHelp)
 	contentHeight := max(1, height-lipgloss.Height(footer))

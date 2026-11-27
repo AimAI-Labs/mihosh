@@ -124,9 +124,6 @@ func (s State) ClearTaskNotice() State {
 }
 
 func (s State) InlineHelpHints() []common.InlineHelpHint {
-	if s.Editing {
-		return nil
-	}
 	return s.inlineHelpHints()
 }
 

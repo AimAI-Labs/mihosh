@@ -13,6 +13,17 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
+func choiceDialogColors(form string) (border, title lipgloss.Color) {
+	switch form {
+	case "stop":
+		return common.Danger(), common.Danger()
+	case "restart", "recover":
+		return common.Warning(), common.Warning()
+	default:
+		return common.TokyoBlue(), common.TokyoForeground()
+	}
+}
+
 func (s State) choiceLayout(width int) pageLayout {
 	t := theme.Current()
 	title := i18n.T("core.action." + s.form)
@@ -24,21 +35,55 @@ func (s State) choiceLayout(width int) pageLayout {
 	if s.form == "geo-update" {
 		desc = i18n.Tf("core.desc.geo-update", s.geoConfirmTarget())
 	}
-	rows := strings.Split(wrap(desc, width-4), "\n")
-	rows = append(rows, "")
+	innerWidth := max(1, width-4)
+	borderColor, titleColor := choiceDialogColors(s.form)
+	divider := lipgloss.NewStyle().Foreground(theme.Resolve(t.Border)).Render(strings.Repeat("─", innerWidth))
+
+	var rows []string
+	for _, line := range strings.Split(wrap(desc, innerWidth), "\n") {
+		rows = append(rows, common.TokyoTextStyle().Render(line))
+	}
+	rows = append(rows, divider)
+
 	confirmLabel := " " + i18n.T("core.dialog.confirm") + " "
 	cancelLabel := " " + i18n.T("core.dialog.cancel") + " "
-	controls := []releaseControl{
-		{actionHit: actionHit{x: 2, y: len(rows) + 1, width: lipgloss.Width(confirmLabel), height: 1}, action: "confirm"},
-		{actionHit: actionHit{x: 4 + lipgloss.Width(confirmLabel), y: len(rows) + 1, width: lipgloss.Width(cancelLabel), height: 1}, action: "cancel"},
+	confirmW := lipgloss.Width(confirmLabel)
+	cancelW := lipgloss.Width(cancelLabel)
+
+	confirmStyle := lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true)
+	if s.Busy {
+		confirmStyle = lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted)).Background(theme.Resolve(t.Selected))
+	} else {
+		switch s.form {
+		case "stop":
+			confirmStyle = lipgloss.NewStyle().Foreground(theme.Resolve(t.Background)).Background(theme.Resolve(t.Danger)).Bold(true)
+		case "restart", "recover":
+			confirmStyle = lipgloss.NewStyle().Foreground(theme.Resolve(t.Background)).Background(theme.Resolve(t.Warning)).Bold(true)
+		}
 	}
-	confirmBtn := lipgloss.NewStyle().Foreground(theme.Resolve(t.Primary)).Background(theme.Resolve(t.Selected)).Bold(true).Render(confirmLabel)
-	cancelBtn := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted)).Render(cancelLabel)
-	rows = append(rows, confirmBtn+"  "+cancelBtn)
+	cancelStyle := lipgloss.NewStyle().Foreground(theme.Resolve(t.Muted)).Background(theme.Resolve(t.Surface))
+
+	var controls []releaseControl
+	if confirmW+2+cancelW <= innerWidth {
+		btnY := len(rows) + 1
+		controls = []releaseControl{
+			{actionHit: actionHit{x: 2, y: btnY, width: confirmW, height: 1}, action: "confirm"},
+			{actionHit: actionHit{x: 4 + confirmW, y: btnY, width: cancelW, height: 1}, action: "cancel"},
+		}
+		rows = append(rows, confirmStyle.Render(confirmLabel)+"  "+cancelStyle.Render(cancelLabel))
+	} else {
+		confirmClamped := ansi.Truncate(confirmLabel, innerWidth, "")
+		cancelClamped := ansi.Truncate(cancelLabel, innerWidth, "")
+		controls = []releaseControl{
+			{actionHit: actionHit{x: 2, y: len(rows) + 1, width: lipgloss.Width(confirmClamped), height: 1}, action: "confirm"},
+			{actionHit: actionHit{x: 2, y: len(rows) + 2, width: lipgloss.Width(cancelClamped), height: 1}, action: "cancel"},
+		}
+		rows = append(rows, confirmStyle.Render(confirmClamped), cancelStyle.Render(cancelClamped))
+	}
 	if s.formErr != nil {
-		rows = append(rows, "", lipgloss.NewStyle().Foreground(theme.Resolve(t.Danger)).Render(wrap(s.formErr.Error(), width-4)))
+		rows = append(rows, "", lipgloss.NewStyle().Foreground(theme.Resolve(t.Danger)).Render(wrap("✗ "+s.formErr.Error(), innerWidth)))
 	}
-	return pageLayout{content: panel(title, strings.Join(rows, "\n"), width), controls: controls}
+	return pageLayout{content: common.RenderBorderedPanel(title, strings.Join(rows, "\n"), width, borderColor, titleColor), controls: controls}
 }
 
 func (s State) geoConfirmTarget() string {
@@ -53,10 +98,23 @@ func (s State) geoConfirmTarget() string {
 	return "GEO"
 }
 
+func formDialogPlacement(content string, width, height int) dialog.Dialog {
+	areaHeight := max(1, height-1)
+	dlgHeight := min(lipgloss.Height(content), areaHeight)
+	top := max(0, (areaHeight-dlgHeight)/2)
+	return dialog.New(content, width, height).Below(top).Clipped()
+}
+
 // The renderer and mouse handler use the same clipped, centered dialog bounds.
 func (s State) formDialog(width, height int) (pageLayout, int) {
-	popupWidth := max(24, min(76, width*2/3))
-	popupWidth = max(24, min(width, popupWidth))
+	maxPopup := 76
+	if isChoiceForm(s.form) {
+		maxPopup = 58
+	}
+	popupWidth := max(24, min(maxPopup, width-4))
+	if width < popupWidth {
+		popupWidth = max(24, width)
+	}
 	var page pageLayout
 	switch s.form {
 	case "details":
@@ -84,11 +142,8 @@ func (s State) formDialog(width, height int) (pageLayout, int) {
 	}
 	page.scrollOffset = offset
 	body = body[offset:min(len(body), offset+budget)]
-	// Retain the frame and a fixed hint when scrolling a tall form or menu.
-	page.content = strings.Join(append(append([]string{lines[0]}, body...),
-		common.TokyoBlueStyle().Render("│ ")+common.PadString(ansi.Truncate(s.inlineHelp(popupWidth-3), popupWidth-4, ""), popupWidth-4)+common.TokyoBlueStyle().Render(" │"),
-		lines[len(lines)-1]), "\n")
-	x, y, _, _ := dialog.New(page.content, width, height).Clipped().Bounds()
+	page.content = strings.Join(append(append([]string{lines[0]}, body...), lines[len(lines)-1]), "\n")
+	x, y, _, _ := formDialogPlacement(page.content, width, height).Bounds()
 	for i := range page.actions {
 		hit := &page.actions[i]
 		hit.y -= offset
@@ -112,7 +167,7 @@ func (s State) formDialog(width, height int) (pageLayout, int) {
 
 func (s State) overlayForm(base string, width, height int) string {
 	page, _ := s.formDialog(width, height)
-	return dialog.New(page.content, width, height).Clipped().Overlay(base, true)
+	return formDialogPlacement(page.content, width, height).Overlay(base, true)
 }
 
 func (s State) clickForm(msg messages.PageMouseClickMsg) (State, tea.Cmd) {
@@ -120,7 +175,7 @@ func (s State) clickForm(msg messages.PageMouseClickMsg) (State, tea.Cmd) {
 		return s, nil
 	}
 	page, _ := s.formDialog(msg.Width, msg.Height)
-	left, top, right, bottom := dialog.New(page.content, msg.Width, msg.Height).Clipped().Bounds()
+	left, top, right, bottom := formDialogPlacement(page.content, msg.Width, msg.Height).Bounds()
 	if msg.X < left || msg.X >= right || msg.Y < top || msg.Y >= bottom {
 		return s.closeForm(), nil
 	}
@@ -150,7 +205,7 @@ func (s State) clickForm(msg messages.PageMouseClickMsg) (State, tea.Cmd) {
 
 func (s State) scrollForm(msg messages.PageMouseScrollMsg) (State, tea.Cmd) {
 	page, _ := s.formDialog(msg.Width, msg.Height)
-	left, top, right, bottom := dialog.New(page.content, msg.Width, msg.Height).Clipped().Bounds()
+	left, top, right, bottom := formDialogPlacement(page.content, msg.Width, msg.Height).Bounds()
 	if msg.X < left || msg.X >= right || msg.Y < top || msg.Y >= bottom {
 		return s, nil
 	}
