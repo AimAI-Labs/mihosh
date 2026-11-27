@@ -209,15 +209,25 @@ func TestModeBarDisplaysClickableLayoutsAtRight(t *testing.T) {
 		}
 		row := lines[1]
 		modes, layouts := modeSwitchLabels(), layoutSwitchLabels()
+		if len(layouts) != 2 || layouts[0] != "⊞" || layouts[1] != "◫" {
+			t.Fatalf("%s: unexpected layout icons: %#v", lang, layouts)
+		}
+		if strings.Contains(row, i18n.T("nodes.layout_cards")) || strings.Contains(row, i18n.T("nodes.layout_columns")) {
+			t.Fatalf("%s: expected icon-only layout switcher, got text in %q", lang, row)
+		}
 		wantRight := " " + strings.Join(layouts, " │ ") + " │"
 		if !strings.HasSuffix(row, wantRight) || !strings.Contains(row, strings.Join(modes, " │ ")) {
-			t.Fatalf("%s: expected left mode and right layout labels: %q", lang, row)
+			t.Fatalf("%s: expected left mode and right layout icons: %q", lang, row)
 		}
 		for i, label := range layouts {
 			at := strings.LastIndex(row, label)
-			hit := resolveModeBarMouseHit(width, lipgloss.Width(row[:at]), 1)
-			if hit.Target != MouseTargetLayout || hit.Index != i {
-				t.Fatalf("%s: click on %q mapped to %+v", lang, label, hit)
+			startX := lipgloss.Width(row[:at]) - 1
+			cellW := lipgloss.Width(" " + label + " ")
+			for offset := 0; offset < cellW; offset++ {
+				hit := resolveModeBarMouseHit(width, startX+offset, 1)
+				if hit.Target != MouseTargetLayout || hit.Index != i {
+					t.Fatalf("%s: click on %q offset %d mapped to %+v", lang, label, offset, hit)
+				}
 			}
 		}
 	}

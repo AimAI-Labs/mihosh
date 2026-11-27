@@ -46,10 +46,15 @@ func modeSwitchLabels() []string {
 	}
 }
 
+const (
+	layoutIconCards   = "⊞"
+	layoutIconColumns = "◫"
+)
+
 func layoutSwitchLabels() []string {
 	return []string{
-		i18n.T("nodes.layout_cards"),
-		i18n.T("nodes.layout_columns"),
+		layoutIconCards,
+		layoutIconColumns,
 	}
 }
 
