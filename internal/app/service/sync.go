@@ -397,9 +397,6 @@ func (s *SyncService) Push(ctx context.Context, dsnOverride, keyOverride string,
 	}
 	defer func() { _ = store.Close() }()
 
-	if err := store.EnsureSchema(ctx); err != nil {
-		return SyncPushResult{}, err
-	}
 	now := time.Now().UTC().Truncate(time.Second)
 	snap := syncinfra.Snapshot{
 		Meta: syncinfra.SnapshotMeta{
@@ -449,9 +446,6 @@ func (s *SyncService) Pull(ctx context.Context, dsnOverride, keyOverride string)
 	}
 	defer func() { _ = store.Close() }()
 
-	if err := store.EnsureSchema(ctx); err != nil {
-		return SyncRestoreResult{}, err
-	}
 	snap, err := store.Pull(ctx, key)
 	if err != nil {
 		return SyncRestoreResult{}, err
@@ -486,9 +480,6 @@ func (s *SyncService) Status(ctx context.Context, dsnOverride, keyOverride strin
 	}
 	defer func() { _ = store.Close() }()
 
-	if err := store.EnsureSchema(ctx); err != nil {
-		return SyncStatusResult{}, err
-	}
 	meta, err := store.Status(ctx, key)
 	if errors.Is(err, syncinfra.ErrSnapshotNotFound) {
 		localBundle, bErr := s.CollectLocalBundle(true)

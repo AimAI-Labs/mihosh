@@ -14,20 +14,12 @@ import (
 )
 
 type memorySyncStore struct {
-	mu          sync.Mutex
-	schemaReady bool
-	snaps       map[string]syncinfra.Snapshot
+	mu    sync.Mutex
+	snaps map[string]syncinfra.Snapshot
 }
 
 func newMemorySyncStore() *memorySyncStore {
 	return &memorySyncStore{snaps: make(map[string]syncinfra.Snapshot)}
-}
-
-func (m *memorySyncStore) EnsureSchema(context.Context) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.schemaReady = true
-	return nil
 }
 
 func (m *memorySyncStore) Push(_ context.Context, snap syncinfra.Snapshot) error {
@@ -214,7 +206,6 @@ func TestSyncServicePostgresPushStatusPull(t *testing.T) {
 	// Push from Device A.
 	pushed, err := svc.Push(context.Background(), "", "", true)
 	require.NoError(t, err)
-	require.True(t, store.schemaReady)
 	require.True(t, pushed.Redacted)
 	require.Equal(t, "workstation", pushed.ProfileKey)
 	require.NotContains(t, pushed.DSN, "supersecret")

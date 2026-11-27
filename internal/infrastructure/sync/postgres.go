@@ -41,7 +41,6 @@ type Snapshot struct {
 
 // Store abstracts PostgreSQL cloud sync persistence for production and offline testing.
 type Store interface {
-	EnsureSchema(ctx context.Context) error
 	Push(ctx context.Context, snap Snapshot) error
 	Pull(ctx context.Context, profileKey string) (Snapshot, error)
 	Status(ctx context.Context, profileKey string) (SnapshotMeta, error)
@@ -59,8 +58,14 @@ CREATE TABLE IF NOT EXISTS mihosh_sync_snapshots (
 	redacted BOOLEAN NOT NULL DEFAULT TRUE,
 	updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-ALTER TABLE mihosh_sync_snapshots ADD COLUMN IF NOT EXISTS content_sha256 TEXT NOT NULL DEFAULT '';
 `
+
+const addSyncContentSHAColumnSQL = `ALTER TABLE mihosh_sync_snapshots ADD COLUMN IF NOT EXISTS content_sha256 TEXT NOT NULL DEFAULT ''`
+
+const (
+	postgresUndefinedTable  = "42P01"
+	postgresUndefinedColumn = "42703"
+)
 
 const upsertSyncSnapshotSQL = `
 INSERT INTO mihosh_sync_snapshots (profile_key, payload, sha256, content_sha256, device, app_version, redacted, updated_at)
@@ -127,16 +132,12 @@ func postgresConnectionError(stage, dsn string, cause error) error {
 	return fmt.Errorf("%s postgres (%s): %w", stage, RedactDSN(dsn), cause)
 }
 
-// EnsureSchema creates the mihosh_sync_snapshots table if it does not already exist.
-func (s *PostgresStore) EnsureSchema(ctx context.Context) error {
-	if s == nil || s.db == nil {
-		return errors.New("postgres store is closed")
+func postgresSQLState(err error) string {
+	var pgError interface{ SQLState() string }
+	if errors.As(err, &pgError) {
+		return pgError.SQLState()
 	}
-	_, err := s.db.ExecContext(ctx, createSyncTableSQL)
-	if err != nil {
-		return fmt.Errorf("ensure sync schema: %w", err)
-	}
-	return nil
+	return ""
 }
 
 // Push upserts a compressed sync snapshot for snap.Meta.ProfileKey.
@@ -153,16 +154,24 @@ func (s *PostgresStore) Push(ctx context.Context, snap Snapshot) error {
 	if updatedAt.IsZero() {
 		updatedAt = time.Now().UTC()
 	}
-	_, err := s.db.ExecContext(ctx, upsertSyncSnapshotSQL,
-		key,
-		snap.Payload,
-		sum,
-		snap.Meta.ContentSHA,
-		snap.Meta.Device,
-		snap.Meta.AppVersion,
-		snap.Meta.Redacted,
-		updatedAt,
-	)
+	writeSnapshot := func() error {
+		_, err := s.db.ExecContext(ctx, upsertSyncSnapshotSQL, key, snap.Payload, sum,
+			snap.Meta.ContentSHA, snap.Meta.Device, snap.Meta.AppVersion, snap.Meta.Redacted, updatedAt)
+		return err
+	}
+	err := writeSnapshot()
+	if postgresSQLState(err) == postgresUndefinedTable {
+		if _, createErr := s.db.ExecContext(ctx, createSyncTableSQL); createErr != nil {
+			return fmt.Errorf("create sync snapshot table: %w", createErr)
+		}
+		err = writeSnapshot()
+	}
+	if postgresSQLState(err) == postgresUndefinedColumn {
+		if _, migrateErr := s.db.ExecContext(ctx, addSyncContentSHAColumnSQL); migrateErr != nil {
+			return fmt.Errorf("migrate sync snapshot table: %w", migrateErr)
+		}
+		err = writeSnapshot()
+	}
 	if err != nil {
 		return fmt.Errorf("push sync snapshot: %w", err)
 	}
@@ -176,7 +185,7 @@ func (s *PostgresStore) Pull(ctx context.Context, profileKey string) (Snapshot, 
 	}
 	key := NormalizeProfileKey(profileKey)
 	var snap Snapshot
-	err := s.db.QueryRowContext(ctx, selectSyncSnapshotSQL, key).Scan(
+	err := s.scanSnapshot(ctx, selectSyncSnapshotSQL, key,
 		&snap.Meta.ProfileKey,
 		&snap.Payload,
 		&snap.Meta.SHA256,
@@ -186,7 +195,7 @@ func (s *PostgresStore) Pull(ctx context.Context, profileKey string) (Snapshot, 
 		&snap.Meta.Redacted,
 		&snap.Meta.UpdatedAt,
 	)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, ErrSnapshotNotFound) {
 		return Snapshot{}, ErrSnapshotNotFound
 	}
 	if err != nil {
@@ -206,7 +215,7 @@ func (s *PostgresStore) Status(ctx context.Context, profileKey string) (Snapshot
 	}
 	key := NormalizeProfileKey(profileKey)
 	var meta SnapshotMeta
-	err := s.db.QueryRowContext(ctx, selectSyncStatusSQL, key).Scan(
+	err := s.scanSnapshot(ctx, selectSyncStatusSQL, key,
 		&meta.ProfileKey,
 		&meta.SizeBytes,
 		&meta.SHA256,
@@ -216,13 +225,26 @@ func (s *PostgresStore) Status(ctx context.Context, profileKey string) (Snapshot
 		&meta.Redacted,
 		&meta.UpdatedAt,
 	)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, ErrSnapshotNotFound) {
 		return SnapshotMeta{}, ErrSnapshotNotFound
 	}
 	if err != nil {
 		return SnapshotMeta{}, fmt.Errorf("query sync status: %w", err)
 	}
 	return meta, nil
+}
+
+func (s *PostgresStore) scanSnapshot(ctx context.Context, query, key string, dest ...any) error {
+	err := s.db.QueryRowContext(ctx, query, key).Scan(dest...)
+	if postgresSQLState(err) == postgresUndefinedColumn {
+		// Legacy schemas do not have a content checksum. Read the existing snapshot without DDL.
+		legacyQuery := strings.Replace(query, "content_sha256", "''", 1)
+		err = s.db.QueryRowContext(ctx, legacyQuery, key).Scan(dest...)
+	}
+	if errors.Is(err, sql.ErrNoRows) || postgresSQLState(err) == postgresUndefinedTable {
+		return ErrSnapshotNotFound
+	}
+	return err
 }
 
 // Close closes the underlying PostgreSQL connection pool.
