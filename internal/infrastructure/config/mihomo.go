@@ -56,17 +56,24 @@ func ResolveMihomoTarget(cfg *Config) MihomoTarget {
 	}
 	target.ConfigPath = path
 
-	data, err := ReadMihomoYAML(path)
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		return target
 	}
+	var fields struct {
+		Secret yaml.Node      `yaml:"secret"`
+		Other  map[string]any `yaml:",inline"`
+	}
+	if err := yaml.Unmarshal(raw, &fields); err != nil {
+		return target
+	}
+	data := fields.Other
 
 	if v, ok := data["external-controller"].(string); ok && v != "" {
 		target.Endpoint.ExternalController = v
 	}
-	if v, ok := data["secret"].(string); ok {
-		target.Endpoint.Secret = v
-	}
+	// Decoding into a string preserves the spelling of numeric scalars.
+	_ = fields.Secret.Decode(&target.Endpoint.Secret)
 	target.Endpoint.MixedPort = resolveMixedPort(data, target.Endpoint.MixedPort)
 	target.AllowLan, _ = data["allow-lan"].(bool)
 	target.LogLevel, _ = data["log-level"].(string)

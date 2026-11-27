@@ -205,3 +205,31 @@ func TestRuleEditsPreserveSymlink(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotZero(t, linfo.Mode()&os.ModeSymlink, "rule edits must not clobber symlinks")
 }
+
+func TestResolveMihomoTargetPreservesScalarSecretText(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	path, err := ManagedMihomoConfigPath()
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
+	cfg := DefaultConfig
+	cfg.Core.Mode = "managed"
+	for _, tc := range []struct{ yaml, secret string }{
+		{"123456", "123456"},
+		{"012345", "012345"},
+		{"'012345'", "012345"},
+		{"true", "true"},
+		{"null", ""},
+		{"[not, a, scalar]", ""},
+	} {
+		t.Run(tc.yaml, func(t *testing.T) {
+			content := "external-controller: 127.0.0.1:9988\nmixed-port: 7654\nallow-lan: true\nlog-level: warning\nsecret: " + tc.yaml + "\n"
+			require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+			target := ResolveMihomoTarget(&cfg)
+			require.Equal(t, tc.secret, target.Endpoint.Secret)
+			require.Equal(t, "127.0.0.1:9988", target.Endpoint.ExternalController)
+			require.Equal(t, 7654, target.Endpoint.MixedPort)
+			require.True(t, target.AllowLan)
+			require.Equal(t, "warning", target.LogLevel)
+		})
+	}
+}
