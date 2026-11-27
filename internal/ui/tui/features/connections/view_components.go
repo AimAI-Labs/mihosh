@@ -208,11 +208,11 @@ func resolveViewModeHit(state PageState, pageX, pageY int) (MouseHit, bool) {
 func connPauseLabel(paused bool, pausedUpdates int) string {
 	if paused {
 		if pausedUpdates > 0 {
-			return " ⏸ " + i18n.Tf("conns.paused_badge_new", pausedUpdates) + " "
+			return " " + common.SymbolPause + " " + i18n.Tf("conns.paused_badge_new", pausedUpdates) + " "
 		}
-		return " ⏸ " + i18n.T("conns.paused_badge") + " "
+		return " " + common.SymbolPause + " " + i18n.T("conns.paused_badge") + " "
 	}
-	return " ⏸ " + i18n.T("conns.pause_btn") + " "
+	return " " + common.SymbolPause + " " + i18n.T("conns.pause_btn") + " "
 }
 
 // RenderConnModeSwitchComponent 渲染连接页面模式切换按钮（带边框，与节点模式切换风格一致）

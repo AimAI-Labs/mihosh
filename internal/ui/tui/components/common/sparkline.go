@@ -107,7 +107,7 @@ func RenderDualSparkline(data1, data2 []int64, config SparklineConfig) string {
 
 	// 标题行
 	if config.Title != "" {
-		lines = append(lines, titleStyle.Render(config.Title)+" "+pauseStyle.Render("⏸"))
+		lines = append(lines, titleStyle.Render(config.Title)+" "+pauseStyle.Render(SymbolPause))
 	}
 
 	// 渲染图表行（从上到下）

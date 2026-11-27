@@ -14,6 +14,7 @@ const (
 	SymbolSelectActive   = "► "
 	SymbolSelectInactive = "  "
 	SymbolCheck          = "✓ "
+	SymbolPause          = "▮▮"
 
 	// Ring Buffer 容量 (引用 model 层的全局定义)
 	ClosedConnCap = model.ClosedConnCap

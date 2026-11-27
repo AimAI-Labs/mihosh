@@ -106,7 +106,7 @@ func RenderLogsPage(state PageState) string {
 			Foreground(theme.Resolve(theme.Current().Background)).
 			Background(theme.Resolve(theme.Current().Warning)).
 			Bold(true).
-			Render(" ⏸ " + badgeText + " ")
+			Render(" " + common.SymbolPause + " " + badgeText + " ")
 		stats += "  " + badge
 	}
 	sections = append(sections, stats)
@@ -184,11 +184,11 @@ func (s State) InlineHelpHints() []common.InlineHelpHint {
 func logPauseLabel(paused bool, pausedNewCount int) string {
 	if paused {
 		if pausedNewCount > 0 {
-			return " ⏸ " + i18n.Tf("logs.paused_badge_new", pausedNewCount) + " "
+			return " " + common.SymbolPause + " " + i18n.Tf("logs.paused_badge_new", pausedNewCount) + " "
 		}
-		return " ⏸ " + i18n.T("logs.paused_badge") + " "
+		return " " + common.SymbolPause + " " + i18n.T("logs.paused_badge") + " "
 	}
-	return " ⏸ " + i18n.T("logs.pause_btn") + " "
+	return " " + common.SymbolPause + " " + i18n.T("logs.pause_btn") + " "
 }
 
 func renderLogPausePill(paused bool, pausedNewCount int) string {

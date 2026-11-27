@@ -7,6 +7,7 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
@@ -65,6 +66,9 @@ func TestConnectionsPauseFreezesActiveAndHistoryWhileContinuingWS(t *testing.T) 
 	if !strings.Contains(rendered, i18n.Tf("conns.paused_badge_new", 5)) {
 		t.Fatalf("expected paused badge in rendered connections page:\n%s", rendered)
 	}
+	if !strings.Contains(rendered, common.SymbolPause) || strings.Contains(rendered, "⏸") {
+		t.Fatalf("expected monochrome pause symbol %q without emoji in connections page:\n%s", common.SymbolPause, rendered)
+	}
 
 	// Resume via Space shows latest live connections and all closed connections accumulated while paused.
 	s, _ = s.Update(tea.KeyMsg{Type: tea.KeySpace})
@@ -89,6 +93,10 @@ func TestConnectionsMouseClickPauseToggle(t *testing.T) {
 	}
 
 	const width, height = 120, 30
+	idleBar := ansi.Strip(RenderConnModeSwitchComponent(ConnViewActive, width, false, false, 0))
+	if !strings.Contains(idleBar, common.SymbolPause) || strings.Contains(idleBar, "⏸") {
+		t.Fatalf("expected monochrome pause symbol %q without emoji in idle mode bar: %q", common.SymbolPause, idleBar)
+	}
 	x, y, ok := findConnMousePoint(s, width, height, MouseTargetPauseToggle, -1)
 	if !ok {
 		t.Fatal("pause toggle button not hit in connections mode bar")

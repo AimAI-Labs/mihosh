@@ -83,3 +83,28 @@ func TestBuildTestResultModal_MixedEntries(t *testing.T) {
 		t.Fatalf("expected total count 3 in modal title")
 	}
 }
+
+func TestTestIconsAvoidEmojiInBothLanguages(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+
+	var s State
+	s.appendTestResult(TestResultEntry{Name: "HK-01", Delay: 42})
+	ps := s.ToPageState(86, 20)
+
+	for _, lang := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(lang)
+		notice := s.TestResultsNotice()
+		if !strings.Contains(notice.Text, "◔") || strings.Contains(notice.Text, "📊") {
+			t.Fatalf("%s: unexpected TestResultsNotice icon in %q", lang, notice.Text)
+		}
+		modal := buildTestResultModal(ps)
+		if !strings.Contains(modal, "◔") || strings.Contains(modal, "📊") {
+			t.Fatalf("%s: unexpected modal title icon in %q", lang, modal)
+		}
+		testingLabel := i18n.T("status.testing")
+		if !strings.Contains(testingLabel, "⟳") || strings.Contains(testingLabel, "⏳") {
+			t.Fatalf("%s: unexpected testing status icon in %q", lang, testingLabel)
+		}
+	}
+}

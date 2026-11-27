@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
@@ -48,6 +49,9 @@ func TestLogsPauseFreezesVisibleSnapshotWhileIngestingLiveLogs(t *testing.T) {
 	if !strings.Contains(rendered, i18n.Tf("logs.paused_badge_new", 11)) {
 		t.Fatalf("expected paused badge with count in rendered logs page:\n%s", rendered)
 	}
+	if !strings.Contains(rendered, common.SymbolPause) || strings.Contains(rendered, "⏸") {
+		t.Fatalf("expected monochrome pause symbol %q without emoji in rendered logs page:\n%s", common.SymbolPause, rendered)
+	}
 
 	// Filtering works against frozen snapshot while paused.
 	s.logFilter = "first"
@@ -70,22 +74,29 @@ func TestLogsPauseFreezesVisibleSnapshotWhileIngestingLiveLogs(t *testing.T) {
 
 func TestLogsClickPauseButtonInLevelBarTogglesPause(t *testing.T) {
 	i18n.Init()
-	s := NewState(nil)
-	const width = 100
-	rendered := ansi.Strip(renderLevelBar(s.logLevel, width, s.paused, s.pausedNewCount))
-	lines := strings.Split(rendered, "\n")
-	btn := i18n.T("logs.pause_btn")
-	idx := strings.Index(lines[1], btn)
-	if idx < 0 {
-		t.Fatalf("pause button %q not found in level bar: %q", btn, lines[1])
-	}
-	x := ansi.StringWidth(lines[1][:idx])
-	next, _ := s.HandleMouseLeft(1, x, width, 30)
-	if !next.Paused() {
-		t.Fatal("clicking pause button in level bar did not pause")
-	}
-	next, _ = next.HandleMouseLeft(1, x, width, 30)
-	if next.Paused() {
-		t.Fatal("clicking pause button again did not resume")
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+	for _, lang := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(lang)
+		s := NewState(nil)
+		const width = 100
+		rendered := ansi.Strip(renderLevelBar(s.logLevel, width, s.paused, s.pausedNewCount))
+		if !strings.Contains(rendered, common.SymbolPause) || strings.Contains(rendered, "⏸") {
+			t.Fatalf("%s: expected monochrome pause symbol %q without emoji in level bar: %q", lang, common.SymbolPause, rendered)
+		}
+		lines := strings.Split(rendered, "\n")
+		btn := i18n.T("logs.pause_btn")
+		idx := strings.Index(lines[1], btn)
+		if idx < 0 {
+			t.Fatalf("%s: pause button %q not found in level bar: %q", lang, btn, lines[1])
+		}
+		x := ansi.StringWidth(lines[1][:idx])
+		next, _ := s.HandleMouseLeft(1, x, width, 30)
+		if !next.Paused() {
+			t.Fatalf("%s: clicking pause button in level bar did not pause", lang)
+		}
+		next, _ = next.HandleMouseLeft(1, x, width, 30)
+		if next.Paused() {
+			t.Fatalf("%s: clicking pause button again did not resume", lang)
+		}
 	}
 }
