@@ -132,6 +132,9 @@ func (m Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if capture.Active && (msg.String() != "ctrl+c" || capture.Interrupt) {
 		return m.dispatchToPage(msg)
 	}
+	if capture.Tab && (msg.Type == tea.KeyTab || msg.Type == tea.KeyShiftTab) {
+		return m.dispatchToPage(msg)
+	}
 
 	// 全局快捷键
 	switch {

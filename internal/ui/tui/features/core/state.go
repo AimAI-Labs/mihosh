@@ -663,5 +663,10 @@ func (s State) Leave() State {
 // InputCapture declares which input belongs to the current page mode.
 func (s State) InputCapture() common.InputCapture {
 	editing := s.tab == 4 && s.editor.IsEditing()
-	return common.InputCapture{Active: s.Editing || editing, Help: s.Editing || editing, Interrupt: editing}
+	return common.InputCapture{
+		Active:    s.Editing || editing,
+		Help:      s.Editing || editing,
+		Interrupt: editing,
+		Tab:       s.IsMihomoPage() && s.hasServiceCard(),
+	}
 }

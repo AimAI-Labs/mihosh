@@ -243,3 +243,57 @@ func TestCoreVersionHelpUsesSelectedAssetAndCapturesScrolling(t *testing.T) {
 		t.Fatal("closing help retained its scroll state")
 	}
 }
+func TestCoreMihomoServiceFocusFromTabAndFooter(t *testing.T) {
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	i18n.Init()
+	svc := service.NewCoreService()
+	defer svc.Close()
+	s := corepage.NewState(svc, nil, nil)
+	s, _ = s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("5")})
+	s.Status.ServiceUnit = "fixture.service"
+	m := Model{currentPage: layout.PageCore, coreState: s, width: 140, height: 38}
+
+	expectFocus := func(want string, msg tea.Msg) {
+		t.Helper()
+		next, _ := m.Update(msg)
+		m = next.(Model)
+		if m.currentPage != layout.PageCore {
+			t.Fatalf("%v switched to page %d", msg, m.currentPage)
+		}
+		for _, hint := range m.coreState.InlineHelpHints() {
+			if hint.Key == want {
+				return
+			}
+		}
+		t.Fatalf("%v did not switch to the pane with %s in the footer", msg, want)
+	}
+	expectFocus("Tab/Esc", tea.KeyMsg{Type: tea.KeyTab})
+	expectFocus("Tab", tea.KeyMsg{Type: tea.KeyShiftTab})
+
+	clickTab := func(want string) {
+		t.Helper()
+		page := m.mainPageLayout()
+		for y := page.noticeRow() + 1; y < page.statusRow(); y++ {
+			for x := 0; x < page.width; x++ {
+				px, py, _, _, ok := page.resolveMainPageMouseHit(x, y)
+				if !ok {
+					continue
+				}
+				keyMsg, hit := page.resolveInlineHelpClick(px, py)
+				if hit && keyMsg.Type == tea.KeyTab {
+					expectFocus(want, tea.MouseMsg{X: x, Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+					return
+				}
+			}
+		}
+		t.Fatal("focus shortcut not found in the clickable footer")
+	}
+	clickTab("Tab/Esc")
+	clickTab("Tab")
+
+	m.coreState.Status.ServiceUnit = ""
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if next.(Model).currentPage != (layout.PageCore+1)%layout.PageCount {
+		t.Fatal("Tab did not navigate globally when no service card was present")
+	}
+}

@@ -1,9 +1,10 @@
 package common
 
 // InputCapture declares page-owned keyboard/mouse input and global key exceptions.
-// Help and Interrupt say whether the page also owns '?' and Ctrl+C.
+// Help, Interrupt and Tab describe ownership of '?', Ctrl+C and Tab/Shift+Tab.
 type InputCapture struct {
 	Active    bool
 	Help      bool
 	Interrupt bool
+	Tab       bool
 }
