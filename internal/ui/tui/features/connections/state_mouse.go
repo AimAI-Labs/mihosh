@@ -144,6 +144,7 @@ func (s State) HandleMouseLeft(
 		if hit.Index < 0 {
 			return s, nil
 		}
+		s.filterList.SetItemCount(s.filteredConnCount())
 		if s.filterList.Cursor != hit.Index {
 			s.filterList.SetCursor(hit.Index)
 			s.inlineDetailPanel.Reset()

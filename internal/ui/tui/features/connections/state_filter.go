@@ -116,7 +116,18 @@ func (s State) filteredConnections() []model.Connection {
 
 // filteredConnCount 过滤后的连接数量
 func (s State) filteredConnCount() int {
-	return len(s.filteredConnections())
+	conns := s.visibleSourceConnections()
+	query := s.currentQuery()
+	if !query.HasEffectiveFilter() {
+		return len(conns)
+	}
+	count := 0
+	for _, conn := range conns {
+		if connMatchesQuery(conn, query) {
+			count++
+		}
+	}
+	return count
 }
 
 // queryConnections applies filtering and stable sorting, returning a fresh slice

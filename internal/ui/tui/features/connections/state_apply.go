@@ -83,6 +83,8 @@ func (s State) applyWSConnectionsAt(data service.ConnectionsData, now time.Time)
 	}
 	if s.paused {
 		s.pausedUpdates++
+	} else {
+		s.filterList.SetItemCount(s.filteredConnCount())
 	}
 	return s
 }
@@ -93,6 +95,8 @@ func (s State) ApplyConnections(resp *model.ConnectionsResponse) State {
 	s.Connections = resp
 	if s.paused {
 		s.pausedUpdates++
+	} else {
+		s.filterList.SetItemCount(s.filteredConnCount())
 	}
 	return s
 }

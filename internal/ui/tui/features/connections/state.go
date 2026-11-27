@@ -552,6 +552,7 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 				s.filterList.ResetFilter()
 				s.protoFilter = ""
 				s.filterField = ConnFilterAll
+				s.filterList.SetItemCount(s.filteredConnCount())
 				s.filterList.SetCursor(0)
 				s.filterList.ScrollTop = 0
 			}
@@ -580,6 +581,7 @@ func (s *State) setConnViewMode(mode int) {
 		mode = ConnViewTraffic
 	}
 	s.connViewMode = mode
+	s.filterList.SetItemCount(s.filteredConnCount())
 	s.filterList.SetCursor(0)
 	s.filterList.ScrollTop = 0
 }

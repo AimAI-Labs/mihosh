@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/api"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/features/connections/components"
 	tea "github.com/charmbracelet/bubbletea"
@@ -546,4 +547,44 @@ func findConnMousePoint(
 		}
 	}
 	return 0, 0, false
+}
+
+func TestConnectionMouseSelectsThirdRowBeforeKeyboardInput(t *testing.T) {
+	for _, source := range []string{"REST", "WebSocket", "history"} {
+		t.Run(source, func(t *testing.T) {
+			state := NewState("", nil, nil, 0, nil)
+			state.setConnViewMode(ConnViewActive)
+			conns := []model.Connection{{ID: "one"}, {ID: "two"}, {ID: "three"}}
+			switch source {
+			case "REST":
+				state = state.ApplyConnections(&model.ConnectionsResponse{Connections: conns})
+			case "WebSocket":
+				state = state.ApplyWSConnections(api.ConnectionsData{Connections: []api.ConnectionData{{ID: "one"}, {ID: "two"}, {ID: "three"}}})
+			case "history":
+				for _, conn := range conns {
+					state.appendClosed(conn)
+				}
+				state.rebuildCachedClosedConns()
+				state.setConnViewMode(ConnViewHistory)
+			}
+			initialCount := state.filterList.ItemCount
+			want := state.filteredConnections()[2].ID
+			const width, height = 120, 30
+			x, y, ok := findConnMousePoint(state, width, height, MouseTargetConnection, 2)
+			if !ok {
+				t.Fatal("failed to find the third connection")
+			}
+			state, cmd := state.HandleMouseLeft(x, y, width, height)
+			if cmd != nil || state.filterList.Cursor != 2 {
+				t.Fatalf("first click cursor = %d, want 2", state.filterList.Cursor)
+			}
+			state, _ = state.HandleMouseLeft(x, y, width, height)
+			if state.connDetailSnapshot == nil || state.connDetailSnapshot.ID != want {
+				t.Fatalf("double click opened %+v, want connection %q", state.connDetailSnapshot, want)
+			}
+			if initialCount != len(conns) {
+				t.Fatalf("list size before first click = %d, want %d", initialCount, len(conns))
+			}
+		})
+	}
 }
