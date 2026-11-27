@@ -13,40 +13,22 @@ import (
 
 // renderRuleSearchBox 渲染搜索框
 func renderRuleSearchBox(filterText string, filterMode bool, engine FilterEngine, selectedTypes []string) string {
-	inputStyle := lipgloss.NewStyle().Foreground(common.Bright())
-
-	if filterMode {
-		inputStyle = inputStyle.Background(common.Highlight())
-	}
-
-	label := common.MutedStyle().Render(i18n.T("rules.search"))
-	input := inputStyle.Render(filterText)
-
-	if filterMode {
-		input += inputStyle.Render("█")
-	}
-
-	engineIndicator := common.RenderSearchEngineBadge(engine)
-
-	hint := ""
-	if filterText == "" {
-		switch engine {
-		case FilterEngineRegex:
-			hint = common.MutedStyle().Render(i18n.T("rules.search_hint_regex"))
-		case FilterEngineFuzzy:
-			hint = common.MutedStyle().Render(i18n.T("rules.search_hint_fuzzy"))
-		default:
-			hint = common.MutedStyle().Render(i18n.T("rules.search_hint"))
-		}
-	}
+	var suffix string
 	if len(selectedTypes) > 0 {
 		typeNames := strings.Join(selectedTypes, ", ")
-		typeIndicator := lipgloss.NewStyle().
+		suffix = lipgloss.NewStyle().
 			Foreground(common.Success()).
 			Render(fmt.Sprintf(" [%s]", typeNames))
-		return label + input + hint + engineIndicator + typeIndicator
 	}
-	return label + input + hint + engineIndicator
+	return common.RenderSearchBox(common.SearchBoxOptions{
+		Label:     i18n.T("rules.search"),
+		Query:     common.SearchQuery{Text: filterText, Engine: engine},
+		Active:    filterMode,
+		Hint:      i18n.T("rules.search_hint"),
+		HintRegex: i18n.T("rules.search_hint_regex"),
+		HintFuzzy: i18n.T("rules.search_hint_fuzzy"),
+		Suffix:    suffix,
+	})
 }
 
 // renderRuleList 渲染规则列表（含整体垂直滚动条）

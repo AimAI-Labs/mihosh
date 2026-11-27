@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	logsHeaderLines      = logsModeSwitchHeight + 5
+	logsHeaderLines      = logsModeSwitchHeight + 3 // 顶部栏(3) + 空行(1) + 统计行(1) + 空行(1)
 	logsFixedLines       = logsHeaderLines + 2
 	logsMinHeight        = 5
 	logsDefaultPadding   = 20
@@ -46,16 +46,17 @@ type logLevelTabStyle struct {
 
 // PageState 日志页面状态
 type PageState struct {
-	Logs               []model.LogEntry // 日志列表
-	FilteredLogIndices []int            // 过滤后的日志索引
-	LogLevel           int              // 当前级别索引
-	FilterText         string           // 搜索关键词
-	FilterMode         bool             // 是否处于过滤输入模式
-	SelectedLog        int              // 选中的日志索引
-	ScrollTop          int              // 滚动偏移
-	HScrollOffset      int              // 水平滚动偏移
-	Width              int              // 页面宽度
-	Height             int              // 页面高度
+	Logs               []model.LogEntry    // 日志列表
+	FilteredLogIndices []int               // 过滤后的日志索引
+	LogLevel           int                 // 当前级别索引
+	FilterText         string              // 搜索关键词
+	FilterMode         bool                // 是否处于过滤输入模式
+	FilterEngine       common.SearchEngine // 搜索匹配引擎
+	SelectedLog        int                 // 选中的日志索引
+	ScrollTop          int                 // 滚动偏移
+	HScrollOffset      int                 // 水平滚动偏移
+	Width              int                 // 页面宽度
+	Height             int                 // 页面高度
 
 	// 详情弹窗
 	DetailMode          bool
@@ -72,16 +73,6 @@ type PageState struct {
 func RenderLogsPage(state PageState) string {
 	var sections []string
 
-	// 渲染日志级别标签栏
-	levelBar := renderLevelBar(state.LogLevel, state.Width, state.Paused, state.PausedNewCount)
-	sections = append(sections, levelBar)
-	sections = append(sections, "")
-
-	// 渲染搜索框
-	searchBox := renderLogSearchBox(state.FilterText, state.FilterMode)
-	sections = append(sections, searchBox)
-	sections = append(sections, "")
-
 	// 过滤日志 (使用缓存的索引)
 	var filteredLogs []model.LogEntry
 	for _, idx := range state.FilteredLogIndices {
@@ -89,6 +80,16 @@ func RenderLogsPage(state PageState) string {
 			filteredLogs = append(filteredLogs, state.Logs[idx])
 		}
 	}
+
+	// 顶部栏：级别/暂停栏与搜索栏互斥切换
+	var topBar string
+	if state.FilterMode || state.FilterText != "" {
+		topBar = renderLogSearchBar(state, len(filteredLogs))
+	} else {
+		topBar = renderLevelBar(state.LogLevel, state.Width, state.Paused, state.PausedNewCount)
+	}
+	sections = append(sections, topBar)
+	sections = append(sections, "")
 
 	// 渲染统计信息
 	stats := common.MutedStyle().Render(i18n.Tf("logs.stats", len(filteredLogs), logLevels[state.LogLevel]))
@@ -155,12 +156,13 @@ func (s State) InlineHelpHints() []common.InlineHelpHint {
 		}
 	}
 
-	// 过滤输入模式：确认 + 取消 + 删除
+	// 过滤输入模式：确认 + 取消 + 删除 + 引擎切换
 	if s.logFilterMode {
 		return []common.InlineHelpHint{
 			{Key: "↵", Desc: i18n.T("help.logs_search.confirm")},
 			{Key: "Esc", Desc: i18n.T("help.logs_search.cancel")},
 			{Key: "⌫", Desc: i18n.T("help.logs_search.backspace")},
+			{Key: "Ctrl+R/F", Desc: i18n.T("help.rules_search.regex_fuzzy")},
 		}
 	}
 
@@ -303,18 +305,34 @@ func ClickedLevel(pageX int, pageWidth int, selectedLevel int) int {
 	return -1
 }
 
-// renderLogSearchBox 渲染搜索框
-func renderLogSearchBox(filterText string, filterMode bool) string {
-	if filterMode {
-		inputStyle := lipgloss.NewStyle().Foreground(common.TokyoPanel()).Background(common.TokyoCyan())
-		label := common.TokyoMutedStyle().Render(i18n.T("logs.search"))
-		input := inputStyle.Render(filterText + "█")
-		return label + input
+// ClickedSearch 判断是否点击了顶部搜索区域（含级别栏空白处或已激活的搜索栏）
+func ClickedSearch(pageX, pageY, pageWidth, selectedLevel int, paused bool, pausedNewCount int, searchActive bool) bool {
+	if searchActive {
+		return common.HitSearchHeaderBar(pageX, pageY, pageWidth, 0)
 	}
+	leftWidth := 0
+	for i, level := range logLevels {
+		leftWidth += lipgloss.Width(renderLogLevelTab(level, i == selectedLevel))
+	}
+	pauseWidth := lipgloss.Width(logPauseLabel(paused, pausedNewCount))
+	return common.HitBarBlankSpace(pageX, pageY, pageWidth, leftWidth, pauseWidth)
+}
 
-	label := common.TokyoMutedStyle().Render(i18n.T("logs.search"))
-	input := lipgloss.NewStyle().Foreground(common.TokyoForeground()).Render(filterText)
-	return label + input
+// renderLogSearchBar 渲染顶部搜索栏（与规则/订阅页样式一致）
+func renderLogSearchBar(state PageState, matched int) string {
+	searchBox := common.RenderSearchBox(common.SearchBoxOptions{
+		Label:     i18n.T("logs.search"),
+		Query:     common.SearchQuery{Text: state.FilterText, Engine: state.FilterEngine},
+		Active:    state.FilterMode,
+		Hint:      i18n.T("logs.search_hint"),
+		HintRegex: i18n.T("logs.search_hint_regex"),
+		HintFuzzy: i18n.T("logs.search_hint_fuzzy"),
+	})
+	stats := i18n.Tf("logs.search_stats", matched)
+	if !state.FilterMode && state.FilterText != "" {
+		stats += " · " + i18n.T("common.search_esc_clear")
+	}
+	return common.RenderSearchHeaderBar(searchBox, stats, "", state.Width)
 }
 
 func logListHeight(pageHeight int) int {

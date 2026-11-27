@@ -314,21 +314,19 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 
 // handleFilterMode 搜索输入模式。
 func (s State) handleFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
-	switch {
-	case key.Matches(msg, common.Keys.Escape):
+	query := common.SearchQuery{Text: s.filter, Engine: s.filterEngine}
+	switch query.HandleKey(msg) {
+	case common.SearchActionCancel:
 		s.filterMode = false
-	case key.Matches(msg, common.Keys.Enter):
+	case common.SearchActionConfirm:
 		s.filterMode = false
 		s.selected = 0
 		s.scrollTop = 0
-	default:
-		query := common.SearchQuery{Text: s.filter, Engine: s.filterEngine}
-		if query.Edit(msg) {
-			s.filter, s.filterEngine = query.Text, query.Engine
-			s.updateFiltered()
-			s.selected = 0
-			s.scrollTop = 0
-		}
+	case common.SearchActionChanged:
+		s.filter, s.filterEngine = query.Text, query.Engine
+		s.updateFiltered()
+		s.selected = 0
+		s.scrollTop = 0
 	}
 	return s, nil
 }
@@ -504,10 +502,17 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 
 	// 列表命中
 	if s.filterMode {
+		if pageY >= subHeaderHeight {
+			s.filterMode = false
+		}
 		return s, nil
 	}
 	if list, hit := subLayoutHit(pageX, pageY, pageWidth); hit {
 		s.setLayout(list)
+		return s, nil
+	}
+	if common.HitSearchHeaderBar(pageX, pageY, pageWidth, subLayoutMenuWidth(pageWidth)) {
+		s.filterMode = true
 		return s, nil
 	}
 	grid := layoutSubList(s.ToPageState(pageWidth, pageHeight))

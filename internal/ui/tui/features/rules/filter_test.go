@@ -89,3 +89,11 @@ func TestTypeFilterUpdatesAvailabilityAndKeepsSearchAvailable(t *testing.T) {
 	require.Empty(t, s.selectedTypes)
 	require.Equal(t, []string{"IP-CIDR", "PROCESS-NAME-REGEX", "SUB-RULE"}, s.availableTypes)
 }
+
+func TestRulesClickSearchBarFocusesAndOutsideExits(t *testing.T) {
+	s := State{}.ApplyRules([]model.Rule{{Type: "Domain", Payload: "a.example", Proxy: "DIRECT"}})
+	s, _ = s.HandleMouseLeft(4, 1, 80, 24)
+	require.True(t, s.ruleFilterMode)
+	s, _ = s.HandleMouseLeft(4, rulesHeaderHeight+1, 80, 24)
+	require.False(t, s.ruleFilterMode)
+}

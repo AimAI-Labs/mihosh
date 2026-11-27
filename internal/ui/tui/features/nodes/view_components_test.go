@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
@@ -259,6 +260,45 @@ func TestColumnLayoutStacksBelowWideBreakpoint(t *testing.T) {
 		nodeX := metrics.ProxyPanelX + lipgloss.Width(nodeRow[:at])
 		if hit := ResolveMouseHit(state, nodeX, node); hit.Target != MouseTargetProxy || hit.Index != 0 {
 			t.Fatalf("node row at %dx%d mapped to %+v", width, height, hit)
+		}
+	}
+}
+
+func TestNodesSearchReplacesModeBarAndKeepsWidth(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+
+	for _, lang := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(lang)
+		for _, width := range []int{32, 80, 120} {
+			state := cardTestState(width, 28)
+			state.TotalProxies = 5
+			state.FilterMode = true
+			state.FilterText = "HK"
+			state.FilterEngine = FilterEngineFuzzy
+			state.ActiveChain = service.ProxyChain{Enabled: true, Nodes: []string{"HK-01", "SG-01"}}
+
+			out := ansi.Strip(RenderNodesPage(state))
+			lines := strings.Split(out, "\n")
+			for i := 0; i < 3; i++ {
+				if lipgloss.Width(lines[i]) != width {
+					t.Fatalf("%s width=%d header line %d width=%d, want %d: %q", lang, width, i, lipgloss.Width(lines[i]), width, lines[i])
+				}
+			}
+			headerRow := lines[1]
+			if !strings.Contains(headerRow, i18n.T("nodes.search")) || !strings.Contains(headerRow, "HK") {
+				t.Fatalf("%s width=%d expected search prompt in top bar: %q", lang, width, headerRow)
+			}
+			if strings.Contains(headerRow, "⊞") || strings.Contains(headerRow, "◫") || strings.Contains(headerRow, i18n.T("nodes.mode_rule")) {
+				t.Fatalf("%s width=%d expected mode/layout controls hidden during search: %q", lang, width, headerRow)
+			}
+			bottom := lines[len(lines)-1]
+			if strings.Contains(bottom, i18n.T("nodes.search")) || strings.Contains(bottom, "HK█") {
+				t.Fatalf("%s width=%d bottom line must not render search text: %q", lang, width, bottom)
+			}
+			if !strings.Contains(bottom, "⛓") || (width >= 80 && !strings.Contains(bottom, "HK-01")) {
+				t.Fatalf("%s width=%d bottom line should still render active chain summary: %q", lang, width, bottom)
+			}
 		}
 	}
 }

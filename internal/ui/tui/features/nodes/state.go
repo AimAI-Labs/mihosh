@@ -222,6 +222,7 @@ func (s State) ToPageState(width, height int) PageState {
 		SelectedGroup:    s.SelectedGroup,
 		SelectedProxy:    s.SelectedProxy,
 		CurrentProxies:   s.displayProxies(),
+		TotalProxies:     len(s.CurrentProxies),
 		Testing:          s.Testing,
 		TestingTarget:    s.TestingTarget,
 		TestResults:      s.sortedTestResults(),
@@ -387,22 +388,20 @@ func (s State) Update(msg tea.Msg) (State, tea.Cmd) {
 
 // handleNodeFilterMode 搜索输入模式处理
 func (s State) handleNodeFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
-	switch {
-	case key.Matches(msg, common.Keys.Escape):
+	query := common.SearchQuery{Text: s.NodeFilter, Engine: s.FilterEngine}
+	switch query.HandleKey(msg) {
+	case common.SearchActionCancel:
 		s.NodeFilterMode = false
 		s.NodeFilter = ""
 		s.SelectedProxy, s.ProxyScrollTop = 0, 0
 		s.updateFilteredProxies()
-	case key.Matches(msg, common.Keys.Enter):
+	case common.SearchActionConfirm:
 		s.NodeFilterMode = false
 		s.SelectedProxy, s.ProxyScrollTop = 0, 0
-	default:
-		query := common.SearchQuery{Text: s.NodeFilter, Engine: s.FilterEngine}
-		if query.Edit(msg) {
-			s.NodeFilter, s.FilterEngine = query.Text, query.Engine
-			s.updateFilteredProxies()
-			s.SelectedProxy, s.ProxyScrollTop = 0, 0
-		}
+	case common.SearchActionChanged:
+		s.NodeFilter, s.FilterEngine = query.Text, query.Engine
+		s.updateFilteredProxies()
+		s.SelectedProxy, s.ProxyScrollTop = 0, 0
 	}
 	return s, nil
 }
@@ -432,6 +431,9 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		return s.handleChainModalClick(pageX, pageY, pageWidth, pageHeight)
 	}
 	if s.NodeFilterMode {
+		if pageY >= cardsModeSwitchHeight {
+			s.NodeFilterMode = false
+		}
 		return s, nil
 	}
 	if s.ShowTestDetail {
@@ -511,6 +513,10 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 			mode := modes[hit.Index]
 			return s, UpdateConfigMode(s.client, mode)
 		}
+		return s, nil
+
+	case MouseTargetSearch:
+		s.NodeFilterMode = true
 		return s, nil
 	}
 

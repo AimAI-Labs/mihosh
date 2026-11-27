@@ -255,3 +255,20 @@ func TestRelativeTime(t *testing.T) {
 	// 过去时间戳应返回某个相对时间描述（非空）
 	assert.NotEmpty(t, relativeTime(1700000000))
 }
+
+func TestSubscriptionClickSearchBarFocusesAndOutsideExits(t *testing.T) {
+	i18n.Init()
+	s := State{}.ApplySubs(sampleSubs(), "a1")
+	s, _ = s.HandleMouseLeft(4, 1, 100, 30)
+	require.True(t, s.filterMode)
+	s, _ = s.HandleMouseLeft(4, subHeaderHeight+1, 100, 30)
+	require.False(t, s.filterMode)
+
+	// Clicking layout tab still toggles layout rather than entering search mode.
+	row := strings.Split(ansi.Strip(RenderSubPage(s.ToPageState(100, 30))), "\n")[1]
+	at := strings.LastIndex(row, i18n.T("sub.layout.list"))
+	require.NotEqual(t, -1, at)
+	s, _ = s.HandleMouseLeft(lipgloss.Width(row[:at]), 1, 100, 30)
+	require.False(t, s.filterMode)
+	require.True(t, s.listMode)
+}

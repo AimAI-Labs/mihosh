@@ -1,9 +1,12 @@
 package common
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestSearchMatcherPreservesPageSemantics(t *testing.T) {
@@ -62,5 +65,65 @@ func TestSearchEdit(t *testing.T) {
 	query.Text = ""
 	if query.Edit(tea.KeyMsg{Type: tea.KeyBackspace}) {
 		t.Fatal("empty backspace changed the query")
+	}
+}
+
+func TestSearchHandleKey(t *testing.T) {
+	q := SearchQuery{}
+	if act := q.HandleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")}); act != SearchActionChanged || q.Text != "a" {
+		t.Fatalf("expected SearchActionChanged and text 'a', got act=%v text=%q", act, q.Text)
+	}
+	if act := q.HandleKey(tea.KeyMsg{Type: tea.KeyCtrlR}); act != SearchActionChanged || q.Engine != SearchRegex {
+		t.Fatalf("expected SearchActionChanged and SearchRegex, got act=%v engine=%v", act, q.Engine)
+	}
+	if act := q.HandleKey(tea.KeyMsg{Type: tea.KeyEnter}); act != SearchActionConfirm {
+		t.Fatalf("expected SearchActionConfirm, got %v", act)
+	}
+	if act := q.HandleKey(tea.KeyMsg{Type: tea.KeyEsc}); act != SearchActionCancel {
+		t.Fatalf("expected SearchActionCancel, got %v", act)
+	}
+	if act := q.HandleKey(tea.KeyMsg{Type: tea.KeyUp}); act != SearchActionNone {
+		t.Fatalf("expected SearchActionNone, got %v", act)
+	}
+}
+
+func TestRenderSearchHeaderBarAndHits(t *testing.T) {
+	box := RenderSearchBox(SearchBoxOptions{
+		Label:     "搜索: ",
+		Query:     SearchQuery{Text: "中文测试关键词很长需要截断", Engine: SearchFuzzy},
+		Active:    true,
+		Hint:      " hint",
+		HintRegex: " regex",
+		HintFuzzy: " fuzzy",
+		Suffix:    " [DOMAIN]",
+	})
+	plainBox := ansi.Strip(box)
+	if !strings.Contains(plainBox, "搜索: 中文测试关键词很长需要截断█ [Fuzzy] [DOMAIN]") {
+		t.Fatalf("unexpected rendered search box: %q", plainBox)
+	}
+
+	for _, trailing := range []string{"", " ⊞ │ ◫ "} {
+		for _, stats := range []string{"", "共 12 条"} {
+			for _, width := range []int{20, 32, 80, 120} {
+				bar := RenderSearchHeaderBar(box, stats, trailing, width)
+				lines := strings.Split(ansi.Strip(bar), "\n")
+				if len(lines) != SearchHeaderHeight {
+					t.Fatalf("width=%d expected %d lines, got %d", width, SearchHeaderHeight, len(lines))
+				}
+				for i, line := range lines {
+					if w := lipgloss.Width(line); w != width {
+						t.Fatalf("width=%d trailing=%q stats=%q line %d width=%d, want %d: %q",
+							width, trailing, stats, i, w, width, line)
+					}
+				}
+			}
+		}
+	}
+
+	if !HitSearchHeaderBar(1, 1, 40, 6) || HitSearchHeaderBar(33, 1, 40, 6) || HitSearchHeaderBar(1, 0, 40, 6) {
+		t.Fatal("unexpected HitSearchHeaderBar bounds result")
+	}
+	if !HitBarBlankSpace(20, 1, 80, 18, 8) || HitBarBlankSpace(18, 1, 80, 18, 8) || HitBarBlankSpace(71, 1, 80, 18, 8) {
+		t.Fatal("unexpected HitBarBlankSpace bounds result")
 	}
 }

@@ -2,11 +2,14 @@ package nodes
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/messages"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // stateCardPoint 返回第 groupIndex 张卡片内第 lineOffset 行的可点击坐标。
@@ -239,5 +242,62 @@ func TestColumnsMouseSelectionAndIndependentScroll(t *testing.T) {
 				t.Fatal("old row positions survived a refresh with no groups")
 			}
 		})
+	}
+}
+
+func TestNodesClickModeBarBlankEntersSearchAndToggleFocus(t *testing.T) {
+	i18n.Init()
+	const width, height = 100, 24
+	state := State{
+		Mode:       "rule",
+		GroupNames: []string{"g1"},
+		Groups:     map[string]model.Group{"g1": {Type: "Selector", Now: "HK-01", All: []string{"HK-01", "SG-01"}}},
+	}
+	state.updateCurrentProxies()
+
+	// Find blank cell between Direct and ⊞ in mode bar row 1.
+	barRow := strings.Split(ansi.Strip(RenderModeSwitchComponent(state.Mode, width, state.Layout)), "\n")[1]
+	idx := strings.Index(barRow, "⊞")
+	if idx < 0 {
+		t.Fatalf("failed to locate ⊞ in mode bar: %q", barRow)
+	}
+	blankX := ansi.StringWidth(barRow[:idx]) - 3
+	if blankX <= 0 {
+		t.Fatalf("failed to locate blank gap in mode bar: %q", barRow)
+	}
+	next, _ := state.HandleMouseLeft(blankX, 1, width, height)
+	if !next.NodeFilterMode {
+		t.Fatal("clicking blank space in mode bar did not enter NodeFilterMode")
+	}
+
+	// Type filter and confirm with Enter; top bar stays in search state (unfocused).
+	for _, r := range "hk" {
+		next, _ = next.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	next, _ = next.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if next.NodeFilterMode || next.NodeFilter != "hk" {
+		t.Fatalf("unexpected filter state after Enter: mode=%v filter=%q", next.NodeFilterMode, next.NodeFilter)
+	}
+
+	// Clicking search bar re-enters edit mode.
+	next, _ = next.HandleMouseLeft(5, 1, width, height)
+	if !next.NodeFilterMode {
+		t.Fatal("clicking filtered search bar did not re-enter NodeFilterMode")
+	}
+
+	// Clicking below header exits edit mode without selecting cards/changing group.
+	next, _ = next.HandleMouseLeft(5, 8, width, height)
+	if next.NodeFilterMode || next.NodeFilter != "hk" {
+		t.Fatalf("clicking below header should exit edit mode and keep filter, got mode=%v filter=%q", next.NodeFilterMode, next.NodeFilter)
+	}
+
+	// Escape clears filter and restores mode/layout bar.
+	next, _ = next.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if next.NodeFilter != "" {
+		t.Fatalf("expected Esc to clear NodeFilter, got %q", next.NodeFilter)
+	}
+	restored := ansi.Strip(RenderNodesPage(next.ToPageState(width, height)))
+	if !strings.Contains(restored, "⊞") {
+		t.Fatalf("expected mode/layout bar restored after clearing search:\n%s", restored)
 	}
 }

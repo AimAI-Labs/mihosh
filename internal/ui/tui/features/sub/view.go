@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
@@ -97,50 +96,19 @@ func RenderSubPage(state PageState) string {
 }
 
 func renderHeader(stats, searchBox string, width int, listMode bool) string {
-	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
-	statsStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
-
-	innerWidth := max(1, width-2)
 	menu := subLayoutTabs(width).render(listMode)
-	available := innerWidth - lipgloss.Width(menu)
-
-	statsText := statsStyle.Render(stats)
-	var content string
-	if room := available - lipgloss.Width(statsText) - 1; room >= min(lipgloss.Width(searchBox), 10) {
-		content = common.PadString(ansi.Truncate(searchBox, room, "…"), room) + " " + statsText
-	} else {
-		content = common.PadString(ansi.Truncate(searchBox, available, "…"), available)
-	}
-	searchRow := borderStyle.Render("│") + content + menu + borderStyle.Render("│")
-	top := borderStyle.Render(theme.Frame().TopLeft + strings.Repeat("─", innerWidth) + theme.Frame().TopRight)
-	bottom := borderStyle.Render(theme.Frame().BottomLeft + strings.Repeat("─", innerWidth) + theme.Frame().BottomRight)
-	return top + "\n" + searchRow + "\n" + bottom
+	return common.RenderSearchHeaderBar(searchBox, stats, menu, width)
 }
 
 func renderSearchBox(filterText string, filterMode bool, engine FilterEngine) string {
-	inputStyle := lipgloss.NewStyle().Foreground(common.Bright())
-	if filterMode {
-		inputStyle = inputStyle.Background(common.Highlight())
-	}
-	label := common.MutedStyle().Render(i18n.T("sub.search"))
-	input := inputStyle.Render(filterText)
-	if filterMode {
-		input += inputStyle.Render("█")
-	}
-	engineIndicator := common.RenderSearchEngineBadge(engine)
-
-	hint := ""
-	if filterText == "" {
-		switch engine {
-		case FilterRegex:
-			hint = common.MutedStyle().Render(i18n.T("sub.search_hint_regex"))
-		case FilterFuzzy:
-			hint = common.MutedStyle().Render(i18n.T("sub.search_hint_fuzzy"))
-		default:
-			hint = common.MutedStyle().Render(i18n.T("sub.search_hint"))
-		}
-	}
-	return label + input + hint + engineIndicator
+	return common.RenderSearchBox(common.SearchBoxOptions{
+		Label:     i18n.T("sub.search"),
+		Query:     common.SearchQuery{Text: filterText, Engine: engine},
+		Active:    filterMode,
+		Hint:      i18n.T("sub.search_hint"),
+		HintRegex: i18n.T("sub.search_hint_regex"),
+		HintFuzzy: i18n.T("sub.search_hint_fuzzy"),
+	})
 }
 
 // relativeTime 把 unix 时间戳转为相对时间描述。

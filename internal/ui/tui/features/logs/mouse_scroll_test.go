@@ -21,7 +21,7 @@ func TestLogMouseUsesRenderedWindowAfterKeyScroll(t *testing.T) {
 	for i := 0; i < 25; i++ {
 		s, _ = s.Update(tea.KeyMsg{Type: tea.KeyDown})
 	}
-	const width, height, firstY = 100, 18, logsModeSwitchHeight + 5
+	const width, height, firstY = 100, 18, logsHeaderLines
 	const capacity = height - logsFixedLines
 	page := s.ToPageState(width, height)
 	want := page.SelectedLog - capacity + 1

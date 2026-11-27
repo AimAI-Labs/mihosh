@@ -30,6 +30,7 @@ const (
 	MouseTargetProxy
 	MouseTargetMode
 	MouseTargetLayout
+	MouseTargetSearch
 )
 
 // MouseHit 是 nodes 页面鼠标命中结果
@@ -171,7 +172,30 @@ func resolveModeBarMouseHit(width, pageX, pageY int) MouseHit {
 			}
 		}
 	}
+	if common.HitBarBlankSpace(pageX, pageY, width, leftW, rightW) {
+		return MouseHit{Target: MouseTargetSearch, Index: -1}
+	}
 	return none
+}
+
+func renderNodeSearchBar(state PageState) string {
+	searchBox := common.RenderSearchBox(common.SearchBoxOptions{
+		Label:     i18n.T("nodes.search"),
+		Query:     common.SearchQuery{Text: state.FilterText, Engine: state.FilterEngine},
+		Active:    state.FilterMode,
+		Hint:      i18n.T("nodes.search_hint"),
+		HintRegex: i18n.T("nodes.search_hint_regex"),
+		HintFuzzy: i18n.T("nodes.search_hint_fuzzy"),
+	})
+	total := state.TotalProxies
+	if total < len(state.CurrentProxies) {
+		total = len(state.CurrentProxies)
+	}
+	stats := i18n.Tf("nodes.search_stats", len(state.CurrentProxies), total)
+	if !state.FilterMode && state.FilterText != "" {
+		stats += " · " + i18n.T("common.search_esc_clear")
+	}
+	return common.RenderSearchHeaderBar(searchBox, stats, "", state.Width)
 }
 
 // ============================================================
@@ -230,9 +254,6 @@ func (s State) InlineHelpHints() []common.InlineHelpHint {
 func (s State) InlineHelpFirstWidth(width int) int {
 	if s.ChainModal.Open || s.ShowTestDetail || s.NodeFilterMode {
 		return width - 1
-	}
-	if s.NodeFilter != "" {
-		return width / 2
 	}
 	chain, _ := s.ActiveGroupChain()
 	if chain.Enabled && len(chain.Nodes) >= 2 {

@@ -4,11 +4,8 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
-	"github.com/AimAI-Labs/mihosh/internal/ui/theme"
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 )
 
 const (
@@ -240,38 +237,7 @@ func (s State) InlineHelpHints() []common.InlineHelpHint {
 // RenderRulesHeaderComponent 渲染规则页面头部组件（带边框，包含统计和搜索框）
 // 统计信息右对齐显示在搜索行右侧
 func RenderRulesHeaderComponent(stats string, searchBox string, width int) string {
-	borderStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
-	statsStyle := lipgloss.NewStyle().Foreground(common.TokyoBlue())
-
-	// 计算内边框宽度
-	innerWidth := width - 2
-	if innerWidth < 1 {
-		innerWidth = 1
-	}
-
-	// 搜索行：左侧搜索框 + 右对齐统计
-	statsText := statsStyle.Render(stats)
-	searchW := lipgloss.Width(searchBox)
-	statsW := lipgloss.Width(statsText)
-	var rowContent string
-	switch {
-	case searchW+1+statsW <= innerWidth:
-		gap := innerWidth - searchW - statsW
-		rowContent = searchBox + strings.Repeat(" ", gap) + statsText
-	case innerWidth-statsW-1 >= 4:
-		searchBox = ansi.Truncate(searchBox, innerWidth-statsW-1, "…")
-		gap := max(1, innerWidth-lipgloss.Width(searchBox)-statsW)
-		rowContent = searchBox + strings.Repeat(" ", gap) + statsText
-	default:
-		rowContent = ansi.Truncate(searchBox, innerWidth, "…")
-	}
-	rowContent = common.PadString(ansi.Truncate(rowContent, innerWidth, ""), innerWidth)
-	searchRow := borderStyle.Render("│") + rowContent + borderStyle.Render("│")
-
-	topLine := borderStyle.Render(theme.Frame().TopLeft + strings.Repeat("─", innerWidth) + theme.Frame().TopRight)
-	bottomLine := borderStyle.Render(theme.Frame().BottomLeft + strings.Repeat("─", innerWidth) + theme.Frame().BottomRight)
-
-	return topLine + "\n" + searchRow + "\n" + bottomLine
+	return common.RenderSearchHeaderBar(searchBox, stats, "", width)
 }
 
 // ResolveMouseHit 根据 pageContent 内的 Y 坐标定位命中的规则行。

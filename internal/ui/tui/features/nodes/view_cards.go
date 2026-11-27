@@ -236,6 +236,12 @@ func ResolveMouseHit(state PageState, pageX, pageY int) MouseHit {
 	none := MouseHit{Target: MouseTargetNone, Index: -1}
 
 	if pageY >= 0 && pageY < cardsModeSwitchHeight && pageX >= 0 {
+		if state.FilterMode || state.FilterText != "" {
+			if common.HitSearchHeaderBar(pageX, pageY, state.Width, 0) {
+				return MouseHit{Target: MouseTargetSearch, Index: -1}
+			}
+			return none
+		}
 		return resolveModeBarMouseHit(state.Width, pageX, pageY)
 	}
 

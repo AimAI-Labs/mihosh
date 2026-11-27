@@ -29,6 +29,30 @@ type SearchQuery struct {
 	Engine SearchEngine
 }
 
+type SearchKeyAction int
+
+const (
+	SearchActionNone SearchKeyAction = iota
+	SearchActionChanged
+	SearchActionConfirm
+	SearchActionCancel
+)
+
+// HandleKey maps search-mode key events to cancel, confirm, or query edits.
+func (q *SearchQuery) HandleKey(msg tea.KeyMsg) SearchKeyAction {
+	switch {
+	case key.Matches(msg, Keys.Escape):
+		return SearchActionCancel
+	case key.Matches(msg, Keys.Enter):
+		return SearchActionConfirm
+	default:
+		if q.Edit(msg) {
+			return SearchActionChanged
+		}
+		return SearchActionNone
+	}
+}
+
 // Edit reports a query change, so the page can rebuild its index and selection once.
 func (q *SearchQuery) Edit(msg tea.KeyMsg) bool {
 	switch {

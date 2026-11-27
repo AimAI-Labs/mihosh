@@ -25,6 +25,7 @@ type PageState struct {
 	GroupScrollTop   int
 	ProxyScrollTop   int
 	CurrentProxies   []string
+	TotalProxies     int
 	Testing          bool
 	TestingTarget    string
 	TestResults      []TestResultEntry
@@ -48,22 +49,18 @@ func displayWidth(s string) int {
 
 // RenderNodesPage 渲染节点管理页面
 func RenderNodesPage(state PageState) string {
-	modeSwitch := RenderModeSwitchComponent(state.Mode, state.Width, state.Layout)
-
-	// ── 底部固定行：搜索提示 ──────────────────────────────
-	// 搜索行始终占一行（空行或内容行），确保其位置固定在底栏上方，
-	// 不随卡片内容多少而上下漂移。
-	var searchLine string
-	engineIndicator := common.RenderSearchEngineBadge(state.FilterEngine)
-
-	if state.FilterMode {
-		searchLine = common.TableHeaderStyle().Render(i18n.Tf("nodes.search_active", state.FilterText)) + engineIndicator
-	} else if state.FilterText != "" {
-		searchLine = common.MutedStyle().Render(i18n.Tf("nodes.search_inactive", state.FilterText)) + engineIndicator
-	} else if state.ActiveChain.Enabled && len(state.ActiveChain.Nodes) >= 2 {
-		searchLine = formatActiveChainSummary(state.ActiveChain, max(12, state.Width/3))
+	var topBar string
+	if state.FilterMode || state.FilterText != "" {
+		topBar = renderNodeSearchBar(state)
 	} else {
-		searchLine = "" // 占位空行由 clampPanelArea 负责填充
+		topBar = RenderModeSwitchComponent(state.Mode, state.Width, state.Layout)
+	}
+
+	// ── 底部固定行：链式代理摘要（无搜索占位冲突） ──────────
+	// 固定占一行（空行或摘要行），确保主体区域位置不漂移。
+	var footerLine string
+	if state.ActiveChain.Enabled && len(state.ActiveChain.Nodes) >= 2 {
+		footerLine = formatActiveChainSummary(state.ActiveChain, max(12, state.Width/3))
 	}
 
 	// 主体区域：按所选布局渲染卡片流或经典双列列表。
@@ -75,7 +72,7 @@ func RenderNodesPage(state PageState) string {
 		bodyArea = clampToLines(renderCardArea(state, areaHeight), areaHeight)
 	}
 
-	mainContent := lipgloss.JoinVertical(lipgloss.Left, modeSwitch, "", bodyArea, searchLine)
+	mainContent := lipgloss.JoinVertical(lipgloss.Left, topBar, "", bodyArea, footerLine)
 
 	if state.ChainModal.Open {
 		modal := buildChainModal(state)

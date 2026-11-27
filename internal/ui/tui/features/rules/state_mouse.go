@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/domain/model"
+	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -224,6 +225,18 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 		return s, nil
 	}
 
+	if s.ruleFilterMode {
+		if pageY >= rulesHeaderHeight {
+			s.ruleFilterMode = false
+		}
+		return s, nil
+	}
+
+	if common.HitSearchHeaderBar(pageX, pageY, pageWidth, 0) {
+		s.ruleFilterMode = true
+		return s, nil
+	}
+
 	if s.showTypeFilter {
 		_, hits := typeFilterLayout(s.ToPageState(pageWidth, pageHeight))
 		for _, h := range hits {
@@ -238,9 +251,6 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 	}
 
 	// 处理规则列表的单击和双击
-	if s.ruleFilterMode {
-		return s, nil
-	}
 	pageState := s.ToPageState(pageWidth, pageHeight)
 	idx := ResolveMouseHit(pageState, pageY)
 	if idx < 0 {

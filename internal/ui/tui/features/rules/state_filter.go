@@ -6,27 +6,24 @@ import (
 
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 
-	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 // handleRuleFilterMode 规则过滤输入模式
 func (s State) handleRuleFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
-	switch {
-	case key.Matches(msg, common.Keys.Escape):
+	query := common.SearchQuery{Text: s.ruleFilter, Engine: s.FilterEngine}
+	switch query.HandleKey(msg) {
+	case common.SearchActionCancel:
 		s.ruleFilterMode = false
-	case key.Matches(msg, common.Keys.Enter):
+	case common.SearchActionConfirm:
 		s.ruleFilterMode = false
 		s.selectedRule = 0
 		s.ruleScrollTop = 0
-	default:
-		query := common.SearchQuery{Text: s.ruleFilter, Engine: s.FilterEngine}
-		if query.Edit(msg) {
-			s.ruleFilter, s.FilterEngine = query.Text, query.Engine
-			s.updateFilteredRules()
-			s.selectedRule = 0
-			s.ruleScrollTop = 0
-		}
+	case common.SearchActionChanged:
+		s.ruleFilter, s.FilterEngine = query.Text, query.Engine
+		s.updateFilteredRules()
+		s.selectedRule = 0
+		s.ruleScrollTop = 0
 	}
 	return s, nil
 }

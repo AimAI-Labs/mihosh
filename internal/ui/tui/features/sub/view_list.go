@@ -22,6 +22,14 @@ func subLayoutTabs(width int) subLayoutMenu {
 	return subLayoutMenu{cards: cards, list: list, start: width - 1 - lipgloss.Width(cards+"│"+list)}
 }
 
+func subLayoutMenuWidth(width int) int {
+	menu := subLayoutTabs(width)
+	if menu.start < 1 {
+		return 0
+	}
+	return width - 1 - menu.start
+}
+
 func (m subLayoutMenu) render(listMode bool) string {
 	if m.start < 1 {
 		return ""

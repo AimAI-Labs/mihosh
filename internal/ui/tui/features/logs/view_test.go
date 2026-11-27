@@ -9,6 +9,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/common"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func init() {
@@ -190,5 +191,45 @@ func TestClickedLevelMatchesVisibleButtons(t *testing.T) {
 	}
 	if got := ClickedLevel(9, 10, selected); got != -1 {
 		t.Errorf("right border of narrow level bar is outside buttons, got %d", got)
+	}
+}
+
+func TestLogsIdleHidesSearchBarAndSearchModeReplacesLevelBar(t *testing.T) {
+	i18n.Init()
+	t.Cleanup(func() { i18n.SetLanguageOverride("") })
+
+	for _, lang := range []string{"zh-CN", "en-US"} {
+		i18n.SetLanguageOverride(lang)
+		s := NewState(nil).AppendLog("info", "alpha entry").AppendLog("warning", "beta entry")
+
+		for _, width := range []int{32, 80, 120} {
+			idleView := ansi.Strip(RenderLogsPage(s.ToPageState(width, 24)))
+			if strings.Contains(idleView, i18n.T("logs.search")) {
+				t.Fatalf("%s width=%d idle logs page must not render persistent search label:\n%s", lang, width, idleView)
+			}
+			for i, line := range strings.Split(idleView, "\n") {
+				if lipgloss.Width(line) > width {
+					t.Fatalf("%s width=%d idle line %d overflowed: %d > %d", lang, width, i, lipgloss.Width(line), width)
+				}
+			}
+
+			sSearch := s
+			sSearch.logFilterMode = true
+			sSearch.logFilter = "alpha"
+			sSearch.filterEngine = common.SearchRegex
+			sSearch.updateFilteredLogs()
+
+			searchView := ansi.Strip(RenderLogsPage(sSearch.ToPageState(width, 24)))
+			lines := strings.Split(searchView, "\n")
+			if lipgloss.Width(lines[1]) != width {
+				t.Fatalf("%s width=%d search bar width=%d, want %d", lang, width, lipgloss.Width(lines[1]), width)
+			}
+			if !strings.Contains(lines[1], i18n.T("logs.search")) || (width >= 80 && !strings.Contains(lines[1], "[RE]")) {
+				t.Fatalf("%s width=%d expected search bar with regex badge: %q", lang, width, lines[1])
+			}
+			if strings.Contains(lines[1], "debug") || strings.Contains(lines[1], i18n.T("logs.pause_btn")) {
+				t.Fatalf("%s width=%d expected level/pause buttons replaced during search: %q", lang, width, lines[1])
+			}
+		}
 	}
 }

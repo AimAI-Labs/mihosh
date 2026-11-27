@@ -1,7 +1,6 @@
 package logs
 
 import (
-	"strings"
 	"time"
 
 	"github.com/AimAI-Labs/mihosh/internal/app/service"
@@ -36,6 +35,7 @@ type State struct {
 	logLevel           int // 0=debug,1=info,2=warning,3=error,4=silent
 	logFilter          string
 	logFilterMode      bool
+	filterEngine       common.SearchEngine
 	selectedLog        int
 	logScrollTop       int
 	logHScrollOffset   int
@@ -199,6 +199,7 @@ func (s State) ToPageState(width, height int) PageState {
 		LogLevel:            s.logLevel,
 		FilterText:          s.logFilter,
 		FilterMode:          s.logFilterMode,
+		FilterEngine:        s.filterEngine,
 		SelectedLog:         s.selectedLog,
 		ScrollTop:           s.logScrollTop,
 		HScrollOffset:       s.logHScrollOffset,
@@ -397,11 +398,20 @@ func (s State) HandleMouseLeft(pageY, pageX, pageWidth, pageHeight int) (State, 
 	}
 
 	if s.logFilterMode {
+		if pageY >= logsModeSwitchHeight {
+			s.logFilterMode = false
+		}
 		return s, nil
 	}
-	// 点击级别栏（带边框，占据 Y=0 到 Y=2）切换日志级别或暂停/恢复
+	// 点击顶部栏（级别/暂停栏与搜索栏互斥，占据 Y=0 到 Y=2）
 	if pageY >= 0 && pageY < logsModeSwitchHeight {
-		// 只检测中间行（Y=1）的按钮点击
+		if s.logFilter != "" {
+			if ClickedSearch(pageX, pageY, pageWidth, s.logLevel, s.paused, s.pausedNewCount, true) {
+				s.logFilterMode = true
+			}
+			return s, nil
+		}
+		// 只检测中间行（Y=1）的按钮或空白处点击
 		if pageY == 1 {
 			if ClickedPause(pageX, pageWidth, s.logLevel, s.paused, s.pausedNewCount) {
 				s = s.TogglePause()
@@ -413,6 +423,10 @@ func (s State) HandleMouseLeft(pageY, pageX, pageWidth, pageHeight int) (State, 
 				s.updateFilteredLogs()
 				s.selectedLog = 0
 				s.logScrollTop = 0
+				return s, nil
+			}
+			if ClickedSearch(pageX, pageY, pageWidth, s.logLevel, s.paused, s.pausedNewCount, false) {
+				s.logFilterMode = true
 			}
 		}
 		return s, nil
@@ -507,19 +521,17 @@ func (s State) UpdateMaxHScrollOffset(width, height int) State {
 
 // handleLogFilterMode 日志过滤输入模式
 func (s State) handleLogFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
-	switch {
-	case key.Matches(msg, common.Keys.Escape):
+	query := common.SearchQuery{Text: s.logFilter, Engine: s.filterEngine}
+	switch query.HandleKey(msg) {
+	case common.SearchActionCancel:
 		s.logFilterMode = false
-	case key.Matches(msg, common.Keys.Enter):
+	case common.SearchActionConfirm:
 		s.logFilterMode = false
 		s.selectedLog = 0
 		s.logScrollTop = 0
-	default:
-		query := common.SearchQuery{Text: s.logFilter}
-		if query.Edit(msg) && query.Text != s.logFilter {
-			s.logFilter = query.Text
-			s.updateFilteredLogs()
-		}
+	case common.SearchActionChanged:
+		s.logFilter, s.filterEngine = query.Text, query.Engine
+		s.updateFilteredLogs()
 	}
 	return s, nil
 }
@@ -530,12 +542,14 @@ func (s *State) updateFilteredLogs() {
 	// 重用预分配的切片，重置长度
 	s.filteredLogIndices = s.filteredLogIndices[:0]
 
+	match := (common.SearchQuery{Text: s.logFilter, Engine: s.filterEngine}).Matcher(common.MatchAllKeywords)
+
 	for i, log := range logList {
 		logLevelIndex := getLogLevelIndex(log.Type)
 		if logLevelIndex < s.logLevel {
 			continue
 		}
-		if s.logFilter != "" && !strings.Contains(strings.ToLower(log.Payload), strings.ToLower(s.logFilter)) {
+		if s.logFilter != "" && !match(log.Payload) {
 			continue
 		}
 		s.filteredLogIndices = append(s.filteredLogIndices, i)
