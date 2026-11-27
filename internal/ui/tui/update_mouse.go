@@ -39,7 +39,7 @@ func (m Model) handleGlobalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 	// 更新弹窗打开时吞掉所有鼠标事件
 	if m.showUpdateDialog {
-		if isMouseLeftPress(msg) {
+		if isMouseLeftPress(msg) && !m.isUpdating {
 			m.showUpdateDialog = false
 			m.updateError = nil
 		}

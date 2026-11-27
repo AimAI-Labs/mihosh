@@ -378,3 +378,40 @@ func TestUpdate_TrafficTestAllMenuClick(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdateDownloadModalAndFailureStayVisible(t *testing.T) {
+	const page = layout.PageCore
+	click := tea.MouseMsg{X: 10, Y: 1, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress}
+	for _, visible := range []bool{true, false} {
+		t.Run(fmt.Sprintf("modal_visible_%t", visible), func(t *testing.T) {
+			m := Model{currentPage: page, showUpdateDialog: visible, isUpdating: true}
+			if visible {
+				next, cmd := m.Update(click)
+				m = next.(Model)
+				if !m.showUpdateDialog || !m.isUpdating || m.currentPage != page || cmd != nil {
+					t.Fatal("download modal failed to intercept a left click")
+				}
+			}
+			err := context.DeadlineExceeded
+			next, _ := m.Update(messages.UpdateAppliedMsg{Err: err})
+			m = next.(Model)
+			if m.isUpdating || m.updateError != err {
+				t.Fatal("download failure did not finish the operation")
+			}
+			if visible {
+				if !m.showUpdateDialog || m.notice.Message.Text != "" {
+					t.Fatal("visible modal should keep and display its own error")
+				}
+				next, _ := m.Update(click)
+				if next.(Model).showUpdateDialog || next.(Model).updateError != nil {
+					t.Fatal("finished modal should dismiss and clear the error")
+				}
+			} else {
+				notice := m.notice.Message
+				if notice.Level != messages.NoticeError || notice.Text == "" || notice.Detail != err.Error() {
+					t.Fatal("update failure with hidden modal was not published")
+				}
+			}
+		})
+	}
+}

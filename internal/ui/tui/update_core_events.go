@@ -116,6 +116,9 @@ func (m Model) applyCoreEvent(msg tea.Msg) (Model, tea.Cmd, bool) {
 		if msg.Err != nil {
 			m.updateError = msg.Err
 			m.isUpdating = false
+			if !m.showUpdateDialog {
+				m.publishError(msg.Err)
+			}
 			return m, nil, true
 		}
 		if msg.ServiceBinary != "" {
