@@ -68,7 +68,7 @@ type PortablePreferences struct {
 	AutoRefreshInterval int                      `yaml:"auto_refresh_interval" json:"auto_refresh_interval"`
 	Theme               string                   `yaml:"theme,omitempty" json:"theme,omitempty"`
 	BorderStyle         string                   `yaml:"border_style,omitempty" json:"border_style,omitempty"`
-	ShellProxy          bool                     `yaml:"shell_proxy,omitempty" json:"shell_proxy,omitempty"`
+	ShellProxy          bool                     `yaml:"shell_proxy,omitempty" json:"shell_proxy,omitempty"` // Legacy bundles only.
 	FileDiffOptions     *profile.FileDiffOptions `yaml:"file_diff_options,omitempty" json:"file_diff_options,omitempty"`
 }
 
@@ -108,7 +108,6 @@ func BuildBundle(cfg *config.Config, mergeYAML, ruleEdits, chainEdits []byte, re
 		AutoRefreshInterval: cfg.AutoRefreshInterval,
 		Theme:               cfg.Theme,
 		BorderStyle:         cfg.BorderStyle,
-		ShellProxy:          cfg.ShellProxy,
 	}
 	if cfg.FileDiffOptions != nil {
 		opts := *cfg.FileDiffOptions

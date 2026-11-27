@@ -250,7 +250,7 @@ func (s *SyncService) RestoreBundle(bundle syncinfra.Bundle, source, profileKey 
 		if prefs.BorderStyle != "" {
 			cfg.BorderStyle = prefs.BorderStyle
 		}
-		cfg.ShellProxy = prefs.ShellProxy
+		cfg.FileDiffOptions = nil
 		if prefs.FileDiffOptions != nil {
 			opts := *prefs.FileDiffOptions
 			cfg.FileDiffOptions = &opts
@@ -296,11 +296,9 @@ func (s *SyncService) RestoreBundle(bundle syncinfra.Bundle, source, profileKey 
 		}
 		cfg.Subs = restoredSubs
 
-		if _, exists := validUIDs[bundle.Config.ActiveSub]; bundle.Config.ActiveSub != "" && exists {
+		cfg.ActiveSub = ""
+		if _, exists := validUIDs[bundle.Config.ActiveSub]; exists {
 			cfg.ActiveSub = bundle.Config.ActiveSub
-		}
-		if _, exists := validUIDs[cfg.ActiveSub]; !exists {
-			cfg.ActiveSub = ""
 		}
 		return files, nil
 	})
@@ -353,14 +351,6 @@ func prepareSyncProfileFiles(bundle syncinfra.Bundle) (config.ProfileFiles, int,
 	}
 	if err := profile.ValidateMergeWrite(merged); err != nil {
 		return files, 0, fmt.Errorf("validate merge.yaml: %w", err)
-	}
-	_, migratedRules, err := profile.PrepareLegacyRuleEdits(previous)
-	if err != nil {
-		return files, 0, err
-	}
-	if files.Rules == nil && migratedRules != nil {
-		files.Rules = migratedRules
-		files.RemoveRules = false
 	}
 	if err := profile.BackupMergeBeforeRestore(previous, merged); err != nil {
 		return files, 0, err
@@ -514,8 +504,18 @@ func (s *SyncService) Status(ctx context.Context, dsnOverride, keyOverride strin
 	if remoteHash == "" {
 		remoteHash = meta.SHA256
 	}
+	matches := meta.ContentSHA == localSHA
+	if !matches && meta.ContentSHA != "" {
+		// Older clients included the local shell hook in snapshot content hashes.
+		localBundle.Config.Preferences.ShellProxy = true
+		legacySHA, err := syncinfra.ContentSHA256(localBundle)
+		if err != nil {
+			return SyncStatusResult{}, err
+		}
+		matches = meta.ContentSHA == legacySHA
+	}
 	state := "diverged"
-	if meta.ContentSHA != "" && meta.ContentSHA == localSHA {
+	if matches {
 		state = "in_sync"
 	}
 	return SyncStatusResult{

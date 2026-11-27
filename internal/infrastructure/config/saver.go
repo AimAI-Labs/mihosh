@@ -56,7 +56,8 @@ func writeConfigFile(cfg *Config, configDir, destination string) error {
 	if cfg.FileDiffOptions != nil {
 		writer.Set("file_diff_options", *cfg.FileDiffOptions)
 	} else if writer.IsSet("file_diff_options") {
-		writer.Set("file_diff_options", nil)
+		// A typed nil writes YAML null instead of falling back to the old value.
+		writer.Set("file_diff_options", cfg.FileDiffOptions)
 	}
 	// 订阅管理字段：subs 为订阅元数据列表，active_sub 为当前激活 UID
 	if cfg.Subs == nil {

@@ -284,3 +284,61 @@ func TestSyncStatusMatchesUnredactedRemoteAndValidatesBundle(t *testing.T) {
 	_, statErr := os.Stat(mergePath)
 	require.True(t, os.IsNotExist(statErr), "omitted merge.yaml should be removed on restore")
 }
+
+func TestRestoreBundleClearsPortableStateAndKeepsLocalShellProxy(t *testing.T) {
+	root := t.TempDir()
+	seedSyncDevice(t, root)
+	options := profile.DiffIgnoreWhitespace
+	require.NoError(t, config.Update(func(cfg *config.Config) error {
+		cfg.FileDiffOptions = &options
+		cfg.ShellProxy = true
+		return nil
+	}))
+	mergePath, err := profile.MergePath()
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(mergePath, []byte("rules:\n  - MATCH,DIRECT\n"), 0600))
+	rulePath, err := profile.RuleEditsPath()
+	require.NoError(t, err)
+
+	svc := NewSyncService()
+	incoming, err := svc.CollectLocalBundle(false)
+	require.NoError(t, err)
+	exportedShellProxy := incoming.Config.Preferences.ShellProxy
+	incoming.Config.ActiveSub = ""
+	incoming.Config.Preferences.FileDiffOptions = nil
+	incoming.Config.Preferences.ShellProxy = false
+	incoming.MergeYAML = []byte("log-level: warning\n")
+	incoming.RuleEdits = nil
+	result, err := svc.RestoreBundle(incoming, "test", "")
+	require.NoError(t, err)
+
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	require.Empty(t, cfg.ActiveSub)
+	require.Nil(t, cfg.FileDiffOptions)
+	require.True(t, cfg.ShellProxy)
+	require.False(t, exportedShellProxy)
+	require.False(t, result.RestoredRules)
+	_, err = os.Stat(rulePath)
+	require.ErrorIs(t, err, os.ErrNotExist)
+}
+
+func TestSyncStatusMatchesLegacyShellProxyFlag(t *testing.T) {
+	seedSyncDevice(t, t.TempDir())
+	store := newMemorySyncStore()
+	svc := &SyncService{openStore: func(context.Context, string) (syncinfra.Store, error) {
+		return store, nil
+	}}
+	legacy, err := svc.CollectLocalBundle(true)
+	require.NoError(t, err)
+	legacy.Config.Preferences.ShellProxy = true
+	hash, err := syncinfra.ContentSHA256(legacy)
+	require.NoError(t, err)
+	require.NoError(t, store.Push(context.Background(), syncinfra.Snapshot{Meta: syncinfra.SnapshotMeta{
+		ProfileKey: "workstation", ContentSHA: hash, Redacted: true,
+	}}))
+
+	status, err := svc.Status(context.Background(), "", "")
+	require.NoError(t, err)
+	require.Equal(t, "in_sync", status.State)
+}
