@@ -131,6 +131,7 @@ func TestSaveShellProxyPersistsPreferenceAndPrivateDynamicLoader(t *testing.T) {
 	path := filepath.Join(root, "proxy.sh")
 	rc, err := os.ReadFile(startup)
 	require.NoError(t, err)
+	require.Contains(t, string(rc), "if [ -x ")
 	require.Contains(t, string(rc), "eval \"$(MIHOSH_CONFIG_DIR=")
 	require.Contains(t, string(rc), " activate bash)\"")
 	cfg, err := config.Load()
@@ -228,9 +229,11 @@ func TestShellProxyStartupPreservesDotfilesAndUpdatesLoader(t *testing.T) {
 			path := filepath.Join(t.TempDir(), ".zshrc")
 			original := "export MY_SETTING=keep" + newline
 			require.NoError(t, os.WriteFile(path, []byte(original), 0640))
-			require.NoError(t, installShellProxyStartup(path, ShellProxySourceCommand("/old/proxy.sh")))
+			_, err := installShellProxyStartup(path, ShellProxySourceCommand("/old/proxy.sh"))
+			require.NoError(t, err)
 			activation := "eval \"$(" + quoteShellProxy("/new ' $(touch injected)/mihosh") + " activate zsh)\""
-			require.NoError(t, installShellProxyStartup(path, activation))
+			_, err = installShellProxyStartup(path, activation)
+			require.NoError(t, err)
 			data, err := os.ReadFile(path)
 			require.NoError(t, err)
 			require.True(t, strings.HasPrefix(string(data), original))
@@ -249,7 +252,8 @@ func TestShellProxyStartupPreservesDotfilesAndUpdatesLoader(t *testing.T) {
 		target, link := filepath.Join(dir, "dotfile"), filepath.Join(dir, ".bashrc")
 		require.NoError(t, os.WriteFile(target, []byte("# keep\n"), 0600))
 		require.NoError(t, os.Symlink(target, link))
-		require.NoError(t, installShellProxyStartup(link, ShellProxySourceCommand("/proxy.sh")))
+		_, err := installShellProxyStartup(link, ShellProxySourceCommand("/proxy.sh"))
+		require.NoError(t, err)
 		actual, err := os.Readlink(link)
 		require.NoError(t, err)
 		require.Equal(t, target, actual)
@@ -264,7 +268,8 @@ func TestShellProxyStartupRejectsInvalidFilesAndUnsupportedShell(t *testing.T) {
 	path := filepath.Join(t.TempDir(), ".bashrc")
 	for _, data := range []string{"# >>> mihosh proxy >>>\nkeep", "# <<< mihosh proxy <<<\nkeep"} {
 		require.NoError(t, os.WriteFile(path, []byte(data), 0600))
-		require.Error(t, installShellProxyStartup(path, "/proxy.sh"))
+		_, err := installShellProxyStartup(path, "/proxy.sh")
+		require.Error(t, err)
 		after, err := os.ReadFile(path)
 		require.NoError(t, err)
 		require.Equal(t, data, string(after))
@@ -283,4 +288,54 @@ func TestShellProxyZshStartupUsesZdotdir(t *testing.T) {
 	path, err := shellProxyStartupFile("zsh")
 	require.NoError(t, err)
 	require.Equal(t, filepath.Join(os.Getenv("ZDOTDIR"), ".zshrc"), path)
+}
+
+func TestSaveShellProxyRollbackPreservesDotfileSymlinkAndMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires a Unix dotfile symlink")
+	}
+	home, root := t.TempDir(), t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/zsh")
+	t.Setenv("ZDOTDIR", "")
+	t.Setenv("MIHOSH_CONFIG_DIR", root)
+	target := filepath.Join(t.TempDir(), "dotfile")
+	link := filepath.Join(home, ".zshrc")
+	const original = "export MY_SETTING=keep\n"
+	require.NoError(t, os.WriteFile(target, []byte(original), 0640))
+	require.NoError(t, os.Chmod(target, 0640))
+	require.NoError(t, os.Symlink(target, link))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "config.yaml"), []byte("language: ["), 0600))
+
+	_, err := SaveShellProxy(true)
+	require.Error(t, err)
+	linkTarget, err := os.Readlink(link)
+	require.NoError(t, err)
+	require.Equal(t, target, linkTarget)
+	content, err := os.ReadFile(target)
+	require.NoError(t, err)
+	require.Equal(t, original, string(content))
+	info, err := os.Stat(target)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0640), info.Mode().Perm())
+}
+
+func TestStableShellProxyExecutablePrefersHomebrewLink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Homebrew symlinks require Unix")
+	}
+	prefix := t.TempDir()
+	installed := filepath.Join(prefix, "Cellar", "mihosh", "2.0.0", "bin", "mihosh")
+	bin := filepath.Join(prefix, "bin")
+	stable := filepath.Join(bin, "mihosh")
+	require.NoError(t, os.MkdirAll(filepath.Dir(installed), 0755))
+	require.NoError(t, os.Mkdir(bin, 0755))
+	require.NoError(t, os.WriteFile(installed, []byte("fixture"), 0755))
+	require.NoError(t, os.Symlink(installed, stable))
+	t.Setenv("PATH", filepath.Dir(installed)+string(os.PathListSeparator)+bin)
+	require.Equal(t, stable, stableShellProxyExecutable(installed))
+
+	require.NoError(t, os.Remove(stable))
+	require.NoError(t, os.WriteFile(stable, []byte("other executable"), 0755))
+	require.Equal(t, installed, stableShellProxyExecutable(installed))
 }

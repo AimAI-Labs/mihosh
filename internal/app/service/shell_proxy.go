@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/AimAI-Labs/mihosh/internal/infrastructure/config"
+	"github.com/AimAI-Labs/mihosh/internal/infrastructure/fsutil"
 )
 
 func quoteShellProxy(value string) string {
@@ -18,6 +19,29 @@ func ShellProxySourceCommand(path string) string { return "source " + quoteShell
 
 func shellProxyCommand(executable, root string) string {
 	return "MIHOSH_CONFIG_DIR=" + quoteShellProxy(root) + " " + quoteShellProxy(executable)
+}
+
+func stableShellProxyExecutable(executable string) string {
+	if !isHomebrewUpdateTarget(executable) {
+		return executable
+	}
+	running, err := os.Stat(executable)
+	if err != nil {
+		return executable
+	}
+	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
+		if !filepath.IsAbs(dir) {
+			continue
+		}
+		candidate := filepath.Join(dir, "mihosh")
+		if isHomebrewUpdateTarget(candidate) {
+			continue
+		}
+		if info, err := os.Stat(candidate); err == nil && os.SameFile(running, info) {
+			return candidate
+		}
+	}
+	return executable
 }
 
 // ShellProxyScript defines bash/zsh helpers and applies the saved preference to its caller.
@@ -95,34 +119,31 @@ func SaveShellProxy(enabled bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	executable = stableShellProxyExecutable(executable)
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return "", err
 	}
 	path := filepath.Join(root, "proxy.sh")
 	activate := shellProxyCommand(executable, root) + " activate " + shell
-	loader := "_mihosh_proxy_script=$(" + activate + ") || return\neval \"$_mihosh_proxy_script\" || {\n  unset _mihosh_proxy_script\n  return 1\n}\nunset _mihosh_proxy_script\n"
+	guard := "[ -x " + quoteShellProxy(executable) + " ]"
+	loader := "if " + guard + "; then\n_mihosh_proxy_script=$(" + activate + ") || return\neval \"$_mihosh_proxy_script\" || {\n  unset _mihosh_proxy_script\n  return 1\n}\nunset _mihosh_proxy_script\nfi\n"
 	prevProxy, prevProxyExisted, err := readOptionalFile(path)
-	if err != nil {
-		return "", err
-	}
-	prevStartup, prevStartupExisted, err := readOptionalFile(startup)
 	if err != nil {
 		return "", err
 	}
 	if err := privateWrite(path, []byte(loader)); err != nil {
 		return "", err
 	}
-	if err := installShellProxyStartup(startup, "eval \"$("+activate+")\""); err != nil {
-		_ = restoreMergeFile(path, prevProxyExisted, prevProxy)
-		return "", err
+	activation := "if " + guard + "; then eval \"$(" + activate + ")\"; fi"
+	rollbackStartup, err := installShellProxyStartup(startup, activation)
+	if err != nil {
+		return "", errors.Join(err, restoreMergeFile(path, prevProxyExisted, prevProxy))
 	}
 	if err := config.Update(func(cfg *config.Config) error {
 		cfg.ShellProxy = enabled
 		return nil
 	}); err != nil {
-		_ = restoreMergeFile(startup, prevStartupExisted, prevStartup)
-		_ = restoreMergeFile(path, prevProxyExisted, prevProxy)
-		return "", err
+		return "", errors.Join(err, rollbackStartup(), restoreMergeFile(path, prevProxyExisted, prevProxy))
 	}
 	return startup, nil
 }
@@ -145,20 +166,20 @@ func shellProxyStartupFile(shell string) (string, error) {
 	}
 }
 
-func installShellProxyStartup(startup, activation string) error {
+func installShellProxyStartup(startup, activation string) (func() error, error) {
 	// Follow dotfile symlinks so an atomic replacement keeps the user's dotfile layout.
 	if info, err := os.Lstat(startup); err == nil && info.Mode()&os.ModeSymlink != 0 {
 		target, err := filepath.EvalSymlinks(startup)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		startup = target
 	} else if err != nil && !os.IsNotExist(err) {
-		return err
+		return nil, err
 	}
-	data, err := os.ReadFile(startup)
-	if err != nil && !os.IsNotExist(err) {
-		return err
+	data, existed, err := readOptionalFile(startup)
+	if err != nil {
+		return nil, err
 	}
 	const begin, end = "# >>> mihosh proxy >>>", "# <<< mihosh proxy <<<"
 	text := string(data)
@@ -170,7 +191,7 @@ func installShellProxyStartup(startup, activation string) error {
 	start, finish := strings.Index(text, begin), strings.Index(text, end)
 	if start >= 0 || finish >= 0 {
 		if start < 0 || finish < start || strings.Count(text, begin) != 1 || strings.Count(text, end) != 1 {
-			return errors.New("invalid Mihosh proxy block in shell startup file")
+			return nil, errors.New("invalid Mihosh proxy block in shell startup file")
 		}
 		text = text[:start] + block + text[finish+len(end):]
 	} else {
@@ -180,14 +201,24 @@ func installShellProxyStartup(startup, activation string) error {
 		text += block + newline
 	}
 	if text == string(data) {
-		return nil
+		return func() error { return nil }, nil
 	}
 	mode := os.FileMode(0600)
-	if info, err := os.Stat(startup); err == nil {
+	if existed {
+		info, err := os.Stat(startup)
+		if err != nil {
+			return nil, err
+		}
 		mode = info.Mode().Perm()
 	}
-	if err := privateWrite(startup, []byte(text)); err != nil {
-		return err
+	opts := fsutil.WriteOptions{Perm: mode}
+	if err := fsutil.WriteFileAtomic(startup, []byte(text), opts); err != nil {
+		return nil, err
 	}
-	return os.Chmod(startup, mode)
+	return func() error {
+		if !existed {
+			return restoreMergeFile(startup, false, nil)
+		}
+		return fsutil.WriteFileAtomic(startup, data, opts)
+	}, nil
 }
