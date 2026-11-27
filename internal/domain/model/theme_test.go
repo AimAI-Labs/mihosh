@@ -6,7 +6,26 @@ import (
 )
 
 func TestThemeNamesAndValidation(t *testing.T) {
-	want := []string{"tokyo-night", "catppuccin", "gruvbox", "nord", "dracula", "kanagawa", "solarized-light"}
+	want := []string{
+		"tokyo-night",
+		"dark",
+		"light",
+		"solarized-dark",
+		"solarized-light",
+		"colorblind-dark",
+		"colorblind-light",
+		"terminal",
+		"catppuccin",
+		"catppuccin-latte",
+		"gruvbox",
+		"gruvbox-light",
+		"nord",
+		"dracula",
+		"kanagawa",
+		"one-dark",
+		"rose-pine",
+		"everforest",
+	}
 	got := ThemeNames()
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ThemeNames() = %v, want %v", got, want)

@@ -2,7 +2,7 @@
 
 ## 概述
 
-Mihosh 是一款基于 Mihomo 的终端代理管理工具。项目内置多主题引擎（默认 **Tokyo Night** 暗色主题，另支持 Catppuccin、Gruvbox、Nord、Dracula）。本文档以 Tokyo Night 为示例定义颜色体系、组件样式、布局规则和交互模式，作为 UI 开发的统一参考。
+Mihosh 是一款基于 Mihomo 的终端代理管理工具。项目内置多主题引擎（默认 **Tokyo Night** 暗色主题，内置 18 套涵盖暗色、浅色、色盲友好及终端原生配色的主题）。本文档以 Tokyo Night 为示例定义颜色体系、组件样式、布局规则和交互模式，作为 UI 开发的统一参考。
 
 > 注意：所有颜色均通过 `theme.Current()` 获取语义色，禁止硬编码具体色值。下表中的具体色值仅为 Tokyo Night 主题示例。
 
@@ -75,12 +75,13 @@ func GetDelayColor(delay int) lipgloss.Color {
 | `Orange` | 扩展 | 橙色强调 |
 | `Purple` | 扩展 | 紫色强调/图表下载 |
 
-可用主题：`tokyo-night`（默认）、`catppuccin`、`gruvbox`、`nord`、`dracula`。
+可用主题（共 18 套）：`tokyo-night`（默认）、`dark`、`light`、`solarized-dark`、`solarized-light`、`colorblind-dark`、`colorblind-light`、`terminal`、`catppuccin`、`catppuccin-latte`、`gruvbox`、`gruvbox-light`、`nord`、`dracula`、`kanagawa`、`one-dark`、`rose-pine`、`everforest`。
 
-切换 API：
+切换与查询 API：
 ```go
 theme.SetTheme("catppuccin") // 切换主题
 t := theme.Current()          // 获取当前主题
+p, ok := theme.Get("dark")    // 无副作用读取指定主题（供实时预览）
 theme.Names()                 // 所有可用主题名
 ```
 

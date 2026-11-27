@@ -7,16 +7,28 @@ Mihosh 内置了强大的多主题引擎，允许你根据终端和个人喜好�
 
 ## 内置主题
 
-Mihosh 内置七款主题。
+Mihosh 内置 18 款主题，涵盖暗色、浅色、色盲友好配色以及终端原生色板：
+
 - **`tokyo-night`** (默认)：深蓝灰背景与高饱和冷色调。
-- **`catppuccin`**：柔和、低对比度的马卡龙配色。
+- **`dark`**：中性深灰蓝暗色主题，低干扰高可读。
+- **`light`**：清爽中性浅色主题，适合浅色终端环境。
+- **`solarized-dark`**：经典 Solarized 深青暗色主题。[Solarized 配色](https://ethanschoonover.com/solarized/)
+- **`solarized-light`**：经典 Solarized 奶油色浅色主题。[Solarized 配色](https://ethanschoonover.com/solarized/)
+- **`colorblind-dark`**：色盲友好暗色主题，采用 Okabe-Ito 安全色板区分延迟与状态。
+- **`colorblind-light`**：色盲友好浅色主题，采用高对比 Okabe-Ito 安全色板。
+- **`terminal`**：跟随宿主终端 ANSI 16 调色板，自动适配用户自定义终端配色。
+- **`catppuccin`**：柔和、低对比度的暗色马卡龙配色（Mocha）。
+- **`catppuccin-latte`**：Catppuccin 浅色马卡龙配色（Latte）。
 - **`gruvbox`**：复古、偏暖的暗色主题。
+- **`gruvbox-light`**：复古暖色浅底主题。
 - **`nord`**：源自北欧冰雪的冷灰色系。
 - **`dracula`**：偏紫色的经典暗色主题。
-- **`kanagawa`** 使用 Kanagawa Wave 的柔和深色配色。 [Kanagawa 配色](https://github.com/rebelot/kanagawa.nvim/blob/master/lua/kanagawa/colors.lua)
-- **`solarized-light`** 使用奶油色背景与柔和的强调色。 [Solarized 配色](https://ethanschoonover.com/solarized/)
+- **`kanagawa`**：使用 Kanagawa Wave 的柔和深色配色。[Kanagawa 配色](https://github.com/rebelot/kanagawa.nvim/blob/master/lua/kanagawa/colors.lua)
+- **`one-dark`**：经典 Atom / VS Code One Dark 深色配色。
+- **`rose-pine`**：柔和低对比暗紫玫瑰配色。
+- **`everforest`**：护眼低饱和度森林绿暗色主题。
 
-可以通过设置页面或命令行切换：
+可以在 TUI 的设置页中点击或按 `Enter` 打开带实时配色预览的主题选择器，也可以通过命令行切换：
 ```bash
 mihosh config set theme catppuccin
 ```

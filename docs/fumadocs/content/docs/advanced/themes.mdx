@@ -7,16 +7,28 @@ Mihosh has a powerful built-in multi-theme engine, allowing you to freely switch
 
 ## Built-in Themes
 
-Mihosh includes seven themes.
+Mihosh includes 18 built-in themes covering dark, light, colorblind-friendly, and native terminal palettes:
+
 - **`tokyo-night`** (Default): Dark blue-gray background with high-saturation cool tones.
-- **`catppuccin`**: Soft, low-contrast macaron color palette.
+- **`dark`**: Neutral dark slate theme with crisp, balanced accents.
+- **`light`**: Clean neutral light theme for light terminal backgrounds.
+- **`solarized-dark`**: Classic Solarized dark teal background with balanced accents. [Solarized palette](https://ethanschoonover.com/solarized/)
+- **`solarized-light`**: Classic Solarized light cream background with subdued accents. [Solarized palette](https://ethanschoonover.com/solarized/)
+- **`colorblind-dark`**: Colorblind-friendly dark theme using an Okabe-Ito palette to distinguish statuses and latencies without red/green confusion.
+- **`colorblind-light`**: Colorblind-friendly light theme using a high-contrast Okabe-Ito palette.
+- **`terminal`**: Follows your host terminal's native ANSI 16 palette.
+- **`catppuccin`**: Soft, low-contrast dark pastel palette (Mocha).
+- **`catppuccin-latte`**: Soft light pastel palette (Latte).
 - **`gruvbox`**: Retro, warm dark theme.
+- **`gruvbox-light`**: Retro, warm light theme.
 - **`nord`**: Cool gray colors inspired by Nordic ice and snow.
 - **`dracula`**: Classic purplish dark theme.
-- **`kanagawa`** brings the muted colors of Kanagawa Wave to the TUI. [Kanagawa palette](https://github.com/rebelot/kanagawa.nvim/blob/master/lua/kanagawa/colors.lua)
-- **`solarized-light`** uses a light cream background and subdued accents. [Solarized palette](https://ethanschoonover.com/solarized/)
+- **`kanagawa`**: Muted colors of Kanagawa Wave. [Kanagawa palette](https://github.com/rebelot/kanagawa.nvim/blob/master/lua/kanagawa/colors.lua)
+- **`one-dark`**: Classic Atom / VS Code One Dark palette.
+- **`rose-pine`**: Soft, low-contrast dark rose-and-iris palette.
+- **`everforest`**: Eye-friendly muted forest green dark theme.
 
-You can switch them via the settings page or command line:
+You can open the interactive theme picker with live preview in the TUI Settings page, or switch via the command line:
 ```bash
 mihosh config set theme catppuccin
 ```
