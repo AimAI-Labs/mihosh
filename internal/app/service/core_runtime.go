@@ -353,6 +353,9 @@ func (s *CoreService) Restart(ctx context.Context) error {
 
 // Setup completes the subscription-free baseline. The caller can import a profile later.
 func (s *CoreService) Setup(ctx context.Context, notify func(coreinfra.Progress)) error {
+	if err := coreinfra.ValidateManagedPlatform(runtime.GOOS); err != nil {
+		return err
+	}
 	status, err := s.Status()
 	if err != nil {
 		return err

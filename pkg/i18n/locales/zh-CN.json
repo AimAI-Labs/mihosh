@@ -1066,6 +1066,7 @@
   "core.heading": "Mihomo 内核管理",
   "core.intro": "自动下载并托管独立内核；已有外部内核继续由原工具管理。",
   "core.not_installed": "未安装托管版本",
+  "core.macos_external_only": "macOS 请先单独启动 Mihomo，再连接其外部控制器",
   "core.mode": "模式",
   "core.version": "版本",
   "core.running": "托管内核正在运行",

@@ -89,6 +89,18 @@ func TestReleaseListFiltersPlatformAndStableReleasesWithoutLosingPagination(t *t
 	}
 }
 
+func TestReleaseListRejectsMacOSBeforeFetching(t *testing.T) {
+	requests := 0
+	f := testFetcher(t, func(Route, *http.Request) (int, string, error) {
+		requests++
+		return 200, "[]", nil
+	})
+	page, err := f.Releases(context.Background(), 1, "darwin", "arm64")
+	if err == nil || requests != 0 || page.Page != 0 {
+		t.Fatalf("macOS should be rejected before fetching or returning a page: %+v, %v, %d requests", page, err, requests)
+	}
+}
+
 func TestReleaseListFallbackDoesNotTrustAcceleratorMetadata(t *testing.T) {
 	data, _ := json.Marshal([]Release{catalogRelease("v1.9.0", "linux-amd64-compatible")})
 	var routes []string

@@ -38,6 +38,9 @@ func (s *CoreService) Configure() error {
 		return err
 	}
 	if cfg.Core.Version == "" {
+		if err := coreinfra.ValidateManagedPlatform(runtime.GOOS); err != nil {
+			return err
+		}
 		return errors.New("install a core version first")
 	}
 	path, err := config.ManagedMihomoConfigPath()

@@ -39,6 +39,9 @@ func testStableReleaseForPlatform(tag, goos, arch string) coreinfra.Release {
 }
 
 func TestCoreReleasesUsesPersistentDiskCacheAndSupportsExplicitRefresh(t *testing.T) {
+	if coreinfra.ValidateManagedPlatform(runtime.GOOS) != nil {
+		t.Skip("managed download catalog unavailable")
+	}
 	newIsolatedService(t)
 	upstreamHits := 0
 	currentTag := "v1.20.0"
@@ -120,6 +123,9 @@ func TestCoreReleasesUsesPersistentDiskCacheAndSupportsExplicitRefresh(t *testin
 }
 
 func TestCoreReleasesIgnoresExpiredAndInvalidCacheEntries(t *testing.T) {
+	if coreinfra.ValidateManagedPlatform(runtime.GOOS) != nil {
+		t.Skip("managed download catalog unavailable")
+	}
 	newIsolatedService(t)
 	upstreamHits := 0
 	svc := NewCoreService()
@@ -174,4 +180,35 @@ func TestCoreReleasesIgnoresExpiredAndInvalidCacheEntries(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, upstreamHits)
 	require.Equal(t, "v1.22.0", got.Releases[0].Tag)
+}
+
+func TestMacOSManagedEntryPointsRequireExternalController(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("macOS managed download policy")
+	}
+	t.Setenv("MIHOSH_CONFIG_DIR", t.TempDir())
+	svc := NewCoreService()
+	t.Cleanup(svc.Close)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	want := coreinfra.ValidateManagedPlatform("darwin").Error()
+	_, err := svc.Releases(ctx, 1, nil)
+	require.EqualError(t, err, want)
+	_, err = svc.RefreshReleases(ctx, 1, nil)
+	require.EqualError(t, err, want)
+	_, err = svc.Release(ctx, "v1.19.33", nil)
+	require.EqualError(t, err, want)
+	require.EqualError(t, svc.Install(ctx, coreinfra.PinnedRelease(), nil), want)
+	require.EqualError(t, svc.Setup(ctx, nil), want)
+	require.EqualError(t, svc.Configure(), want)
+
+	cacheDir, err := releasePageCacheDir()
+	require.NoError(t, err)
+	_, err = os.Stat(cacheDir)
+	require.ErrorIs(t, err, os.ErrNotExist)
+
+	require.True(t, saveCachedReleasePage(coreinfra.ReleasePage{Page: 1, FetchedAt: time.Now()}, runtime.GOOS, runtime.GOARCH))
+	_, ok := CachedReleasePage(1)
+	require.False(t, ok)
 }

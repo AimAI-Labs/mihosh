@@ -1066,6 +1066,7 @@
   "core.heading": "Mihomo Core",
   "core.intro": "Install and manage an independent Mihomo core. Existing external cores stay under their own management.",
   "core.not_installed": "No managed version installed",
+  "core.macos_external_only": "on macOS, start Mihomo separately and connect to its external controller",
   "core.mode": "Mode",
   "core.version": "Version",
   "core.running": "Managed core is running",

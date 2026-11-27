@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 )
 
 const releaseAPI = "https://api.github.com/repos/MetaCubeX/mihomo/releases/"
@@ -114,6 +116,9 @@ func (f *Fetcher) Releases(ctx context.Context, page int, goos, arch string) (Re
 	if page < 1 {
 		return ReleasePage{}, errors.New("invalid release page")
 	}
+	if err := ValidateManagedPlatform(goos); err != nil {
+		return ReleasePage{}, err
+	}
 	endpoint := strings.TrimSuffix(releaseAPI, "/") + "?per_page=" + strconv.Itoa(ReleasePageSize) + "&page=" + strconv.Itoa(page)
 	var result ReleasePage
 	_, route, err := f.Metadata(ctx, endpoint, func(data []byte) error {
@@ -158,11 +163,23 @@ func (f *Fetcher) Releases(ctx context.Context, page int, goos, arch string) (Re
 	return result, nil
 }
 
+// ValidateManagedPlatform checks support for downloading and setting up a managed core.
+func ValidateManagedPlatform(goos string) error {
+	switch goos {
+	case "linux", "windows":
+		return nil
+	case "darwin":
+		return errors.New(i18n.T("core.macos_external_only"))
+	default:
+		return fmt.Errorf("unsupported core platform: %s", goos)
+	}
+}
+
 // SelectAsset uses baseline amd64 builds, avoiding unverified CPU instructions.
 // Unsupported platforms fail explicitly rather than guessing an executable.
 func (r Release) SelectAsset(goos, arch string) (Asset, error) {
-	if goos != "linux" && goos != "windows" {
-		return Asset{}, fmt.Errorf("unsupported core platform: %s/%s", goos, arch)
+	if err := ValidateManagedPlatform(goos); err != nil {
+		return Asset{}, err
 	}
 	platform := arch
 	switch arch {

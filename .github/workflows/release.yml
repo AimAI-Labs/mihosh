@@ -39,7 +39,8 @@ jobs:
         run: |
           export MIHOSH_UPDATE_TEST_BINARY="$RUNNER_TEMP/mihosh"
           go test ./internal ./internal/bootstrap ./internal/infrastructure/{api,config,profile,sync} ./internal/ui/tui/features/logs ./pkg/...
-          go test ./internal/app/service -run 'Test(UpdateSelectsExactVerifiedReleaseAsset|ApplyReleaseUpdate|RestoreBundle|SyncService|ProfileServiceRetries|ActivateRemote|ActivateRefreshesChangedSource|ActivateLoadsChangedLocalSource|BatchStopsClaiming|OversizedRemoteSubscription)'
+          go test ./internal/app/service -run 'Test(UpdateSelectsExactVerifiedReleaseAsset|ApplyReleaseUpdate|RestoreBundle|SyncService|ProfileServiceRetries|ActivateRemote|ActivateRefreshesChangedSource|ActivateLoadsChangedLocalSource|BatchStopsClaiming|OversizedRemoteSubscription|MacOSManagedEntryPoints)'
+          go test ./internal/infrastructure/host -run '^TestGracefulCancelSendsSIGTERM$'
           go test ./internal/cli -run '^TestSyncCLI'
           go test ./internal/ui/tui -run 'Test(ActivationMetadataFailureNotice|TargetChangeInvalidates|SlowControllerDiscovery|QueuedWebSocketMessage|WebSocketLogBurst|WSInbox)'
 

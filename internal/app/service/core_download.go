@@ -33,6 +33,9 @@ func coreFetcher(cfg *config.Config, notify func(coreinfra.Progress)) *coreinfra
 	return f
 }
 func (s *CoreService) Release(ctx context.Context, tag string, notify func(coreinfra.Progress)) (coreinfra.Release, error) {
+	if err := coreinfra.ValidateManagedPlatform(runtime.GOOS); err != nil {
+		return coreinfra.Release{}, err
+	}
 	cfg, err := loadCoreConfig()
 	if err != nil {
 		return coreinfra.Release{}, err
@@ -89,6 +92,9 @@ func (s *CoreService) RefreshReleases(ctx context.Context, page int, notify func
 
 // CachedReleasePage returns the last stored catalogue page even when due for refresh.
 func CachedReleasePage(page int) (coreinfra.ReleasePage, bool) {
+	if coreinfra.ValidateManagedPlatform(runtime.GOOS) != nil {
+		return coreinfra.ReleasePage{}, false
+	}
 	return loadCachedReleasePage(page, runtime.GOOS, runtime.GOARCH)
 }
 
@@ -102,6 +108,9 @@ func (s *CoreService) releases(ctx context.Context, page int, notify func(corein
 		return coreinfra.ReleasePage{}, errors.New("invalid release page")
 	}
 	goos, goarch := runtime.GOOS, runtime.GOARCH
+	if err := coreinfra.ValidateManagedPlatform(goos); err != nil {
+		return coreinfra.ReleasePage{}, err
+	}
 	if !force {
 		if cached, ok := loadCachedReleasePage(page, goos, goarch); ok && ReleasePageIsFresh(cached.FetchedAt) {
 			return cached, nil
@@ -220,6 +229,9 @@ func clearLaterCachedReleasePages(goos, goarch string) {
 	}
 }
 func (s *CoreService) Install(ctx context.Context, r coreinfra.Release, notify func(coreinfra.Progress)) error {
+	if err := coreinfra.ValidateManagedPlatform(runtime.GOOS); err != nil {
+		return err
+	}
 	if !s.mu.TryLock() {
 		return errors.New("another core operation is active")
 	}

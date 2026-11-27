@@ -261,6 +261,3 @@ func ConfigureTUNProcess(cmd *exec.Cmd) {
 		cmd.SysProcAttr.AmbientCaps = append(cmd.SysProcAttr.AmbientCaps, unix.CAP_NET_RAW)
 	}
 }
-func GracefulCancel(cmd *exec.Cmd) {
-	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
-}

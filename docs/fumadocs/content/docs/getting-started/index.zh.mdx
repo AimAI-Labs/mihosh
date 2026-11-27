@@ -17,11 +17,11 @@ Mihosh 是一款基于 Mihomo 的全功能终端 UI (TUI) 与 CLI 代理管理�
 
   <Step>
     ### 初始化托管内核或连接已有 Mihomo
-    如需由 Mihosh 自动安装托管内核并生成基础配置，可执行：
+    在 Linux 和 Windows 上，可由 Mihosh 自动安装托管内核并生成基础配置：
     ```bash
     mihosh setup
     ```
-    如果本机已在运行 Mihomo，Mihosh 会自动发现其配置文件中的 `external-controller`、`secret` 和 `mixed-port`，也可以运行 `mihosh doctor` 检查连通性。
+    在 macOS 上，请单独启动 Mihomo，再连接其外部控制器。Mihosh 会自动发现本机配置文件中的 `external-controller`、`secret` 和 `mixed-port`。运行 `mihosh doctor` 可以检查连通性。
   </Step>
 
   <Step>

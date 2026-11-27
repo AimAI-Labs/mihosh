@@ -26,5 +26,4 @@ func (unsupported) CleanupTUN(context.Context, TUN) error {
 	return errors.New("unsupported TUN platform")
 }
 func configureGuard(*exec.Cmd)      {}
-func GracefulCancel(*exec.Cmd)      {}
 func ConfigureTUNProcess(*exec.Cmd) {}
