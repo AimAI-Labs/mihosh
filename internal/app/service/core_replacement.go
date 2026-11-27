@@ -40,7 +40,11 @@ func (s *CoreService) replaceCore(ctx context.Context, change coreReplacement) e
 			// Cancellation of the replacement must not prevent recovery of the old selection.
 			restartErr = s.start(context.Background(), true)
 		}
-		return errors.Join(cause, stopErr, restoreErr, restartErr)
+		failure := errors.Join(cause, stopErr, restoreErr, restartErr)
+		if wasRunning && s.process == nil {
+			s.failure = failure
+		}
+		return failure
 	}
 	if err := ctx.Err(); err != nil {
 		return rollback(err)
