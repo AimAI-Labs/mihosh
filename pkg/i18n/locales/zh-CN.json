@@ -1331,6 +1331,7 @@
   "help.scroll_hint": "↑↓ / PgUp PgDn / 滚轮 浏览",
   "core.config_path": "配置路径",
   "core.controller_address": "管理接口",
+  "core.form.invalid_proxy_port": "请输入 1 到 65535 之间的代理端口。",
   "core.mixed_port_label": "代理端口",
   "core.catalog.prerelease": "预发布",
   "core.task.complete": "任务已完成",

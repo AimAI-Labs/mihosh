@@ -37,6 +37,7 @@ func (s *State) openDNSQuery() tea.Cmd {
 	if s.dns.input.CharLimit == 0 {
 		s.dns.input = newDNSInput()
 	}
+	s.dns.input.Placeholder = i18n.T("conns.dns.domain_placeholder")
 	s.dns.open = true
 	s.dns.scroll = 0
 	if conn := s.selectedConnection(); conn != nil && conn.Metadata.Host != "" {

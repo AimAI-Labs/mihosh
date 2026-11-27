@@ -9,6 +9,7 @@ import (
 	"github.com/AimAI-Labs/mihosh/internal/ui/tui/components/dialog"
 	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 type syncDialog struct {
@@ -54,9 +55,10 @@ func buildSyncModal(state PageState, width, height int) syncDialog {
 		}
 		status = style.Render(common.TruncateDisplay(m.StatusText, innerWidth))
 	}
-	if !m.Busy {
-		d.hints = common.WrapInlineHints(hints, innerWidth)
+	if m.Busy {
+		hints = []common.InlineHelpHint{{Key: "Esc", Desc: i18n.T("settings.sync.close")}}
 	}
+	d.hints = common.WrapInlineHints(hints, innerWidth)
 	available := height - 2 - len(d.hints)
 	if status != "" {
 		available--
@@ -147,20 +149,33 @@ func buildSyncModal(state PageState, width, height int) syncDialog {
 
 func renderModalInputLine(val string, cursor, width int, focused bool) string {
 	display := val
+	visibleWidth := modalInputWidth(width)
 	if focused {
 		runes := []rune(val)
 		c := max(0, min(cursor, len(runes)))
-		display = string(runes[:c]) + "▏" + string(runes[c:])
+		start := modalInputStart(runes, c, visibleWidth)
+		display = string(runes[start:c]) + "▏" + string(runes[c:])
 	}
-	if display == "" {
-		display = " "
-	}
-	display = common.TruncateDisplay(display, max(8, width-2))
+	display = ansi.Truncate(display, visibleWidth, "")
 	style := lipgloss.NewStyle().
 		Foreground(theme.Resolve(common.TokyoForeground())).
 		Padding(0, 1)
 	if focused {
 		style = style.Background(theme.Resolve(common.TokyoSelected()))
 	}
-	return style.Render(common.PadString(display, max(8, width-2)))
+	return style.Render(common.PadString(display, visibleWidth))
+}
+
+func modalInputWidth(width int) int { return max(1, width-2) }
+
+func modalInputStart(value []rune, cursor, width int) int {
+	start, space := cursor, width-1
+	for start > 0 {
+		space -= common.DisplayWidth(string(value[start-1]))
+		if space < 0 {
+			break
+		}
+		start--
+	}
+	return start
 }

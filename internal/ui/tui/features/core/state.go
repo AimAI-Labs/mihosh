@@ -211,16 +211,16 @@ func (s State) begin(action string) (State, tea.Cmd) {
 		case "restart":
 			err = svc.Restart(ctx)
 		case "connect":
+			if args[0] == "" {
+				err = svc.UseExternal()
+				break
+			}
 			mixed, e := strconv.Atoi(args[2])
 			if e != nil {
 				err = e
 				break
 			}
-			if args[0] == "" {
-				err = svc.UseExternal()
-			} else {
-				err = svc.ConnectExternal(args[0], args[1], mixed)
-			}
+			err = svc.ConnectExternal(args[0], args[1], mixed)
 		case "external":
 			err = svc.UseExternal()
 		case "install":

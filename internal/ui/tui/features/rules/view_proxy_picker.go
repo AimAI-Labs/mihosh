@@ -64,24 +64,15 @@ func computeProxyPickerLayout(state PageState, width, height int) proxyPickerLay
 	// 列表在弹窗内的起始行（上边框1 + Tab行1 + 搜索行1 = 3）
 	listStartY := 3
 
-	// 滚动偏移
-	visibleStart := form.pickerScrollTop
-	if visibleStart < 0 {
-		visibleStart = 0
-	}
-	if visibleStart > total-listHeight && total > listHeight {
-		visibleStart = total - listHeight
-	}
-	if visibleStart < 0 {
-		visibleStart = 0
-	}
+	scroll := min(form.pickerScrollTop, max(0, total-listHeight))
+	window := common.ResolveListWindow(total, form.pickerCursor, scroll, listHeight)
 
 	return proxyPickerLayout{
 		modalWidth:   modalWidth,
 		modalHeight:  modalHeight,
 		listStartY:   listStartY,
 		listHeight:   listHeight,
-		visibleStart: visibleStart,
+		visibleStart: window.Start,
 	}
 }
 
@@ -202,26 +193,25 @@ func ResolveProxyPickerBounds(state PageState, width, height int) (left, top, ri
 	return dialog.New(modal, width, height).Below(rulesHeaderHeight + 1).Bounds()
 }
 
-// ResolveProxyPickerListItemAt 判断页面坐标 (pageX, pageY) 命中的策略列表项索引。
-// 若不在列表行上则返回 -1。
-func ResolveProxyPickerListItemAt(state PageState, pageX, pageY, width, height int) int {
+// resolveProxyPickerListItemAt returns the hit and the current viewport start.
+func resolveProxyPickerListItemAt(state PageState, pageX, pageY, width, height int) (index, start int) {
 	left, top, right, bottom := ResolveProxyPickerBounds(state, width, height)
 	if pageX < left || pageX >= right || pageY < top || pageY >= bottom {
-		return -1
+		return -1, 0
 	}
 	layout := computeProxyPickerLayout(state, width, height)
 
 	listTopRow := top + layout.listStartY
 	listBottomRow := listTopRow + layout.listHeight
 	if pageY < listTopRow || pageY >= listBottomRow {
-		return -1
+		return -1, 0
 	}
 
 	rowOffset := pageY - listTopRow
 	idx := layout.visibleStart + rowOffset
 	filtered := state.AddForm.pickerFiltered()
 	if idx < 0 || idx >= len(filtered) {
-		return -1
+		return -1, 0
 	}
-	return idx
+	return idx, layout.visibleStart
 }

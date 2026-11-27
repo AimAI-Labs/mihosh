@@ -1,10 +1,12 @@
 package core
 
 import (
-	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"errors"
 	"strconv"
 	"strings"
 
+	"github.com/AimAI-Labs/mihosh/internal/app/service"
+	"github.com/AimAI-Labs/mihosh/pkg/i18n"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -148,23 +150,29 @@ func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 		return s, s.fields[s.focus].Focus()
 	case "enter":
 		if s.form != "network" {
-			s.args = nil
+			args := make([]string, 0, len(s.fields))
 			for _, f := range s.fields {
 				value := strings.TrimSpace(f.Value())
-				if s.form == "external" && len(s.args) == 1 {
+				if s.form == "external" && len(args) == 1 {
 					value = f.Value()
 				}
 
-				s.args = append(s.args, value)
+				args = append(args, value)
 			}
 			action := "release"
 			if s.form == "import" {
 				action = "import"
 			}
 			if s.form == "external" {
+				if args[0] != "" {
+					port, err := strconv.Atoi(args[2])
+					if err != nil || port < 1 || port > 65535 {
+						s.formErr = errors.New(i18n.T("core.form.invalid_proxy_port"))
+						return s, nil
+					}
+				}
 				action = "connect"
 			}
-			args := s.args
 			s = s.closeForm()
 			s.args = args
 			return s.begin(action)
@@ -188,6 +196,9 @@ func (s State) updateForm(msg tea.KeyMsg) (State, tea.Cmd) {
 		return s, nil
 	}
 	var cmd tea.Cmd
+	if s.form == "external" && s.focus == 2 {
+		s.formErr = nil
+	}
 	s.fields[s.focus], cmd = s.fields[s.focus].Update(msg)
 	return s, cmd
 }

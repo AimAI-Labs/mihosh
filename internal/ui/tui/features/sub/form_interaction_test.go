@@ -232,3 +232,16 @@ func TestEditFormFetchOptionsPersistAndPreserveUsageForSameURL(t *testing.T) {
 		t.Fatal("expected U shortcut to start batch remote update")
 	}
 }
+
+func TestSourceFormRecognizesHTTPWhenTypingTheFirstLetter(t *testing.T) {
+	form := newAddForm()
+	form.fieldCursor = addFieldSrc
+	form.kindRemote = false
+	form.focusCurrent()
+	form.srcField.SetValue("ttps://fixture.example/sub")
+	form.srcField.CursorStart()
+	updated, _, _, _ := updateFormFields(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")}, form)
+	if updated.srcField.Value() != "https://fixture.example/sub" || !updated.kindRemote {
+		t.Fatalf("URL edit failed to infer remote source: %q, remote=%v", updated.srcField.Value(), updated.kindRemote)
+	}
+}

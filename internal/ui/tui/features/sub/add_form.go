@@ -244,6 +244,17 @@ func (s State) handleAddFormUpdate(msg tea.KeyMsg) (State, tea.Cmd) {
 //   - submit：是否触发了 Enter 且校验通过（调用方据此决定提交命令）；
 //   - cmd：文本输入产生的命令（无则 nil）；
 //   - closed：是否按 Esc 取消（调用方据此关闭弹窗）。
+func (f *addForm) updateSourceField(msg tea.KeyMsg) tea.Cmd {
+	before := f.srcField.Value()
+	var cmd tea.Cmd
+	f.srcField, cmd = f.srcField.Update(msg)
+	after := f.srcField.Value()
+	if !f.kindExplicit && before != after {
+		f.kindRemote = service.ParseSourceKind(after) == service.SourceRemote
+	}
+	return cmd
+}
+
 func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, cmd tea.Cmd, closed bool) {
 	switch {
 	case msg.String() == "esc":
@@ -264,13 +275,13 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 
 	case msg.String() == "up":
 		if form.isSrcField() {
-			form.srcField, cmd = form.srcField.Update(msg)
+			cmd = form.updateSourceField(msg)
 			return form, false, cmd, false
 		}
 		form.cycleField(-1)
 	case msg.String() == "down":
 		if form.isSrcField() {
-			form.srcField, cmd = form.srcField.Update(msg)
+			cmd = form.updateSourceField(msg)
 			return form, false, cmd, false
 		}
 		form.cycleField(1)
@@ -296,7 +307,7 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 		if form.isNameField() {
 			form.nameField, c = form.nameField.Update(msg)
 		} else if form.isSrcField() {
-			form.srcField, c = form.srcField.Update(msg)
+			c = form.updateSourceField(msg)
 		} else if form.isUAField() {
 			form.uaField, c = form.uaField.Update(msg)
 		}
@@ -324,7 +335,7 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 		if form.isNameField() {
 			form.nameField, c = form.nameField.Update(msg)
 		} else if form.isSrcField() {
-			form.srcField, c = form.srcField.Update(msg)
+			c = form.updateSourceField(msg)
 		} else if form.isUAField() {
 			form.uaField, c = form.uaField.Update(msg)
 		}
@@ -352,7 +363,7 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 		if form.isNameField() {
 			form.nameField, c = form.nameField.Update(msg)
 		} else if form.isSrcField() {
-			form.srcField, c = form.srcField.Update(msg)
+			c = form.updateSourceField(msg)
 		} else if form.isUAField() {
 			form.uaField, c = form.uaField.Update(msg)
 		}
@@ -368,10 +379,7 @@ func updateFormFields(msg tea.KeyMsg, form addForm) (next addForm, submit bool, 
 		if form.isNameField() {
 			form.nameField, c = form.nameField.Update(msg)
 		} else if form.isSrcField() {
-			form.srcField, c = form.srcField.Update(msg)
-			if !form.kindExplicit {
-				form.kindRemote = service.ParseSourceKind(strings.TrimSpace(form.srcField.Value())) == service.SourceRemote
-			}
+			c = form.updateSourceField(msg)
 		} else if form.isUAField() {
 			form.uaField, c = form.uaField.Update(msg)
 		}

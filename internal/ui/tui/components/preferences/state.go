@@ -1144,6 +1144,6 @@ func (s State) InputCapture() common.InputCapture {
 	return common.InputCapture{
 		Active:    s.editMode || s.syncModal.Open,
 		Help:      textInput,
-		Interrupt: textInput,
+		Interrupt: textInput && !s.syncModal.Busy,
 	}
 }

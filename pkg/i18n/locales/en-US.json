@@ -1331,6 +1331,7 @@
   "help.scroll_hint": "↑↓ / PgUp PgDn / wheel to scroll",
   "core.config_path": "Config path",
   "core.controller_address": "Controller",
+  "core.form.invalid_proxy_port": "Enter a proxy port between 1 and 65535.",
   "core.mixed_port_label": "Proxy port",
   "core.catalog.prerelease": "Prerelease",
   "core.task.complete": "Task completed",

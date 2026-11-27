@@ -514,15 +514,10 @@ func (s State) handleLogFilterMode(msg tea.KeyMsg) (State, tea.Cmd) {
 		s.logFilterMode = false
 		s.selectedLog = 0
 		s.logScrollTop = 0
-	case key.Matches(msg, common.Keys.Backspace):
-		if len(s.logFilter) > 0 {
-			s.logFilter = s.logFilter[:len(s.logFilter)-1]
-			s.updateFilteredLogs()
-		}
 	default:
-		input := msg.String()
-		if len(input) == 1 && input[0] >= 32 && input[0] < 127 {
-			s.logFilter += input
+		query := common.SearchQuery{Text: s.logFilter}
+		if query.Edit(msg) && query.Text != s.logFilter {
+			s.logFilter = query.Text
 			s.updateFilteredLogs()
 		}
 	}

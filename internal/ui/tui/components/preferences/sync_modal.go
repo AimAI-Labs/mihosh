@@ -60,6 +60,10 @@ func (s State) SetSyncService(svc *service.SyncService) State {
 
 // OpenSyncModal opens the Backup & Cloud Sync modal on the Mihosh settings tab.
 func (s State) OpenSyncModal() State {
+	if s.syncModal.Busy {
+		s.syncModal.Open = true
+		return s
+	}
 	s.syncModal = SyncModalState{
 		Open: true,
 		Mode: syncModeMenu,
@@ -69,6 +73,9 @@ func (s State) OpenSyncModal() State {
 
 func (s State) handleSyncModalKey(msg tea.KeyMsg) (State, tea.Cmd) {
 	if s.syncModal.Busy {
+		if key.Matches(msg, common.Keys.Escape) {
+			s.syncModal.Open = false
+		}
 		return s, nil
 	}
 	m := &s.syncModal
@@ -268,12 +275,12 @@ func (s State) handleSyncModalScroll(up bool) State {
 }
 
 func (s State) handleSyncModalClick(pageX, pageY, pageWidth, pageHeight int) (State, tea.Cmd) {
-	if s.syncModal.Busy {
-		return s, nil
-	}
 	modal := buildSyncModal(s.ToPageState(s.Config, nil), pageWidth, pageHeight)
 	left, top, right, bottom := modal.Bounds()
 	if pageY < top || pageY >= bottom || pageX < left || pageX >= right {
+		if s.syncModal.Busy {
+			return s, nil
+		}
 		s.syncModal = SyncModalState{}
 		return s, nil
 	}
@@ -287,6 +294,9 @@ func (s State) handleSyncModalClick(pageX, pageY, pageWidth, pageHeight int) (St
 			return s.handleSyncModalKey(key)
 		}
 	}
+	if s.syncModal.Busy {
+		return s, nil
+	}
 	row := y - modal.bodyTop
 	m := &s.syncModal
 	switch m.Mode {
@@ -297,7 +307,7 @@ func (s State) handleSyncModalClick(pageX, pageY, pageWidth, pageHeight int) (St
 		}
 	case syncModeExportPath, syncModeImportPath:
 		if row == 1 {
-			m.InputCursor = modalInputCursor(m.InputValue, x-1, m.InputCursor)
+			m.InputCursor = modalInputCursor(m.InputValue, x-1, m.InputCursor, modal.innerWidth)
 		}
 	case syncModePGConfig:
 		if row >= 0 && row < 4 {
@@ -312,20 +322,25 @@ func (s State) handleSyncModalClick(pageX, pageY, pageWidth, pageHeight int) (St
 			}
 			m.PGField, m.FormCursor = field, len([]rune(value))
 			if row%2 == 1 {
-				m.FormCursor = modalInputCursor(value, x-1, cursor)
+				m.FormCursor = modalInputCursor(value, x-1, cursor, modal.innerWidth)
 			}
 		}
 	}
 	return s, nil
 }
 
-func modalInputCursor(value string, column, current int) int {
+func modalInputCursor(value string, column, current, width int) int {
 	runes := []rune(value)
-	for i, r := range runes {
+	start := 0
+	if current >= 0 {
+		current = min(current, len(runes))
+		start = modalInputStart(runes, current, modalInputWidth(width))
+	}
+	for i := start; i < len(runes); i++ {
 		if i == current {
 			column--
 		}
-		column -= common.DisplayWidth(string(r))
+		column -= common.DisplayWidth(string(runes[i]))
 		if column < 0 {
 			return i
 		}
@@ -340,10 +355,10 @@ func (s State) CompleteSync(msg messages.SyncDoneMsg) State {
 			s.Config = loaded
 		}
 	}
+	s.syncModal.Busy = false
 	if !s.syncModal.Open {
 		return s
 	}
-	s.syncModal.Busy = false
 	s.syncModal.Mode = syncModeMenu
 	if msg.Err != nil {
 		s.syncModal.StatusText = msg.Err.Error()

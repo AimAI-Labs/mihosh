@@ -85,14 +85,14 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 				return s, nil
 			}
 			// 点击在 picker 内：尝试映射到列表项
-			idx := ResolveProxyPickerListItemAt(pageState, pageX, pageY, pageWidth, pageHeight)
+			idx, scroll := resolveProxyPickerListItemAt(pageState, pageX, pageY, pageWidth, pageHeight)
 			if idx < 0 {
 				return s, nil
 			}
 			form := s.addForm
 			now := time.Now()
 			isDouble := s.proxyPickerDC.IsDoubleClick(struct{}{}, idx, now)
-			form.pickerCursor = idx
+			form.pickerCursor, form.pickerScrollTop = idx, scroll
 			if isDouble {
 				filtered := form.pickerFiltered()
 				if idx < len(filtered) {
@@ -169,14 +169,14 @@ func (s State) HandleMouseLeft(pageX, pageY, pageWidth, pageHeight int) (State, 
 				form.pickerClose()
 				return s.applyEditFormUpdate(form)
 			}
-			idx := ResolveProxyPickerListItemAt(pageState, pageX, pageY, pageWidth, pageHeight)
+			idx, scroll := resolveProxyPickerListItemAt(pageState, pageX, pageY, pageWidth, pageHeight)
 			if idx < 0 {
 				return s, nil
 			}
 			form := s.addForm
 			now := time.Now()
 			isDouble := s.proxyPickerDC.IsDoubleClick(struct{}{}, idx, now)
-			form.pickerCursor = idx
+			form.pickerCursor, form.pickerScrollTop = idx, scroll
 			if isDouble {
 				filtered := form.pickerFiltered()
 				if idx < len(filtered) {
