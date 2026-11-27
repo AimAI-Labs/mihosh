@@ -235,7 +235,12 @@ func isIPv6Unsupported(err error) bool {
 	if err == nil {
 		return false
 	}
-	msg := strings.ToLower(err.Error())
+	msg := err.Error()
+	var exitError *exec.ExitError
+	if errors.As(err, &exitError) {
+		msg += "\n" + string(exitError.Stderr)
+	}
+	msg = strings.ToLower(msg)
 	return strings.Contains(msg, "address family not supported") || strings.Contains(msg, "eafnosupport")
 }
 func configureGuard(cmd *exec.Cmd) {

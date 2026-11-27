@@ -3,7 +3,6 @@ package host
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -85,11 +84,11 @@ func TestCheckTUNReportsSetcapCommandWhenUnprivileged(t *testing.T) {
 func TestCleanupTUN_SkipsDisabledIPv6(t *testing.T) {
 	identity := TUNIdentity(t.TempDir())
 	var ipv4Deleted int
-	n := &DesktopNetwork{Run: func(_ context.Context, name string, args ...string) ([]byte, error) {
+	n := &DesktopNetwork{Run: func(ctx context.Context, name string, args ...string) ([]byte, error) {
 		require.Equal(t, "ip", name)
 		joined := strings.Join(args, " ")
 		if strings.HasPrefix(joined, "-6 ") {
-			return nil, errors.New("RTNETLINK answers: Address family not supported by protocol")
+			return Run(ctx, "sh", "-c", "echo 'RTNETLINK answers: Address family not supported by protocol' >&2; exit 2")
 		}
 		if strings.Contains(joined, "rule show") {
 			return json.Marshal([]map[string]any{{"priority": identity.Rule}})
